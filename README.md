@@ -57,6 +57,13 @@ Console. Nó trả về một bảng 9 dòng, cột `ket_qua` phải **ĐÚNG** 
 23, danh sách gốc 134 người, 10 nhóm, 90 số điện thoại, Nhóm 6 có 14 thành
 viên và 8 phần bài, trưởng nhóm là Ngô Phú Cường.
 
+**Nếu console chết giữa chừng** — thường là dừng ngay ở danh sách 134 học viên,
+vì câu lệnh đó dài 35 KB gói trong đúng một lệnh — thì dán
+[`scripts/setup-d1-part2.sql`](scripts/setup-d1-part2.sql) để chạy nốt. Tệp đó
+bẻ 134 dòng thành 7 mẻ nhỏ, và **chạy lại được nhiều lần**: nó tự xoá phần dở
+dang trước khi nạp, nên lỡ chết lần nữa thì cứ dán lại từ đầu. Sinh lại bằng
+`node scripts/build-part2-sql.mjs` khi migration 0002/0003 thay đổi.
+
 Ở trang cơ sở dữ liệu, chép lại **Database ID** (dạng UUID) để dùng ở bước sau.
 
 ### 2. Sửa đúng một dòng trong code
