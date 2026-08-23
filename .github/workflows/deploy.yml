@@ -137,6 +137,28 @@ jobs:
             exit 0
           fi
 
+          # Chứng minh kiến trúc "Pages phục vụ giao diện + Worker Route cướp
+          # /api/*" thật sự hoạt động trên cùng một hostname. Ba phép thử:
+          echo "--- giao diện (/) phải là HTML của Pages ---"
+          curl -s https://k3vaceo.cuongngo.app/ -o /tmp/trang.html
+          if grep -q '<title>k3vaceo</title>' /tmp/trang.html; then
+            echo "✓ / trả về giao diện từ Pages"
+          else
+            echo "::error::/ không trả về giao diện mong đợi."; head -c 500 /tmp/trang.html; exit 1
+          fi
+
+          echo "--- đường dẫn SPA (/nhom) cũng phải ra giao diện, không phải 404 ---"
+          spa=$(curl -s -o /dev/null -w '%{http_code}' https://k3vaceo.cuongngo.app/nhom)
+          echo "  HTTP $spa $([ "$spa" = "200" ] && echo '✓' || echo '✗ (luật _redirects chưa ăn)')"
+
+          echo "--- /api/khong-co-that phải là JSON 404 của Worker, KHÔNG phải index.html ---"
+          ma=$(curl -s -o /tmp/404.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/khong-co-that)
+          echo "  HTTP $ma — $(head -c 200 /tmp/404.json)"
+          if [ "$ma" != "404" ] || ! head -c 1 /tmp/404.json | grep -q '{'; then
+            echo "::error::Worker Route không phủ hết /api/* — đường dẫn lạ rơi xuống Pages."; exit 1
+          fi
+          echo "✓ Worker Route phủ toàn bộ /api/*"
+
           node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
             const mong = { ok: true, roster_total: 134, groups_total: 10,
@@ -151,10 +173,11 @@ jobs:
             console.log("\n✓ /api/health đúng hết. Ứng dụng đã chạy thật trên tên miền.");
           '
 
-      # Đến đây mới đánh hỏng job nếu route chưa tạo được — để phần kiểm tra
-      # phía trên kịp chạy và báo cáo.
-      - name: Kết luận
+      # Route đang chạy được (đã tạo sẵn trên dashboard), nhưng wrangler không
+      # đọc/ghi lại được nó vì thiếu quyền zone. Mã Worker vẫn deploy bình
+      # thường; chỉ là mỗi lượt deploy đều đỏ ở bước này. Cảnh báo chứ không
+      # đánh hỏng job, vì phần kiểm tra phía trên mới là thước đo thật.
+      - name: Nhắc về quyền quản route
         if: steps.check.outputs.skip != 'true' && steps.worker.outputs.route_loi == 'true'
         run: |
-          echo "::error::Worker Route k3vaceo.cuongngo.app/api/* chưa tạo được. Thêm quyền Zone → Workers Routes → Edit (phạm vi cuongngo.app) vào API token rồi bấm Re-run all jobs."
-          exit 1
+          echo "::warning::wrangler không quản được Worker Route vì API token thiếu 'Zone → Workers Routes → Edit' (phạm vi cuongngo.app). Route hiện có vẫn chạy, mã Worker vẫn deploy được — nhưng sửa pattern route trong wrangler.toml sẽ không có tác dụng cho tới khi thêm quyền này."
