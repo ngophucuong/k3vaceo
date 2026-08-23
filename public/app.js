@@ -132,7 +132,11 @@ async function renderClaim(token) {
     $('#claimcard').innerHTML = `<div class="lb">Link mời</div><h1>Không mở được link này</h1>
       <div class="err">${e.status === 429 ? 'Thử hơi nhiều lần, chờ một lát rồi mở lại.'
         : 'Link đã hết hạn hoặc không đúng. Nhắn cho trưởng nhóm để xin gửi lại.'}</div>
-      <div style="margin-top:16px"><button class="wide" onclick="location.href='/'">Về trang chính</button></div>`;
+      <div style="margin-top:16px"><button class="wide" id="claimHome">Về trang chính</button></div>`;
+    // Gắn bằng thuộc tính DOM chứ không viết onclick="" vào HTML: CSP đặt
+    // script-src 'self' để chặn mọi handler nội tuyến — đó là lớp phòng thủ
+    // thứ hai cho đúng loại lỗi XSS đã từng có ở Kho.
+    $('#claimHome').onclick = () => { location.href = '/'; };
     return;
   }
   const { member, group } = data;

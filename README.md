@@ -38,28 +38,86 @@ migrations/             Schema + dữ liệu D1, áp theo đúng thứ tự file
 scripts/                Công cụ nhập liệu + sinh lời mời đầu tiên
 ```
 
-## Triển khai lần đầu
+## Deploy tự động từ GitHub
 
-Cần: tài khoản Cloudflare, domain `maychudev.com` đã thêm vào tài khoản đó
-(để sau này trỏ subdomain `k3vaceo.maychudev.com`), Node.js 18+.
+Đẩy code lên nhánh chính là GitHub Actions tự deploy: áp migration D1, deploy
+Worker, đồng bộ bí mật SMTP, rồi deploy Pages. Xem `.github/workflows/deploy.yml`.
+
+### Bạn cần chuẩn bị ở Cloudflare — đúng ba thứ
+
+**1. Thêm domain `cuongngo.app` vào tài khoản Cloudflare** (Dashboard → Add a
+site), trỏ nameserver theo hướng dẫn của Cloudflare. Bắt buộc, vì Worker Route
+cần zone này tồn tại. Chưa có thì bước deploy Worker báo lỗi "không tìm thấy
+zone".
+
+**2. Tạo cơ sở dữ liệu D1** — chạy một lần trên máy bạn:
 
 ```bash
-npm install                 # cài wrangler + xlsx (chỉ dùng để phát triển, không đóng gói vào sản phẩm)
-npx wrangler login          # đăng nhập tài khoản Cloudflare thật của bạn
+npm install && npx wrangler login
+npx wrangler d1 create k3vaceo      # in ra database_id, chép lại
 ```
 
-### 1. Tạo D1 và áp schema + dữ liệu
+**3. Tạo API token** — Dashboard → My Profile → API Tokens → Create Token →
+Custom token, với các quyền:
+
+| Loại | Mục | Quyền |
+|---|---|---|
+| Account | Workers Scripts | Edit |
+| Account | Workers KV Storage | Edit |
+| Account | D1 | Edit |
+| Account | Cloudflare Pages | Edit |
+| Zone | Workers Routes | Edit (chọn zone `cuongngo.app`) |
+
+Account ID lấy ở trang tổng quan của tài khoản (cột phải).
+
+### Rồi đặt bí mật ở GitHub
+
+Repo → Settings → Secrets and variables → Actions → New repository secret:
+
+| Tên bí mật | Giá trị | Bắt buộc |
+|---|---|---|
+| `CLOUDFLARE_API_TOKEN` | token vừa tạo ở bước 3 | ✔ |
+| `CLOUDFLARE_ACCOUNT_ID` | Account ID | ✔ |
+| `CLOUDFLARE_D1_DATABASE_ID` | database_id từ bước 2 | ✔ |
+| `SMTP_HOST` | vd `smtp.gmail.com` | tuỳ chọn |
+| `SMTP_PORT` | `587` (STARTTLS) hoặc `465` (TLS) | tuỳ chọn |
+| `SMTP_SECURE` | `starttls` hoặc `tls` | tuỳ chọn |
+| `SMTP_USER` | địa chỉ đăng nhập | tuỳ chọn |
+| `SMTP_PASS` | **mật khẩu ứng dụng**, không phải mật khẩu thường | tuỳ chọn |
+| `MAIL_FROM` | `Nhóm 6 K03 <ten@gmail.com>` | tuỳ chọn |
+
+Nhóm SMTP bỏ trống cũng deploy được — chỉ riêng đăng nhập lại bằng email báo
+chưa cấu hình, còn link mời vẫn chạy bình thường.
+
+### Sau khi Actions chạy xong
+
+Vào Cloudflare Dashboard → Workers & Pages → project `k3vaceo` → Custom
+domains, gắn `k3vaceo.cuongngo.app`. Worker Route thì `wrangler.toml` đã khai
+sẵn nên deploy tự tạo.
+
+Kiểm tra: `https://k3vaceo.cuongngo.app/api/health` phải trả về
+`{"ok":true,"roster_total":134,"groups_total":10,"group6_members":14,...}`.
+
+`k3vaceo.cuongngo.app` **cố định vĩnh viễn** kể từ khi có người đăng ký passkey
+— đổi tên miền sau đó là mọi passkey chết sạch (mục 4.3 SRS). Đuôi `.app` nằm
+trong danh sách HSTS nạp sẵn của trình duyệt nên luôn bắt buộc HTTPS, hợp với
+yêu cầu của passkey.
+
+## Triển khai bằng tay (nếu không dùng GitHub Actions)
 
 ```bash
+npm install
+npx wrangler login
+
 npx wrangler d1 create k3vaceo
-# Lệnh trên in ra database_id — dán vào worker/wrangler.toml, thay REPLACE_WITH_REAL_DATABASE_ID
+# Dán database_id vào worker/wrangler.toml, thay REPLACE_WITH_REAL_DATABASE_ID
 
 cd worker
 npx wrangler d1 migrations apply k3vaceo --remote
 cd ..
 ```
 
-Bốn migration áp theo thứ tự:
+Sáu migration áp theo thứ tự:
 
 - `0001_init.sql` — toàn bộ bảng theo mục 3 SRS.
 - `0002_seed_roster.sql` — 134 người/10 nhóm từ danh sách gốc (sinh tự động, xem bên dưới).
@@ -68,35 +126,17 @@ Bốn migration áp theo thứ tự:
 - `0005_webauthn_challenges.sql` — chỗ giữ challenge của passkey giữa hai chặng, cùng vài index.
 - `0006_wizard_and_presentation.sql` — bảng xin vào nhóm, hai cột phân công thuyết trình.
 
-### 2. Deploy Worker
-
 ```bash
 cd worker
-npx wrangler deploy
+npx wrangler deploy                                        # Worker (API)
 cd ..
+npx wrangler pages deploy public --project-name=k3vaceo    # giao diện
 ```
 
-Kiểm tra: mở `https://<tên-worker>.<subdomain>.workers.dev/api/health` — phải
-trả về `{"ok":true,"roster_total":134,"groups_total":10,"group6_members":14,"group6_truong_nhom":"Ngô Phú Cường"}`.
+Rồi gắn custom domain `k3vaceo.cuongngo.app` vào project Pages trong Dashboard.
+Worker Route đã khai sẵn trong `wrangler.toml` nên deploy tự tạo.
 
-### 3. Deploy Pages
-
-```bash
-npx wrangler pages deploy public --project-name=k3vaceo
-```
-
-### 4. Trỏ domain thật
-
-Trong Cloudflare Dashboard (zone `maychudev.com`):
-
-1. Gắn custom domain `k3vaceo.maychudev.com` vào project Pages `k3vaceo`.
-2. Thêm Worker Route: pattern `k3vaceo.maychudev.com/api/*` → worker `k3vaceo-api`
-   (mở comment tương ứng trong `worker/wrangler.toml` rồi `wrangler deploy` lại).
-
-Domain này **cố định vĩnh viễn** kể từ khi passkey (Đợt 3) đi vào hoạt động —
-đổi domain sau đó làm chết toàn bộ passkey đã đăng ký (mục 4.3 SRS).
-
-### 5. Đăng nhập lần đầu
+### Đăng nhập lần đầu
 
 Chưa ai có link mời cả (kể cả trưởng nhóm) — cần tự tay tạo một link để vào lần đầu:
 
@@ -110,7 +150,7 @@ nay** có nút **"Phát link mời cho người chưa vào"** — bấm là ra s
 bản 13 dòng để dán thẳng vào Zalo nhóm. Ai lỡ mất link thì vào tab **Nhóm**,
 mở người đó ra, bấm **"Phát lại link mời cho người này"**.
 
-### 6. Cấu hình gửi thư (cho đăng nhập lại bằng email — Đợt 2)
+### Cấu hình gửi thư bằng tay (nếu không đặt bí mật ở GitHub)
 
 ```bash
 cd worker

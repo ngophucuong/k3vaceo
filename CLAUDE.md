@@ -9,7 +9,7 @@ Công cụ làm việc nhóm cho **Nhóm 6, lớp CEO K03** (VCCI × Đại họ
 buổi bảo vệ kế hoạch kinh doanh theo nhóm. Người chịu trách nhiệm sản phẩm:
 **Ngô Phú Cường**, trưởng nhóm 6 (cũng là người dùng đang trò chuyện).
 
-Tên miền cố định: `k3vaceo.maychudev.com` — **không đổi được** vì passkey neo
+Tên miền cố định: `k3vaceo.cuongngo.app` — **không đổi được** vì passkey neo
 vào tên miền (mục 4.3 SRS).
 
 Hai tài liệu gốc do người dùng cung cấp, không nằm trong repo:
@@ -116,8 +116,11 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
 
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 
-- **Chưa deploy lần nào.** Người dùng tự chạy `wrangler` trên tài khoản
-  Cloudflare của họ — xem README. Chưa có `database_id` thật.
+- **Chưa deploy lần nào.** Đã có GitHub Actions
+  (`.github/workflows/deploy.yml`) tự deploy khi đẩy lên nhánh chính, nhưng
+  người dùng còn phải đặt ba bí mật ở GitHub (`CLOUDFLARE_API_TOKEN`,
+  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`) và thêm zone
+  `cuongngo.app` vào Cloudflare. Xem README mục "Deploy tự động từ GitHub".
 - **SMTP cá nhân**: người dùng chọn dùng SMTP riêng nhưng chưa cho biết nhà
   cung cấp/host/tài khoản. Client SMTP đã kiểm thử trọn giao thức bằng server
   giả, chưa bắt tay TLS với máy chủ thật.

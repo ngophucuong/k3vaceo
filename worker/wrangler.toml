@@ -9,7 +9,7 @@ compatibility_flags = ["nodejs_compat"]
 # mọi passkey đã đăng ký chết sạch, không cứu được. Khi chạy cục bộ thì đặt
 # RP_ID=localhost trong .dev.vars.
 [vars]
-RP_ID = "k3vaceo.maychudev.com"
+RP_ID = "k3vaceo.cuongngo.app"
 
 # Điền database_id thật sau khi chạy: npx wrangler d1 create k3vaceo
 # (xem README.md ở gốc repo cho từng bước)
@@ -19,10 +19,12 @@ database_name = "k3vaceo"
 database_id = "REPLACE_WITH_REAL_DATABASE_ID"
 migrations_dir = "../migrations"
 
-# Bật khi domain k3vaceo.maychudev.com đã trỏ vào Cloudflare (Đợt 1):
-# [[routes]]
-# pattern = "k3vaceo.maychudev.com/api/*"
-# zone_name = "maychudev.com"
+# Worker nhận /api/* trên tên miền thật. Zone cuongngo.app phải có sẵn trong
+# tài khoản Cloudflare trước khi deploy, nếu không wrangler báo không tìm thấy
+# zone — lỗi rõ ràng, cứ thêm domain vào Cloudflare rồi chạy lại.
+[[routes]]
+pattern = "k3vaceo.cuongngo.app/api/*"
+zone_name = "cuongngo.app"
 
 # Kiểm thử cục bộ cả API lẫn giao diện trên một cổng: thêm tạm khối dưới đây
 # rồi `wrangler dev` — xem "Kiểm thử cục bộ" trong README.md. KHÔNG commit khối

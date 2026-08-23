@@ -23,4 +23,4 @@ const escapedName = fullName.replace(/'/g, "''");
 console.log('1) Chạy lệnh này để ghi lời mời vào D1 thật (đổi --remote thành --local nếu đang thử ở máy):\n');
 console.log(`npx wrangler d1 execute k3vaceo --remote --command "INSERT INTO invites (member_id, token_hash, expires_at, created_at) SELECT id, '${tokenHash}', datetime('now','+14 days'), datetime('now') FROM members WHERE full_name = '${escapedName}';"`);
 console.log('\n2) Sau đó mở đường link này (còn hạn 14 ngày, dùng được nhiều lần):\n');
-console.log(`   https://k3vaceo.maychudev.com/i/${token}`);
+console.log(`   https://k3vaceo.cuongngo.app/i/${token}`);
