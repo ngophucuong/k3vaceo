@@ -11,7 +11,8 @@
 -- tạo ra (danh sách gốc + trạng thái khởi tạo Nhóm 6), nên lỡ chết giữa chừng
 -- thì cứ dán lại từ đầu.
 --
--- Xong thì dán tiếp scripts/verify-d1.sql để kiểm tra: 9 dòng phải ĐÚNG hết.
+-- Xong thì dán tiếp scripts/verify-d1.sql để kiểm tra: một dòng, cột cuối
+-- ket_qua phải là "ĐÚNG HẾT".
 -- ═══════════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────────────────────

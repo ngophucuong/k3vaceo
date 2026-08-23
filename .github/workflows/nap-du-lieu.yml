@@ -1,0 +1,91 @@
+name: Nạp dữ liệu vào D1
+
+# Bấm tay ở tab Actions. Dùng khi console D1 trên dashboard nghẹn với tệp SQL
+# lớn — máy chạy hộ, wrangler tự cắt tệp thành lô vừa cỡ rồi gửi lên D1.
+on:
+  workflow_dispatch:
+    inputs:
+      chi_kiem_tra:
+        description: 'Chỉ kiểm tra, không nạp (để soi trạng thái hiện tại)'
+        type: boolean
+        default: false
+
+concurrency:
+  group: nap-du-lieu
+  cancel-in-progress: false
+
+jobs:
+  nap:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Thiếu bí mật thì dừng ngay với lời nhắn rõ ràng, đừng để wrangler báo
+      # lỗi xác thực khó hiểu ở tận bước sau.
+      - name: Kiểm tra bí mật
+        run: |
+          thieu=
+          [ -z "$CLOUDFLARE_API_TOKEN" ]  && thieu="$thieu CLOUDFLARE_API_TOKEN"
+          [ -z "$CLOUDFLARE_ACCOUNT_ID" ] && thieu="$thieu CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$thieu" ]; then
+            echo "::error::Chưa đặt bí mật:$thieu — thêm ở Settings → Secrets and variables → Actions. Xem README mục 'Nhờ GitHub nạp hộ'."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # database_id đã nằm sẵn trong worker/wrangler.toml nên không cần điền.
+      - name: Xác nhận trỏ đúng cơ sở dữ liệu
+        run: grep -n 'database_id' worker/wrangler.toml
+
+      - name: Nạp danh sách 134 học viên + kích hoạt Nhóm 6
+        if: ${{ !inputs.chi_kiem_tra }}
+        run: $WRANGLER --file=scripts/setup-d1-part2.sql
+
+      # Chín dòng kiểm tra phải ĐÚNG hết, không thì đánh hỏng job để thấy ngay
+      # ở tab Actions chứ không phải tự đi soi.
+      # Truy vấn kiểm tra trả về ĐÚNG MỘT dòng; cột ket_qua phải là "ĐÚNG HẾT".
+      # Không thì đánh hỏng job để thấy ngay ở tab Actions, khỏi phải tự đi soi.
+      - name: Kiểm tra kết quả
+        run: |
+          $WRANGLER --file=scripts/verify-d1.sql --json > /tmp/kq.json || {
+            echo "::error::Không chạy được truy vấn kiểm tra."; cat /tmp/kq.json; exit 1; }
+          # --input-type=commonjs vì package.json của repo khai "type": "module",
+          # mà node -e lấy chế độ theo package.json gần nhất — thiếu cờ này thì
+          # require() không tồn tại và bước kiểm tra chết vô cớ.
+          node --input-type=commonjs -e '
+            // wrangler có thể in thêm dòng thông báo ra stdout trước JSON, nên
+            // cắt lấy đúng đoạn JSON chứ không parse thẳng cả tệp.
+            const raw = require("fs").readFileSync("/tmp/kq.json", "utf8");
+            const dau = raw.search(/[\[{]/);
+            const cuoi = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
+            if (dau < 0 || cuoi < dau) {
+              console.error("::error::Không tìm thấy JSON trong kết quả:");
+              console.error(raw.slice(0, 2000)); process.exit(1);
+            }
+            const kq = JSON.parse(raw.slice(dau, cuoi + 1));
+            const dong = (Array.isArray(kq) ? kq : [kq]).flatMap(x => x && x.results || []);
+            if (dong.length !== 1) {
+              console.error(`::error::Mong đợi 1 dòng kết quả, nhận được ${dong.length}.`);
+              process.exit(1);
+            }
+            const d = dong[0];
+            for (const [cot, gia_tri] of Object.entries(d)) {
+              if (cot === "ket_qua") continue;
+              console.log(`  ${cot}: ${gia_tri}`);
+            }
+            if (d.ket_qua !== "ĐÚNG HẾT") {
+              console.error(`::error::Kiểm tra ra "${d.ket_qua}" — dữ liệu nạp chưa xong.`);
+              process.exit(1);
+            }
+            console.log("\n✓ ĐÚNG HẾT. Cơ sở dữ liệu đã sẵn sàng.");
+          '

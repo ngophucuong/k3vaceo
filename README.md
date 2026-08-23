@@ -53,16 +53,46 @@ sáu migration thành một lần chạy, sinh tự động từ chính các mig
 không lệch. Chạy đúng một lần trên cơ sở dữ liệu trống.
 
 Kiểm tra lại: dán tiếp [`scripts/verify-d1.sql`](scripts/verify-d1.sql) vào
-Console. Nó trả về một bảng 9 dòng, cột `ket_qua` phải **ĐÚNG** hết — số bảng
-23, danh sách gốc 134 người, 10 nhóm, 90 số điện thoại, Nhóm 6 có 14 thành
-viên và 8 phần bài, trưởng nhóm là Ngô Phú Cường.
+Console. Nó trả về **một dòng**, mỗi cột đọc theo dạng "thực tế/mong đợi" — số
+bảng 23/23, danh sách gốc 134/134 người, 10/10 nhóm, 90/90 số điện thoại, Nhóm 6
+có 14/14 thành viên và 8/8 phần bài, trưởng nhóm là Ngô Phú Cường. Cột cuối
+`ket_qua` phải là **ĐÚNG HẾT**.
 
-**Nếu console chết giữa chừng** — thường là dừng ngay ở danh sách 134 học viên,
-vì câu lệnh đó dài 35 KB gói trong đúng một lệnh — thì dán
-[`scripts/setup-d1-part2.sql`](scripts/setup-d1-part2.sql) để chạy nốt. Tệp đó
-bẻ 134 dòng thành 7 mẻ nhỏ, và **chạy lại được nhiều lần**: nó tự xoá phần dở
-dang trước khi nạp, nên lỡ chết lần nữa thì cứ dán lại từ đầu. Sinh lại bằng
-`node scripts/build-part2-sql.mjs` khi migration 0002/0003 thay đổi.
+#### Nếu console chết giữa chừng
+
+Console D1 hay dừng ngay ở danh sách 134 học viên, vì câu lệnh đó dài 35 KB gói
+trong đúng một lệnh. Có ba đường đi tiếp, xếp theo mức đỡ tốn công:
+
+**a) Nhờ GitHub nạp hộ** — không phải dán SQL lần nào nữa, và dùng lại được cho
+mọi migration sau này. Cần hai bí mật trong repo, đặt ở **Settings → Secrets and
+variables → Actions → New repository secret**:
+
+| Tên bí mật | Lấy ở đâu |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → Create Token → Custom token, quyền tối thiểu **Account → D1 → Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare → Workers & Pages, cột phải, mục Account ID |
+
+Xong vào tab **Actions → Nạp dữ liệu vào D1 → Run workflow**. Máy chạy
+`wrangler d1 execute --remote --file=…`, tự cắt tệp thành lô vừa cỡ, rồi chạy
+luôn phần kiểm tra và đánh hỏng job nếu có chỗ sai. Đánh dấu ô *Chỉ kiểm tra*
+để soi trạng thái hiện tại mà không nạp gì.
+
+**b) Dán một tệp vừa** — [`scripts/setup-d1-part2.sql`](scripts/setup-d1-part2.sql),
+42 KB, bẻ 134 dòng thành 7 mẻ. **Chạy lại được nhiều lần**: nó tự xoá phần dở
+dang trước khi nạp, nên lỡ chết lần nữa thì cứ dán lại từ đầu.
+
+**c) Dán 16 tệp nhỏ** — thư mục [`scripts/d1-parts/`](scripts/d1-parts), tệp lớn
+nhất 3 KB. Dán lần lượt theo số thứ tự `01` → `16`, mỗi tệp một lần Execute.
+Chậm nhưng chắc: mỗi tệp tự chủ và chạy lại được, dán nhầm hai lần cũng không
+nhân đôi dữ liệu.
+
+Sinh lại các tệp trên khi migration 0002/0003 thay đổi:
+`node scripts/build-part2-sql.mjs && node scripts/build-d1-parts.mjs`.
+
+> `verify-d1.sql` cố ý không dùng `UNION ALL`. D1 từ chối câu lệnh có từ **6
+> nhánh hợp trở lên** khi chạy qua tệp — báo `SQLITE_ERROR: too many terms in
+> compound SELECT`. Bản đầu tiên dùng 9 nhánh nên chết; bản hiện tại gộp thành
+> một dòng bằng truy vấn con.
 
 Ở trang cơ sở dữ liệu, chép lại **Database ID** (dạng UUID) để dùng ở bước sau.
 
