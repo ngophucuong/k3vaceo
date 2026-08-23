@@ -1,0 +1,15 @@
+name = "k3vaceo-api"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Điền database_id thật sau khi chạy: npx wrangler d1 create k3vaceo
+# (xem README.md ở gốc repo cho từng bước)
+[[d1_databases]]
+binding = "DB"
+database_name = "k3vaceo"
+database_id = "REPLACE_WITH_REAL_DATABASE_ID"
+
+# Bật khi domain k3vaceo.maychudev.com đã trỏ vào Cloudflare (Đợt 1):
+# [[routes]]
+# pattern = "k3vaceo.maychudev.com/api/*"
+# zone_name = "maychudev.com"

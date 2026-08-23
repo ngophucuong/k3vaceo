@@ -1,0 +1,102 @@
+[
+  {
+    "groupNo": 1,
+    "fullName": "Nguyễn Văn Khải",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 1,
+    "fullName": "Nguyễn Thị Phượng",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 2,
+    "fullName": "Man Thị Kim Liên",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 2,
+    "fullName": "Hồ Việt Anh",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 3,
+    "fullName": "Phạm Hồng Đức",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 3,
+    "fullName": "Chử Minh Châu",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 4,
+    "fullName": "Đặng Văn Khải",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 4,
+    "fullName": "Trịnh Thái Thường",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 5,
+    "fullName": "Đào Văn Duy",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 5,
+    "fullName": "Bùi Đức Mạnh",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 6,
+    "fullName": "Nguyễn Thị Thu Hương",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 6,
+    "fullName": "Phan Thị Thanh Nga",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 7,
+    "fullName": "Lê Thanh Phú",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 7,
+    "fullName": "Nghiêm Thị Chung",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 8,
+    "fullName": "Nguyễn Bảo Kiên",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 8,
+    "fullName": "Hoàng Thị Thu Hiền",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 9,
+    "fullName": "Lê Thị Huế",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 9,
+    "fullName": "Hoàng Thị Lương",
+    "role": "pho_nhom"
+  },
+  {
+    "groupNo": 10,
+    "fullName": "Trần Thị Thủy",
+    "role": "truong_nhom"
+  },
+  {
+    "groupNo": 10,
+    "fullName": "Đỗ Thị Thu",
+    "role": "pho_nhom"
+  }
+]

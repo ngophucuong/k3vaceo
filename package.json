@@ -1,0 +1,13 @@
+{
+  "name": "k3vaceo",
+  "private": true,
+  "type": "module",
+  "description": "Công cụ làm việc nhóm cho lớp K03 (VCCI x Đại học Andrews) — Cloudflare Pages + Workers + D1.",
+  "scripts": {
+    "import:roster": "node scripts/import-roster.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0",
+    "xlsx": "^0.18.5"
+  }
+}
