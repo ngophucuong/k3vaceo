@@ -5,14 +5,23 @@
 -- Nếu báo "no such table: d1_migrations" thì nghĩa là chưa chạy tệp cuối
 -- (scripts/d1-parts/16-ghi-nho-va-kiem-tra.sql) — chạy nó rồi kiểm tra lại.
 --
+-- Cột `bang_23` đếm theo DANH SÁCH TÊN chứ không đếm tất cả bảng trong lược đồ.
+-- Lý do: D1 thật có thêm bảng nội bộ của Cloudflare (bản chạy cục bộ thì không),
+-- nên đếm tất cả ra 24 và báo sai oan. Đếm theo tên thì thêm bảng nội bộ nào
+-- nữa cũng không ảnh hưởng.
+--
 -- CỐ Ý KHÔNG DÙNG UNION ALL. D1 từ chối câu lệnh có từ 6 nhánh hợp trở lên khi
 -- chạy qua tệp: SQLITE_ERROR "too many terms in compound SELECT". Bản cũ dùng
 -- 9 nhánh nên chết. Gộp thành một dòng bằng truy vấn con thì không vướng.
 
 WITH d AS (
   SELECT
-    (SELECT COUNT(*) FROM sqlite_master
-      WHERE type = 'table' AND name NOT LIKE 'sqlite_%')                    AS bang,
+    (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (
+       'activity','audit_log','cohorts','credentials','d1_migrations',
+       'fund_declarations','fund_rounds','groups','insights','invites',
+       'join_requests','links','member_profile','members','officers',
+       'plan_sections','plan_template_sections','plan_templates','plans',
+       'rate_events','roster','sessions','webauthn_challenges'))            AS bang,
     (SELECT COUNT(*) FROM roster)                                           AS hoc_vien,
     (SELECT COUNT(*) FROM groups)                                           AS nhom,
     (SELECT COUNT(*) FROM roster WHERE phone IS NOT NULL)                   AS dien_thoai,
