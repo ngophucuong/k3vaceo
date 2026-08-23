@@ -9,6 +9,12 @@ on:
         description: 'Chỉ kiểm tra, không nạp (để soi trạng thái hiện tại)'
         type: boolean
         default: false
+  # Ngòi nổ theo tệp: sửa .github/nap-du-lieu.trigger là chạy. Chỉ đúng tệp đó
+  # mới kích hoạt, nên đẩy code bình thường không bao giờ vô tình nạp lại dữ liệu.
+  # Có mặt vì gọi API "Run workflow" cần quyền actions:write mà không phải
+  # token nào cũng có; sửa một tệp thì chỉ cần quyền đẩy code.
+  push:
+    paths: ['.github/nap-du-lieu.trigger']
 
 concurrency:
   group: nap-du-lieu
