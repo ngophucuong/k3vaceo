@@ -52,7 +52,10 @@ Mở tab **Console** của cơ sở dữ liệu vừa tạo, dán toàn bộ n�
 sáu migration thành một lần chạy, sinh tự động từ chính các migration đó nên
 không lệch. Chạy đúng một lần trên cơ sở dữ liệu trống.
 
-Xong thì ở tab Console gõ thử `SELECT COUNT(*) FROM roster;` — phải ra **134**.
+Kiểm tra lại: dán tiếp [`scripts/verify-d1.sql`](scripts/verify-d1.sql) vào
+Console. Nó trả về một bảng 9 dòng, cột `ket_qua` phải **ĐÚNG** hết — số bảng
+23, danh sách gốc 134 người, 10 nhóm, 90 số điện thoại, Nhóm 6 có 14 thành
+viên và 8 phần bài, trưởng nhóm là Ngô Phú Cường.
 
 Ở trang cơ sở dữ liệu, chép lại **Database ID** (dạng UUID) để dùng ở bước sau.
 
