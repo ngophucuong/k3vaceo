@@ -197,6 +197,35 @@ không phải ĐÚNG HẾT.
 - **Số điện thoại Lê Trung Đức** trong roster là `098778525`, thiếu 1 số. Giữ
   nguyên trong `roster`, không đưa vào `members`. Cần hỏi lại.
 
+## Đăng nhập: không có vai "admin" riêng
+
+Sản phẩm không có tài khoản quản trị. Quyền đến từ bảng `officers`; Ngô Phú
+Cường là `truong_nhom` của Nhóm 6 — vai cao nhất hiện có trong dữ liệu (vai cấp
+lớp còn để ngỏ, xem mục việc treo).
+
+Ba lối vào, không có mật khẩu ở lối nào (mục 4 SRS):
+
+1. **Link mời** `/i/<token>` — 14 ngày, dùng nhiều lần. Người đã có phiên phát
+   cho người khác bằng nút trong ứng dụng (`POST /api/members/:id/invite`).
+2. **Magic link qua email** `/dangnhap` — 15 phút, dùng một lần. Cần đủ bốn bí
+   mật `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, **`MAIL_FROM`** trên Worker;
+   thiếu thì trả 503 `mailer_not_configured`.
+3. **Passkey** — sau khi vào được lần đầu thì đăng ký trong tab Tài khoản.
+
+**Vòng luẩn quẩn của lần đầu tiên** và cách phá: muốn phát link mời thì phải
+đăng nhập đã. Dùng `.github/workflows/phat-link-moi.yml` — ghi thẳng lời mời
+vào D1 rồi in link ra log Actions. Kích hoạt bằng tab Actions (cần
+`actions:write`) hoặc sửa `.github/phat-link-moi.trigger` rồi đẩy lên.
+
+Link nằm trong log nên hạn mặc định chỉ 120 phút, và **mỗi lần chạy tự huỷ mọi
+lời mời chưa dùng trước đó của đúng người ấy** — token in ở lần chạy cũ chết
+ngay. `scripts/bootstrap-invite.mjs` làm cùng việc đó nhưng cần terminal.
+
+Đã kiểm nguyên luồng trên Worker cục bộ: token → `GET /api/invite/<token>` ra
+đúng hồ sơ → `POST .../claim` ra cookie phiên HttpOnly SameSite=Lax 90 ngày →
+`/api/home` đúng người → `POST /api/members/:id/invite` phát được link cho
+người khác. Token bịa thì 410.
+
 ## Cách làm việc mà người dùng đang mong đợi
 
 Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn nàn:
