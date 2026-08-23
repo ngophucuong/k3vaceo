@@ -114,8 +114,50 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
 - `plan_sections.present_member_id` / `present_minutes` — phân công thuyết
   trình; tách bảng riêng chỉ để giữ hai cột là thừa.
 
+## Cạm bẫy của D1 thật — trả giá bằng bốn lần chạy hỏng
+
+Bốn điều dưới đây **không lộ ra khi chạy `wrangler d1 execute --local`**, chỉ
+lộ khi chạm D1 thật. Đừng vấp lại.
+
+1. **`--remote --file` KHÔNG trả về kết quả SELECT.** Nó đi qua đường "import"
+   của D1 và chỉ trả bản tóm tắt (`Total queries executed` / `Rows read` /
+   `Rows written`). Truy vấn có chạy thật, nhưng không lấy được dòng nào.
+   Muốn đọc kết quả thì phải dùng `--command`. Ngược lại, muốn nạp tệp lớn thì
+   phải dùng `--file` — đường import mới là chỗ tự cắt lô.
+
+2. **D1 thật có 24 bảng, không phải 23.** Bảng thứ 24 là của Cloudflare, bản
+   cục bộ không có. Nên `verify-d1.sql` đếm theo **danh sách tên bảng** của dự
+   án chứ không đếm tất cả bảng khác `sqlite_%`.
+
+3. **D1 từ chối câu lệnh có từ 6 nhánh `UNION ALL` trở lên khi chạy qua tệp** —
+   `SQLITE_ERROR: too many terms in compound SELECT`. Qua `--command` thì 16
+   nhánh vẫn chạy. Đo được, không phải suy đoán. Vì vậy `verify-d1.sql` gộp
+   thành một dòng bằng truy vấn con, tuyệt đối không dùng `UNION ALL`.
+
+4. **Console D1 trên dashboard nghẹn với câu lệnh dài.** Câu INSERT 134 học
+   viên dài 35 KB, dán vào là chạy dở dang **mà vẫn báo thành công** — đã một
+   lần làm roster có 154 dòng (134 đủ + 20 dòng trùng của mẻ đầu). Đừng tin
+   console; nạp bằng workflow rồi đọc phần kiểm tra.
+
+## Nạp dữ liệu lên D1 từ nay về sau
+
+`.github/workflows/nap-du-lieu.yml`. Hai cách kích hoạt:
+
+- Tab **Actions → Nạp dữ liệu vào D1 → Run workflow** (cần quyền
+  `actions:write`; token của phiên Claude Code **không** có, sẽ nhận 403).
+- Sửa `.github/nap-du-lieu.trigger` rồi đẩy lên. Chỉ đúng tệp đó kích hoạt,
+  nên đẩy code bình thường không bao giờ vô tình nạp lại dữ liệu.
+
+Bí mật đã đặt sẵn trong repo: `CLOUDFLARE_API_TOKEN` (quyền D1:Edit) và
+`CLOUDFLARE_ACCOUNT_ID`. Workflow tự kiểm tra và **đánh hỏng job** nếu kết quả
+không phải ĐÚNG HẾT.
+
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 
+- **D1 đã dựng và nạp xong thật** (23/8). `database_id` thật nằm trong
+  `worker/wrangler.toml`. Nạp bằng workflow `.github/workflows/nap-du-lieu.yml`,
+  kết quả ĐÚNG HẾT: 134 học viên, 10 nhóm, 90 số điện thoại, Nhóm 6 đủ 14 thành
+  viên và 8 phần bài, trưởng nhóm Ngô Phú Cường. Còn lại: deploy Worker + Pages.
 - **Chưa deploy lần nào.** Zone `cuongngo.app` đã có trong Cloudflare. README
   có ba đường: Cách A làm hết trên dashboard (Cloudflare tự kéo code từ
   GitHub), Cách B dùng GitHub Actions, Cách C chạy wrangler tay. Người dùng
