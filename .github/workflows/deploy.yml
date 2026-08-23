@@ -151,11 +151,15 @@ jobs:
           spa=$(curl -s -o /dev/null -w '%{http_code}' https://k3vaceo.cuongngo.app/nhom)
           echo "  HTTP $spa $([ "$spa" = "200" ] && echo '✓' || echo '✗ (luật _redirects chưa ăn)')"
 
-          echo "--- /api/khong-co-that phải là JSON 404 của Worker, KHÔNG phải index.html ---"
-          ma=$(curl -s -o /tmp/404.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/khong-co-that)
-          echo "  HTTP $ma — $(head -c 200 /tmp/404.json)"
-          if [ "$ma" != "404" ] || ! head -c 1 /tmp/404.json | grep -q '{'; then
-            echo "::error::Worker Route không phủ hết /api/* — đường dẫn lạ rơi xuống Pages."; exit 1
+          # Đường dẫn /api lạ phải do WORKER trả lời, không phải Pages. Điều cần
+          # khẳng định là "thân trả về là JSON", chứ không phải một mã HTTP cụ
+          # thể: middleware xác thực chạy trước nhánh 404 nên đường dẫn lạ ra
+          # 401 not_authenticated chứ không ra 404. Bắt đúng 404 là bắt sai.
+          echo "--- /api/khong-co-that phải do Worker trả lời (JSON), KHÔNG phải index.html ---"
+          ma=$(curl -s -o /tmp/la.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/khong-co-that)
+          echo "  HTTP $ma — $(head -c 200 /tmp/la.json)"
+          if ! head -c 1 /tmp/la.json | grep -q '{'; then
+            echo "::error::Worker Route không phủ hết /api/* — đường dẫn lạ rơi xuống Pages (nhận được HTML)."; exit 1
           fi
           echo "✓ Worker Route phủ toàn bộ /api/*"
 

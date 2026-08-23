@@ -154,23 +154,23 @@ không phải ĐÚNG HẾT.
 
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 
-- **Trạng thái deploy thật (23/8)** — tất cả chạy qua GitHub Actions, không
-  dùng Git integration của dashboard:
-  - ✅ **D1** dựng và nạp xong. `database_id` thật trong `worker/wrangler.toml`.
-    Kiểm tra ra ĐÚNG HẾT: 134 học viên, 10 nhóm, 90 số điện thoại, Nhóm 6 đủ 14
-    thành viên và 8 phần bài, trưởng nhóm Ngô Phú Cường.
-  - ✅ **Pages** `k3vaceo` đã tạo và deploy.
-  - ✅ **Worker** `k3vaceo-api` đã tải mã lên, có binding D1 và biến `RP_ID`.
-    (Lần đầu wrangler cảnh báo đè lên bản placeholder tạo bằng dashboard —
-    đúng như mong đợi.)
-  - ❌ **Worker Route** `k3vaceo.cuongngo.app/api/*` CHƯA tạo được. API token
-    thiếu quyền **Zone → Workers Routes → Edit** cho zone `cuongngo.app`
-    (`Authentication error [code: 10000]`). `Zone → Zone → Read` thì đã có —
-    wrangler tra được zone id rồi mới chết ở bước tạo route.
-  - ❌ **Custom domain của Pages** chưa gắn. Chỗ này **bắt buộc làm tay trên
-    dashboard**, wrangler không có lệnh. Nó cũng chính là chỗ sinh ra bản ghi
-    DNS cho `k3vaceo.cuongngo.app`, mà không có bản ghi đó thì Worker Route có
-    tạo được cũng không ai gọi tới.
+- **ĐÃ CHẠY THẬT trên https://k3vaceo.cuongngo.app (23/8).** Toàn bộ deploy đi
+  qua GitHub Actions, không dùng Git integration của dashboard. Kiểm chứng bằng
+  chính workflow, không phải đọc code:
+  - `/api/health` → `{"ok":true,"roster_total":134,"groups_total":10,
+    "group6_members":14,"group6_truong_nhom":"Ngô Phú Cường"}`
+  - `/` → giao diện từ Pages; `/nhom` → 200 (luật `_redirects` ăn)
+  - `/api/<đường dẫn lạ>` → JSON của Worker, chứng tỏ route phủ hết `/api/*`
+  - Kiến trúc "Pages phục vụ giao diện + Worker Route cướp `/api/*` trên cùng
+    một hostname" **đã được chứng minh chạy được**, không còn là giả định.
+  - DNS: CNAME `k3vaceo.cuongngo.app` → `k3vaceo.pages.dev` (proxied). Bản ghi
+    A `192.0.2.1` cũ đã xoá.
+- **Điểm gợn duy nhất còn lại**: API token thiếu **Zone → Workers Routes →
+  Edit** cho zone `cuongngo.app`, nên `wrangler deploy` đỏ ở bước hoà hợp
+  route (`Authentication error [code: 10000]`) — dù mã Worker vẫn tải lên
+  xong và route hiện có vẫn chạy. Hệ quả thật: **sửa `pattern` route trong
+  `wrangler.toml` sẽ không có tác dụng** cho tới khi thêm quyền này. Workflow
+  chỉ cảnh báo chứ không đánh hỏng job.
 - Zone `cuongngo.app` đã có trong Cloudflare. README
   có ba đường: Cách A làm hết trên dashboard (Cloudflare tự kéo code từ
   GitHub), Cách B dùng GitHub Actions, Cách C chạy wrangler tay. Người dùng
