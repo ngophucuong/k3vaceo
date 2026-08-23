@@ -19,6 +19,21 @@ function toast(t) {
   clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2400);
 }
 
+const vnMoney = n => Number(n ?? 0).toLocaleString('vi-VN');
+
+/* ═══════════ WEBAUTHN — đổi qua lại base64url ↔ ArrayBuffer ═══════════
+   Trình duyệt mới có PublicKeyCredential.parseCreationOptionsFromJSON() làm
+   sẵn việc này, nhưng Safari iOS 16 (thiết bị SRS mục 8 yêu cầu đỡ) chưa có,
+   nên tự đổi tay cho chắc. */
+const b64uToBuf = s => {
+  const bin = atob(String(s).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(bin, c => c.charCodeAt(0)).buffer;
+};
+const bufToB64u = b => btoa(String.fromCharCode(...new Uint8Array(b)))
+  .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+const passkeySupported = () => !!(window.PublicKeyCredential && navigator.credentials?.create);
+
 const ERR_TEXT = {
   email_taken: 'Email này người khác trong lớp đã dùng.',
   email_invalid: 'Email chưa đúng định dạng.',
@@ -29,6 +44,18 @@ const ERR_TEXT = {
   url_must_be_https: 'Đường dẫn phải bắt đầu bằng https://',
   rate_limited: 'Bạn thử hơi nhiều lần. Chờ một lát rồi làm lại.',
   mailer_not_configured: 'Chưa cấu hình gửi thư — nhắn trưởng nhóm để lấy link mời.',
+  only_collector: 'Chỉ người thu của đợt này mới xác nhận đã nhận tiền.',
+  already_verified: 'Người thu đã xác nhận nhận được tiền của bạn — không bỏ khai được nữa.',
+  round_not_open: 'Đợt thu này chưa mở.',
+  amount_invalid: 'Số tiền chưa hợp lệ.',
+  bank_bin_invalid: 'Mã ngân hàng phải đúng 6 chữ số.',
+  account_no_invalid: 'Số tài khoản chỉ gồm chữ và số.',
+  collector_not_found: 'Người thu phải là thành viên trong nhóm.',
+  title_required: 'Cần đặt tên cho đợt thu.',
+  passkey_verify_failed: 'Không xác thực được passkey. Thử lại hoặc dùng email.',
+  passkey_unknown: 'Passkey này chưa được đăng ký ở đây.',
+  passkey_already_registered: 'Thiết bị này đã đăng ký passkey rồi.',
+  challenge_invalid: 'Phiên đăng ký passkey hết hạn — bấm lại từ đầu.',
 };
 const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
 
@@ -171,8 +198,10 @@ function renderLogin() {
     <label class="f">Email</label><input id="lgEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
     <div id="lgMsg" class="hintline" style="display:none"></div>
     <button class="wide" id="lgSend">Gửi link đăng nhập</button>
-    <div class="foot" style="padding:14px 0 0">Chưa từng nhận link mời? Nhắn trưởng hoặc phó nhóm — Đợt 1 chỉ vào được bằng link mời riêng.</div>
+    <button class="wide ghost" id="lgPasskey" style="margin-top:10px">Đăng nhập bằng passkey</button>
+    <div class="foot" style="padding:14px 0 0">Chưa từng nhận link mời? Nhắn trưởng hoặc phó nhóm — link mời riêng là lối vào đầu tiên.</div>
   </div></div>`;
+  $('#lgPasskey').onclick = loginWithPasskey;
   $('#lgSend').onclick = async () => {
     const email = $('#lgEmail').value.trim();
     if (!email) return;
@@ -242,7 +271,7 @@ function route() {
   if (v === 'bai') drawBai();
   if (v === 'nhom') drawNhom();
   if (v === 'kho') drawKho('all');
-  if (v === 'quy') drawQuySoon();
+  if (v === 'quy') drawQuy();
 }
 const go = v => { location.hash = '#/' + v; };
 
@@ -685,28 +714,340 @@ function openLinkAdd() {
   };
 }
 
-/* ─── Quỹ — chưa tới đợt ─── */
-function drawQuySoon() {
-  $('#v-quy').innerHTML = `<div class="soon"><div class="ic">💳</div>
-    <h3>Quỹ đang lên Đợt 3</h3>
-    <p>Mã QR theo đợt và tự khai sẽ có ở Đợt 3 (hạn 11/9), sau khi có đủ thông tin tài khoản người thu.</p></div>`;
+/* ─── Quỹ ─── */
+let FUNDS = null;
+
+async function drawQuy() {
+  if (!$('#v-quy').dataset.loaded) $('#v-quy').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
+  FUNDS = await apiGet('/api/funds');
+  $('#v-quy').dataset.loaded = '1';
+  const { rounds, can_create_group, can_create_class } = FUNDS;
+
+  $('#v-quy').innerHTML = `
+  ${rounds.length ? rounds.map(r => renderRound(r)).join('') : `
+    <div class="card"><div class="cb">
+      <div style="font-weight:600;margin-bottom:4px">Chưa có khoản thu nào</div>
+      <div class="mut">Trưởng hoặc phó nhóm tạo khoản thu, ứng dụng tự sinh mã riêng cho từng người.</div>
+    </div></div>`}
+  ${can_create_group || can_create_class ? `<button class="wide ghost" id="newFund" style="margin-top:12px">+ Tạo đợt thu mới</button>` : ''}
+  <div class="foot">Tiền vào thẳng tài khoản người thu. Ứng dụng không giữ tiền, không đứng giữa,
+    và trạng thái ở đây là lời tự khai chứ không phải sao kê.</div>`;
+
+  // Ảnh QR nạp từ img.vietqr.io — hỏng thì thay bằng ô giải thích, đừng để
+  // một ô vỡ ảnh nằm giữa màn hình tiền nong.
+  document.querySelectorAll('#v-quy img.qr').forEach(img => {
+    img.onerror = () => {
+      img.outerHTML = `<div class="ph">Chưa hiện được mã. Kiểm tra lại số tài khoản của đợt thu, hoặc chuyển khoản tay theo thông tin bên dưới.</div>`;
+    };
+  });
+  document.querySelectorAll('#v-quy [data-copy]').forEach(b => {
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.dataset.copy); toast('Đã chép nội dung chuyển khoản'); }
+      catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
+    };
+  });
+  document.querySelectorAll('#v-quy [data-declare]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const id = b.dataset.declare;
+        if (b.dataset.on === '1') await apiDelete(`/api/funds/${id}/declare`);
+        else await apiPost(`/api/funds/${id}/declare`);
+        await drawQuy(); await refreshHome();
+      } catch (e) { toast(errText(e)); b.disabled = false; }
+    };
+  });
+  document.querySelectorAll('#v-quy [data-ledger]').forEach(b => {
+    b.onclick = () => openLedger(Number(b.dataset.ledger));
+  });
+  document.querySelectorAll('#v-quy [data-openround]').forEach(b => {
+    b.onclick = () => confirmOpenRound(Number(b.dataset.openround));
+  });
+  if ($('#newFund')) $('#newFund').onclick = openFundCreate;
+}
+
+function renderRound(r) {
+  const dots = Array.from({ length: r.total_people }, (_, i) =>
+    `<i class="${i < r.declared_count ? 'd' : ''}"${i < r.verified_count ? ' data-v="1"' : ''}></i>`).join('');
+  return `
+  <div class="card">
+    <div class="cb">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">
+        ${esc(r.title)}${r.scope === 'class' ? ' · quỹ lớp' : ''}${r.status === 'draft' ? ' · bản nháp' : ''}${r.status === 'closed' ? ' · đã đóng' : ''}</div>
+      <div class="amt">${vnMoney(r.amount)}<small> đ / người</small></div>
+      ${r.purpose ? `<div class="mut" style="margin-top:11px">${esc(r.purpose)}</div>` : ''}
+      ${r.collector_name ? `<div class="mut" style="margin-top:5px">Người thu: <b style="color:var(--ink)">${esc(r.collector_name)}</b></div>` : ''}
+      <div class="tagrow" style="margin-top:10px">
+        ${r.closes_on ? `<span class="tg">đóng ${esc(r.closes_on)}</span>` : ''}
+        <span class="tg">${esc(r.bank_name || r.bank_bin)}</span>
+      </div>
+    </div>
+
+    ${r.status === 'draft' ? `<div class="cb" style="border-top:1px solid var(--line)">
+        <div class="mut" style="margin-bottom:10px">Bản nháp — chưa ai trong nhóm thấy đợt này.</div>
+        <button class="wide" data-openround="${r.id}">Mở đợt thu</button>
+      </div>` : `
+      <div class="qrw">
+        <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
+        <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
+        <button class="copy" data-copy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
+      </div>
+      <div class="cb">
+        ${r.i_am_verified
+          ? `<div class="wide ok" style="cursor:default">✓ Người thu đã nhận tiền của bạn</div>
+             <div class="foot" style="padding:9px 0 0">Đây là xác nhận của người thu sau khi soi sao kê.</div>`
+          : r.i_declared
+            ? `<button class="wide ok" data-declare="${r.id}" data-on="1">✓ Bạn đã tự khai là đã chuyển</button>
+               <div class="foot" style="padding:9px 0 0">Người thu sẽ đối chiếu sao kê. Khai nhầm thì chạm lại để bỏ.</div>`
+            : `<button class="wide" data-declare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Tôi đã chuyển</button>
+               <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>`}
+        <div class="dots">${dots}</div>
+        <div class="foot" style="padding:8px 0 0">
+          <b class="num" style="color:var(--ink)">${r.declared_count}/${r.total_people}</b> người đã tự khai${r.verified_count ? `, người thu đã nhận <b class="num" style="color:var(--go)">${r.verified_count}</b>` : ''}.
+          Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.</div>
+        ${r.can_see_ledger ? `<button class="wide ghost" data-ledger="${r.id}" style="margin-top:12px;padding:11px;font-size:14px">Mở sổ ${r.i_am_collector ? 'của người thu' : 'theo dõi'}</button>` : ''}
+      </div>`}
+  </div>`;
+}
+
+// Mục 6.2 SRS bắt hiện lời nhắc này khi mở đợt — ứng dụng không có cách nào
+// đối chiếu số tài khoản với ngân hàng, sai một số là tiền đi nhầm chỗ.
+function confirmOpenRound(id) {
+  const r = FUNDS.rounds.find(x => x.id === id);
+  openSheet(`
+   <h3>Mở đợt thu</h3>
+   <p class="sub">Mở xong là cả nhóm thấy mã QR và bắt đầu chuyển tiền.</p>
+   <div class="warn">
+     <b>Kiểm tra lại số tài khoản. Ứng dụng không đối chiếu được số tài khoản với ngân hàng.</b>
+   </div>
+   <div class="card" style="margin-top:12px"><div class="cb">
+     <div class="fi"><div class="k">Ngân hàng</div><div class="v">${esc(r.bank_name || r.bank_bin)}</div></div>
+     <div class="fi"><div class="k">Số tài khoản</div><div class="v num">${esc(r.account_no)}</div></div>
+     <div class="fi"><div class="k">Chủ tài khoản</div><div class="v">${esc(r.account_name) || '—'}</div></div>
+     <div class="fi" style="margin-bottom:0"><div class="k">Mỗi người</div><div class="v num">${vnMoney(r.amount)} đ</div></div>
+   </div></div>
+   <div class="qrw" style="margin-top:12px;border-radius:12px">
+     <img class="qr" src="${esc(r.qr_url)}" alt="Thử mã QR trước khi mở" width="160" height="160">
+     <div class="cap">Quét thử bằng app ngân hàng để chắc tên người nhận đúng.</div>
+   </div>
+   <div class="sa"><button class="big c" id="orCancel">Chưa mở</button>
+     <button class="big go" id="orGo">Số tài khoản đúng — mở đợt</button></div>`);
+  $('#orCancel').onclick = closeSheet;
+  $('#orGo').onclick = () => submitting($('#orGo'), async () => {
+    await apiPatch(`/api/funds/${id}`, { status: 'open' });
+    await drawQuy(); await refreshHome();
+  }, 'Đã mở đợt thu');
+}
+
+function openFundCreate() {
+  const banks = FUNDS.banks;
+  const members = MEMBERS.length ? MEMBERS : null;
+  openSheet(`
+   <h3>Tạo đợt thu</h3>
+   <p class="sub">Số tài khoản đặt riêng cho từng đợt, không dùng chung toàn hệ thống. Tạo xong còn ở bản nháp — xem lại rồi mới mở.</p>
+   <label class="f">Tiêu đề</label><input id="fT" maxlength="120" placeholder="Kiến tập nhà máy Bắc Ninh">
+   <label class="f">Mục đích</label><input id="fP" maxlength="300" placeholder="Xe và ăn trưa">
+   <label class="f">Số tiền mỗi người (đ)</label><input id="fA" type="number" min="1000" step="1000" inputmode="numeric" placeholder="350000">
+   <label class="f">Ngân hàng</label>
+   <select id="fB">${banks.map(b => `<option value="${b.bin}">${esc(b.name)}</option>`).join('')}
+     <option value="__other">— ngân hàng khác, tự nhập mã —</option></select>
+   <div id="fBinWrap" style="display:none">
+     <label class="f">Mã ngân hàng VietQR (6 chữ số)</label><input id="fBin" maxlength="6" inputmode="numeric" placeholder="970422">
+   </div>
+   <label class="f">Số tài khoản</label><input id="fAcc" maxlength="32" inputmode="numeric" placeholder="0789267999">
+   <label class="f">Tên chủ tài khoản</label><input id="fAccName" maxlength="120" placeholder="PHAM THE NAM">
+   <label class="f">Người thu</label>
+   <select id="fC"><option value="">— chưa chọn —</option>
+     ${(members ?? []).map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}</select>
+   <label class="f">Ngày đóng</label><input id="fClose" type="date">
+   <div id="fErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="fCancel">Thôi</button>
+     <button class="big go" id="fSave">Tạo bản nháp</button></div>`);
+
+  $('#fB').onchange = () => { $('#fBinWrap').style.display = $('#fB').value === '__other' ? 'block' : 'none'; };
+  $('#fCancel').onclick = closeSheet;
+  $('#fSave').onclick = async () => {
+    const bin = $('#fB').value === '__other' ? $('#fBin').value.trim() : $('#fB').value;
+    if (!/^\d{6}$/.test(bin)) {
+      $('#fErr').textContent = 'Mã ngân hàng phải đúng 6 chữ số.'; $('#fErr').style.display = 'block'; return;
+    }
+    await submitting($('#fSave'), async () => {
+      await apiPost('/api/funds', {
+        scope: 'group',
+        title: $('#fT').value, purpose: $('#fP').value,
+        amount: Number($('#fA').value || 0),
+        bank_bin: bin, account_no: $('#fAcc').value.trim(), account_name: $('#fAccName').value,
+        collector_member_id: $('#fC').value === '' ? null : Number($('#fC').value),
+        closes_on: $('#fClose').value || null,
+      });
+      await drawQuy();
+    }, 'Đã tạo bản nháp — xem lại rồi mở');
+  };
+  ensureMembers().then(list => {
+    if (!members && $('#fC')) {
+      $('#fC').innerHTML = `<option value="">— chưa chọn —</option>` +
+        list.map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('');
+    }
+  });
+}
+
+async function openLedger(roundId) {
+  openSheet(`<h3>Sổ thu</h3><p class="sub">Đang tải…</p>`);
+  let data;
+  try { data = await apiGet(`/api/funds/${roundId}/ledger`); }
+  catch (e) { closeSheet(); toast(errText(e)); return; }
+
+  const { round, people, i_am_collector } = data;
+  const done = people.filter(p => p.verified).length;
+  openSheet(`
+   <h3>${esc(round.title)}</h3>
+   <p class="sub">${vnMoney(round.amount)} đ mỗi người · người thu đã nhận ${done}/${people.length}.
+     ${i_am_collector ? 'Soi sao kê xong thì bấm xác nhận từng người.' : 'Chỉ người thu mới xác nhận được đã nhận tiền.'}</p>
+   <div class="warn" style="margin-bottom:14px">Không có nhắc nợ tự động. Ai chưa chuyển thì nhắn riêng.</div>
+   <div class="card"><div class="cb" style="padding:2px 14px">
+     ${people.map(p => `<div class="fd">
+       ${avatar(p.full_name)}
+       <div class="x"><b>${esc(p.full_name)}</b>
+         <div style="font-size:11.5px;margin-top:2px" class="${p.verified ? 'st-ok' : p.declared ? 'st-mid' : 'st-no'}">${esc(p.status_label)}</div></div>
+       <div style="display:flex;gap:6px;align-items:center">
+         ${p.phone ? `<a class="tg" href="tel:${esc(p.phone)}">gọi</a>` : ''}
+         ${i_am_collector ? `<button class="tg ${p.verified ? 'go' : ''}" data-verify="${p.id}" data-undo="${p.verified ? '1' : '0'}">${p.verified ? 'bỏ xác nhận' : 'đã nhận'}</button>` : ''}
+       </div></div>`).join('')}
+   </div></div>
+   <div class="sa"><button class="big c" id="ldClose">Đóng</button></div>`);
+
+  $('#ldClose').onclick = closeSheet;
+  document.querySelectorAll('.sheet [data-verify]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await apiPost(`/api/funds/${roundId}/verify`, { member_id: Number(b.dataset.verify), undo: b.dataset.undo === '1' });
+        await openLedger(roundId);
+        await drawQuy();
+      } catch (e) { toast(errText(e)); b.disabled = false; }
+    };
+  });
+}
+
+/* ─── Passkey ─── */
+async function registerPasskey() {
+  if (!passkeySupported()) { toast('Thiết bị này chưa hỗ trợ passkey'); return; }
+  try {
+    const { handle, options } = await apiPost('/api/passkey/register/options');
+    const publicKey = {
+      ...options,
+      challenge: b64uToBuf(options.challenge),
+      user: { ...options.user, id: b64uToBuf(options.user.id) },
+      excludeCredentials: (options.excludeCredentials ?? []).map(c => ({ ...c, id: b64uToBuf(c.id) })),
+    };
+    const cred = await navigator.credentials.create({ publicKey });
+    await apiPost('/api/passkey/register/verify', {
+      handle,
+      label: navigator.userAgent.includes('iPhone') ? 'iPhone'
+        : navigator.userAgent.includes('Android') ? 'Điện thoại Android' : 'Máy tính',
+      response: {
+        id: cred.id,
+        rawId: bufToB64u(cred.rawId),
+        type: cred.type,
+        clientExtensionResults: cred.getClientExtensionResults(),
+        response: {
+          clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+          attestationObject: bufToB64u(cred.response.attestationObject),
+          transports: cred.response.getTransports?.() ?? [],
+        },
+      },
+    });
+    toast('Đã thêm passkey');
+    return true;
+  } catch (e) {
+    // Người dùng bấm huỷ ở hộp thoại hệ thống thì không phải lỗi, đừng la lên.
+    if (e?.name === 'NotAllowedError' || e?.name === 'AbortError') return false;
+    toast(errText(e));
+    return false;
+  }
+}
+
+async function loginWithPasskey() {
+  if (!passkeySupported()) { toast('Thiết bị này chưa hỗ trợ passkey'); return; }
+  try {
+    const { handle, options } = await apiPost('/api/passkey/login/options');
+    const publicKey = {
+      ...options,
+      challenge: b64uToBuf(options.challenge),
+      allowCredentials: (options.allowCredentials ?? []).map(c => ({ ...c, id: b64uToBuf(c.id) })),
+    };
+    const cred = await navigator.credentials.get({ publicKey });
+    await apiPost('/api/passkey/login/verify', {
+      handle,
+      response: {
+        id: cred.id,
+        rawId: bufToB64u(cred.rawId),
+        type: cred.type,
+        clientExtensionResults: cred.getClientExtensionResults(),
+        response: {
+          clientDataJSON: bufToB64u(cred.response.clientDataJSON),
+          authenticatorData: bufToB64u(cred.response.authenticatorData),
+          signature: bufToB64u(cred.response.signature),
+          userHandle: cred.response.userHandle ? bufToB64u(cred.response.userHandle) : undefined,
+        },
+      },
+    });
+    history.replaceState({}, '', '/');
+    boot();
+  } catch (e) {
+    if (e?.name === 'NotAllowedError' || e?.name === 'AbortError') return;
+    toast(errText(e));
+  }
 }
 
 /* ─── Tài khoản ─── */
-function openMe() {
+async function openMe() {
   openSheet(`
    ${avatar(HOME.me.full_name)}
    <h3 style="margin-top:12px">${esc(HOME.me.full_name)}</h3>
    <p class="sub">${esc(HOME.group?.label ?? '')} · Khoá K03</p>
+   <div id="pkBox" class="mut" style="margin-bottom:14px">Đang xem passkey…</div>
    <div class="sa"><button class="big c" id="meClose">Đóng</button>
      <button class="big go" id="meLogout" style="background:var(--due)">Đăng xuất</button></div>`);
   $('#meClose').onclick = closeSheet;
   $('#meLogout').onclick = async () => {
     await apiPost('/api/auth/logout');
     closeSheet();
-    HOME = null; PLAN = null; MEMBERS = [];
+    HOME = null; PLAN = null; MEMBERS = []; FUNDS = null;
     renderNoSession();
   };
+  drawPasskeyBox();
+}
+
+async function drawPasskeyBox() {
+  if (!$('#pkBox')) return;
+  let list = [];
+  try { list = (await apiGet('/api/passkey')).passkeys; } catch { /* không chặn màn tài khoản */ }
+  if (!$('#pkBox')) return;
+
+  $('#pkBox').innerHTML = `
+    <div class="eb" style="margin-bottom:8px">Passkey <span class="c">${list.length}</span></div>
+    ${list.length ? `<div class="card"><div class="cb" style="padding:2px 14px">
+      ${list.map(p => `<div class="fd"><div class="x"><b>${esc(p.label)}</b>
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">
+          thêm ${vnDate(p.created_at)}${p.last_used_at ? ' · dùng gần nhất ' + vnDate(p.last_used_at) : ''}</div></div>
+        <button class="lnk" data-rmpk="${p.id}">gỡ</button></div>`).join('')}
+    </div></div>`
+    : `<div class="mut" style="margin-bottom:10px">Chưa có passkey nào. Thêm một cái để lần sau vào bằng vân tay hoặc khuôn mặt, khỏi chờ thư.</div>`}
+    ${passkeySupported() ? `<button class="wide ghost" id="pkAdd" style="margin-top:10px;padding:11px;font-size:14px">+ Thêm passkey cho thiết bị này</button>`
+      : `<div class="mut" style="margin-top:8px">Thiết bị này chưa hỗ trợ passkey.</div>`}
+    <div class="foot" style="padding:10px 0 0">Passkey chỉ là lối đi nhanh. Email vẫn luôn là đường lui — gỡ hết passkey cũng không mất quyền vào.</div>`;
+
+  if ($('#pkAdd')) $('#pkAdd').onclick = async () => {
+    $('#pkAdd').disabled = true;
+    if (await registerPasskey()) await drawPasskeyBox(); else $('#pkAdd').disabled = false;
+  };
+  document.querySelectorAll('.sheet [data-rmpk]').forEach(b => {
+    b.onclick = async () => {
+      try { await apiDelete(`/api/passkey/${b.dataset.rmpk}`); toast('Đã gỡ passkey'); await drawPasskeyBox(); }
+      catch (e) { toast(errText(e)); }
+    };
+  });
 }
 
 /* ═══════════ KHỞI ĐỘNG ═══════════ */

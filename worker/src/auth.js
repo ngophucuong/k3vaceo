@@ -82,8 +82,12 @@ export async function getCurrentMember(request, env) {
   const token = parseCookies(request)[SESSION_COOKIE];
   if (!token) return null;
   const tokenHash = await sha256Hex(token);
+  // Kèm luôn số nhóm: nội dung chuyển khoản ({NHOM}) và vài chỗ khác cần đến
+  // nó, lấy sẵn ở đây đỡ phải truy vấn lại mỗi lần.
   const row = await env.DB.prepare(
-    `SELECT m.* FROM sessions s JOIN members m ON m.id = s.member_id
+    `SELECT m.*, g.no AS group_no FROM sessions s
+     JOIN members m ON m.id = s.member_id
+     LEFT JOIN groups g ON g.id = m.group_id
      WHERE s.token_hash = ? AND s.expires_at > datetime('now') AND m.is_active = 1`
   ).bind(tokenHash).first();
   return row ?? null;

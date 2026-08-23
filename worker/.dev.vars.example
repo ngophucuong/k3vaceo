@@ -1,5 +1,10 @@
 # Chép thành .dev.vars để chạy cục bộ (tệp .dev.vars KHÔNG commit — xem .gitignore).
 # Trên bản thật thì đặt bằng `wrangler secret put <TÊN>`, đừng để trong wrangler.toml.
+
+# rp.id của passkey. Chạy cục bộ thì phải là localhost, nếu không trình duyệt
+# từ chối đăng ký. Bản thật lấy giá trị trong wrangler.toml, KHÔNG đổi.
+RP_ID=localhost
+
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=starttls

@@ -4,13 +4,16 @@ Công cụ làm việc nhóm cho Nhóm 6, khoá K03 (VCCI × Đại học Andrew
 Pages (tệp tĩnh) + Cloudflare Worker (API) + D1 (SQLite). Không build step,
 không framework — xem `SRS v1.0` mục 8.
 
-Trạng thái hiện tại: **Đợt 1 và Đợt 2** xong.
+Trạng thái hiện tại: **Đợt 1, 2 và 3** xong.
 
 - Đợt 1 — nhận diện qua link mời, hồ sơ tự sửa (và sửa hộ), cơ cấu nhóm có
   lịch sử, Kho liên kết, màn hình Hôm nay.
 - Đợt 2 — bài 8 phần, gợi ý phân công tính ở máy chủ, tiến độ, tâm đắc, nhật
   ký đóng góp, đăng nhập lại bằng email qua SMTP cá nhân.
-- Đợt 3 (quỹ, passkey) và Đợt 4 (wizard cho nhóm khác, xuất Word) chưa tới.
+- Đợt 3 — quỹ hai cấp, mã QR VietQR riêng từng người, tự khai, sổ của người
+  thu, passkey.
+- Đợt 4 (wizard cho nhóm khác, xuất bản thảo Word, bảng phân công thuyết
+  trình) chưa tới.
 
 ## Cấu trúc
 
@@ -23,9 +26,9 @@ worker/                 Cloudflare Worker — API
   src/auth.js              link mời, magic link, phiên cookie
   src/mailer.js            SMTP qua TCP Socket API của Workers
   src/permissions.js       ma trận quyền mục 2.2 SRS + audit_log/activity
-  src/lib/                 http, crypto, validate, ratelimit, suggest
-  src/routes/              home, members, officers, plan, insights,
-                           links, wizard, email-login, session
+  src/lib/                 http, crypto, validate, ratelimit, suggest, vietqr
+  src/routes/              home, members, officers, plan, insights, links,
+                           wizard, email-login, funds, passkey, session
 migrations/             Schema + dữ liệu D1, áp theo đúng thứ tự file
 scripts/                Công cụ nhập liệu + sinh lời mời đầu tiên
 ```
@@ -57,6 +60,7 @@ Bốn migration áp theo thứ tự:
 - `0002_seed_roster.sql` — 134 người/10 nhóm từ danh sách gốc (sinh tự động, xem bên dưới).
 - `0003_seed_group6.sql` — kích hoạt thật Nhóm 6: 14 thành viên, cơ cấu có lịch sử, bài 8 phần, tâm đắc, Kho, nhật ký.
 - `0004_invite_kind_and_rate_limit.sql` — tách magic link khỏi link mời, thêm bảng đếm giới hạn tần suất.
+- `0005_webauthn_challenges.sql` — chỗ giữ challenge của passkey giữa hai chặng, cùng vài index.
 
 ### 2. Deploy Worker
 
@@ -179,15 +183,59 @@ GET    /api/links?tag=bai|buoi|lop
 POST   /api/links                  { url, title?, kind?, tag? }
 DELETE /api/links/:id
 POST   /api/wizard/invites         → khối link mời cho người chưa nhận tên
+
+GET    /api/funds                  → đợt thu áp dụng cho tôi + QR riêng của tôi
+POST   /api/funds                  (trưởng/phó nhóm | Ban cán sự lớp)
+PATCH  /api/funds/:id              { status, closes_on, ... }
+GET    /api/funds/:id/qr           → URL ảnh QR đã dựng cho người đang đăng nhập
+POST   /api/funds/:id/declare      { note? }   → tự khai đã chuyển
+DELETE /api/funds/:id/declare      → bỏ khai
+GET    /api/funds/:id/ledger       (người thu | trưởng nhóm) → danh sách đầy đủ
+POST   /api/funds/:id/verify       { member_id, undo? }  (chỉ người thu)
+
+POST   /api/passkey/register/options | /verify
+POST   /api/passkey/login/options    | /verify
+GET    /api/passkey                → passkey của tôi
+GET    /api/passkey/member/:id     → passkey của thành viên (trưởng/phó nhóm)
+DELETE /api/passkey/:id            → tự gỡ, hoặc trưởng/phó gỡ hộ
 ```
 
 Mọi route (trừ nhóm auth ở trên) cần cookie phiên hợp lệ; máy chủ tự kiểm tra
 vai và phạm vi nhóm theo đúng ma trận mục 2.2 SRS, không tin giao diện.
 
-Hai điểm cố ý khác DDL nguyên văn mục 3 SRS, đã ghi lý do trong migration
-0004: cột `invites.kind` (tách link mời 14 ngày dùng nhiều lần khỏi magic
-link 15 phút dùng một lần) và bảng `rate_events` (để làm được giới hạn 20
-lần thử token mỗi IP mỗi giờ mà mục 8 SRS yêu cầu).
+Ba điểm cố ý khác DDL nguyên văn mục 3 SRS, đều ghi lý do ngay trong migration:
+cột `invites.kind` (tách link mời 14 ngày dùng nhiều lần khỏi magic link 15
+phút dùng một lần), bảng `rate_events` (để làm được giới hạn 20 lần thử token
+mỗi IP mỗi giờ mà mục 8 SRS yêu cầu), và bảng `webauthn_challenges` (chỗ giữ
+challenge giữa hai chặng của passkey — không giữ được trong bộ nhớ Worker).
+
+## Quỹ — vài điều cần biết trước khi dùng thật
+
+- **Số tài khoản đặt theo từng đợt**, không phải cấu hình toàn hệ thống (mục
+  6.1 SRS). Mỗi đợt có ngân hàng, số tài khoản và người thu riêng.
+- **Tạo xong nằm ở bản nháp.** Cả nhóm chưa thấy gì cho tới khi bấm mở. Màn
+  hình mở đợt bắt đọc lời nhắc *"Kiểm tra lại số tài khoản. Ứng dụng không đối
+  chiếu được số tài khoản với ngân hàng"* và cho quét thử QR trước.
+- **Trạng thái luôn gọi là "đã tự khai"**, không bao giờ là "đã đóng". Chỉ khi
+  người thu soi sao kê rồi bấm xác nhận mới thành "người thu đã nhận", và hai
+  trạng thái này hiển thị khác hẳn nhau.
+- **Thành viên thường chỉ thấy số đếm** (ví dụ 9/14), không thấy tên ai đã
+  khai hay chưa. Chỉ người thu và trưởng/phó nhóm mở được sổ đầy đủ.
+- **Không có nhắc nợ tự động.** Sổ có nút gọi điện để người thu tự nhắn riêng.
+- **Quỹ lớp chưa tạo được** vì chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
+  điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn: thêm một dòng `officers` với
+  `group_id IS NULL` và role `lop_truong`/`lop_pho`/`thu_quy` là chạy ngay.
+
+## Passkey — vài điều cần biết
+
+- `rp.id` nằm ở `[vars]` trong `worker/wrangler.toml`, **cố định vĩnh viễn**.
+  Đổi tên miền là mọi passkey đã đăng ký chết, không cứu được (mục 4.3 SRS).
+- Passkey chỉ là lối đi nhanh. **Email luôn là đường lui** — gỡ hết passkey
+  không làm ai mất quyền vào.
+- Mỗi người nhiều passkey được (điện thoại, máy tính). Trưởng/phó nhóm gỡ được
+  passkey của thành viên khi họ đổi máy.
+- Passkey chỉ chạy trên HTTPS (hoặc `localhost`). Trên preview `*.pages.dev`
+  thì `rp.id` không khớp nên **không thử được** — phải đợi domain thật.
 
 ## Nhập lại danh sách khi có bản mới
 
@@ -219,7 +267,20 @@ sinh ra rồi tự áp bằng `wrangler d1 migrations apply`.
   thức (EHLO nhiều dòng, AUTH LOGIN, DATA, tiêu đề tiếng Việt mã hoá RFC 2047)
   nhưng bằng một SMTP server giả chạy cục bộ, chưa bắt tay TLS với máy chủ
   thật. Lần đầu cấu hình bằng tài khoản thật cần thử gửi một thư để chắc chắn.
-- **Quỹ mới là màn "sắp có"** — bảng dữ liệu đã có trong D1 từ đầu, API đọc/ghi
-  tới Đợt 3 mới thêm.
 - **Đăng nhập lại bằng email (Đợt 2)** cần bạn cho biết SMTP cá nhân dùng nhà
   cung cấp nào (Gmail/Outlook/khác) — xem mục "Email" trong kế hoạch triển khai.
+- **Ảnh QR chưa hiển thị thật lần nào.** URL dựng ra đã kiểm đúng đến từng ký
+  tự theo mục 6.3, nhưng môi trường phát triển không ra được internet nên chưa
+  lần nào tải được ảnh từ `img.vietqr.io`. Tiêu chí nghiệm thu Đợt 3 — *"QR
+  quét được bằng ba ứng dụng ngân hàng khác nhau"* — phải làm bằng điện thoại
+  thật sau khi deploy. Khi ảnh hỏng thì giao diện tự thay bằng ô ghi đủ ngân
+  hàng, số tài khoản và nội dung chuyển khoản để chuyển tay.
+- **Danh mục mã ngân hàng là bản rút gọn** (26 ngân hàng hay gặp trong
+  `worker/src/lib/vietqr.js`), chép theo bộ mã BIN Napas nhưng chưa đối chiếu
+  được với nguồn công bố vì không có mạng. Ngân hàng nào không có trong danh
+  sách thì gõ tay mã 6 chữ số. Trước khi mở đợt thu thật, quét thử QR một lần
+  để chắc tên người nhận hiện đúng.
+- **Passkey chưa thử trên thiết bị thật.** Đã chạy trọn vòng đăng ký và đăng
+  nhập bằng virtual authenticator của Chrome, nhưng chưa thử Face ID trên
+  iPhone hay vân tay trên Android. Việc này phải đợi domain thật vì `rp.id`
+  neo vào tên miền.

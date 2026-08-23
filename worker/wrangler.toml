@@ -1,6 +1,15 @@
 name = "k3vaceo-api"
 main = "src/index.js"
 compatibility_date = "2026-08-01"
+# Cần cho @simplewebauthn/server (passkey, Đợt 3). Đây là cờ runtime, không
+# phải bước build — vẫn deploy bằng đúng một lệnh `wrangler deploy`.
+compatibility_flags = ["nodejs_compat"]
+
+# rp.id của passkey — CỐ ĐỊNH VĨNH VIỄN theo mục 4.3 SRS. Đổi giá trị này là
+# mọi passkey đã đăng ký chết sạch, không cứu được. Khi chạy cục bộ thì đặt
+# RP_ID=localhost trong .dev.vars.
+[vars]
+RP_ID = "k3vaceo.maychudev.com"
 
 # Điền database_id thật sau khi chạy: npx wrangler d1 create k3vaceo
 # (xem README.md ở gốc repo cho từng bước)

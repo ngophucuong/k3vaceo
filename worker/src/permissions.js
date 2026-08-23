@@ -2,6 +2,19 @@
 // class_officer chưa có ai giữ trong dữ liệu hiện tại (chưa mở tầng lớp), nên
 // chưa cần kiểm ở đây — thêm khi Ban cán sự lớp thật sự dùng (mục 11, điểm #6).
 
+// Vai cấp lớp (lớp trưởng, lớp phó, thủ quỹ) = bản ghi officers có group_id
+// NULL. Hiện chưa ai giữ vai này — mục 11 điểm #6 SRS để ngỏ việc có mở tầng
+// lớp hay không. Kiểm tra vẫn viết đủ ở đây để lúc Ban cán sự lớp được thêm
+// vào thì quỹ lớp chạy được ngay, không phải sửa quyền.
+export async function isClassOfficer(env, memberId) {
+  const row = await env.DB.prepare(
+    `SELECT 1 FROM officers
+     WHERE group_id IS NULL AND member_id = ?
+       AND role IN ('lop_truong', 'lop_pho', 'thu_quy') AND superseded_at IS NULL`
+  ).bind(memberId).first();
+  return !!row;
+}
+
 export async function isGroupOfficer(env, memberId, groupId) {
   const row = await env.DB.prepare(
     `SELECT 1 FROM officers

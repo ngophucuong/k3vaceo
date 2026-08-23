@@ -16,6 +16,11 @@ import { postLogout } from './routes/session.js';
 import { getPlan, patchSection, patchTopic } from './routes/plan.js';
 import { postInsight, deleteInsight } from './routes/insights.js';
 import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
+import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify } from './routes/funds.js';
+import {
+  postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
+  listPasskeys, deletePasskey,
+} from './routes/passkey.js';
 
 const INVITE_TRIES_PER_HOUR = 20;   // mục 8 SRS
 
@@ -64,6 +69,12 @@ export default {
       if (pathname === '/api/auth/logout' && method === 'POST') {
         return postLogout(request, env);
       }
+      if (pathname === '/api/passkey/login/options' && method === 'POST') {
+        return postLoginOptions(request, env);
+      }
+      if (pathname === '/api/passkey/login/verify' && method === 'POST') {
+        return postLoginVerify(request, env);
+      }
 
       // ── Cần phiên đăng nhập hợp lệ ───────────────────────────────────────
       const me = await getCurrentMember(request, env);
@@ -107,6 +118,41 @@ export default {
       }
 
       if (pathname === '/api/wizard/invites' && method === 'POST') return postWizardInvites(request, env, me);
+
+      if (pathname === '/api/funds' && method === 'GET') return listFunds(env, me);
+      if (pathname === '/api/funds' && method === 'POST') return postFund(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)$/)) && method === 'PATCH') {
+        return patchFund(request, env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)\/qr$/)) && method === 'GET') {
+        return getFundQr(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)\/declare$/)) && method === 'POST') {
+        return postDeclare(request, env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)\/declare$/)) && method === 'DELETE') {
+        return deleteDeclare(env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)\/ledger$/)) && method === 'GET') {
+        return getLedger(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)\/verify$/)) && method === 'POST') {
+        return postVerify(request, env, me, Number(m[1]), ip);
+      }
+
+      if (pathname === '/api/passkey/register/options' && method === 'POST') {
+        return postRegisterOptions(request, env, me);
+      }
+      if (pathname === '/api/passkey/register/verify' && method === 'POST') {
+        return postRegisterVerify(request, env, me, ip);
+      }
+      if (pathname === '/api/passkey' && method === 'GET') return listPasskeys(env, me, null);
+      if ((m = pathname.match(/^\/api\/passkey\/member\/(\d+)$/)) && method === 'GET') {
+        return listPasskeys(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/passkey\/(\d+)$/)) && method === 'DELETE') {
+        return deletePasskey(env, me, Number(m[1]), ip);
+      }
 
       return error('not_found', 404, { path: pathname });
     } catch (err) {
