@@ -16,7 +16,7 @@ RP_ID = "k3vaceo.cuongngo.app"
 [[d1_databases]]
 binding = "DB"
 database_name = "k3vaceo"
-database_id = "REPLACE_WITH_REAL_DATABASE_ID"
+database_id = "5b4d476b-fb4b-4bfa-97f3-59332b455290"
 migrations_dir = "../migrations"
 
 # Worker nhận /api/* trên tên miền thật. Zone cuongngo.app phải có sẵn trong
