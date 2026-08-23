@@ -22,11 +22,13 @@ async function computeAction(env, me) {
     };
   }
 
-  const plan = await env.DB.prepare('SELECT id FROM plans WHERE group_id = ?').bind(me.group_id).first();
+  const plan = await env.DB.prepare('SELECT id, topic_product, topic_customers FROM plans WHERE group_id = ?')
+    .bind(me.group_id).first();
   if (plan) {
-    const section0 = await env.DB.prepare('SELECT owner_member_id FROM plan_sections WHERE plan_id = ? AND ord = 0')
-      .bind(plan.id).first();
-    if (section0 && !section0.owner_member_id) {
+    // "Chốt đề tài" là đã ghi được sản phẩm và khách hàng mục tiêu vào
+    // plans.topic_* — không phải là đã có ai nhận phần 0. Hai việc khác nhau:
+    // mục 7.1 SRS xét đề tài ở bước 3 rồi mới xét nhận phần ở bước 4.
+    if (!plan.topic_product || !plan.topic_customers) {
       return {
         h: 'Nhóm chưa chốt đề tài',
         p: 'Chưa có sản phẩm và khách hàng mục tiêu thì bảy phần sau đều treo. Đây là việc chặn mọi việc khác.',

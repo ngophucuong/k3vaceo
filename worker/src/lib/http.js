@@ -20,9 +20,14 @@ export function parseCookies(request) {
   return out;
 }
 
+// Luôn trả về một object thuần. Body là null, số, chuỗi hay mảng đều thành {}
+// — nếu không thì `'title' in body` ném TypeError và mọi payload dị dạng biến
+// thành lỗi 500 thay vì được xử lý như dữ liệu sai.
 export async function readJson(request) {
   try {
-    return await request.json();
+    const data = await request.json();
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) return {};
+    return data;
   } catch {
     return {};
   }

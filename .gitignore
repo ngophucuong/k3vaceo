@@ -1,3 +1,6 @@
 node_modules/
 .wrangler/
 *.log
+
+# bí mật cục bộ, không commit
+worker/.dev.vars

@@ -1,20 +1,26 @@
 // k3vaceo API — router tay, không dùng framework (nguyên tắc hạ tầng, xem SRS mục 8).
-// Đợt 1: nhận diện qua link mời, hồ sơ tự sửa, cơ cấu nhóm có lịch sử, Kho,
-// Hôm nay. Đợt 2 (bài/tiến độ/tâm đắc/email) và Đợt 3 (quỹ/passkey) thêm route
-// mới vào routes/ mà không đổi cách định tuyến này.
+// Đợt 1: nhận diện qua link mời, hồ sơ tự sửa, cơ cấu nhóm có lịch sử, Kho, Hôm nay.
+// Đợt 2: bài 8 phần, gợi ý phân công, tiến độ, tâm đắc, đăng nhập lại bằng email.
+// Đợt 3 (quỹ, passkey) thêm route mới vào routes/ mà không đổi cách định tuyến này.
 
 import { json, error } from './lib/http.js';
 import { getCurrentMember } from './auth.js';
+import { clientIp, allow } from './lib/ratelimit.js';
 import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
-import { listMembers, patchMember, putMemberProfile } from './routes/members.js';
+import { listMembers, getMember, patchMember, putMemberProfile } from './routes/members.js';
 import { getOfficers, putOfficers } from './routes/officers.js';
 import { listLinks, postLink, deleteLink } from './routes/links.js';
-import { postWizardInvites } from './routes/wizard.js';
+import { postWizardInvites, postMemberInvite } from './routes/wizard.js';
 import { postLogout } from './routes/session.js';
+import { getPlan, patchSection, patchTopic } from './routes/plan.js';
+import { postInsight, deleteInsight } from './routes/insights.js';
+import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
+
+const INVITE_TRIES_PER_HOUR = 20;   // mục 8 SRS
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const { pathname } = url;
     const method = request.method;
@@ -33,32 +39,66 @@ export default {
       if (pathname === '/api/health' && method === 'GET') return handleHealth(env);
 
       let m;
+
+      // ── Không cần đăng nhập ──────────────────────────────────────────────
+      // Hai route token dưới đây là lối vào duy nhất khi chưa có phiên, nên
+      // phải chặn dò token theo IP (mục 8 SRS: 20 lần thử mỗi IP mỗi giờ).
       if ((m = pathname.match(/^\/api\/invite\/([^/]+)$/)) && method === 'GET') {
+        if (!(await allow(env, 'invite_try', clientIp(request), INVITE_TRIES_PER_HOUR))) {
+          return error('rate_limited', 429, { retry_after_minutes: 60 });
+        }
         return getInvite(env, m[1]);
       }
       if ((m = pathname.match(/^\/api\/invite\/([^/]+)\/claim$/)) && method === 'POST') {
+        if (!(await allow(env, 'invite_try', clientIp(request), INVITE_TRIES_PER_HOUR))) {
+          return error('rate_limited', 429, { retry_after_minutes: 60 });
+        }
         return postInviteClaim(request, env, m[1]);
+      }
+      if (pathname === '/api/auth/email' && method === 'POST') {
+        return postEmailRequest(request, env, ctx);
+      }
+      if ((m = pathname.match(/^\/api\/auth\/email\/([^/]+)$/)) && method === 'POST') {
+        return postEmailConsume(request, env, m[1]);
       }
       if (pathname === '/api/auth/logout' && method === 'POST') {
         return postLogout(request, env);
       }
 
-      // Mọi route dưới đây cần phiên đăng nhập hợp lệ.
+      // ── Cần phiên đăng nhập hợp lệ ───────────────────────────────────────
       const me = await getCurrentMember(request, env);
       if (!me) return error('not_authenticated', 401);
+      const ip = clientIp(request);
 
       if (pathname === '/api/home' && method === 'GET') return getHome(env, me);
 
       if (pathname === '/api/members' && method === 'GET') return listMembers(env, me);
+      if ((m = pathname.match(/^\/api\/members\/(\d+)$/)) && method === 'GET') {
+        return getMember(env, me, Number(m[1]));
+      }
       if ((m = pathname.match(/^\/api\/members\/(\d+)$/)) && method === 'PATCH') {
         return patchMember(request, env, me, Number(m[1]));
       }
       if ((m = pathname.match(/^\/api\/members\/(\d+)\/profile$/)) && method === 'PUT') {
         return putMemberProfile(request, env, me, Number(m[1]));
       }
+      if ((m = pathname.match(/^\/api\/members\/(\d+)\/invite$/)) && method === 'POST') {
+        return postMemberInvite(request, env, me, Number(m[1]));
+      }
 
       if (pathname === '/api/officers' && method === 'GET') return getOfficers(env, me);
-      if (pathname === '/api/officers' && method === 'PUT') return putOfficers(request, env, me);
+      if (pathname === '/api/officers' && method === 'PUT') return putOfficers(request, env, me, ip);
+
+      if (pathname === '/api/plan' && method === 'GET') return getPlan(env, me);
+      if (pathname === '/api/plan/topic' && method === 'PATCH') return patchTopic(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/plan\/sections\/(\d+)$/)) && method === 'PATCH') {
+        return patchSection(request, env, me, Number(m[1]), ip);
+      }
+
+      if (pathname === '/api/insights' && method === 'POST') return postInsight(request, env, me);
+      if ((m = pathname.match(/^\/api\/insights\/(\d+)$/)) && method === 'DELETE') {
+        return deleteInsight(env, me, Number(m[1]));
+      }
 
       if (pathname === '/api/links' && method === 'GET') return listLinks(env, me, url.searchParams.get('tag'));
       if (pathname === '/api/links' && method === 'POST') return postLink(request, env, me);
@@ -70,7 +110,10 @@ export default {
 
       return error('not_found', 404, { path: pathname });
     } catch (err) {
-      return error('internal_error', 500, { message: String(err) });
+      // Chi tiết lỗi chỉ ghi ở máy chủ. Trả nguyên String(err) ra ngoài sẽ lộ
+      // tên bảng, tên cột và cả câu SQL qua các thông báo của D1.
+      console.error(`${method} ${pathname}:`, err?.stack || String(err));
+      return error('internal_error', 500);
     }
   },
 };

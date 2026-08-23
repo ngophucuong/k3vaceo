@@ -10,17 +10,27 @@ export async function isGroupOfficer(env, memberId, groupId) {
   return !!row;
 }
 
-// Chính chủ, hoặc trưởng/phó của đúng nhóm người đó.
+// Ma trận mục 2.2 SRS: "Sửa hồ sơ người khác cùng nhóm (sửa hộ)" — thành viên
+// thường CŨNG được, không cần là trưởng/phó. Điều kiện duy nhất là cùng nhóm
+// (nguyên tắc N6 — dữ liệu nhóm cách ly). Mọi lần sửa hộ đều ghi audit_log và
+// ghi rõ "do X sửa hộ" trong nhật ký, đúng chú thích (*) của bảng.
 export async function canEditProfile(env, actor, target) {
   if (actor.id === target.id) return true;
-  if (actor.group_id !== target.group_id) return false;
-  return isGroupOfficer(env, actor.id, actor.group_id);
+  return actor.group_id === target.group_id;
 }
 
 // Cập nhật cơ cấu, gán người phụ trách phần bài: chỉ trưởng/phó của chính nhóm mình.
 export async function canManageGroup(env, actor, groupId) {
   if (actor.group_id !== groupId) return false;
   return isGroupOfficer(env, actor.id, groupId);
+}
+
+// Ma trận mục 2.2: "Cập nhật tiến độ phần mình giữ" — thành viên ✓ (chỉ phần
+// mình giữ), trưởng/phó ✓ (phần nào cũng được, vì họ điều phối cả bài).
+// Còn "Gán người phụ trách phần bài" thì chỉ trưởng/phó — tách riêng ở route.
+export async function canUpdateSection(env, actor, section) {
+  if (section.owner_member_id === actor.id) return true;
+  return isGroupOfficer(env, actor.id, actor.group_id);
 }
 
 export async function logAudit(env, { actorId, action, targetType, targetId, before, after, ip }) {

@@ -1,14 +1,36 @@
 /* ═══════════ TIỆN ÍCH ═══════════ */
 const $ = s => document.querySelector(s);
-const esc = s => String(s ?? '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-const ini = n => { const w = n.trim().split(/\s+/); return (w[w.length - 2]?.[0] || '') + (w[w.length - 1]?.[0] || ''); };
-const hue = n => { let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
+// Phải thoát cả dấu nháy: chuỗi này được nhúng vào bên trong thuộc tính HTML
+// (href="...", value="..."), nên bỏ sót dấu " là thoát ra khỏi thuộc tính và
+// gắn được onmouseover — bất kỳ ai gắn liên kết vào Kho cũng chèn được mã
+// chạy trên máy đồng đội.
+const ESC_MAP = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' };
+const esc = s => String(s ?? '').replace(/[<>&"']/g, c => ESC_MAP[c]);
+
+const ini = n => { const w = String(n ?? '').trim().split(/\s+/); return (w[w.length - 2]?.[0] || '') + (w[w.length - 1]?.[0] || ''); };
+const hue = n => { let h = 0; for (const c of String(n ?? '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 const avatar = (name, cl = '') => `<span class="av ${cl}" style="background:hsl(${hue(name)} 34% 42%)">${esc(ini(name))}</span>`;
-const short = n => n.trim().split(/\s+/).slice(-2).join(' ');
+const short = n => String(n ?? '').trim().split(/\s+/).slice(-2).join(' ');
+const vnDate = s => { const d = new Date(String(s).replace(' ', 'T') + 'Z'); return isNaN(d) ? '' : d.toLocaleDateString('vi-VN'); };
+
 function toast(t) {
   const e = $('#toast'); e.textContent = t; e.classList.add('on');
-  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2100);
+  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2400);
 }
+
+const ERR_TEXT = {
+  email_taken: 'Email này người khác trong lớp đã dùng.',
+  email_invalid: 'Email chưa đúng định dạng.',
+  email_required: 'Cần điền email.',
+  forbidden: 'Bạn không có quyền làm việc này.',
+  forbidden_assign: 'Chỉ trưởng hoặc phó nhóm mới giao được phần bài.',
+  last_officer: 'Không bỏ trống được: nhóm phải còn ít nhất một trưởng hoặc phó.',
+  url_must_be_https: 'Đường dẫn phải bắt đầu bằng https://',
+  rate_limited: 'Bạn thử hơi nhiều lần. Chờ một lát rồi làm lại.',
+  mailer_not_configured: 'Chưa cấu hình gửi thư — nhắn trưởng nhóm để lấy link mời.',
+};
+const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
 
 /* ═══════════ GỌI API ═══════════ */
 async function api(path, opts = {}) {
@@ -28,17 +50,25 @@ const apiPut = (p, body) => api(p, { method: 'PUT', body: JSON.stringify(body ??
 const apiDelete = p => api(p, { method: 'DELETE' });
 
 /* ═══════════ TRẠNG THÁI ═══════════ */
-let HOME = null; // kết quả /api/home gần nhất, header và "Hôm nay" dùng chung
+let HOME = null;      // /api/home gần nhất
+let PLAN = null;      // /api/plan gần nhất
+let MEMBERS = [];     // /api/members gần nhất
 
-function iAmOfficer() {
-  return !!HOME?.officers?.some(o => o.member_id === HOME.me.id);
+const iAmOfficer = () => !!HOME?.officers?.some(o => o.member_id === HOME.me.id);
+
+async function refreshHome() {
+  HOME = await apiGet('/api/home');
+  drawHead(); drawNay();
+}
+async function ensureMembers() {
+  if (!MEMBERS.length) MEMBERS = (await apiGet('/api/members')).members;
+  return MEMBERS;
 }
 
-/* ═══════════ SHEET DÙNG CHUNG ═══════════ */
+/* ═══════════ SHEET ═══════════ */
 function ensureVeil() {
   if ($('#veil')) return;
-  document.body.insertAdjacentHTML('beforeend',
-    `<div class="veil" id="veil"><div class="sheet" id="sheet"></div></div>`);
+  document.body.insertAdjacentHTML('beforeend', `<div class="veil" id="veil"><div class="sheet" id="sheet"></div></div>`);
   $('#veil').addEventListener('click', e => { if (e.target.id === 'veil') closeSheet(); });
 }
 function openSheet(html) {
@@ -46,19 +76,36 @@ function openSheet(html) {
   $('#sheet').innerHTML = '<div class="grab"></div>' + html;
   $('#veil').classList.add('on');
 }
-function closeSheet() { $('#veil')?.classList.remove('on'); }
+const closeSheet = () => $('#veil')?.classList.remove('on');
+
+// Bọc nút Lưu: khoá nút khi đang gửi, hiện lỗi nói được thành lời khi hỏng.
+async function submitting(btn, fn, okMsg) {
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Đang lưu…';
+  try {
+    await fn();
+    closeSheet();
+    if (okMsg) toast(okMsg);
+    return true;
+  } catch (e) {
+    toast(errText(e));
+    btn.disabled = false; btn.textContent = label;
+    return false;
+  }
+}
 
 /* ═══════════ MÀN NHẬN LINK MỜI (/i/:token) ═══════════ */
 async function renderClaim(token) {
   document.body.classList.add('noapp');
-  const root = $('#root');
-  root.innerHTML = `<div class="claimwrap"><div class="claimcard" id="claimcard">Đang tải…</div></div>`;
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard" id="claimcard">Đang tải…</div></div>`;
   let data;
   try {
     data = await apiGet(`/api/invite/${encodeURIComponent(token)}`);
   } catch (e) {
     $('#claimcard').innerHTML = `<div class="lb">Link mời</div><h1>Không mở được link này</h1>
-      <div class="err">Link đã hết hạn hoặc không đúng. Nhắn cho trưởng nhóm để xin gửi lại.</div>`;
+      <div class="err">${e.status === 429 ? 'Thử hơi nhiều lần, chờ một lát rồi mở lại.'
+        : 'Link đã hết hạn hoặc không đúng. Nhắn cho trưởng nhóm để xin gửi lại.'}</div>
+      <div style="margin-top:16px"><button class="wide" onclick="location.href='/'">Về trang chính</button></div>`;
     return;
   }
   const { member, group } = data;
@@ -66,50 +113,93 @@ async function renderClaim(token) {
     <div class="lb">${esc(group.label)} · Khoá K03</div>
     <h1>${member.already_claimed ? 'Sửa lại hồ sơ của bạn' : `Chào ${esc(short(member.full_name))}`}</h1>
     <p class="sub">${member.already_claimed
-      ? 'Bạn đã xác nhận hồ sơ trước đó — sửa lại nếu có gì đổi, hoặc bấm thẳng "Vào ứng dụng".'
+      ? 'Bạn đã xác nhận hồ sơ trước đó — sửa lại nếu có gì đổi rồi bấm lưu.'
       : 'Thông tin lấy từ danh sách Ban tổ chức, có chỗ đã cũ hoặc sai. Sửa lại cho đúng rồi xác nhận.'}</p>
     <label class="f">Họ tên</label><input value="${esc(member.full_name)}" disabled>
     <label class="f">Email <span style="color:var(--due)">*</span></label>
-    <input id="cEmail" value="${esc(member.email)}" placeholder="ten@congty.vn" inputmode="email">
-    <div class="hintline">Dùng để đăng nhập lại từ lần sau (Đợt 2).</div>
-    <label class="f">Điện thoại</label><input id="cPhone" value="${esc(member.phone)}" placeholder="09xx xxx xxx" inputmode="tel">
-    <label class="f">Chức vụ</label><input id="cTitle" value="${esc(member.title)}">
-    <label class="f">Đơn vị</label><input id="cCompany" value="${esc(member.company)}">
+    <input id="cEmail" value="${esc(member.email)}" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
+    <div class="hintline">Dùng để tự đăng nhập lại nếu mất link này.</div>
+    <label class="f">Điện thoại</label><input id="cPhone" value="${esc(member.phone)}" placeholder="09xx xxx xxx" inputmode="tel" maxlength="30">
+    <label class="f">Chức vụ</label><input id="cTitle" value="${esc(member.title)}" maxlength="120">
+    <label class="f">Đơn vị</label><input id="cCompany" value="${esc(member.company)}" maxlength="160">
     <div id="cErr" class="errline" style="display:none"></div>
     <button class="wide" id="cSubmit">${member.already_claimed ? 'Lưu' : 'Xác nhận hồ sơ'}</button>`;
 
+  const showErr = msg => { $('#cErr').textContent = msg; $('#cErr').style.display = 'block'; };
   $('#cSubmit').onclick = async () => {
     const email = $('#cEmail').value.trim();
-    if (!email) {
-      $('#cErr').textContent = 'Cần điền email để dùng lần sau.';
-      $('#cErr').style.display = 'block';
-      $('#cEmail').style.boxShadow = 'inset 0 0 0 2px var(--due)';
-      return;
-    }
-    $('#cSubmit').textContent = 'Đang lưu…';
+    if (!email) { showErr('Cần điền email để dùng lần sau.'); return; }
+    const label = $('#cSubmit').textContent;
+    $('#cSubmit').disabled = true; $('#cSubmit').textContent = 'Đang lưu…';
     try {
       await apiPost(`/api/invite/${encodeURIComponent(token)}/claim`, {
-        email, phone: $('#cPhone').value.trim(), title: $('#cTitle').value.trim(), company: $('#cCompany').value.trim(),
+        email, phone: $('#cPhone').value, title: $('#cTitle').value, company: $('#cCompany').value,
       });
       history.replaceState({}, '', '/');
-      document.body.classList.remove('noapp');
       boot();
     } catch (e) {
-      $('#cErr').textContent = 'Không lưu được — thử lại.';
-      $('#cErr').style.display = 'block';
-      $('#cSubmit').textContent = member.already_claimed ? 'Lưu' : 'Xác nhận hồ sơ';
+      showErr(errText(e));
+      $('#cSubmit').disabled = false; $('#cSubmit').textContent = label;
     }
   };
 }
 
-/* ═══════════ CHƯA ĐĂNG NHẬP ═══════════ */
+/* ═══════════ ĐĂNG NHẬP LẠI BẰNG EMAIL ═══════════ */
+async function renderMagicConsume(token) {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard"><h1>Đang đưa bạn vào…</h1></div></div>`;
+  try {
+    await apiPost(`/api/auth/email/${encodeURIComponent(token)}`);
+    history.replaceState({}, '', '/');
+    boot();
+  } catch (e) {
+    $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+      <div class="lb">Đăng nhập</div><h1>Link này không dùng được nữa</h1>
+      <div class="err">Link đăng nhập chỉ dùng một lần và hết hạn sau 15 phút. Xin một link mới.</div>
+      <div style="margin-top:16px"><button class="wide" id="again">Xin link mới</button></div>
+    </div></div>`;
+    $('#again').onclick = renderLogin;
+  }
+}
+
+function renderLogin() {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+    <div class="lb">k3vaceo · Khoá K03</div>
+    <h1>Đăng nhập</h1>
+    <p class="sub">Nhập email bạn đã khai lúc nhận link mời. Chúng tôi gửi một đường dẫn đăng nhập tới hộp thư đó.</p>
+    <label class="f">Email</label><input id="lgEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
+    <div id="lgMsg" class="hintline" style="display:none"></div>
+    <button class="wide" id="lgSend">Gửi link đăng nhập</button>
+    <div class="foot" style="padding:14px 0 0">Chưa từng nhận link mời? Nhắn trưởng hoặc phó nhóm — Đợt 1 chỉ vào được bằng link mời riêng.</div>
+  </div></div>`;
+  $('#lgSend').onclick = async () => {
+    const email = $('#lgEmail').value.trim();
+    if (!email) return;
+    const btn = $('#lgSend');
+    btn.disabled = true; btn.textContent = 'Đang gửi…';
+    try {
+      await apiPost('/api/auth/email', { email });
+      $('#lgMsg').style.display = 'block';
+      $('#lgMsg').innerHTML = 'Nếu email này có trong lớp, đường dẫn đăng nhập vừa được gửi tới đó. Link sống 15 phút.';
+      btn.textContent = 'Đã gửi';
+    } catch (e) {
+      $('#lgMsg').style.display = 'block';
+      $('#lgMsg').style.color = 'var(--due)';
+      $('#lgMsg').textContent = errText(e);
+      btn.disabled = false; btn.textContent = 'Gửi link đăng nhập';
+    }
+  };
+}
+
 function renderNoSession() {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
-    <div class="lb">k3vaceo</div><h1>Cần link mời từ trưởng nhóm</h1>
-    <p class="sub">Đợt 1 mới nhận diện qua link mời riêng cho từng người. Nếu bạn đã có link, mở lại đúng link đó.
-    Chưa có thì nhắn trưởng hoặc phó nhóm để xin gửi lại.</p>
+    <div class="lb">k3vaceo · Khoá K03</div><h1>Chưa đăng nhập</h1>
+    <p class="sub">Mở đúng link mời riêng trưởng nhóm đã gửi, hoặc đăng nhập bằng email bạn đã khai.</p>
+    <button class="wide" id="toLogin">Đăng nhập bằng email</button>
   </div></div>`;
+  $('#toLogin').onclick = renderLogin;
 }
 
 /* ═══════════ KHUNG ỨNG DỤNG ═══════════ */
@@ -149,12 +239,12 @@ function route() {
   document.querySelectorAll('.nb').forEach(x => x.classList.toggle('on', x.dataset.v === v));
   $('#v-' + v).classList.add('on');
   window.scrollTo({ top: 0, behavior: 'instant' });
+  if (v === 'bai') drawBai();
   if (v === 'nhom') drawNhom();
   if (v === 'kho') drawKho('all');
-  if (v === 'bai') drawSoon('bai');
-  if (v === 'quy') drawSoon('quy');
+  if (v === 'quy') drawQuySoon();
 }
-function go(v) { location.hash = '#/' + v; }
+const go = v => { location.hash = '#/' + v; };
 
 /* ─── Đầu trang ─── */
 function drawHead() {
@@ -165,15 +255,20 @@ function drawHead() {
 
   const sections = HOME.progress.sections;
   $('#rail').innerHTML = sections.map(s =>
-    `<button class="seg ${s.pct === 0 ? 'zero' : ''}" title="${esc(s.title)}" onclick="location.hash='#/bai'">
-      <i style="width:${s.pct}%"></i></button>`).join('');
+    `<button class="seg ${s.pct === 0 ? 'zero' : ''}" title="${esc(s.title)}" data-goto-bai="1"><i style="width:${s.pct}%"></i></button>`).join('');
+  document.querySelectorAll('#rail [data-goto-bai]').forEach(b => { b.onclick = () => go('bai'); });
   $('#pAll').textContent = HOME.progress.overall_pct + '%';
   $('#pOwn').innerHTML = HOME.progress.mine_count
     ? `Bạn giữ <b class="num">${HOME.progress.mine_count}</b> phần`
     : `<span style="color:var(--due)">Bạn chưa nhận phần nào</span>`;
 
   if (HOME.cohort?.defense_on) {
-    const days = Math.ceil((new Date(HOME.cohort.defense_on) - new Date()) / 86400000);
+    // So theo ngày lịch địa phương: new Date('2026-09-26') là nửa đêm UTC nên
+    // ở múi giờ Việt Nam số ngày sẽ nhảy lúc 7 giờ sáng thay vì lúc nửa đêm.
+    const [y, mo, d] = HOME.cohort.defense_on.split('-').map(Number);
+    const target = new Date(y, mo - 1, d);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const days = Math.round((target - today) / 86400000);
     $('#cdN').textContent = days > 0 ? days : 0;
   }
 }
@@ -181,7 +276,6 @@ function drawHead() {
 /* ─── Hôm nay ─── */
 function drawNay() {
   const a = HOME.action;
-  const targetHash = { profile: null, plan: '#/bai', fund: '#/quy', insight: '#/bai' }[a.target];
   $('#v-nay').innerHTML = `
   <div class="hero">
     <div class="lb">Việc của bạn</div>
@@ -200,49 +294,238 @@ function drawNay() {
             ? `<div class="nm">${esc(o.full_name)}</div><div class="co">${esc(o.title || '')}${o.title && o.company ? ' · ' : ''}${esc(o.company || '')}</div>`
             : `<div class="nm">Chưa có ai nhận</div>`}
           <div class="src">${esc(o?.note || '')}</div></div>
-        ${iAmOfficer() ? `<button class="ico" data-role="${role}" data-label="${esc(label)}">✎</button>` : ''}
+        ${iAmOfficer() ? `<button class="ico" data-role="${role}" data-label="${esc(label)}" aria-label="Sửa ${esc(label)}">✎</button>` : ''}
       </div>`;
     }).join('')}</div>
+    ${iAmOfficer() ? `<button class="wide ghost" id="inviteBtn" style="margin-top:10px">Phát link mời cho người chưa vào</button>` : ''}
   </div>
   <div class="sect">
     <div class="eb">Đang diễn ra</div>
     <div class="card"><div class="cb" style="padding:4px 16px">
       ${HOME.feed.length ? HOME.feed.map(f => `<div class="fd">${avatar(f.actor_name)}
           <div class="x"><b>${esc(short(f.actor_name))}</b> ${esc(f.summary)}</div>
-          <span class="t">${new Date(f.created_at).toLocaleDateString('vi-VN')}</span></div>`).join('')
+          <span class="t">${vnDate(f.created_at)}</span></div>`).join('')
         : '<div class="cb mut">Chưa có hoạt động nào.</div>'}
     </div></div>
   </div>`;
 
   $('#heroCta').onclick = () => {
     if (a.target === 'profile') openMemberEdit(HOME.me.id);
-    else if (targetHash) location.hash = targetHash;
+    else if (a.target === 'plan') go('bai');
+    else if (a.target === 'insight') { go('bai'); setTimeout(openInsightAdd, 260); }
+    else if (a.target === 'fund') go('quy');
   };
   document.querySelectorAll('#v-nay .ico[data-role]').forEach(btn => {
     btn.onclick = () => openOfficerEdit(btn.dataset.role, btn.dataset.label);
   });
+  if ($('#inviteBtn')) $('#inviteBtn').onclick = openInviteSheet;
+}
+
+/* ─── Phát link mời ─── */
+async function openInviteSheet() {
+  openSheet(`<h3>Phát link mời</h3><p class="sub">Đang lấy danh sách…</p>`);
+  let data;
+  try { data = await apiPost('/api/wizard/invites'); }
+  catch (e) { closeSheet(); toast(errText(e)); return; }
+
+  const lines = data.lines;
+  openSheet(`
+   <h3>Phát link mời</h3>
+   <p class="sub">${lines.length ? 'Mỗi người một link riêng. Chép cả khối rồi dán vào Zalo nhóm.' : 'Cả nhóm đã nhận tên xong — không còn ai cần link.'}</p>
+   ${lines.length ? `<div class="card"><div class="cb" style="padding:0 14px">
+     ${lines.map(l => `<div class="fd"><div class="x"><b>${esc(l.full_name)}</b>
+       <div style="font-size:11.5px;color:var(--ink3);word-break:break-all;margin-top:2px">
+         ${l.url ? esc(l.url) : 'đã phát trước đó — dùng nút phát lại ở tab Nhóm'}</div></div></div>`).join('')}
+   </div></div>
+   <button class="wide" id="copyAll" style="margin-top:12px">Chép cả khối</button>` : ''}
+   <div class="sa"><button class="big c" id="ivClose">Đóng</button></div>`);
+  $('#ivClose').onclick = closeSheet;
+  if ($('#copyAll')) $('#copyAll').onclick = async () => {
+    try { await navigator.clipboard.writeText(data.text); toast('Đã chép — dán vào Zalo nhóm'); }
+    catch { toast('Trình duyệt không cho chép tự động — chép tay giúp nhé'); }
+  };
+}
+
+/* ─── Bài ─── */
+async function drawBai() {
+  if (!$('#v-bai').dataset.loaded) $('#v-bai').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
+  PLAN = await apiGet('/api/plan');
+  $('#v-bai').dataset.loaded = '1';
+  const { plan, sections, suggestions, insights, overall_pct, can_assign } = PLAN;
+  const topicDone = plan.topic_product && plan.topic_customers;
+
+  $('#v-bai').innerHTML = `
+  <div class="rub">
+    <div class="rc"><div class="p">40%</div><div class="l">Thuyết trình</div>
+      <ul><li>Không quá 20 phút</li><li>Trả lời hội đồng</li><li>Nhiều người cùng nói</li></ul></div>
+    <div class="rc"><div class="p">60%</div><div class="l">Bài viết</div>
+      <ul><li>Tính khả thi</li><li>Số liệu có nguồn</li><li>Đủ bảy phần</li><li>Nhiều người cùng viết</li></ul></div>
+  </div>
+  <div class="foot" style="padding:0 2px 18px">
+    Mục “khả năng làm việc nhóm” được chấm ở cả hai nửa. Nhật ký ở màn hình Hôm nay tự ghi ai làm gì —
+    đến 26/9 nó là bằng chứng, không phải lời nói.
+  </div>
+
+  <div class="eb">Đề tài</div>
+  <div class="card"><div class="cb">
+    ${topicDone
+      ? `<div class="fi"><div class="k">Sản phẩm / dịch vụ</div><div class="v">${esc(plan.topic_product)}</div></div>
+         <div class="fi" style="margin-bottom:0"><div class="k">Khách hàng mục tiêu</div><div class="v">${esc(plan.topic_customers)}</div></div>`
+      : `<div style="font-weight:600;margin-bottom:4px;color:var(--due)">Nhóm chưa chốt đề tài</div>
+         <div class="mut">Chưa có sản phẩm và khách hàng mục tiêu thì bảy phần sau đều treo.</div>`}
+    ${can_assign ? `<button class="wide ghost" id="topicBtn" style="margin-top:13px;padding:11px;font-size:14px">
+        ${topicDone ? 'Sửa đề tài' : 'Chốt đề tài'}</button>` : ''}
+  </div></div>
+
+  <div class="eb" style="margin-top:26px">Tám phần <span class="c">${overall_pct}%</span></div>
+  <div class="card">${sections.map(s => {
+    const sg = suggestions[String(s.ord)];
+    return `<button class="pt ${s.pct === 0 ? 'zero' : ''}" data-section="${s.id}">
+      <span class="pnum">${s.ord === 0 ? '—' : '0' + s.ord}</span>
+      <div class="pbd">
+        <h4>${esc(s.title)}</h4>
+        <div class="rq">${esc(s.requirement)}</div>
+        ${s.owner_member_id
+          ? `<div class="own">${avatar(s.owner_name)} ${esc(short(s.owner_name))}</div>`
+          : sg ? `<span class="hint">✦ hợp với ${esc(short(sg.full_name))}</span>`
+               : `<span class="tg due">chưa ai nhận</span>`}
+        ${s.note ? `<div class="rq" style="margin-top:7px;margin-bottom:0">Còn thiếu: ${esc(s.note)}</div>` : ''}
+        <div class="pbar"><i style="width:${s.pct}%"></i></div>
+      </div>
+      <span class="pct">${s.pct}%</span></button>`;
+  }).join('')}</div>
+
+  <div class="eb" style="margin-top:28px">Tâm đắc <span class="c">${insights.length}</span></div>
+  ${insights.length ? insights.map(q => `<div class="q">
+      <blockquote>“${esc(q.body)}”</blockquote>
+      <div class="qf"><span class="w">${esc(q.speaker)}</span><span>·</span><span>${vnDate(q.heard_on)}</span>
+        ${q.section_ord !== null && q.section_ord !== undefined ? `<span class="tg">→ phần ${q.section_ord}</span>` : ''}
+        ${q.created_by === HOME.me.id || iAmOfficer() ? `<button class="lnk" data-del-insight="${q.id}">gỡ</button>` : ''}
+      </div></div>`).join('')
+    : `<div class="card"><div class="cb mut">Chưa ghi câu nào. Nghe được câu hay trong buổi học thì ghi lại — nó chảy thẳng vào bài.</div></div>`}
+  <button class="wide ghost" id="addInsight" style="margin-top:6px">+ Ghi một câu vừa nghe được</button>
+  <div class="foot">Câu nào ghi lại cũng nên gắn vào một phần — ghi xong là bài dày thêm.</div>`;
+
+  document.querySelectorAll('#v-bai [data-section]').forEach(b => {
+    b.onclick = () => openSectionEdit(Number(b.dataset.section));
+  });
+  document.querySelectorAll('#v-bai [data-del-insight]').forEach(b => {
+    b.onclick = async () => {
+      try { await apiDelete(`/api/insights/${b.dataset.delInsight}`); toast('Đã gỡ'); await drawBai(); await refreshHome(); }
+      catch (e) { toast(errText(e)); }
+    };
+  });
+  $('#addInsight').onclick = openInsightAdd;
+  if ($('#topicBtn')) $('#topicBtn').onclick = openTopicEdit;
+}
+
+function openTopicEdit() {
+  const p = PLAN.plan;
+  openSheet(`
+   <h3>Đề tài của nhóm</h3>
+   <p class="sub">Bản mẫu của giảng viên dựng quanh một sản phẩm mới — không bắt buộc phải là công ty có sẵn của ai.</p>
+   <label class="f">Sản phẩm hoặc dịch vụ</label>
+   <textarea id="tP" maxlength="300" placeholder="Nhóm định làm gì">${esc(p.topic_product)}</textarea>
+   <label class="f">Khách hàng mục tiêu</label>
+   <textarea id="tC" maxlength="300" placeholder="Bán cho ai">${esc(p.topic_customers)}</textarea>
+   <div class="sa"><button class="big c" id="tCancel">Thôi</button>
+     <button class="big go" id="tSave">Lưu</button></div>`);
+  $('#tCancel').onclick = closeSheet;
+  $('#tSave').onclick = () => submitting($('#tSave'), async () => {
+    await apiPatch('/api/plan/topic', { topic_product: $('#tP').value, topic_customers: $('#tC').value });
+    await drawBai(); await refreshHome();
+  }, 'Đã lưu đề tài');
+}
+
+async function openSectionEdit(sectionId) {
+  const s = PLAN.sections.find(x => x.id === sectionId);
+  const sg = PLAN.suggestions[String(s.ord)];
+  const canAssign = PLAN.can_assign;
+  const iOwn = s.owner_member_id === HOME.me.id;
+  const members = PLAN.members;
+
+  openSheet(`
+   <h3>${s.ord === 0 ? '' : 'Phần ' + s.ord + ' · '}${esc(s.title)}</h3>
+   <p class="sub">${esc(s.requirement)}</p>
+   ${sg && canAssign ? `<div class="card" style="margin-bottom:14px"><div class="cb" style="display:flex;align-items:center;gap:11px">
+     ${avatar(sg.full_name)}<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--go);font-weight:600">Gợi ý theo chức vụ</div>
+     <div style="font-size:14px;font-weight:600">${esc(sg.full_name)}</div>
+     <div style="font-size:12.5px;color:var(--ink2)">${esc(sg.title)}</div></div>
+     <button class="tg go" style="padding:7px 12px" id="pickSg">Chọn</button>
+   </div></div>` : ''}
+   ${canAssign ? `<label class="f">Ai phụ trách</label>
+     <select id="sOwner"><option value="">— chưa ai nhận —</option>
+       ${members.map(m => `<option value="${m.id}" ${s.owner_member_id === m.id ? 'selected' : ''}>${esc(m.full_name)}${m.title ? ' · ' + esc(m.title) : ''}</option>`).join('')}
+     </select>`
+    : `<label class="f">Ai phụ trách</label>
+       <div class="ro">${s.owner_name ? esc(s.owner_name) : 'chưa ai nhận'} <span style="color:var(--ink3)">· chỉ trưởng hoặc phó nhóm đổi được</span></div>`}
+   ${canAssign || iOwn ? `
+     <label class="f">Đã xong bao nhiêu phần trăm</label>
+     <input id="sPct" type="number" min="0" max="100" value="${s.pct}" inputmode="numeric">
+     <label class="f">Còn thiếu gì</label>
+     <textarea id="sNote" maxlength="500" placeholder="Đã có số liệu nào, còn thiếu nguồn nào.">${esc(s.note)}</textarea>`
+    : `<div class="hintline" style="margin-top:14px">Bạn không giữ phần này nên không sửa được tiến độ. Nhắn ${s.owner_name ? esc(short(s.owner_name)) : 'trưởng nhóm'} nếu cần đổi.</div>`}
+   <div class="sa"><button class="big c" id="sCancel">Thôi</button>
+     ${canAssign || iOwn ? `<button class="big go" id="sSave">Lưu</button>` : ''}</div>`);
+
+  $('#sCancel').onclick = closeSheet;
+  if ($('#pickSg')) $('#pickSg').onclick = () => { $('#sOwner').value = String(sg.id); };
+  if ($('#sSave')) $('#sSave').onclick = () => submitting($('#sSave'), async () => {
+    const payload = { pct: Number($('#sPct').value || 0), note: $('#sNote').value };
+    if (canAssign) payload.owner_member_id = $('#sOwner').value === '' ? null : Number($('#sOwner').value);
+    await apiPatch(`/api/plan/sections/${sectionId}`, payload);
+    await drawBai(); await refreshHome();
+  }, 'Đã cập nhật');
+}
+
+function openInsightAdd() {
+  const sections = PLAN?.sections ?? [];
+  openSheet(`
+   <h3>Câu vừa nghe được</h3>
+   <p class="sub">Hai dòng là đủ. Ghi tên người nói kể cả khi họ chưa dùng ứng dụng.</p>
+   <label class="f">Câu nói</label>
+   <textarea id="iBody" maxlength="1000" placeholder="Chép đại ý, không cần đúng từng chữ."></textarea>
+   <label class="f">Ai nói</label><input id="iWho" maxlength="120" placeholder="Giảng viên buổi 5 / tên người trong nhóm">
+   <label class="f">Chảy vào phần nào</label>
+   <select id="iSec"><option value="">— chưa gắn phần nào —</option>
+     ${sections.map(s => `<option value="${s.id}">${s.ord === 0 ? '—' : 'Phần ' + s.ord} · ${esc(s.title)}</option>`).join('')}</select>
+   <div class="sa"><button class="big c" id="iCancel">Thôi</button>
+     <button class="big go" id="iSave">Ghi lại</button></div>`);
+  $('#iCancel').onclick = closeSheet;
+  setTimeout(() => $('#iBody')?.focus(), 240);
+  $('#iSave').onclick = async () => {
+    if (!$('#iBody').value.trim()) { $('#iBody').style.boxShadow = 'inset 0 0 0 2px var(--due)'; return; }
+    await submitting($('#iSave'), async () => {
+      await apiPost('/api/insights', {
+        body: $('#iBody').value, speaker: $('#iWho').value,
+        section_id: $('#iSec').value === '' ? null : Number($('#iSec').value),
+      });
+      if (!location.hash.includes('bai')) go('bai'); else await drawBai();
+      await refreshHome();
+    }, 'Đã ghi, và đã gắn vào bài');
+  };
 }
 
 /* ─── Nhóm ─── */
-let MEMBERS_CACHE = [];
 async function drawNhom() {
-  $('#v-nhom').innerHTML = `<div class="foot" style="padding:0 2px 16px">Đang tải…</div>`;
-  const { members } = await apiGet('/api/members');
-  MEMBERS_CACHE = members;
+  if (!$('#v-nhom').dataset.loaded) $('#v-nhom').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
+  MEMBERS = (await apiGet('/api/members')).members;
+  $('#v-nhom').dataset.loaded = '1';
+  const officer = iAmOfficer();
+
   $('#v-nhom').innerHTML = `
   <div class="foot" style="padding:0 2px 16px">
     Hồ sơ lấy từ danh sách Ban tổ chức, có chỗ sai và có chỗ đã cũ.
-    <b style="color:var(--ink)">Ai cũng tự sửa được hồ sơ của mình</b> — không cần xin ai.
+    <b style="color:var(--ink)">Ai cũng tự sửa được hồ sơ của mình</b>, và sửa hộ được cho người cùng nhóm.
   </div>
-  <div class="eb">Thành viên <span class="c">${members.filter(m => m.claimed).length}/${members.length}</span></div>
+  <div class="eb">Thành viên <span class="c">${MEMBERS.filter(m => m.claimed).length}/${MEMBERS.length}</span></div>
   <div class="card">
-    ${members.map(m => {
-      const f = m.profile_filled;
-      return `<button class="mrow" data-toggle="${m.id}">
+    ${MEMBERS.map(m => `
+      <button class="mrow" data-toggle="${m.id}">
         ${avatar(m.full_name)}
-        <div class="b"><div class="nm">${esc(m.full_name)}</div>
+        <div class="b"><div class="nm">${esc(m.full_name)}${m.claimed ? '' : '<span class="tg due" style="font-size:10px;padding:1px 7px">chưa vào</span>'}</div>
           <div class="co">${esc(m.title || '')}${m.title && m.company ? ' · ' : ''}${esc(m.company || '')}</div></div>
-        <span class="ring ${f === 4 ? 'full' : 'part'}">${f === 4 ? '✓' : f}</span>
+        <span class="ring ${m.profile_filled === 4 ? 'full' : 'part'}">${m.profile_filled === 4 ? '✓' : m.profile_filled}</span>
       </button>
       <div class="pan" id="pan${m.id}">
         <div class="fi"><div class="k">Liên hệ</div>
@@ -255,15 +538,16 @@ async function drawNhom() {
         <div class="fi"><div class="k">Bán cho ai</div><div class="v ${m.profile.sells_to ? '' : 'blank'}">${esc(m.profile.sells_to) || 'Chưa điền'}</div></div>
         <div class="fi"><div class="k">Cần gì ở nhóm</div><div class="v ${m.profile.needs ? '' : 'blank'}">${esc(m.profile.needs) || 'Chưa điền'}</div></div>
         <div class="fi"><div class="k">Giúp được gì</div><div class="v ${m.profile.offers ? '' : 'blank'}">${esc(m.profile.offers) || 'Chưa điền'}</div></div>
-        <button class="wide" style="padding:11px;font-size:14px" data-edit="${m.id}">
+        <button class="wide ghost" style="padding:11px;font-size:14px" data-edit="${m.id}">
           ${m.id === HOME.me.id ? 'Sửa hồ sơ của tôi' : 'Sửa giúp — rồi báo lại chính chủ'}</button>
-      </div>`;
-    }).join('')}
-  </div>`;
+        ${officer ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" data-invite="${m.id}">Phát lại link mời cho người này</button>` : ''}
+      </div>`).join('')}
+  </div>
+  <div class="foot">Ai biết số điện thoại người còn trống thì điền hộ, chính chủ sửa lại sau.</div>`;
 
   document.querySelectorAll('#v-nhom [data-toggle]').forEach(btn => {
     btn.onclick = () => {
-      const id = btn.dataset.toggle, panel = $('#pan' + id), was = panel.classList.contains('on');
+      const panel = $('#pan' + btn.dataset.toggle), was = panel.classList.contains('on');
       document.querySelectorAll('#v-nhom .pan').forEach(p => p.classList.remove('on'));
       if (!was) panel.classList.add('on');
     };
@@ -271,71 +555,90 @@ async function drawNhom() {
   document.querySelectorAll('#v-nhom [data-edit]').forEach(btn => {
     btn.onclick = () => openMemberEdit(Number(btn.dataset.edit));
   });
+  document.querySelectorAll('#v-nhom [data-invite]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        const r = await apiPost(`/api/members/${btn.dataset.invite}/invite`);
+        openSheet(`<h3>Link mời cho ${esc(r.full_name)}</h3>
+          <p class="sub">Link cũ của người này đã bị vô hiệu. Gửi link dưới đây qua Zalo.</p>
+          <div class="card"><div class="cb" style="word-break:break-all;font-size:13px">${esc(r.url)}</div></div>
+          <div class="sa"><button class="big c" id="ivC">Đóng</button><button class="big go" id="ivCopy">Chép link</button></div>`);
+        $('#ivC').onclick = closeSheet;
+        $('#ivCopy').onclick = async () => {
+          try { await navigator.clipboard.writeText(r.url); toast('Đã chép link'); } catch { toast('Chép tay giúp nhé'); }
+        };
+      } catch (e) { toast(errText(e)); }
+    };
+  });
 }
 
-function openMemberEdit(id) {
-  const m = MEMBERS_CACHE.find(x => x.id === id) || { id, ...HOME.me, profile: {} };
+// Luôn đọc hồ sơ từ máy chủ trước khi mở form. Lấy từ bộ nhớ đệm sẽ có lúc
+// đệm còn rỗng (vừa đăng nhập, bấm thẳng "Điền nốt" ở Hôm nay) — khi đó form
+// hiện trống và bấm Lưu sẽ xoá sạch chức vụ, đơn vị, số điện thoại đang có.
+async function openMemberEdit(id) {
+  openSheet(`<h3>Hồ sơ</h3><p class="sub">Đang tải…</p>`);
+  let m;
+  try { m = (await apiGet(`/api/members/${id}`)).member; }
+  catch (e) { closeSheet(); toast(errText(e)); return; }
+
   const own = id === HOME.me.id;
   openSheet(`
    <h3>${esc(m.full_name)}</h3>
    <p class="sub">${own ? 'Ban tổ chức ghi có chỗ sai thì sửa thẳng ở đây, không cần xin ai.'
                         : 'Bạn đang sửa hộ. Sửa xong nhớ nhắn cho chính chủ một câu.'}</p>
-   <label class="f">Điện thoại</label><input id="eP" value="${esc(m.phone)}" placeholder="09xx xxx xxx" inputmode="tel">
-   <label class="f">Chức vụ</label><input id="eT" value="${esc(m.title)}">
-   <label class="f">Đơn vị</label><input id="eC" value="${esc(m.company)}">
-   <label class="f">Bán gì</label><input id="eA" value="${esc(m.profile?.sells_what)}" maxlength="80">
-   <label class="f">Bán cho ai</label><input id="eB" value="${esc(m.profile?.sells_to)}" maxlength="80">
-   <label class="f">Cần gì ở nhóm</label><input id="eD" value="${esc(m.profile?.needs)}" maxlength="80">
-   <label class="f">Giúp được gì cho nhóm</label><input id="eE" value="${esc(m.profile?.offers)}" maxlength="80">
+   ${own ? `<label class="f">Email</label><input id="eEmail" value="${esc(m.email)}" inputmode="email" maxlength="160">
+            <div class="hintline">Dùng để tự đăng nhập lại nếu mất link mời.</div>` : ''}
+   <label class="f">Điện thoại</label><input id="eP" value="${esc(m.phone)}" placeholder="09xx xxx xxx" inputmode="tel" maxlength="30">
+   <label class="f">Chức vụ</label><input id="eT" value="${esc(m.title)}" maxlength="120">
+   <label class="f">Đơn vị</label><input id="eC" value="${esc(m.company)}" maxlength="160">
+   <label class="f">Bán gì</label><input id="eA" value="${esc(m.profile.sells_what)}" maxlength="80">
+   <label class="f">Bán cho ai</label><input id="eB" value="${esc(m.profile.sells_to)}" maxlength="80">
+   <label class="f">Cần gì ở nhóm</label><input id="eD" value="${esc(m.profile.needs)}" maxlength="80">
+   <label class="f">Giúp được gì cho nhóm</label><input id="eE" value="${esc(m.profile.offers)}" maxlength="80">
+   <div class="hintline">Hai dòng cuối là chỗ cả nhóm dùng đến khi chia việc.</div>
    <div class="sa"><button class="big c" id="eCancel">Thôi</button>
      <button class="big go" id="eSave">Lưu</button></div>`);
+
   $('#eCancel').onclick = closeSheet;
-  $('#eSave').onclick = async () => {
-    $('#eSave').disabled = true; $('#eSave').textContent = 'Đang lưu…';
-    try {
-      await apiPatch(`/api/members/${id}`, { title: $('#eT').value, company: $('#eC').value, phone: $('#eP').value });
-      await apiPut(`/api/members/${id}/profile`, {
-        sells_what: $('#eA').value, sells_to: $('#eB').value, needs: $('#eD').value, offers: $('#eE').value,
-      });
-      closeSheet(); toast('Đã lưu');
-      HOME = await apiGet('/api/home'); drawHead(); drawNay();
-      if (!$('#v-nhom').classList.contains('on')) { /* nothing */ } else drawNhom();
-    } catch (e) {
-      toast('Không lưu được — thử lại');
-      $('#eSave').disabled = false; $('#eSave').textContent = 'Lưu';
-    }
-  };
+  $('#eSave').onclick = () => submitting($('#eSave'), async () => {
+    const patch = { title: $('#eT').value, company: $('#eC').value, phone: $('#eP').value };
+    if (own) patch.email = $('#eEmail').value;
+    await apiPatch(`/api/members/${id}`, patch);
+    await apiPut(`/api/members/${id}/profile`, {
+      sells_what: $('#eA').value, sells_to: $('#eB').value, needs: $('#eD').value, offers: $('#eE').value,
+    });
+    await refreshHome();
+    if ($('#v-nhom').dataset.loaded) await drawNhom();
+  }, 'Đã lưu');
 }
 
-function openOfficerEdit(role, label) {
+async function openOfficerEdit(role, label) {
+  const members = await ensureMembers();
+  const current = HOME.officers.find(o => o.role === role);
   openSheet(`
    <h3>${esc(label)}</h3>
-   <p class="sub">Ghi vào đây kèm ghi chú nguồn, để không ai phải hỏi lại.</p>
+   <p class="sub">Ghi kèm ghi chú nguồn, để sau không ai phải hỏi lại bản nào đang đúng.</p>
    <label class="f">Là ai</label>
    <select id="oM"><option value="">— còn trống —</option>
-     ${MEMBERS_CACHE.map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}</select>
-   <label class="f">Ghi chú nguồn</label><input id="oN" placeholder="chốt trong buổi họp nhóm ngày…">
+     ${members.map(m => `<option value="${m.id}" ${current?.member_id === m.id ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select>
+   <label class="f">Ghi chú nguồn</label>
+   <input id="oN" maxlength="200" placeholder="chốt trong buổi họp nhóm ngày…" value="${esc(current?.note)}">
    <div class="sa"><button class="big c" id="oCancel">Thôi</button>
      <button class="big go" id="oSave">Ghi vào</button></div>`);
   $('#oCancel').onclick = closeSheet;
-  $('#oSave').onclick = async () => {
-    $('#oSave').disabled = true;
-    try {
-      const v = $('#oM').value;
-      await apiPut('/api/officers', { role, member_id: v ? Number(v) : null, note: $('#oN').value });
-      closeSheet(); toast('Đã cập nhật cơ cấu');
-      HOME = await apiGet('/api/home'); drawHead(); drawNay();
-    } catch (e) {
-      toast('Không lưu được — thử lại'); $('#oSave').disabled = false;
-    }
-  };
+  $('#oSave').onclick = () => submitting($('#oSave'), async () => {
+    const v = $('#oM').value;
+    await apiPut('/api/officers', { role, member_id: v === '' ? null : Number(v), note: $('#oN').value });
+    await refreshHome();
+  }, 'Đã cập nhật cơ cấu');
 }
 
 /* ─── Kho ─── */
 const KHO_FILTERS = [['all', 'Tất cả'], ['bai', 'Cho bài'], ['buoi', 'Theo buổi'], ['lop', 'Lớp K03']];
 async function drawKho(tag) {
-  $('#v-kho').innerHTML = `<div class="foot" style="padding:0 2px 14px">Đang tải…</div>`;
-  const { links } = await apiGet(tag && tag !== 'all' ? `/api/links?tag=${tag}` : '/api/links');
+  if (!$('#v-kho').dataset.loaded) $('#v-kho').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
+  const { links } = await apiGet(tag && tag !== 'all' ? `/api/links?tag=${encodeURIComponent(tag)}` : '/api/links');
+  $('#v-kho').dataset.loaded = '1';
   $('#v-kho').innerHTML = `
   <div class="foot" style="padding:0 2px 14px">
     Kho chỉ giữ đường dẫn. File vẫn nằm ở Drive của người làm ra nó — ứng dụng không chứa,
@@ -343,13 +646,13 @@ async function drawKho(tag) {
   </div>
   <div class="fl">${KHO_FILTERS.map(([k, l]) => `<button class="fc ${tag === k ? 'on' : ''}" data-tag="${k}">${l}</button>`).join('')}</div>
   <div class="card">${links.length ? links.map(r => r.url
-      ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener">
+      ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">
           <span class="ext">${esc(r.kind)}</span><div class="b"><div class="t">${esc(r.title)}</div>
-          <div class="m">${new Date(r.created_at).toLocaleDateString('vi-VN')}</div></div><span style="color:var(--ink3)">↗</span></a>`
+          <div class="m">${vnDate(r.created_at)}</div></div><span style="color:var(--ink3)">↗</span></a>`
       : `<div class="rs" style="cursor:default"><span class="ext">${esc(r.kind)}</span>
           <div class="b"><div class="t">${esc(r.title)}</div><div class="m">chưa có đường dẫn — điền khi có</div></div></div>`
     ).join('') : '<div class="cb mut">Chưa có liên kết nào trong mục này.</div>'}</div>
-  <button class="wide" style="margin-top:12px;background:transparent;color:var(--ink2);box-shadow:inset 0 0 0 1px var(--line2)" id="addLinkBtn">+ Gắn một liên kết</button>
+  <button class="wide ghost" style="margin-top:12px" id="addLinkBtn">+ Gắn một liên kết</button>
   <div class="foot"></div>`;
 
   document.querySelectorAll('#v-kho [data-tag]').forEach(btn => { btn.onclick = () => drawKho(btn.dataset.tag); });
@@ -360,8 +663,8 @@ function openLinkAdd() {
   openSheet(`
    <h3>Gắn liên kết</h3>
    <p class="sub">Chỉ dán đường dẫn https — file để nguyên chỗ cũ.</p>
-   <label class="f">Đường dẫn</label><input id="lU" placeholder="https://…" inputmode="url">
-   <label class="f">Gọi là gì</label><input id="lN" placeholder="Báo cáo thị trường FMCG 2025">
+   <label class="f">Đường dẫn</label><input id="lU" placeholder="https://…" inputmode="url" maxlength="2000">
+   <label class="f">Gọi là gì</label><input id="lN" maxlength="200" placeholder="Báo cáo thị trường FMCG 2025">
    <label class="f">Loại</label><select id="lK"><option>DRIVE</option><option>SHEET</option><option>DOCX</option><option>PDF</option><option>WEB</option></select>
    <label class="f">Dùng cho</label><select id="lT"><option value="bai">Cho bài</option><option value="buoi">Theo buổi</option><option value="lop">Lớp K03</option></select>
    <div id="lErr" class="errline" style="display:none"></div>
@@ -369,26 +672,24 @@ function openLinkAdd() {
      <button class="big go" id="lSave">Gắn vào</button></div>`);
   $('#lCancel').onclick = closeSheet;
   $('#lSave').onclick = async () => {
-    const url = $('#lU').value.trim();
-    if (!/^https:\/\//i.test(url)) {
-      $('#lErr').textContent = 'Cần đường dẫn bắt đầu bằng https://'; $('#lErr').style.display = 'block'; return;
+    if (!/^https:\/\//i.test($('#lU').value.trim())) {
+      $('#lErr').textContent = 'Cần đường dẫn bắt đầu bằng https://';
+      $('#lErr').style.display = 'block'; return;
     }
-    $('#lSave').disabled = true;
-    try {
-      await apiPost('/api/links', { url, title: $('#lN').value.trim(), kind: $('#lK').value, tag: $('#lT').value });
-      closeSheet(); toast('Đã gắn vào Kho'); drawKho('all');
-    } catch (e) {
-      $('#lErr').textContent = 'Không gắn được — thử lại.'; $('#lErr').style.display = 'block'; $('#lSave').disabled = false;
-    }
+    await submitting($('#lSave'), async () => {
+      await apiPost('/api/links', {
+        url: $('#lU').value.trim(), title: $('#lN').value, kind: $('#lK').value, tag: $('#lT').value,
+      });
+      await drawKho('all'); await refreshHome();
+    }, 'Đã gắn vào Kho');
   };
 }
 
-/* ─── Bài / Quỹ — chưa tới đợt, hiện tạm ─── */
-function drawSoon(which) {
-  const info = which === 'bai'
-    ? { ic: '📋', h: 'Bài 8 phần đang lên Đợt 2', p: 'Gợi ý phân công, tiến độ và tâm đắc sẽ có ở Đợt 2 (hạn 4/9). Dùng tạm nhóm Zalo trong lúc chờ.' }
-    : { ic: '💳', h: 'Quỹ đang lên Đợt 3', p: 'Mã QR theo đợt và tự khai sẽ có ở Đợt 3 (hạn 11/9), sau khi có đủ thông tin tài khoản người thu.' };
-  $('#v-' + which).innerHTML = `<div class="soon"><div class="ic">${info.ic}</div><h3>${esc(info.h)}</h3><p>${esc(info.p)}</p></div>`;
+/* ─── Quỹ — chưa tới đợt ─── */
+function drawQuySoon() {
+  $('#v-quy').innerHTML = `<div class="soon"><div class="ic">💳</div>
+    <h3>Quỹ đang lên Đợt 3</h3>
+    <p>Mã QR theo đợt và tự khai sẽ có ở Đợt 3 (hạn 11/9), sau khi có đủ thông tin tài khoản người thu.</p></div>`;
 }
 
 /* ─── Tài khoản ─── */
@@ -403,25 +704,27 @@ function openMe() {
   $('#meLogout').onclick = async () => {
     await apiPost('/api/auth/logout');
     closeSheet();
-    HOME = null;
+    HOME = null; PLAN = null; MEMBERS = [];
     renderNoSession();
   };
 }
 
 /* ═══════════ KHỞI ĐỘNG ═══════════ */
-async function renderApp() {
+function renderApp() {
   document.body.classList.remove('noapp');
   $('#root').innerHTML = shellHtml();
   ensureVeil();
-  document.querySelectorAll('.nb').forEach(b => b.onclick = () => go(b.dataset.v));
+  document.querySelectorAll('.nb').forEach(b => { b.onclick = () => go(b.dataset.v); });
   drawHead();
   drawNay();
   route();
 }
 
 async function boot() {
-  const m = location.pathname.match(/^\/i\/([^/]+)\/?$/);
-  if (m) return renderClaim(m[1]);
+  let m;
+  if ((m = location.pathname.match(/^\/i\/([^/]+)\/?$/))) return renderClaim(m[1]);
+  if ((m = location.pathname.match(/^\/dangnhap\/([^/]+)\/?$/))) return renderMagicConsume(m[1]);
+  if (location.pathname.replace(/\/$/, '') === '/dangnhap') return renderLogin();
 
   try {
     HOME = await apiGet('/api/home');
