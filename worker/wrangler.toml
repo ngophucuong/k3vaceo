@@ -8,8 +8,17 @@ compatibility_date = "2026-08-01"
 binding = "DB"
 database_name = "k3vaceo"
 database_id = "REPLACE_WITH_REAL_DATABASE_ID"
+migrations_dir = "../migrations"
 
 # Bật khi domain k3vaceo.maychudev.com đã trỏ vào Cloudflare (Đợt 1):
 # [[routes]]
 # pattern = "k3vaceo.maychudev.com/api/*"
 # zone_name = "maychudev.com"
+
+# Kiểm thử cục bộ cả API lẫn giao diện trên một cổng: thêm tạm khối dưới đây
+# rồi `wrangler dev` — xem "Kiểm thử cục bộ" trong README.md. KHÔNG commit khối
+# này khi bật — production thật là Pages tách riêng + Worker Route ở trên.
+# [assets]
+# directory = "../public"
+# binding = "ASSETS"
+# run_worker_first = true
