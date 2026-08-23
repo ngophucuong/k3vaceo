@@ -116,11 +116,17 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
 
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 
-- **Chưa deploy lần nào.** Đã có GitHub Actions
-  (`.github/workflows/deploy.yml`) tự deploy khi đẩy lên nhánh chính, nhưng
-  người dùng còn phải đặt ba bí mật ở GitHub (`CLOUDFLARE_API_TOKEN`,
-  `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_D1_DATABASE_ID`) và thêm zone
-  `cuongngo.app` vào Cloudflare. Xem README mục "Deploy tự động từ GitHub".
+- **Chưa deploy lần nào.** Zone `cuongngo.app` đã có trong Cloudflare. README
+  có ba đường: Cách A làm hết trên dashboard (Cloudflare tự kéo code từ
+  GitHub), Cách B dùng GitHub Actions, Cách C chạy wrangler tay. Người dùng
+  nghiêng về Cách A vì không muốn dùng terminal.
+  - Cách A vướng đúng một chỗ: `database_id` bắt buộc phải nằm trong
+    `worker/wrangler.toml` (Cloudflare đọc tệp này khi deploy), nên phải sửa
+    một dòng — sửa được bằng trình soạn thảo web của GitHub.
+  - Cách A **không tự chạy migration mới**. Có migration mới thì dán vào tab
+    Console của D1, hoặc chạy `node scripts/build-setup-sql.mjs` để sinh lại
+    `scripts/setup-d1.sql` (tệp gộp cả sáu migration, có sẵn phần ghi vào
+    `d1_migrations` để wrangler sau này không áp đè).
 - **SMTP cá nhân**: người dùng chọn dùng SMTP riêng nhưng chưa cho biết nhà
   cung cấp/host/tài khoản. Client SMTP đã kiểm thử trọn giao thức bằng server
   giả, chưa bắt tay TLS với máy chủ thật.

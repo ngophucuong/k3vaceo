@@ -38,10 +38,92 @@ migrations/             Schema + dữ liệu D1, áp theo đúng thứ tự file
 scripts/                Công cụ nhập liệu + sinh lời mời đầu tiên
 ```
 
-## Deploy tự động từ GitHub
+## Cách A — làm hoàn toàn trên dashboard Cloudflare
 
-Đẩy code lên nhánh chính là GitHub Actions tự deploy: áp migration D1, deploy
-Worker, đồng bộ bí mật SMTP, rồi deploy Pages. Xem `.github/workflows/deploy.yml`.
+Không cần cài gì trên máy, không mở terminal. Cloudflare tự kéo code từ GitHub.
+Điều kiện: `cuongngo.app` đã có trong tài khoản Cloudflare.
+
+### 1. Tạo cơ sở dữ liệu
+
+**Storage & Databases → D1 → Create** → tên đúng là `k3vaceo`.
+
+Mở tab **Console** của cơ sở dữ liệu vừa tạo, dán toàn bộ nội dung tệp
+[`scripts/setup-d1.sql`](scripts/setup-d1.sql) vào rồi Execute. Tệp này gộp cả
+sáu migration thành một lần chạy, sinh tự động từ chính các migration đó nên
+không lệch. Chạy đúng một lần trên cơ sở dữ liệu trống.
+
+Xong thì ở tab Console gõ thử `SELECT COUNT(*) FROM roster;` — phải ra **134**.
+
+Ở trang cơ sở dữ liệu, chép lại **Database ID** (dạng UUID) để dùng ở bước sau.
+
+### 2. Sửa đúng một dòng trong code
+
+Đây là chỗ duy nhất không làm trên Cloudflare được: `database_id` phải nằm
+trong `worker/wrangler.toml`, vì Cloudflare đọc tệp này khi deploy.
+
+Mở [`worker/wrangler.toml`](worker/wrangler.toml) trên GitHub → bấm bút chì →
+thay `REPLACE_WITH_REAL_DATABASE_ID` bằng Database ID vừa chép → Commit. Vẫn
+là trình duyệt, không cần terminal.
+
+### 3. Tạo Worker (API) nối với GitHub
+
+**Workers & Pages → Create → Workers → Import a repository**, chọn repo này rồi
+đặt:
+
+| Ô | Điền |
+|---|---|
+| Project name | `k3vaceo-api` |
+| Branch | `claude/read-content-deployment-plan-dpsv8m` |
+| Build command | `npm install` |
+| Deploy command | `npx wrangler deploy --config worker/wrangler.toml` |
+| Root directory | để trống (gốc repo) |
+
+Binding D1 và biến `RP_ID` đã khai sẵn trong `wrangler.toml` nên Cloudflare tự
+gắn — không phải thêm tay. Worker Route `k3vaceo.cuongngo.app/api/*` cũng khai
+sẵn, deploy xong là tự có.
+
+### 4. Tạo Pages (giao diện) nối với GitHub
+
+**Workers & Pages → Create → Pages → Connect to Git**, chọn cùng repo:
+
+| Ô | Điền |
+|---|---|
+| Project name | `k3vaceo` |
+| Production branch | `claude/read-content-deployment-plan-dpsv8m` |
+| Framework preset | None |
+| Build command | để trống |
+| Build output directory | `public` |
+
+Giao diện là HTML/CSS/JS thuần nên không có bước build — để trống là đúng.
+
+Deploy xong: project Pages → **Custom domains → Set up a domain** →
+`k3vaceo.cuongngo.app`.
+
+### 5. Bí mật SMTP (tuỳ chọn, cho đăng nhập lại bằng email)
+
+Worker `k3vaceo-api` → **Settings → Variables and Secrets → Add**, kiểu
+**Secret**, sáu biến: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+`SMTP_PASS`, `MAIL_FROM`. Bỏ qua cũng được — link mời vẫn chạy bình thường,
+chỉ riêng đăng nhập bằng email báo chưa cấu hình.
+
+### 6. Kiểm tra
+
+Mở `https://k3vaceo.cuongngo.app/api/health` — phải ra
+`{"ok":true,"roster_total":134,"groups_total":10,"group6_members":14,...}`.
+
+Từ đây, mỗi lần đẩy code lên nhánh chính là Cloudflare tự deploy lại cả hai.
+**Lưu ý:** Cloudflare không tự chạy migration mới. Có migration mới thì dán
+phần thêm vào tab Console của D1, hoặc chuyển sang Cách B bên dưới.
+
+---
+
+## Cách B — deploy tự động từ GitHub Actions
+
+Khác Cách A ở chỗ: Actions **tự chạy migration** mỗi lần deploy, nên thêm
+migration mới không phải đụng tay vào D1. Đổi lại phải tạo API token.
+
+Chưa đặt bí mật thì workflow bỏ qua êm (báo notice, không báo hỏng) — chọn
+Cách A thì không phải nhìn dấu X đỏ ở mỗi commit.
 
 ### Bạn cần chuẩn bị ở Cloudflare — đúng ba thứ
 
@@ -103,7 +185,7 @@ Kiểm tra: `https://k3vaceo.cuongngo.app/api/health` phải trả về
 trong danh sách HSTS nạp sẵn của trình duyệt nên luôn bắt buộc HTTPS, hợp với
 yêu cầu của passkey.
 
-## Triển khai bằng tay (nếu không dùng GitHub Actions)
+## Cách C — triển khai bằng tay từ máy của bạn
 
 ```bash
 npm install
