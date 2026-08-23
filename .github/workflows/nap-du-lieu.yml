@@ -63,7 +63,12 @@ jobs:
       # Không thì đánh hỏng job để thấy ngay ở tab Actions, khỏi phải tự đi soi.
       - name: Kiểm tra kết quả
         run: |
-          $WRANGLER --file=scripts/verify-d1.sql --json > /tmp/kq.json || {
+          # PHẢI dùng --command, KHÔNG dùng --file. Với --remote thì --file đi qua
+          # đường "import" của D1, và đường đó chỉ trả về bản tóm tắt
+          # (Total queries executed / Rows read / …) chứ KHÔNG trả về các dòng
+          # mà câu SELECT sinh ra. Dùng --file ở đây thì parser đọc ra undefined.
+          SQL=$(grep -v '^[[:space:]]*--' scripts/verify-d1.sql)
+          $WRANGLER --command "$SQL" --json > /tmp/kq.json || {
             echo "::error::Không chạy được truy vấn kiểm tra."; cat /tmp/kq.json; exit 1; }
           # --input-type=commonjs vì package.json của repo khai "type": "module",
           # mà node -e lấy chế độ theo package.json gần nhất — thiếu cờ này thì
