@@ -1,0 +1,134 @@
+name: Phát link mời đầu tiên
+
+# Con gà quả trứng: muốn phát link mời trong ứng dụng thì phải đăng nhập đã, mà
+# muốn đăng nhập lần đầu thì phải có link mời. Workflow này phá vòng đó bằng
+# cách ghi thẳng một lời mời vào D1.
+#
+# CHỈ dùng cho lần đầu, hoặc khi kẹt ngoài ứng dụng. Sau khi vào được thì phát
+# link cho người khác bằng nút trong ứng dụng, đừng chạy lại chỗ này.
+#
+# LƯU Ý VỀ BẢO MẬT: đường link in ra trong log của Actions. Repo riêng tư nên
+# chỉ chủ repo đọc được, nhưng nó vẫn là một lối vào tài khoản. Vì vậy hạn mặc
+# định chỉ 120 phút, và mỗi lần chạy tự huỷ mọi lời mời chưa dùng trước đó của
+# đúng người này — nghĩa là token in ở lần chạy cũ chết ngay.
+on:
+  workflow_dispatch:
+    inputs:
+      ho_ten:
+        description: 'Họ tên đúng như trong bảng members'
+        type: string
+        default: 'Ngô Phú Cường'
+      so_phut:
+        description: 'Link sống được bao nhiêu phút'
+        type: string
+        default: '120'
+  push:
+    paths: ['.github/phat-link-moi.trigger']
+
+concurrency:
+  group: phat-link-moi
+  cancel-in-progress: false
+
+jobs:
+  phat:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
+      HO_TEN: ${{ inputs.ho_ten || 'Ngô Phú Cường' }}
+      SO_PHUT: ${{ inputs.so_phut || '120' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Kiểm tra bí mật
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Chưa đặt bí mật Cloudflare."; exit 1
+          fi
+
+      - run: npm ci
+
+      # Bảng chữ cái bỏ các ký tự dễ đọc nhầm (0/O, 1/l/I) — link này có khi
+      # phải đọc qua điện thoại. Giống hệt scripts/bootstrap-invite.mjs.
+      - name: Sinh token
+        run: |
+          node --input-type=commonjs -e '
+            const crypto = require("crypto"), fs = require("fs");
+            const BANG = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+            let token = "";
+            for (const b of crypto.randomBytes(22)) token += BANG[b % BANG.length];
+            fs.writeFileSync("/tmp/token", token);
+            fs.writeFileSync("/tmp/hash", crypto.createHash("sha256").update(token).digest("hex"));
+          '
+
+      # Đọc một con số từ kết quả --json của wrangler. Cố ý KHÔNG dùng
+      # meta.changes: D1 thật có trả trường đó nhưng bản chạy cục bộ thì không,
+      # nên phép kiểm dựa vào nó chỉ đúng một nửa số môi trường. Đếm bằng truy
+      # vấn thì ở đâu cũng đúng.
+      - name: Chuẩn bị bộ đọc kết quả
+        run: |
+          cat > /tmp/doc-so.cjs <<'EOF'
+          const raw = require("fs").readFileSync(process.argv[2], "utf8");
+          const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
+          if (d < 0 || c < d) { console.error("Không tìm thấy JSON:\n" + raw.slice(0, 1000)); process.exit(1); }
+          const kq = JSON.parse(raw.slice(d, c + 1));
+          const dong = (Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || []);
+          process.stdout.write(String(dong.length ? dong[0][process.argv[3]] : ""));
+          EOF
+
+      - name: Kiểm tra người này có trong bảng members
+        run: |
+          ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
+          $WRANGLER --json --command "SELECT COUNT(*) AS n FROM members
+            WHERE full_name = '$ten' AND is_active = 1;" > /tmp/co.json
+          n=$(node /tmp/doc-so.cjs /tmp/co.json n)
+          if [ "$n" != "1" ]; then
+            echo "::error::Tìm thấy $n người tên '$HO_TEN' trong bảng members (cần đúng 1). Kiểm tra lại họ tên, gõ y hệt kể cả dấu."
+            exit 1
+          fi
+          echo "✓ tìm thấy đúng 1 người"
+
+      # Huỷ lời mời cũ TRƯỚC khi tạo cái mới: token đã in ở lần chạy trước
+      # cũng nằm trong log, nên để nó sống là để lại một lối vào không ai canh.
+      - name: Huỷ lời mời chưa dùng trước đó
+        run: |
+          ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
+          $WRANGLER --command "UPDATE invites SET used_at = datetime('now')
+            WHERE kind = 'invite' AND used_at IS NULL
+              AND member_id = (SELECT id FROM members WHERE full_name = '$ten');" >/dev/null
+          echo "✓ đã huỷ lời mời cũ (nếu có)"
+
+      - name: Ghi lời mời mới rồi đọc lại để chắc chắn
+        run: |
+          ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
+          hash=$(cat /tmp/hash)
+          $WRANGLER --command "INSERT INTO invites (member_id, token_hash, kind, expires_at, created_at)
+            SELECT id, '$hash', 'invite', datetime('now', '+$SO_PHUT minutes'), datetime('now')
+              FROM members WHERE full_name = '$ten';" >/dev/null
+
+          # Đọc lại bằng đúng điều kiện mà Worker dùng khi phân giải token
+          # (kind, chưa dùng, chưa hết hạn) — nghĩa là kiểm đúng thứ sẽ chạy.
+          $WRANGLER --json --command "SELECT COUNT(*) AS n FROM invites
+            WHERE token_hash = '$hash' AND kind = 'invite'
+              AND used_at IS NULL AND expires_at > datetime('now');" > /tmp/moi.json
+          n=$(node /tmp/doc-so.cjs /tmp/moi.json n)
+          if [ "$n" != "1" ]; then
+            echo "::error::Đọc lại thấy $n lời mời hợp lệ chứ không phải 1."; exit 1
+          fi
+          echo "✓ lời mời đã vào D1 và còn hiệu lực"
+
+      - name: In đường link
+        run: |
+          echo "════════════════════════════════════════════════════════"
+          echo "  LINK ĐĂNG NHẬP CHO: $HO_TEN   (sống $SO_PHUT phút)"
+          echo ""
+          echo "  https://k3vaceo.cuongngo.app/i/$(cat /tmp/token)"
+          echo ""
+          echo "  Mở link → điền email → xong là vào thẳng, có phiên đăng nhập."
+          echo "  Vào rồi thì đăng ký passkey ngay để lần sau khỏi cần link."
+          echo "════════════════════════════════════════════════════════"
