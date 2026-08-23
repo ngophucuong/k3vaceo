@@ -84,9 +84,13 @@ là trình duyệt, không cần terminal.
 |---|---|
 | Project name | `k3vaceo-api` |
 | Branch | `claude/read-content-deployment-plan-dpsv8m` |
-| Build command | `npm install` |
+| Build command | `npm install --include=dev` |
 | Deploy command | `npx wrangler deploy --config worker/wrangler.toml` |
 | Root directory | để trống (gốc repo) |
+
+`--include=dev` là bắt buộc: môi trường build của Cloudflare đặt sẵn
+`NODE_ENV=production`, mà `wrangler` nằm ở `devDependencies` — thiếu cờ này thì
+`npx wrangler` phải tải bản mới nhất từ mạng, không đúng bản đã ghim.
 
 Binding D1 và biến `RP_ID` đã khai sẵn trong `wrangler.toml` nên Cloudflare tự
 gắn — không phải thêm tay. Worker Route `k3vaceo.cuongngo.app/api/*` cũng khai
