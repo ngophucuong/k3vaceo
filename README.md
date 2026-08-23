@@ -7,6 +7,17 @@ không framework — xem `SRS v1.0` mục 8.
 > Đang tiếp tục dự án này? Đọc `CLAUDE.md` trước — nó ghi bối cảnh, các quy
 > ước đã chốt, cạm bẫy của môi trường và việc còn treo.
 
+## Đang chạy thật
+
+**https://k3vaceo.cuongngo.app** — Pages phục vụ giao diện, Worker Route cướp
+`/api/*`, D1 đã nạp đủ 134 học viên. Mọi thứ deploy qua GitHub Actions; đẩy code
+lên nhánh chính là tự deploy rồi tự kiểm tra tên miền thật.
+
+Một điểm gợn còn lại: API token thiếu **Zone → Workers Routes → Edit** cho zone
+`cuongngo.app`, nên `wrangler` không hoà hợp được route (route hiện có vẫn chạy,
+mã Worker vẫn deploy được). Hệ quả: **sửa `pattern` route trong
+`worker/wrangler.toml` sẽ không có tác dụng** cho tới khi thêm quyền đó.
+
 Trạng thái hiện tại: **Đợt 1, 2, 3 và 4** xong.
 
 - Đợt 1 — nhận diện qua link mời, hồ sơ tự sửa (và sửa hộ), cơ cấu nhóm có
