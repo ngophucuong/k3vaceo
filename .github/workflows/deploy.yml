@@ -66,18 +66,24 @@ jobs:
         if: steps.check.outputs.skip != 'true'
         run: npx wrangler pages deploy public --project-name=k3vaceo --branch="$NHANH" --commit-dirty=true
 
-      # Tạo Worker Route trên zone cuongngo.app cần quyền zone, khác với quyền
-      # account để tải mã Worker lên. Thiếu quyền thì mã lên được mà route thì
-      # không, nên bắt lỗi riêng và nói thẳng thiếu quyền nào.
+      # Tải mã Worker lên là quyền cấp ACCOUNT; tạo Worker Route là quyền cấp
+      # ZONE — hai thứ khác nhau, Workers Scripts:Edit không kéo theo. Thiếu
+      # quyền zone thì mã vẫn lên được, chỉ route là không. Ở đây KHÔNG chết
+      # ngay: ghi nhận rồi chạy tiếp để bước kiểm tra cuối vẫn nói được tình
+      # hình thật của tên miền. Cuối job mới đánh hỏng.
       - name: Deploy Worker (API)
+        id: worker
         if: steps.check.outputs.skip != 'true'
         working-directory: worker
         run: |
           set -o pipefail
-          if ! npx wrangler deploy 2>&1 | tee /tmp/worker.log; then
-            if grep -qiE 'route|zone|authorization|authentication|10000|9109' /tmp/worker.log; then
-              echo "::error::Tải mã Worker có thể đã xong nhưng Worker Route thì chưa. API token cần thêm quyền cấp zone cho cuongngo.app: 'Zone → Workers Routes → Edit' và 'Zone → Zone → Read'. Thêm xong bấm Re-run job."
-            fi
+          if npx wrangler deploy 2>&1 | tee /tmp/worker.log; then
+            echo "route_loi=" >> "$GITHUB_OUTPUT"
+          elif grep -q 'workers/routes' /tmp/worker.log; then
+            echo "route_loi=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Mã Worker đã tải lên nhưng KHÔNG tạo được Worker Route. API token thiếu quyền cấp zone cho cuongngo.app: Zone → Workers Routes → Edit. Chạy tiếp để xem tình hình tên miền."
+          else
+            echo "::error::Deploy Worker hỏng vì lý do khác route — xem log phía trên."
             exit 1
           fi
 
@@ -102,23 +108,39 @@ jobs:
             printf '%s' "${!name}" | npx wrangler secret put "$name"
           done
 
-      # Chưa gắn custom domain cho Pages thì bước này còn đỏ — gắn được bằng
-      # dashboard thôi, wrangler không có lệnh cho việc đó. Vì vậy chỉ cảnh báo.
-      - name: Kiểm tra sau khi deploy
+      # Chứng chỉ SSL của custom domain mất vài phút mới cấp xong, nên thử lại
+      # vài lượt chứ đừng kết luận vội. Và phân biệt cho rõ: trả về JSON là
+      # Worker Route đã chen được vào; trả về HTML là request rơi xuống Pages
+      # (vì _redirects có luật bắt tất cả /* → /index.html).
+      - name: Kiểm tra tên miền thật
+        id: kiemtra
         if: steps.check.outputs.skip != 'true'
         run: |
-          echo "Chờ Cloudflare lan cấu hình…"
-          sleep 20
-          code=$(curl -s -o /tmp/health.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/health || true)
-          echo "HTTP $code"; cat /tmp/health.json 2>/dev/null || true; echo
+          for lan in 1 2 3 4 5 6; do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' \
+                   -H 'Accept: application/json' \
+                   https://k3vaceo.cuongngo.app/api/health || echo 000)
+            echo "lần $lan: HTTP $code"
+            [ "$code" = "200" ] && break
+            [ "$lan" = "6" ] || sleep 20
+          done
+          echo "--- nội dung nhận được (2000 ký tự đầu) ---"
+          head -c 2000 /tmp/health.json 2>/dev/null; echo
+
           if [ "$code" != "200" ]; then
-            echo "::warning::/api/health chưa trả 200. Thường là vì chưa gắn custom domain k3vaceo.cuongngo.app cho project Pages — làm ở Cloudflare → Workers & Pages → k3vaceo → Custom domains."
+            echo "::warning::/api/health chưa trả 200 (HTTP $code). Nếu custom domain còn 'pending' thì chờ Cloudflare cấp chứng chỉ rồi chạy lại."
             exit 0
           fi
+
+          if ! head -c 1 /tmp/health.json | grep -q '{'; then
+            echo "::warning::Tên miền sống rồi nhưng /api/health trả về HTML chứ không phải JSON — request rơi xuống Pages, tức Worker Route CHƯA chen vào được."
+            exit 0
+          fi
+
           node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
-            const mong = { roster_total: 134, groups_total: 10, group6_members: 14,
-                           group6_truong_nhom: "Ngô Phú Cường" };
+            const mong = { ok: true, roster_total: 134, groups_total: 10,
+                           group6_members: 14, group6_truong_nhom: "Ngô Phú Cường" };
             let sai = 0;
             for (const [k, v] of Object.entries(mong)) {
               const ok = d[k] === v;
@@ -126,5 +148,13 @@ jobs:
               console.log(`${ok ? "✓" : "✗"} ${k}: ${JSON.stringify(d[k])} (mong đợi ${JSON.stringify(v)})`);
             }
             if (sai) { console.error(`::error::${sai} chỗ lệch ở /api/health.`); process.exit(1); }
-            console.log("\n✓ /api/health đúng hết. Ứng dụng đã chạy thật.");
+            console.log("\n✓ /api/health đúng hết. Ứng dụng đã chạy thật trên tên miền.");
           '
+
+      # Đến đây mới đánh hỏng job nếu route chưa tạo được — để phần kiểm tra
+      # phía trên kịp chạy và báo cáo.
+      - name: Kết luận
+        if: steps.check.outputs.skip != 'true' && steps.worker.outputs.route_loi == 'true'
+        run: |
+          echo "::error::Worker Route k3vaceo.cuongngo.app/api/* chưa tạo được. Thêm quyền Zone → Workers Routes → Edit (phạm vi cuongngo.app) vào API token rồi bấm Re-run all jobs."
+          exit 1
