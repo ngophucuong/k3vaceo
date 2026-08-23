@@ -154,11 +154,24 @@ không phải ĐÚNG HẾT.
 
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 
-- **D1 đã dựng và nạp xong thật** (23/8). `database_id` thật nằm trong
-  `worker/wrangler.toml`. Nạp bằng workflow `.github/workflows/nap-du-lieu.yml`,
-  kết quả ĐÚNG HẾT: 134 học viên, 10 nhóm, 90 số điện thoại, Nhóm 6 đủ 14 thành
-  viên và 8 phần bài, trưởng nhóm Ngô Phú Cường. Còn lại: deploy Worker + Pages.
-- **Chưa deploy lần nào.** Zone `cuongngo.app` đã có trong Cloudflare. README
+- **Trạng thái deploy thật (23/8)** — tất cả chạy qua GitHub Actions, không
+  dùng Git integration của dashboard:
+  - ✅ **D1** dựng và nạp xong. `database_id` thật trong `worker/wrangler.toml`.
+    Kiểm tra ra ĐÚNG HẾT: 134 học viên, 10 nhóm, 90 số điện thoại, Nhóm 6 đủ 14
+    thành viên và 8 phần bài, trưởng nhóm Ngô Phú Cường.
+  - ✅ **Pages** `k3vaceo` đã tạo và deploy.
+  - ✅ **Worker** `k3vaceo-api` đã tải mã lên, có binding D1 và biến `RP_ID`.
+    (Lần đầu wrangler cảnh báo đè lên bản placeholder tạo bằng dashboard —
+    đúng như mong đợi.)
+  - ❌ **Worker Route** `k3vaceo.cuongngo.app/api/*` CHƯA tạo được. API token
+    thiếu quyền **Zone → Workers Routes → Edit** cho zone `cuongngo.app`
+    (`Authentication error [code: 10000]`). `Zone → Zone → Read` thì đã có —
+    wrangler tra được zone id rồi mới chết ở bước tạo route.
+  - ❌ **Custom domain của Pages** chưa gắn. Chỗ này **bắt buộc làm tay trên
+    dashboard**, wrangler không có lệnh. Nó cũng chính là chỗ sinh ra bản ghi
+    DNS cho `k3vaceo.cuongngo.app`, mà không có bản ghi đó thì Worker Route có
+    tạo được cũng không ai gọi tới.
+- Zone `cuongngo.app` đã có trong Cloudflare. README
   có ba đường: Cách A làm hết trên dashboard (Cloudflare tự kéo code từ
   GitHub), Cách B dùng GitHub Actions, Cách C chạy wrangler tay. Người dùng
   nghiêng về Cách A vì không muốn dùng terminal.
