@@ -208,6 +208,17 @@ main{padding-top:18px}
 .st-mid{color:var(--due)}
 .st-no{color:var(--ink3)}
 
+/* ─── BẢNG PHÂN CÔNG THUYẾT TRÌNH ─── */
+.prow{display:flex;align-items:center;gap:13px;padding:11px 16px;border-bottom:1px solid var(--line)}
+.prow:last-child{border-bottom:0}
+.prow .pnum{padding-top:0}
+.prow .pbd{flex:1;min-width:0}
+
+/* ─── THẺ WIZARD (rộng hơn thẻ đăng nhập) ─── */
+.claimcard.wide-card{max-width:460px}
+.claimcard .opt{margin-bottom:8px}
+.claimcard .fd input[type=checkbox]{accent-color:var(--go);width:18px;height:18px;flex:0 0 auto}
+
 /* ─── SẮP CÓ ─── */
 .soon{background:var(--surf);border-radius:var(--r);box-shadow:var(--sh);padding:26px 20px;text-align:center}
 .soon .ic{font-size:26px;margin-bottom:10px}

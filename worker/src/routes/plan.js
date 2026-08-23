@@ -16,8 +16,11 @@ export async function getPlan(env, me) {
   const [sectionsRes, membersRes, insightsRes] = await Promise.all([
     env.DB.prepare(
       `SELECT ps.id, ps.ord, ps.title, ps.requirement, ps.pct, ps.note, ps.owner_member_id,
-              m.full_name AS owner_name
-       FROM plan_sections ps LEFT JOIN members m ON m.id = ps.owner_member_id
+              ps.present_member_id, ps.present_minutes,
+              m.full_name AS owner_name, pm.full_name AS present_name
+       FROM plan_sections ps
+       LEFT JOIN members m ON m.id = ps.owner_member_id
+       LEFT JOIN members pm ON pm.id = ps.present_member_id
        WHERE ps.plan_id = ? ORDER BY ps.ord`
     ).bind(plan.id).all(),
     env.DB.prepare(
@@ -37,6 +40,11 @@ export async function getPlan(env, me) {
   const members = membersRes.results ?? [];
   const overall = sections.length ? Math.round(sections.reduce((s, x) => s + x.pct, 0) / sections.length) : 0;
 
+  // Ba-rem chấm thuyết trình: "không quá 20 phút" và "nhiều người cùng nói" —
+  // tính sẵn cả hai để giao diện khỏi phải cộng lại.
+  const totalMinutes = sections.reduce((n, s) => n + (s.present_minutes || 0), 0);
+  const speakers = new Set(sections.map(s => s.present_member_id).filter(Boolean));
+
   return json({
     plan: { topic_product: plan.topic_product, topic_customers: plan.topic_customers },
     sections,
@@ -44,6 +52,7 @@ export async function getPlan(env, me) {
     suggestions: suggestOwners(members, sections),
     insights: insightsRes.results ?? [],
     overall_pct: overall,
+    presentation: { total_minutes: totalMinutes, limit_minutes: 20, speaker_count: speakers.size },
     can_assign: await canManageGroup(env, me, me.group_id),
   });
 }
@@ -89,10 +98,52 @@ export async function patchSection(request, env, me, sectionId, ip) {
   }
   const note = 'note' in body ? cleanText(body.note, 500) : section.note;
 
+  // Phân công thuyết trình — cùng quyền với gán người phụ trách, vì đây cũng
+  // là quyết định điều phối của cả nhóm chứ không phải việc riêng từng phần.
+  let presentId = section.present_member_id;
+  let presentMinutes = section.present_minutes;
+  const wantsPresentChange = 'present_member_id' in body || 'present_minutes' in body;
+  if (wantsPresentChange) {
+    if (!(await canManageGroup(env, me, me.group_id))) return error('forbidden_assign', 403);
+    if ('present_member_id' in body) {
+      const raw = body.present_member_id;
+      if (raw === null || raw === '') {
+        presentId = null;
+      } else {
+        presentId = Number(raw);
+        if (!Number.isInteger(presentId) || presentId <= 0) return error('owner_invalid', 422);
+        const ok = await env.DB.prepare(
+          'SELECT id FROM members WHERE id = ? AND group_id = ? AND is_active = 1'
+        ).bind(presentId, me.group_id).first();
+        if (!ok) return error('member_not_in_group', 422);
+      }
+    }
+    if ('present_minutes' in body) {
+      const raw = body.present_minutes;
+      if (raw === null || raw === '') {
+        presentMinutes = null;
+      } else {
+        const n = Number(raw);
+        // Chặn ở 20 vì cả bài chỉ có 20 phút — một phần không thể dài hơn cả bài.
+        if (!Number.isInteger(n) || n < 0 || n > 20) return error('minutes_invalid', 422);
+        presentMinutes = n;
+      }
+    }
+  }
+
   await env.DB.prepare(
     `UPDATE plan_sections SET owner_member_id = ?, pct = ?, note = ?,
+       present_member_id = ?, present_minutes = ?,
        updated_at = datetime('now'), updated_by = ? WHERE id = ?`
-  ).bind(ownerId, pct, note, me.id, section.id).run();
+  ).bind(ownerId, pct, note, presentId, presentMinutes, me.id, section.id).run();
+
+  if (wantsPresentChange) {
+    await logActivity(env, {
+      cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+      verb: 'plan.present', objectType: 'plan_section', objectId: section.id,
+      summary: `phân công thuyết trình phần ${section.ord}`,
+    });
+  }
 
   if (wantsOwnerChange && ownerId !== section.owner_member_id) {
     const who = ownerId

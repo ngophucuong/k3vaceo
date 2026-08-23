@@ -221,6 +221,199 @@ function renderLogin() {
   };
 }
 
+/* ═══════════ WIZARD DỰNG NHÓM (/start) ═══════════
+   Mục tiêu mục 5 SRS: một trưởng nhóm bất kỳ tự dựng xong dưới 5 phút, không
+   cần liên hệ ai. Nên gộp các bước bỏ qua được và điền sẵn tối đa. */
+const WZ = { step: 1, person: null, group: null, rosterRest: [], members: [] };
+
+function wzShell(title, sub, body, footer) {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard wide-card">
+    <div class="lb">Dựng không gian nhóm · Khoá K03</div>
+    <h1>${esc(title)}</h1>
+    <p class="sub">${sub}</p>
+    ${body}
+    ${footer ?? ''}
+  </div></div>`;
+}
+
+function renderStart() {
+  WZ.step = 1;
+  wzShell('Bạn là ai', 'Gõ tên bạn để tìm trong danh sách 134 học viên K03. Gõ không dấu cũng được.', `
+    <label class="f">Họ tên</label>
+    <input id="wzQ" placeholder="ví dụ: nguyen van a" autocomplete="off">
+    <div id="wzHits"></div>
+    <div id="wzErr" class="errline" style="display:none"></div>
+    <div class="foot" style="padding:14px 0 0">Không tìm thấy tên mình? Nhắn Ban cán sự lớp — danh sách này lấy nguyên từ bản Ban tổ chức phát ngày 15/8.</div>`);
+
+  let timer;
+  $('#wzQ').oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const q = $('#wzQ').value.trim();
+      if (q.length < 2) { $('#wzHits').innerHTML = ''; return; }
+      try {
+        const { people } = await apiGet(`/api/wizard/roster/search?q=${encodeURIComponent(q)}`);
+        $('#wzHits').innerHTML = people.length
+          ? people.map(p => `<button class="opt" data-pick='${esc(JSON.stringify(p))}'>
+              <div style="flex:1;min-width:0">
+                <div style="font-weight:600;font-size:14.5px">${esc(p.full_name)}</div>
+                <div style="font-size:12.5px;color:var(--ink2)">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
+              </div>
+              ${p.already_member ? '<span class="tg go">đã có nhóm</span>' : ''}</button>`).join('')
+          : `<div class="mut" style="padding:6px 2px">Không có tên nào khớp.</div>`;
+        document.querySelectorAll('#wzHits [data-pick]').forEach(b => {
+          b.onclick = () => wzStep2(JSON.parse(b.dataset.pick));
+        });
+      } catch (e) {
+        $('#wzErr').textContent = errText(e); $('#wzErr').style.display = 'block';
+      }
+    }, 250);
+  };
+  setTimeout(() => $('#wzQ')?.focus(), 200);
+}
+
+function wzStep2(person) {
+  WZ.person = person;
+  const groupNo = Number(String(person.group_label).match(/\d+/)?.[0] ?? 0);
+  wzShell(`Chào ${esc(short(person.full_name))}`,
+    'Danh sách ghi bạn ở nhóm dưới đây. Đổi được nếu bạn đã chuyển nhóm.', `
+    <label class="f">Email của bạn <span style="color:var(--due)">*</span></label>
+    <input id="wzEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
+    <div class="hintline">Dùng để đăng nhập lại nếu mất link.</div>
+    <label class="f">Nhóm của bạn</label>
+    <select id="wzGroup">${Array.from({ length: 10 }, (_, i) => i + 1).map(n =>
+      `<option value="${n}" ${n === groupNo ? 'selected' : ''}>Nhóm ${n}</option>`).join('')}</select>
+    <div id="wzErr" class="errline" style="display:none"></div>
+    <div class="sa"><button class="big c" id="wzBack">Quay lại</button>
+      <button class="big go" id="wzGo">Dựng nhóm này</button></div>`);
+  $('#wzBack').onclick = renderStart;
+  $('#wzGo').onclick = async () => {
+    const email = $('#wzEmail').value.trim();
+    if (!email) { $('#wzErr').textContent = 'Cần điền email.'; $('#wzErr').style.display = 'block'; return; }
+    const btn = $('#wzGo'); btn.disabled = true; btn.textContent = 'Đang dựng…';
+    try {
+      const r = await apiPost('/api/wizard/claim-group', {
+        roster_id: person.roster_id, email, group_no: Number($('#wzGroup').value),
+      });
+      WZ.group = r.group;
+      WZ.rosterRest = r.roster_rest;
+      WZ.members = r.roster_rest.map(x => ({ ...x, keep: true }));
+      wzStep3();
+    } catch (e) {
+      if (e.status === 409 && e.data?.already_claimed) { wzAlreadyClaimed(e.data); return; }
+      $('#wzErr').textContent = errText(e); $('#wzErr').style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Dựng nhóm này';
+    }
+  };
+  setTimeout(() => $('#wzEmail')?.focus(), 200);
+}
+
+// Ràng buộc mục 5: một nhóm chỉ một người dựng. Người thứ hai sang luồng xin vào.
+function wzAlreadyClaimed(info) {
+  const lead = info.lead;
+  wzShell(`${esc(info.group.label)} đã có người dựng`,
+    lead ? `Trưởng nhóm hiện tại là <b>${esc(lead.full_name)}</b>. Nhanh nhất là nhắn thẳng cho anh/chị ấy xin link mời.`
+         : 'Nhóm này đã có người dựng không gian.', `
+    ${lead?.phone ? `<a class="wide" href="tel:${esc(lead.phone)}" style="display:block;text-align:center;text-decoration:none">Gọi ${esc(short(lead.full_name))} · ${esc(lead.phone)}</a>` : ''}
+    ${info.you_are_already_member
+      ? `<div class="foot" style="padding:14px 0 0">Bạn đã có tên trong nhóm rồi — chỉ cần trưởng nhóm phát lại link mời cho bạn.</div>`
+      : `<div class="foot" style="padding:14px 0 6px">Hoặc gửi một yêu cầu xin vào nhóm, trưởng nhóm sẽ thấy khi mở ứng dụng.</div>
+         <label class="f">Nhắn kèm một câu</label>
+         <input id="wzNote" maxlength="200" placeholder="ví dụ: em chuyển từ nhóm 3 sang">
+         <button class="wide ghost" id="wzJoin">Gửi yêu cầu xin vào nhóm</button>`}
+    <div class="sa" style="margin-top:14px"><button class="big c" id="wzBack">Quay lại</button></div>`);
+  $('#wzBack').onclick = renderStart;
+  if ($('#wzJoin')) $('#wzJoin').onclick = async () => {
+    const btn = $('#wzJoin'); btn.disabled = true;
+    try {
+      await apiPost('/api/wizard/join-request', {
+        group_no: info.group.no, full_name: WZ.person.full_name,
+        roster_id: WZ.person.roster_id, note: $('#wzNote').value,
+      });
+      btn.textContent = 'Đã gửi — chờ trưởng nhóm nhận';
+    } catch (e) { toast(errText(e)); btn.disabled = false; }
+  };
+}
+
+function wzStep3() {
+  WZ.step = 3;
+  wzShell(`Thành viên ${esc(WZ.group.label)}`,
+    'Danh sách đổ sẵn từ bản Ban tổ chức. Bỏ tick người không còn trong nhóm, rồi bấm xác nhận.', `
+    <div class="card"><div class="cb" style="padding:2px 14px">
+      ${WZ.members.map((m, i) => `<label class="fd" style="cursor:pointer">
+        <input type="checkbox" data-keep="${i}" checked style="width:auto;margin:6px 0 0">
+        <div class="x"><b>${esc(m.full_name)}</b>
+          <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(m.title || '')}${m.title && m.company ? ' · ' : ''}${esc(m.company || '')}</div></div>
+      </label>`).join('')}
+    </div></div>
+    <div class="foot" style="padding:10px 0 4px">Bạn (<b>${esc(short(WZ.person.full_name))}</b>) đã ở trong nhóm và đang là trưởng nhóm.</div>
+    <div class="sa"><button class="big go" id="wzNext">Xác nhận ${WZ.members.length} người</button></div>`);
+
+  document.querySelectorAll('[data-keep]').forEach(cb => {
+    cb.onchange = () => {
+      WZ.members[Number(cb.dataset.keep)].keep = cb.checked;
+      const n = WZ.members.filter(m => m.keep).length;
+      $('#wzNext').textContent = `Xác nhận ${n} người`;
+    };
+  });
+  $('#wzNext').onclick = () => submitting($('#wzNext'), async () => {
+    const list = WZ.members.filter(m => m.keep)
+      .map(m => ({ roster_id: m.roster_id, full_name: m.full_name, title: m.title, company: m.company, phone: m.phone }));
+    await apiPost('/api/wizard/members', { members: list });
+    wzStep4();
+  });
+}
+
+async function wzStep4() {
+  WZ.step = 4;
+  const { members } = await apiGet('/api/members');
+  wzShell('Đề tài và phó nhóm',
+    'Hai ô này bỏ trống cũng được — điền sau ở màn hình chính. Khung bài tám phần theo hướng dẫn giảng viên sẽ tạo tự động.', `
+    <label class="f">Sản phẩm hoặc dịch vụ</label>
+    <textarea id="wzP" maxlength="300" placeholder="Nhóm định làm gì"></textarea>
+    <label class="f">Khách hàng mục tiêu</label>
+    <textarea id="wzC" maxlength="300" placeholder="Bán cho ai"></textarea>
+    <label class="f">Phó nhóm</label>
+    <select id="wzDep"><option value="">— để trống, chọn sau —</option>
+      ${members.filter(m => m.full_name !== WZ.person.full_name)
+        .map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}</select>
+    <div class="sa"><button class="big go" id="wzNext">Tạo khung bài</button></div>`);
+
+  $('#wzNext').onclick = () => submitting($('#wzNext'), async () => {
+    await apiPost('/api/wizard/plan', { topic_product: $('#wzP').value, topic_customers: $('#wzC').value });
+    const dep = $('#wzDep').value;
+    if (dep) {
+      await apiPut('/api/officers', { role: 'pho_nhom', member_id: Number(dep), note: 'chọn khi dựng nhóm' })
+        .catch(() => { /* không chặn wizard vì một việc bỏ qua được */ });
+    }
+    await wzStep5();
+  });
+}
+
+async function wzStep5() {
+  WZ.step = 5;
+  wzShell('Phát link mời', 'Xong rồi. Chép khối dưới đây dán thẳng vào Zalo nhóm — mỗi người một link riêng.', `
+    <div class="card"><div class="cb" style="padding:0 14px" id="wzLines">Đang sinh link…</div></div>
+    <button class="wide" id="wzCopy" style="margin-top:12px">Chép cả khối</button>
+    <button class="wide ghost" id="wzDone" style="margin-top:10px">Vào ứng dụng</button>`);
+
+  let data;
+  try { data = await apiPost('/api/wizard/invites'); }
+  catch (e) { $('#wzLines').innerHTML = `<div class="mut" style="padding:12px 0">${esc(errText(e))}</div>`; data = { lines: [], text: '' }; }
+
+  $('#wzLines').innerHTML = data.lines.length
+    ? data.lines.map(l => `<div class="fd"><div class="x"><b>${esc(l.full_name)}</b>
+        <div style="font-size:11px;color:var(--ink3);word-break:break-all;margin-top:2px">${esc(l.url ?? '(đã phát trước đó)')}</div></div></div>`).join('')
+    : `<div class="mut" style="padding:12px 0">Không còn ai cần link mời.</div>`;
+
+  $('#wzCopy').onclick = async () => {
+    try { await navigator.clipboard.writeText(data.text); toast('Đã chép — dán vào Zalo nhóm'); }
+    catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
+  };
+  $('#wzDone').onclick = () => { history.replaceState({}, '', '/'); boot(); };
+}
+
 function renderNoSession() {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
@@ -328,6 +521,7 @@ function drawNay() {
     }).join('')}</div>
     ${iAmOfficer() ? `<button class="wide ghost" id="inviteBtn" style="margin-top:10px">Phát link mời cho người chưa vào</button>` : ''}
   </div>
+  <div class="sect" id="joinBox" style="display:none"></div>
   <div class="sect">
     <div class="eb">Đang diễn ra</div>
     <div class="card"><div class="cb" style="padding:4px 16px">
@@ -348,6 +542,51 @@ function drawNay() {
     btn.onclick = () => openOfficerEdit(btn.dataset.role, btn.dataset.label);
   });
   if ($('#inviteBtn')) $('#inviteBtn').onclick = openInviteSheet;
+  if (iAmOfficer()) drawJoinRequests();
+}
+
+// Người ngoài xin vào nhóm (wizard bước 3). Chỉ hiện khi thật sự có yêu cầu —
+// không có thì không chiếm chỗ trên màn hình.
+async function drawJoinRequests() {
+  let requests = [];
+  try { requests = (await apiGet('/api/join-requests')).requests; } catch { return; }
+  const box = $('#joinBox');
+  if (!box || !requests.length) return;
+
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="eb">Xin vào nhóm <span class="c">${requests.length}</span></div>
+    <div class="card"><div class="cb" style="padding:2px 14px">
+      ${requests.map(r => `<div class="fd">
+        ${avatar(r.full_name)}
+        <div class="x"><b>${esc(r.full_name)}</b>
+          ${r.note ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(r.note)}</div>` : ''}
+          ${r.email ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(r.email)}</div>` : ''}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="tg" data-jr="${r.id}" data-ok="0">từ chối</button>
+          <button class="tg go" data-jr="${r.id}" data-ok="1">nhận</button>
+        </div></div>`).join('')}
+    </div></div>`;
+
+  document.querySelectorAll('#joinBox [data-jr]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const r = await apiPost(`/api/join-requests/${b.dataset.jr}`, { accept: b.dataset.ok === '1' });
+        if (r.accepted && r.url) {
+          openSheet(`<h3>Đã nhận ${esc(r.full_name)}</h3>
+            <p class="sub">Gửi link mời dưới đây cho họ qua Zalo.</p>
+            <div class="card"><div class="cb" style="word-break:break-all;font-size:13px">${esc(r.url)}</div></div>
+            <div class="sa"><button class="big c" id="jrC">Đóng</button><button class="big go" id="jrCopy">Chép link</button></div>`);
+          $('#jrC').onclick = closeSheet;
+          $('#jrCopy').onclick = async () => {
+            try { await navigator.clipboard.writeText(r.url); toast('Đã chép link'); } catch { toast('Chép tay giúp nhé'); }
+          };
+        } else toast('Đã từ chối');
+        await refreshHome();
+      } catch (e) { toast(errText(e)); b.disabled = false; }
+    };
+  });
 }
 
 /* ─── Phát link mời ─── */
@@ -381,6 +620,7 @@ async function drawBai() {
   PLAN = await apiGet('/api/plan');
   $('#v-bai').dataset.loaded = '1';
   const { plan, sections, suggestions, insights, overall_pct, can_assign } = PLAN;
+  const pres = PLAN.presentation ?? { total_minutes: 0, limit_minutes: 20, speaker_count: 0 };
   const topicDone = plan.topic_product && plan.topic_customers;
 
   $('#v-bai').innerHTML = `
@@ -433,7 +673,30 @@ async function drawBai() {
       </div></div>`).join('')
     : `<div class="card"><div class="cb mut">Chưa ghi câu nào. Nghe được câu hay trong buổi học thì ghi lại — nó chảy thẳng vào bài.</div></div>`}
   <button class="wide ghost" id="addInsight" style="margin-top:6px">+ Ghi một câu vừa nghe được</button>
-  <div class="foot">Câu nào ghi lại cũng nên gắn vào một phần — ghi xong là bài dày thêm.</div>`;
+
+  <div class="eb" style="margin-top:28px">Thuyết trình
+    <span class="c">${pres.total_minutes}/${pres.limit_minutes} phút</span></div>
+  <div class="card">
+    <div class="cb" style="padding-bottom:10px">
+      <div class="${pres.total_minutes > pres.limit_minutes ? 'warn' : 'mut'}" style="font-size:13px">
+        ${pres.total_minutes > pres.limit_minutes
+          ? `<b>Quá ${pres.total_minutes - pres.limit_minutes} phút.</b> Ba-rem chấm “không quá 20 phút” — cắt bớt trước khi lên bảo vệ.`
+          : `Đã phân ${pres.total_minutes} phút cho ${pres.speaker_count} người nói. Ba-rem chấm cả “không quá 20 phút” lẫn “nhiều người cùng nói”.`}
+      </div>
+    </div>
+    ${sections.map(s => `<div class="prow">
+      <span class="pnum">${s.ord === 0 ? '—' : '0' + s.ord}</span>
+      <div class="pbd"><div style="font-size:13.5px;font-weight:600">${esc(s.title)}</div>
+        <div style="font-size:12.5px;color:${s.present_name ? 'var(--ink2)' : 'var(--ink3)'};margin-top:2px">
+          ${s.present_name ? esc(s.present_name) : 'chưa phân công'}</div></div>
+      <span class="pct">${s.present_minutes ? s.present_minutes + "'" : '—'}</span>
+      ${can_assign ? `<button class="ico" data-present="${s.id}" aria-label="Phân công thuyết trình">✎</button>` : ''}
+    </div>`).join('')}
+  </div>
+
+  <button class="wide ghost" id="exportDocx" style="margin-top:16px">Tải bản thảo Word (8 phần)</button>
+  <div class="foot">Bản thảo dựng sẵn khung tám phần đúng thứ tự, kèm phân công, tâm đắc và nguồn đã gắn.
+    Nội dung từng phần thì nhóm tự viết trong Word.</div>`;
 
   document.querySelectorAll('#v-bai [data-section]').forEach(b => {
     b.onclick = () => openSectionEdit(Number(b.dataset.section));
@@ -446,6 +709,41 @@ async function drawBai() {
   });
   $('#addInsight').onclick = openInsightAdd;
   if ($('#topicBtn')) $('#topicBtn').onclick = openTopicEdit;
+  document.querySelectorAll('#v-bai [data-present]').forEach(b => {
+    b.onclick = () => openPresentEdit(Number(b.dataset.present));
+  });
+  $('#exportDocx').onclick = () => {
+    // Để trình duyệt tự tải: endpoint trả sẵn content-disposition, cookie phiên
+    // đi kèm vì cùng tên miền.
+    location.href = '/api/plan/export.docx';
+    toast('Đang tải bản thảo…');
+  };
+}
+
+function openPresentEdit(sectionId) {
+  const s = PLAN.sections.find(x => x.id === sectionId);
+  const pres = PLAN.presentation;
+  const others = pres.total_minutes - (s.present_minutes || 0);
+  openSheet(`
+   <h3>${s.ord === 0 ? '' : 'Phần ' + s.ord + ' · '}${esc(s.title)}</h3>
+   <p class="sub">Ai đứng nói phần này và nói bao lâu. Các phần khác đang chiếm ${others} phút,
+     còn lại ${Math.max(0, pres.limit_minutes - others)} phút trong giới hạn 20.</p>
+   <label class="f">Người nói</label>
+   <select id="prM"><option value="">— chưa phân công —</option>
+     ${PLAN.members.map(m => `<option value="${m.id}" ${s.present_member_id === m.id ? 'selected' : ''}>${esc(m.full_name)}</option>`).join('')}</select>
+   <label class="f">Bao nhiêu phút</label>
+   <input id="prN" type="number" min="0" max="20" inputmode="numeric" value="${s.present_minutes ?? ''}">
+   <div class="sa"><button class="big c" id="prCancel">Thôi</button>
+     <button class="big go" id="prSave">Lưu</button></div>`);
+  $('#prCancel').onclick = closeSheet;
+  $('#prSave').onclick = () => submitting($('#prSave'), async () => {
+    const v = $('#prM').value, n = $('#prN').value;
+    await apiPatch(`/api/plan/sections/${sectionId}`, {
+      present_member_id: v === '' ? null : Number(v),
+      present_minutes: n === '' ? null : Number(n),
+    });
+    await drawBai();
+  }, 'Đã phân công');
 }
 
 function openTopicEdit() {
@@ -1066,6 +1364,7 @@ async function boot() {
   if ((m = location.pathname.match(/^\/i\/([^/]+)\/?$/))) return renderClaim(m[1]);
   if ((m = location.pathname.match(/^\/dangnhap\/([^/]+)\/?$/))) return renderMagicConsume(m[1]);
   if (location.pathname.replace(/\/$/, '') === '/dangnhap') return renderLogin();
+  if (location.pathname.replace(/\/$/, '') === '/start') return renderStart();
 
   try {
     HOME = await apiGet('/api/home');

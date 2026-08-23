@@ -4,7 +4,10 @@ Công cụ làm việc nhóm cho Nhóm 6, khoá K03 (VCCI × Đại học Andrew
 Pages (tệp tĩnh) + Cloudflare Worker (API) + D1 (SQLite). Không build step,
 không framework — xem `SRS v1.0` mục 8.
 
-Trạng thái hiện tại: **Đợt 1, 2 và 3** xong.
+> Đang tiếp tục dự án này? Đọc `CLAUDE.md` trước — nó ghi bối cảnh, các quy
+> ước đã chốt, cạm bẫy của môi trường và việc còn treo.
+
+Trạng thái hiện tại: **Đợt 1, 2, 3 và 4** xong.
 
 - Đợt 1 — nhận diện qua link mời, hồ sơ tự sửa (và sửa hộ), cơ cấu nhóm có
   lịch sử, Kho liên kết, màn hình Hôm nay.
@@ -12,8 +15,8 @@ Trạng thái hiện tại: **Đợt 1, 2 và 3** xong.
   ký đóng góp, đăng nhập lại bằng email qua SMTP cá nhân.
 - Đợt 3 — quỹ hai cấp, mã QR VietQR riêng từng người, tự khai, sổ của người
   thu, passkey.
-- Đợt 4 (wizard cho nhóm khác, xuất bản thảo Word, bảng phân công thuyết
-  trình) chưa tới.
+- Đợt 4 — wizard cho nhóm khác tự dựng ở `/start`, xuất bản thảo Word tám
+  phần, bảng phân công thuyết trình 20 phút.
 
 ## Cấu trúc
 
@@ -26,9 +29,11 @@ worker/                 Cloudflare Worker — API
   src/auth.js              link mời, magic link, phiên cookie
   src/mailer.js            SMTP qua TCP Socket API của Workers
   src/permissions.js       ma trận quyền mục 2.2 SRS + audit_log/activity
-  src/lib/                 http, crypto, validate, ratelimit, suggest, vietqr
+  src/lib/                 http, crypto, validate, ratelimit, suggest,
+                           vietqr, docx (ZIP + OOXML tự viết)
   src/routes/              home, members, officers, plan, insights, links,
-                           wizard, email-login, funds, passkey, session
+                           wizard, start-wizard, export, email-login,
+                           funds, passkey, session
 migrations/             Schema + dữ liệu D1, áp theo đúng thứ tự file
 scripts/                Công cụ nhập liệu + sinh lời mời đầu tiên
 ```
@@ -61,6 +66,7 @@ Bốn migration áp theo thứ tự:
 - `0003_seed_group6.sql` — kích hoạt thật Nhóm 6: 14 thành viên, cơ cấu có lịch sử, bài 8 phần, tâm đắc, Kho, nhật ký.
 - `0004_invite_kind_and_rate_limit.sql` — tách magic link khỏi link mời, thêm bảng đếm giới hạn tần suất.
 - `0005_webauthn_challenges.sql` — chỗ giữ challenge của passkey giữa hai chặng, cùng vài index.
+- `0006_wizard_and_presentation.sql` — bảng xin vào nhóm, hai cột phân công thuyết trình.
 
 ### 2. Deploy Worker
 
@@ -179,10 +185,20 @@ PATCH /api/plan/sections/:id       { owner_member_id?, pct?, note? }
 POST  /api/insights                { body, speaker?, heard_on?, section_id? }
 DELETE /api/insights/:id
 
+GET    /api/plan/export.docx       → bản thảo Word tám phần đúng thứ tự
+
 GET    /api/links?tag=bai|buoi|lop
 POST   /api/links                  { url, title?, kind?, tag? }
 DELETE /api/links/:id
-POST   /api/wizard/invites         → khối link mời cho người chưa nhận tên
+
+GET    /api/wizard/roster/search?q=   → tìm trong 134 người (không cần phiên)
+POST   /api/wizard/claim-group        { roster_id, email, group_no }  (không cần phiên)
+POST   /api/wizard/join-request       { group_no, full_name, ... }    (không cần phiên)
+POST   /api/wizard/members            { members[] }
+POST   /api/wizard/plan               { topic_product?, topic_customers? }
+POST   /api/wizard/invites            → khối link mời cho người chưa nhận tên
+GET    /api/join-requests             → yêu cầu xin vào nhóm (trưởng/phó nhóm)
+POST   /api/join-requests/:id         { accept }  → nhận thì ra luôn link mời
 
 GET    /api/funds                  → đợt thu áp dụng cho tôi + QR riêng của tôi
 POST   /api/funds                  (trưởng/phó nhóm | Ban cán sự lớp)
@@ -284,3 +300,11 @@ sinh ra rồi tự áp bằng `wrangler d1 migrations apply`.
   nhập bằng virtual authenticator của Chrome, nhưng chưa thử Face ID trên
   iPhone hay vân tay trên Android. Việc này phải đợi domain thật vì `rp.id`
   neo vào tên miền.
+- **Bản thảo Word chưa mở bằng Word thật.** LibreOffice có trong môi trường
+  phát triển nhưng hỏng (không convert nổi cả tệp `.txt`), nên tệp sinh ra
+  được kiểm bằng bộ lược đồ OOXML chính thức ISO/IEC 29500 và đọc lại bằng
+  `python-docx` — cả hai đều sạch, đúng tám phần theo thứ tự. Vẫn nên mở thử
+  một lần bằng Word hoặc Google Docs trước khi nộp bài.
+- **Xuất Word là BẢN THẢO, không phải bài hoàn chỉnh.** Công cụ dựng khung tám
+  phần đúng thứ tự, điền sẵn phân công, tiến độ, tâm đắc và nguồn đã gắn; chỗ
+  nội dung từng phần để trống cho nhóm tự viết trong Word.

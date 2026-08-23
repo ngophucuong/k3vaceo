@@ -21,6 +21,11 @@ import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
 } from './routes/passkey.js';
+import {
+  searchRoster, claimGroup, bulkMembers, createPlan,
+  postJoinRequest, listJoinRequests, decideJoinRequest,
+} from './routes/start-wizard.js';
+import { exportPlanDocx } from './routes/export.js';
 
 const INVITE_TRIES_PER_HOUR = 20;   // mục 8 SRS
 
@@ -75,6 +80,17 @@ export default {
       if (pathname === '/api/passkey/login/verify' && method === 'POST') {
         return postLoginVerify(request, env);
       }
+      // Wizard: ba route đầu chạy khi CHƯA có phiên — đó là cả điểm của nó,
+      // một trưởng nhóm bất kỳ tự dựng được mà không cần ai mời trước.
+      if (pathname === '/api/wizard/roster/search' && method === 'GET') {
+        return searchRoster(request, env);
+      }
+      if (pathname === '/api/wizard/claim-group' && method === 'POST') {
+        return claimGroup(request, env);
+      }
+      if (pathname === '/api/wizard/join-request' && method === 'POST') {
+        return postJoinRequest(request, env);
+      }
 
       // ── Cần phiên đăng nhập hợp lệ ───────────────────────────────────────
       const me = await getCurrentMember(request, env);
@@ -118,6 +134,14 @@ export default {
       }
 
       if (pathname === '/api/wizard/invites' && method === 'POST') return postWizardInvites(request, env, me);
+      if (pathname === '/api/wizard/members' && method === 'POST') return bulkMembers(request, env, me, ip);
+      if (pathname === '/api/wizard/plan' && method === 'POST') return createPlan(request, env, me, ip);
+      if (pathname === '/api/join-requests' && method === 'GET') return listJoinRequests(env, me);
+      if ((m = pathname.match(/^\/api\/join-requests\/(\d+)$/)) && method === 'POST') {
+        return decideJoinRequest(request, env, me, Number(m[1]), ip);
+      }
+
+      if (pathname === '/api/plan/export.docx' && method === 'GET') return exportPlanDocx(env, me);
 
       if (pathname === '/api/funds' && method === 'GET') return listFunds(env, me);
       if (pathname === '/api/funds' && method === 'POST') return postFund(request, env, me, ip);
