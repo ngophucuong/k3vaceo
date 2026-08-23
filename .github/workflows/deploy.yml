@@ -5,7 +5,7 @@ name: Deploy lên Cloudflare
 on:
   push:
     branches: [claude/read-content-deployment-plan-dpsv8m]
-    paths-ignore: ['**.md']
+    paths-ignore: ['**.md', '.github/nap-du-lieu.trigger']
   workflow_dispatch:
 
 concurrency:
@@ -18,6 +18,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NHANH: claude/read-content-deployment-plan-dpsv8m
     steps:
       - uses: actions/checkout@v4
 
@@ -26,42 +27,62 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - run: npm ci
-
-      # Chưa đặt bí mật thì BỎ QUA chứ không báo hỏng — có hai đường deploy hợp
-      # lệ (Actions này, hoặc Git integration ngay trên dashboard Cloudflare).
-      # Ai chọn đường dashboard thì không phải nhìn dấu X đỏ ở mỗi commit.
+      # Chưa đặt bí mật thì BỎ QUA chứ không báo hỏng — deploy bằng Git
+      # integration ngay trên dashboard Cloudflare cũng là đường hợp lệ, và ai
+      # chọn đường đó thì không phải nhìn dấu X đỏ ở mỗi commit.
+      #
+      # database_id KHÔNG còn nằm trong danh sách bí mật: nó đã được điền thẳng
+      # vào worker/wrangler.toml, vì Cloudflare cũng đọc tệp đó khi deploy từ
+      # dashboard. Để hai nơi là có ngày lệch nhau.
       - name: Kiểm tra đã có đủ bí mật chưa
         id: check
-        env:
-          D1_ID: ${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$D1_ID" ]; then
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Chưa đặt bí mật Cloudflare nên bỏ qua deploy. Nếu bạn deploy bằng Git integration trên dashboard Cloudflare thì đây là điều bình thường. Muốn deploy từ đây thì xem README mục 'Deploy tự động từ GitHub'."
+            echo "::notice::Chưa đặt bí mật Cloudflare nên bỏ qua deploy. Xem README mục 'Deploy tự động từ GitHub'."
           fi
 
-      # database_id không phải bí mật thật (muốn dùng vẫn phải có API token),
-      # nhưng để trong secret thì mọi cấu hình nằm chung một chỗ, khỏi phải sửa
-      # code mỗi lần đổi cơ sở dữ liệu.
-      - name: Điền database_id vào wrangler.toml
+      - run: npm ci
         if: steps.check.outputs.skip != 'true'
-        run: sed -i "s/REPLACE_WITH_REAL_DATABASE_ID/${{ secrets.CLOUDFLARE_D1_DATABASE_ID }}/" worker/wrangler.toml
 
-      # Migration ở đây đều là thêm bảng/thêm cột/nạp dữ liệu gốc, và D1 tự ghi
-      # nhớ cái nào đã chạy nên không áp lại lần hai.
-      - name: Áp migration lên D1 thật
+      # Dữ liệu gốc đã nạp bằng workflow "Nạp dữ liệu vào D1", và bảng
+      # d1_migrations đã ghi đủ sáu migration, nên bước này hiện là không-làm-gì.
+      # Giữ lại để migration MỚI sau này tự áp khi deploy.
+      - name: Áp migration mới (nếu có) lên D1 thật
         if: steps.check.outputs.skip != 'true'
         working-directory: worker
         run: npx wrangler d1 migrations apply k3vaceo --remote
 
+      # ── Pages trước, Worker sau ────────────────────────────────────────────
+      # Bản ghi DNS của k3vaceo.cuongngo.app do Pages custom domain tạo ra.
+      # Worker Route chỉ chen được vào một hostname đã có bản ghi DNS.
+      - name: Tạo project Pages nếu chưa có
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          npx wrangler pages project create k3vaceo --production-branch="$NHANH" \
+            || echo "Project đã tồn tại, bỏ qua."
+
+      - name: Deploy Pages (giao diện)
+        if: steps.check.outputs.skip != 'true'
+        run: npx wrangler pages deploy public --project-name=k3vaceo --branch="$NHANH" --commit-dirty=true
+
+      # Tạo Worker Route trên zone cuongngo.app cần quyền zone, khác với quyền
+      # account để tải mã Worker lên. Thiếu quyền thì mã lên được mà route thì
+      # không, nên bắt lỗi riêng và nói thẳng thiếu quyền nào.
       - name: Deploy Worker (API)
         if: steps.check.outputs.skip != 'true'
         working-directory: worker
-        run: npx wrangler deploy
+        run: |
+          set -o pipefail
+          if ! npx wrangler deploy 2>&1 | tee /tmp/worker.log; then
+            if grep -qiE 'route|zone|authorization|authentication|10000|9109' /tmp/worker.log; then
+              echo "::error::Tải mã Worker có thể đã xong nhưng Worker Route thì chưa. API token cần thêm quyền cấp zone cho cuongngo.app: 'Zone → Workers Routes → Edit' và 'Zone → Zone → Read'. Thêm xong bấm Re-run job."
+            fi
+            exit 1
+          fi
 
-      # Bí mật SMTP là tuỳ chọn: chưa đặt thì bỏ qua, ứng dụng vẫn chạy, chỉ
-      # riêng đăng nhập lại bằng email báo chưa cấu hình.
+      # Bí mật SMTP là tuỳ chọn ở đây: nếu bạn đã đặt thẳng trên dashboard
+      # Cloudflare thì bỏ trống chỗ này, `wrangler deploy` không xoá bí mật cũ.
       - name: Đồng bộ bí mật SMTP cho Worker
         if: steps.check.outputs.skip != 'true'
         working-directory: worker
@@ -74,31 +95,36 @@ jobs:
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
           if [ -z "$SMTP_HOST" ]; then
-            echo "Chưa đặt bí mật SMTP — bỏ qua. Đăng nhập bằng email sẽ báo chưa cấu hình."
+            echo "Không có bí mật SMTP trong GitHub — bỏ qua, giữ nguyên bí mật đã đặt trên Cloudflare."
             exit 0
           fi
           for name in SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS MAIL_FROM; do
             printf '%s' "${!name}" | npx wrangler secret put "$name"
           done
 
-      - name: Tạo project Pages nếu chưa có
-        if: steps.check.outputs.skip != 'true'
-        run: |
-          npx wrangler pages project create k3vaceo \
-            --production-branch=claude/read-content-deployment-plan-dpsv8m 2>/dev/null \
-            || echo "Project đã tồn tại, bỏ qua."
-
-      - name: Deploy Pages (giao diện)
-        if: steps.check.outputs.skip != 'true'
-        run: npx wrangler pages deploy public --project-name=k3vaceo --commit-dirty=true
-
+      # Chưa gắn custom domain cho Pages thì bước này còn đỏ — gắn được bằng
+      # dashboard thôi, wrangler không có lệnh cho việc đó. Vì vậy chỉ cảnh báo.
       - name: Kiểm tra sau khi deploy
         if: steps.check.outputs.skip != 'true'
         run: |
           echo "Chờ Cloudflare lan cấu hình…"
           sleep 20
           code=$(curl -s -o /tmp/health.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/health || true)
-          echo "HTTP $code"; cat /tmp/health.json 2>/dev/null || true
+          echo "HTTP $code"; cat /tmp/health.json 2>/dev/null || true; echo
           if [ "$code" != "200" ]; then
-            echo "::warning::/api/health chưa trả 200. Kiểm tra domain đã trỏ vào Cloudflare và Worker Route đã có chưa."
+            echo "::warning::/api/health chưa trả 200. Thường là vì chưa gắn custom domain k3vaceo.cuongngo.app cho project Pages — làm ở Cloudflare → Workers & Pages → k3vaceo → Custom domains."
+            exit 0
           fi
+          node --input-type=commonjs -e '
+            const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
+            const mong = { roster_total: 134, groups_total: 10, group6_members: 14,
+                           group6_truong_nhom: "Ngô Phú Cường" };
+            let sai = 0;
+            for (const [k, v] of Object.entries(mong)) {
+              const ok = d[k] === v;
+              if (!ok) sai++;
+              console.log(`${ok ? "✓" : "✗"} ${k}: ${JSON.stringify(d[k])} (mong đợi ${JSON.stringify(v)})`);
+            }
+            if (sai) { console.error(`::error::${sai} chỗ lệch ở /api/health.`); process.exit(1); }
+            console.log("\n✓ /api/health đúng hết. Ứng dụng đã chạy thật.");
+          '
