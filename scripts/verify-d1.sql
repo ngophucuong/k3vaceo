@@ -2,6 +2,9 @@
 -- Kết quả là MỘT dòng. Cột cuối cùng `ket_qua` phải là "ĐÚNG HẾT".
 -- Mỗi cột đọc theo dạng "thực tế/mong đợi", ví dụ `hoc_vien_134` ra "134/134".
 --
+-- Riêng `nhom6` kiểm "ít nhất 14" chứ không "đúng 14": nhóm ĐƯỢC PHÉP đông
+-- thêm khi Ban tổ chức chuyển người sang. Hụt đi mới là dấu hiệu mất dữ liệu.
+--
 -- Nếu báo "no such table: d1_migrations" thì nghĩa là chưa chạy tệp cuối
 -- (scripts/d1-parts/16-ghi-nho-va-kiem-tra.sql) — chạy nó rồi kiểm tra lại.
 --
@@ -45,13 +48,13 @@ SELECT
   hoc_vien   || '/134'                    AS hoc_vien_134,
   nhom       || '/10'                     AS nhom_10,
   dien_thoai || '/90'                     AS dien_thoai_90,
-  nhom6      || '/14'                     AS nhom6_14,
+  nhom6      || ' (cần ≥14)'             AS nhom6,
   phan_bai   || '/8'                      AS phan_bai_8,
   co_cau     || '/2'                      AS co_cau_2,
   migration  || '/11'                     AS migration_11,
   COALESCE(truong_nhom, '(chưa có)')      AS truong_nhom,
   CASE WHEN bang = 27 AND hoc_vien = 134 AND nhom = 10 AND dien_thoai = 90
-        AND nhom6 = 14 AND phan_bai = 8 AND co_cau = 2 AND migration = 11
+        AND nhom6 >= 14 AND phan_bai = 8 AND co_cau = 2 AND migration = 11
         AND truong_nhom = 'Ngô Phú Cường'
        THEN 'ĐÚNG HẾT' ELSE 'CÓ CHỖ SAI' END AS ket_qua
 FROM d;

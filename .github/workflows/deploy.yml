@@ -199,9 +199,22 @@ jobs:
 
           KHOP="$khop" node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
+            // Ghi cứng sĩ số Nhóm 6 là sai bản chất: nhóm ĐƯỢC PHÉP đông thêm.
+            // Ngày 24/8 Ban tổ chức chuyển Nguyễn Thị Tùng Vân sang, nhóm lên 15
+            // người, và deploy đỏ ba lượt liền trong khi mã lên hoàn toàn bình
+            // thường. Một phép kiểm báo động vì chuyện đúng thì tệ hơn không có:
+            // lần sau người ta thấy đỏ sẽ bỏ qua. Kiểm "không hụt đi" thay vì
+            // "đúng bằng" — hụt mới là dấu hiệu dữ liệu bị mất.
             const mong = { ok: true, roster_total: 134, groups_total: 10,
-                           group6_members: 14, group6_truong_nhom: "Ngô Phú Cường" };
+                           group6_truong_nhom: "Ngô Phú Cường" };
+            const TOI_THIEU_NHOM6 = 14;
             let sai = 0;
+            {
+              const n = d.group6_members;
+              const ok = Number.isInteger(n) && n >= TOI_THIEU_NHOM6;
+              if (!ok) sai++;
+              console.log(`${ok ? "✓" : "✗"} group6_members: ${JSON.stringify(n)} (cần ít nhất ${TOI_THIEU_NHOM6})`);
+            }
             for (const [k, v] of Object.entries(mong)) {
               const ok = d[k] === v;
               if (!ok) sai++;
