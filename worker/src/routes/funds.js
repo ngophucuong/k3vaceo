@@ -60,8 +60,10 @@ async function shapeRound(env, round, me) {
     env.DB.prepare('SELECT declared_at, verified_at, note FROM fund_declarations WHERE round_id = ? AND member_id = ?')
       .bind(round.id, me.id).first(),
     env.DB.prepare(
-      `SELECT COUNT(*) AS declared, SUM(CASE WHEN verified_at IS NOT NULL THEN 1 ELSE 0 END) AS verified
-       FROM fund_declarations WHERE round_id = ? AND declared_at IS NOT NULL`
+      `SELECT SUM(CASE WHEN declared_at IS NOT NULL THEN 1 ELSE 0 END) AS declared,
+              SUM(CASE WHEN verified_at IS NOT NULL THEN 1 ELSE 0 END) AS verified,
+              COUNT(*) AS tong
+       FROM fund_declarations WHERE round_id = ?`
     ).bind(round.id).first(),
     round.collector_member_id
       ? env.DB.prepare('SELECT full_name FROM members WHERE id = ?').bind(round.collector_member_id).first()
@@ -86,6 +88,7 @@ async function shapeRound(env, round, me) {
     account_no: round.account_no,
     account_name: round.account_name,
     collector_name: collector?.full_name ?? null,
+    collector_member_id: round.collector_member_id,
     i_am_collector: round.collector_member_id === me.id,
     opens_on: round.opens_on,
     closes_on: round.closes_on,
@@ -102,6 +105,9 @@ async function shapeRound(env, round, me) {
     thuoc_quy: round.thuoc_quy || (round.scope === 'class' ? 'lop' : 'nhom'),
     qr_url: buildQrUrl(round, note),
     can_see_ledger: await canSeeLedger(env, me, round),
+    // Có người khai rồi thì số tiền/số tài khoản/người thu/sổ nhận khoá lại;
+    // giao diện cần biết để không bày ra ô sửa rồi mới báo lỗi.
+    da_co_nguoi_khai: (counts?.tong ?? 0) > 0,
   };
 }
 
@@ -199,6 +205,19 @@ export async function postFund(request, env, me, ip) {
   return json({ ok: true, id: row.id });
 }
 
+// Đợt thu đã tạo còn sửa được tới đâu. Ranh giới không phải "nháp hay đã mở"
+// mà là "đã có ai tự khai chưa": chừng nào chưa ai chuyển tiền thì mọi thứ
+// còn sửa thoải mái, kể cả số tiền và số tài khoản. Có người khai rồi thì số
+// tiền, số tài khoản, người thu và sổ nhận tiền phải khoá — người ta đã
+// chuyển theo thông tin cũ, đổi đi là biến lời khai của họ thành nói dối.
+// Ngày tháng, tiêu đề, mục đích và cú pháp thì sửa được suốt đời đợt thu.
+async function daCoNguoiKhai(env, roundId) {
+  const row = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM fund_declarations WHERE round_id = ?'
+  ).bind(roundId).first();
+  return (row?.n ?? 0) > 0;
+}
+
 export async function patchFund(request, env, me, roundId, ip) {
   const round = await loadRound(env, roundId);
   if (!round || !roundAppliesTo(round, me)) return error('not_found', 404);
@@ -206,21 +225,58 @@ export async function patchFund(request, env, me, roundId, ip) {
 
   const body = await readJson(request);
   const next = { ...round };
+  const khoa = await daCoNguoiKhai(env, round.id);
+
   if ('status' in body) {
     if (!['draft', 'open', 'closed'].includes(body.status)) return error('status_invalid', 422);
     next.status = body.status;
   }
+  // Ngày tháng sửa được bất cứ lúc nào — hạn nộp bị dời là chuyện thường,
+  // bắt xoá đợt rồi tạo lại chỉ vì lùi một ngày là vô lý.
   if ('closes_on' in body) next.closes_on = cleanText(body.closes_on, 20);
   if ('opens_on' in body) next.opens_on = cleanText(body.opens_on, 20);
   if ('purpose' in body) next.purpose = cleanText(body.purpose, 300);
   if ('title' in body) next.title = cleanText(body.title, 120) ?? round.title;
+
+  if ('amount' in body) {
+    if (khoa) return error('so_tien_khoa', 409);
+    const amount = Number(body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return error('amount_invalid', 422);
+    next.amount = Math.round(amount);
+  }
+  if ('bank_bin' in body || 'account_no' in body || 'account_name' in body) {
+    if (khoa) return error('tai_khoan_khoa', 409);
+    if ('bank_bin' in body) {
+      const bin = cleanText(body.bank_bin, 6);
+      if (!isValidBin(bin)) return error('bank_bin_invalid', 422);
+      next.bank_bin = bin;
+      next.bank_name = bankName(bin) ?? cleanText(body.bank_name, 60);
+    }
+    if ('account_no' in body) {
+      const acc = cleanText(body.account_no, 32);
+      if (!acc || !/^[0-9A-Za-z]{4,32}$/.test(acc)) return error('account_no_invalid', 422);
+      next.account_no = acc;
+    }
+    if ('account_name' in body) next.account_name = cleanText(body.account_name, 120);
+  }
+  if ('collector_member_id' in body) {
+    if (khoa) return error('nguoi_thu_khoa', 409);
+    const cid = body.collector_member_id == null ? null : Number(body.collector_member_id);
+    if (cid != null) {
+      const ok = await env.DB.prepare(
+        'SELECT id FROM members WHERE id = ? AND cohort_id = ? AND is_active = 1'
+      ).bind(cid, round.cohort_id).first();
+      if (!ok) return error('collector_invalid', 422);
+    }
+    next.collector_member_id = cid;
+  }
   // Cú pháp chuyển khoản sửa được cả sau khi tạo. Người thu hay phát hiện
   // mình cần thêm chữ ("Quylop", "Dot2"...) sau khi đã nhìn sao kê thật; bắt
   // huỷ đợt rồi tạo lại chỉ vì mấy chữ ấy là vô lý.
-  // Đổi sổ nhận tiền chỉ khi còn BẢN NHÁP. Đợt đã mở mà đổi thì số dư hai sổ
-  // nhảy cùng lúc, người xem không hiểu tiền chạy đi đâu.
+  // Đổi sổ nhận tiền chỉ khi CHƯA AI KHAI. Có tiền vào rồi mà đổi thì số dư
+  // hai sổ nhảy cùng lúc, người xem không hiểu tiền chạy đi đâu.
   if ('thuoc_quy' in body) {
-    if (round.status !== 'draft') return error('thuoc_quy_khoa', 409);
+    if (khoa) return error('thuoc_quy_khoa', 409);
     if (round.scope === 'class' && body.thuoc_quy !== 'lop') return error('thuoc_quy_invalid', 422);
     next.thuoc_quy = body.thuoc_quy === 'lop' ? 'lop' : 'nhom';
   }
@@ -235,15 +291,24 @@ export async function patchFund(request, env, me, roundId, ip) {
 
   await env.DB.prepare(
     `UPDATE fund_rounds SET status = ?, opens_on = ?, closes_on = ?, purpose = ?, title = ?,
-       syntax_template = ?, thuoc_quy = ? WHERE id = ?`
+       amount = ?, bank_bin = ?, bank_name = ?, account_no = ?, account_name = ?,
+       collector_member_id = ?, syntax_template = ?, thuoc_quy = ? WHERE id = ?`
   ).bind(next.status, next.opens_on, next.closes_on, next.purpose, next.title,
+         next.amount, next.bank_bin, next.bank_name, next.account_no, next.account_name,
+         next.collector_member_id,
          next.syntax_template ?? round.syntax_template,
          next.thuoc_quy ?? round.thuoc_quy, round.id).run();
 
   await logAudit(env, {
     actorId: me.id, action: 'fund.update', targetType: 'fund_round', targetId: round.id,
-    before: { status: round.status, closes_on: round.closes_on },
-    after: { status: next.status, closes_on: next.closes_on }, ip,
+    before: {
+      status: round.status, opens_on: round.opens_on, closes_on: round.closes_on,
+      title: round.title, amount: round.amount, account_no: round.account_no,
+    },
+    after: {
+      status: next.status, opens_on: next.opens_on, closes_on: next.closes_on,
+      title: next.title, amount: next.amount, account_no: next.account_no,
+    }, ip,
   });
   if (round.status !== 'open' && next.status === 'open') {
     await logActivity(env, {
@@ -252,6 +317,29 @@ export async function patchFund(request, env, me, roundId, ip) {
       summary: `mở đợt thu "${next.title}"`,
     });
   }
+  return json({ ok: true });
+}
+
+// Xoá hẳn đợt thu. Chỉ khi chưa một ai tự khai — có lời khai rồi thì xoá là
+// xoá bằng chứng của người khác, không phải việc của người tạo đợt. Lúc ấy
+// đường đúng là đóng đợt lại, số liệu vẫn còn để đối chiếu về sau.
+export async function deleteFund(env, me, roundId, ip) {
+  const round = await loadRound(env, roundId);
+  if (!round || !roundAppliesTo(round, me)) return error('not_found', 404);
+  if (!(await canCreate(env, me, round.scope, round.group_id))) return error('forbidden', 403);
+  if (await daCoNguoiKhai(env, round.id)) return error('co_nguoi_khai', 409);
+
+  // Khoản chi đã gắn vào đợt này thì gỡ ràng buộc chứ không xoá lây — tiền đã
+  // chi ra là việc có thật, không biến mất theo đợt thu.
+  await env.DB.prepare('UPDATE fund_expenses SET round_id = NULL WHERE round_id = ?')
+    .bind(round.id).run();
+  await env.DB.prepare('DELETE FROM fund_rounds WHERE id = ?').bind(round.id).run();
+
+  await logAudit(env, {
+    actorId: me.id, action: 'fund.delete', targetType: 'fund_round', targetId: round.id,
+    before: { title: round.title, amount: round.amount, status: round.status,
+              scope: round.scope, thuoc_quy: round.thuoc_quy }, ip,
+  });
   return json({ ok: true });
 }
 

@@ -20,7 +20,9 @@ import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
          postVerifyMyEmail, postVerifyMyEmailConfirm } from './routes/onboard.js';
 import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify,
          listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
-         postDeclareFor } from './routes/funds.js';
+         postDeclareFor, deleteFund } from './routes/funds.js';
+import { getLich, postBuoi, patchBuoi, deleteBuoi, postThongBao,
+         deleteThongBao } from './routes/lich.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
@@ -189,6 +191,9 @@ export default {
       if ((m = pathname.match(/^\/api\/funds\/(\d+)$/)) && method === 'PATCH') {
         return patchFund(request, env, me, Number(m[1]), ip);
       }
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)$/)) && method === 'DELETE') {
+        return deleteFund(env, me, Number(m[1]), ip);
+      }
       if ((m = pathname.match(/^\/api\/funds\/(\d+)\/qr$/)) && method === 'GET') {
         return getFundQr(env, me, Number(m[1]));
       }
@@ -208,6 +213,21 @@ export default {
       }
       if ((m = pathname.match(/^\/api\/funds\/(\d+)\/verify$/)) && method === 'POST') {
         return postVerify(request, env, me, Number(m[1]), ip);
+      }
+
+      // Lịch học và thông báo của lớp. Đọc thì cả khoá đọc được, ghi thì chỉ
+      // Ban cán sự lớp — kiểm ngay trong từng handler.
+      if (pathname === '/api/lich' && method === 'GET') return getLich(env, me);
+      if (pathname === '/api/lich' && method === 'POST') return postBuoi(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/lich\/(\d+)$/)) && method === 'PATCH') {
+        return patchBuoi(request, env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/lich\/(\d+)$/)) && method === 'DELETE') {
+        return deleteBuoi(env, me, Number(m[1]), ip);
+      }
+      if (pathname === '/api/thong-bao' && method === 'POST') return postThongBao(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/thong-bao\/(\d+)$/)) && method === 'DELETE') {
+        return deleteThongBao(env, me, Number(m[1]), ip);
       }
 
       if (pathname === '/api/passkey/register/options' && method === 'POST') {

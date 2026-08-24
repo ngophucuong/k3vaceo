@@ -791,6 +791,8 @@ function drawNay() {
     }).join('')}</div>
     ${iAmOfficer() ? `<button class="wide ghost" id="inviteBtn" style="margin-top:10px">Phát link mời cho người chưa đăng nhập</button>` : ''}
   </div>
+  ${veThongBao()}
+  ${veLichHoc()}
   <div class="sect" id="joinBox" style="display:none"></div>
   <div class="sect">
     <div class="eb">Đang diễn ra</div>
@@ -812,7 +814,167 @@ function drawNay() {
     btn.onclick = () => openOfficerEdit(btn.dataset.role, btn.dataset.label);
   });
   if ($('#inviteBtn')) $('#inviteBtn').onclick = openInviteSheet;
+  if ($('#lichThem')) $('#lichThem').onclick = () => suaBuoi(null);
+  if ($('#tbThem')) $('#tbThem').onclick = themThongBao;
+  document.querySelectorAll('#v-nay [data-buoi]').forEach(b => {
+    b.onclick = () => suaBuoi(Number(b.dataset.buoi));
+  });
+  document.querySelectorAll('#v-nay [data-xoatb]').forEach(b => {
+    b.onclick = () => xoaThongBao(Number(b.dataset.xoatb));
+  });
   if (iAmOfficer()) drawJoinRequests();
+}
+
+/* ─── Lịch học và thông báo của lớp ───
+   Ban tổ chức gửi lịch qua Zalo mỗi tuần và tin nhắn ấy trôi mất sau hai ngày.
+   Đây là chỗ chốt lại — đọc thôi, không phải điểm danh (mục 1.4 SRS xếp điểm
+   danh ngoài phạm vi v1). Chỉ Ban cán sự lớp sửa được. */
+
+const THU = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+// 'YYYY-MM-DD' → 'Thứ Năm 27/8'. Cắt chuỗi rồi dựng Date theo giờ địa phương;
+// new Date('2026-08-27') bị hiểu là UTC nên ở múi giờ Việt Nam vẫn ra đúng
+// ngày, nhưng ở múi âm thì lùi một ngày — không đáng để dính bẫy ấy.
+function ngayVN(iso) {
+  if (!iso) return '';
+  const [y, m, d] = String(iso).split('-').map(Number);
+  if (!y || !m || !d) return String(iso);
+  return `${THU[new Date(y, m - 1, d).getDay()]} ${d}/${m}`;
+}
+
+function khungGio(b) {
+  if (b.tu_gio && b.den_gio) return `${b.tu_gio}–${b.den_gio}`;
+  if (b.tu_gio) return `từ ${b.tu_gio}`;
+  if (b.den_gio) return `đến ${b.den_gio}`;
+  return b.ghi_chu ? '' : 'cả buổi';
+}
+
+function veLichHoc() {
+  const ds = HOME.lich_hoc ?? [];
+  const sua = !!HOME.can_sua_lich;
+  if (!ds.length && !sua) return '';
+  return `
+  <div class="sect">
+    <div class="eb">Lịch học sắp tới${ds.length ? ` <span class="c">${ds.length}</span>` : ''}</div>
+    <div class="card"><div class="cb" style="padding:4px 16px">
+      ${ds.length ? ds.map(b => `<div class="fd" style="align-items:flex-start">
+        <div class="x">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)">
+            ${esc(ngayVN(b.ngay))}${khungGio(b) ? ' · ' + esc(khungGio(b)) : ''}${b.ghi_chu ? ' · ' + esc(b.ghi_chu) : ''}</div>
+          <b>${esc(b.chu_de)}</b>
+          ${b.giang_vien ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(b.giang_vien)}</div>` : ''}
+        </div>
+        ${sua ? `<button class="ico" data-buoi="${b.id}" aria-label="Sửa buổi ${esc(b.chu_de)}">✎</button>` : ''}
+      </div>`).join('')
+        : '<div class="cb mut">Chưa có buổi nào trong lịch.</div>'}
+    </div></div>
+    ${sua ? `<button class="wide ghost" id="lichThem" style="margin-top:10px">+ Thêm buổi học</button>` : ''}
+  </div>`;
+}
+
+function veThongBao() {
+  const ds = HOME.thong_bao ?? [];
+  const sua = !!HOME.can_sua_lich;
+  if (!ds.length && !sua) return '';
+  return `
+  <div class="sect">
+    <div class="eb">Thông báo của lớp</div>
+    ${ds.length ? ds.map(t => `<div class="warn" style="margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">
+      <div style="flex:1;min-width:0">${esc(t.noi_dung)}
+        ${t.nguon ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:4px;font-weight:400">${esc(t.nguon)}</div>` : ''}</div>
+      ${sua ? `<button class="ico" data-xoatb="${t.id}" aria-label="Gỡ thông báo">✕</button>` : ''}
+    </div>`).join('')
+      : '<div class="card"><div class="cb mut">Chưa có thông báo nào.</div></div>'}
+    ${sua ? `<button class="wide ghost" id="tbThem" style="margin-top:2px">+ Thêm thông báo</button>` : ''}
+  </div>`;
+}
+
+// id = null là thêm mới.
+function suaBuoi(id) {
+  const b = id ? (HOME.lich_hoc ?? []).find(x => x.id === id) : null;
+  openSheet(`
+   <h3>${b ? 'Sửa buổi học' : 'Thêm buổi học'}</h3>
+   <p class="sub">Cả lớp đọc được lịch này. Sai một ngày là có người đi nhầm buổi, nên xem kỹ trước khi lưu.</p>
+   <label class="f">Ngày</label><input id="lNgay" type="date" value="${esc(b?.ngay || '')}">
+   <label class="f">Từ giờ</label><input id="lTu" type="time" value="${esc(b?.tu_gio || '')}">
+   <label class="f">Đến giờ</label><input id="lDen" type="time" value="${esc(b?.den_gio || '')}">
+   <div class="hintline">Để trống giờ nếu thông báo chỉ nói “buổi sáng”, rồi ghi rõ vào ô ghi chú.</div>
+   <label class="f">Chủ đề</label><input id="lChuDe" maxlength="200" value="${esc(b?.chu_de || '')}"
+     placeholder="Hướng dẫn lập Kế hoạch kinh doanh">
+   <label class="f">Giảng viên</label><input id="lGV" maxlength="200" value="${esc(b?.giang_vien || '')}"
+     placeholder="TS. Trần Đoàn Kim — VCCI">
+   <label class="f">Ghi chú</label><input id="lGhiChu" maxlength="300" value="${esc(b?.ghi_chu || '')}"
+     placeholder="Buổi sáng">
+   ${b ? `<div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+     <button class="wide ghost" id="lXoa" style="padding:11px;font-size:14px">Xoá buổi này khỏi lịch</button>
+   </div>` : ''}
+   <div id="lErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="lThoi">Thôi</button>
+     <button class="big go" id="lLuu">Lưu</button></div>`);
+
+  $('#lThoi').onclick = closeSheet;
+  if ($('#lXoa')) $('#lXoa').onclick = () => submitting($('#lXoa'), async () => {
+    await apiDelete(`/api/lich/${id}`);
+    await refreshHome();
+  }, 'Đã xoá khỏi lịch');
+
+  $('#lLuu').onclick = () => {
+    if (!$('#lNgay').value) {
+      $('#lErr').textContent = 'Phải có ngày.'; $('#lErr').style.display = 'block'; return;
+    }
+    if (!$('#lChuDe').value.trim()) {
+      $('#lErr').textContent = 'Phải có chủ đề.'; $('#lErr').style.display = 'block'; return;
+    }
+    const than = {
+      ngay: $('#lNgay').value, tu_gio: $('#lTu').value || null, den_gio: $('#lDen').value || null,
+      chu_de: $('#lChuDe').value, giang_vien: $('#lGV').value, ghi_chu: $('#lGhiChu').value,
+    };
+    submitting($('#lLuu'), async () => {
+      if (id) await apiPatch(`/api/lich/${id}`, than);
+      else await apiPost('/api/lich', than);
+      await refreshHome();
+    }, id ? 'Đã lưu' : 'Đã thêm vào lịch');
+  };
+}
+
+function themThongBao() {
+  openSheet(`
+   <h3>Thêm thông báo</h3>
+   <p class="sub">Thứ cả lớp cần biết mà không gắn vào một buổi cụ thể. Đây không phải chỗ nhắn tin —
+     nguyên tắc N1: Zalo để bàn, ứng dụng để chốt.</p>
+   <label class="f">Nội dung</label>
+   <textarea id="tbND" rows="4" maxlength="1000" placeholder="Chương trình tham quan kiến tập chuyển sang chiều thứ Sáu 11/9/2026."></textarea>
+   <label class="f">Ai phát</label><input id="tbNguon" maxlength="60" value="Ban tổ chức">
+   <label class="f">Ẩn sau ngày</label><input id="tbHan" type="date">
+   <div class="hintline">Quá ngày này thì thông báo tự thôi hiện. Để trống là hiện mãi.</div>
+   <div id="tbErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="tbThoi">Thôi</button>
+     <button class="big go" id="tbLuu">Đăng</button></div>`);
+  $('#tbThoi').onclick = closeSheet;
+  $('#tbLuu').onclick = () => {
+    if (!$('#tbND').value.trim()) {
+      $('#tbErr').textContent = 'Phải có nội dung.'; $('#tbErr').style.display = 'block'; return;
+    }
+    submitting($('#tbLuu'), async () => {
+      await apiPost('/api/thong-bao', {
+        noi_dung: $('#tbND').value, nguon: $('#tbNguon').value, het_han: $('#tbHan').value || null,
+      });
+      await refreshHome();
+    }, 'Đã đăng thông báo');
+  };
+}
+
+function xoaThongBao(id) {
+  const t = (HOME.thong_bao ?? []).find(x => x.id === id);
+  openSheet(`<h3>Gỡ thông báo</h3>
+    <p class="sub">“${esc(t?.noi_dung || '')}”</p>
+    <div class="sa"><button class="big c" id="gThoi">Thôi</button>
+      <button class="big go" id="gGo">Gỡ xuống</button></div>`);
+  $('#gThoi').onclick = closeSheet;
+  $('#gGo').onclick = () => submitting($('#gGo'), async () => {
+    await apiDelete(`/api/thong-bao/${id}`);
+    await refreshHome();
+  }, 'Đã gỡ');
 }
 
 // Người ngoài xin vào nhóm (wizard bước 3). Chỉ hiện khi thật sự có yêu cầu —
@@ -1334,8 +1496,8 @@ async function drawQuy() {
   document.querySelectorAll('#v-quy [data-openround]').forEach(b => {
     b.onclick = () => confirmOpenRound(Number(b.dataset.openround));
   });
-  document.querySelectorAll('#v-quy [data-cuphap]').forEach(b => {
-    b.onclick = () => suaCuPhap(Number(b.dataset.cuphap));
+  document.querySelectorAll('#v-quy [data-suadot]').forEach(b => {
+    b.onclick = () => suaDot(Number(b.dataset.suadot));
   });
   document.querySelectorAll('#v-quy [data-soquy]').forEach(b => {
     b.onclick = () => openSoChi(b.dataset.soquy);
@@ -1371,49 +1533,150 @@ function suaDuocDot(r) {
   return r.scope === 'class' ? !!FUNDS?.can_create_class : !!FUNDS?.can_create_group;
 }
 
-function suaCuPhap(id) {
+// Sửa đợt thu đã tạo. Ranh giới sửa được hay không KHÔNG phải "nháp hay đã
+// mở" mà là "đã có ai tự khai chưa" — trùng đúng luật máy chủ trong patchFund.
+// Chưa ai khai thì sửa được tất, kể cả số tiền và số tài khoản. Có người khai
+// rồi thì mấy thứ ấy khoá lại, còn ngày tháng và câu chữ vẫn sửa suốt.
+function suaDot(id) {
   const r = FUNDS.rounds.find(x => x.id === id);
+  const khoa = !!r.da_co_nguoi_khai;
+  const banks = FUNDS.banks;
+  const coBin = banks.some(b => b.bin === r.bank_bin);
+
   openSheet(`
-   <h3>Cú pháp chuyển khoản</h3>
-   <p class="sub">Quyết định dòng nội dung mà cả ${r.scope === 'class' ? 'lớp' : 'nhóm'} sẽ gõ khi chuyển tiền,
-     và là thứ người thu đọc trên sao kê để biết ai đã chuyển.</p>
-   <label class="f">Cú pháp</label>
-   <input id="cpO" maxlength="60" value="${esc(r.syntax_template)}" spellcheck="false">
+   <h3>Sửa đợt thu</h3>
+   <p class="sub">${khoa
+      ? 'Đã có người tự khai đã chuyển. Số tiền, số tài khoản, người thu và sổ nhận tiền khoá lại — họ đã chuyển theo thông tin cũ.'
+      : 'Chưa ai tự khai, nên sửa được mọi thứ.'}</p>
+
+   <label class="f">Tiêu đề</label>
+   <input id="sT" maxlength="120" value="${esc(r.title)}">
+   <label class="f">Mục đích</label>
+   <input id="sP" maxlength="300" value="${esc(r.purpose || '')}">
+   <label class="f">Ngày mở</label>
+   <input id="sOpen" type="date" value="${esc(r.opens_on || '')}">
+   <label class="f">Ngày đóng</label>
+   <input id="sClose" type="date" value="${esc(r.closes_on || '')}">
+   <div class="hintline">Để trống là không đặt hạn. Đổi ngày lúc nào cũng được, kể cả khi đợt đang mở.</div>
+
+   <label class="f">Số tiền mỗi người (đ)</label>
+   <input id="sA" type="number" min="1000" step="1000" inputmode="numeric" value="${esc(String(r.amount))}" ${khoa ? 'disabled' : ''}>
+   <label class="f">Tiền thu về thuộc quỹ nào</label>
+   <select id="sQ" ${khoa || r.scope === 'class' ? 'disabled' : ''}>
+     <option value="nhom"${r.thuoc_quy === 'nhom' ? ' selected' : ''}>Quỹ nhóm</option>
+     <option value="lop"${r.thuoc_quy === 'lop' ? ' selected' : ''}>Quỹ lớp</option></select>
+   <label class="f">Ngân hàng</label>
+   <select id="sB" ${khoa ? 'disabled' : ''}>
+     ${banks.map(b => `<option value="${b.bin}"${b.bin === r.bank_bin ? ' selected' : ''}>${esc(b.name)}</option>`).join('')}
+     <option value="__other"${coBin ? '' : ' selected'}>— ngân hàng khác, tự nhập mã —</option></select>
+   <div id="sBinWrap" style="display:${coBin ? 'none' : 'block'}">
+     <label class="f">Mã ngân hàng VietQR (6 chữ số)</label>
+     <input id="sBin" maxlength="6" inputmode="numeric" value="${coBin ? '' : esc(r.bank_bin || '')}" ${khoa ? 'disabled' : ''}>
+   </div>
+   <label class="f">Số tài khoản</label>
+   <input id="sAcc" maxlength="32" inputmode="numeric" value="${esc(r.account_no || '')}" ${khoa ? 'disabled' : ''}>
+   <label class="f">Tên chủ tài khoản</label>
+   <input id="sAccName" maxlength="120" value="${esc(r.account_name || '')}" ${khoa ? 'disabled' : ''}>
+   <label class="f">Người thu</label>
+   <select id="fC" ${khoa ? 'disabled' : ''}><option value="">— chưa chọn —</option></select>
+
+   <label class="f">Cú pháp nội dung chuyển khoản</label>
+   <input id="sCP" maxlength="60" value="${esc(r.syntax_template)}" spellcheck="false">
    <div class="hintline"><b>{TEN}</b> thay bằng họ tên người chuyển, <b>{NHOM}</b> thay bằng số nhóm.
      Chữ khác gõ thẳng vào. Ví dụ <span class="ma">{TEN} Nhom {NHOM} Quylop</span>.</div>
    <div class="card" style="margin-top:8px"><div class="cb" style="padding:11px 14px">
      <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)">Bạn sẽ thấy</div>
-     <div id="cpXem" class="num" style="font-size:15px;font-weight:600;margin-top:4px;word-break:break-word"></div>
-     <div id="cpDai" class="foot" style="padding:6px 0 0"></div>
+     <div id="sCPXem" class="num" style="font-size:15px;font-weight:600;margin-top:4px;word-break:break-word"></div>
+     <div id="sCPDai" class="foot" style="padding:6px 0 0"></div>
    </div></div>
-   ${r.status === 'open' ? `<div class="warn" style="margin-top:12px">Đợt này đã mở. Đổi cú pháp thì mã QR của
+   ${r.status === 'open' ? `<div class="warn" style="margin-top:12px">Đợt đang mở. Đổi cú pháp thì mã QR của
      người CHƯA chuyển sẽ đổi theo, còn ai đã chuyển rồi vẫn giữ nội dung cũ trên sao kê — người thu nhớ để ý
      cả hai kiểu.</div>` : ''}
-   <div id="cpErr" class="errline" style="display:none"></div>
-   <div class="sa"><button class="big c" id="cpThoi">Thôi</button>
-     <button class="big go" id="cpLuu">Lưu</button></div>`);
+
+   <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+     ${r.status === 'open' ? `<button class="wide ghost" id="sDong" style="padding:11px;font-size:14px">Đóng đợt thu lại</button>` : ''}
+     ${r.status === 'closed' ? `<button class="wide ghost" id="sMoLai" style="padding:11px;font-size:14px">Mở lại đợt thu</button>` : ''}
+     ${khoa
+       ? `<div class="foot" style="padding:2px 0 0">Không xoá được đợt này nữa: đã có người tự khai, xoá đi là xoá luôn lời khai của họ. Muốn dừng thì đóng đợt lại, số liệu vẫn còn để đối chiếu.</div>`
+       : `<button class="wide ghost" id="sXoa" style="padding:11px;font-size:14px">Xoá hẳn đợt thu này</button>`}
+   </div>
+
+   <div id="sErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="sThoi">Thôi</button>
+     <button class="big go" id="sLuu">Lưu</button></div>`);
 
   const ve = () => {
-    const ra = dungNoiDung($('#cpO').value, HOME?.me?.full_name ?? '', HOME?.group?.no ?? '');
-    $('#cpXem').textContent = ra || '(trống)';
-    $('#cpDai').textContent = ra.length > 40
+    const ra = dungNoiDung($('#sCP').value, HOME?.me?.full_name ?? '', HOME?.group?.no ?? '');
+    $('#sCPXem').textContent = ra || '(trống)';
+    $('#sCPDai').textContent = ra.length > 40
       ? `${ra.length} ký tự — hơi dài, vài ngân hàng sẽ cắt bớt. Nên rút gọn.`
       : `${ra.length} ký tự.`;
-    $('#cpDai').style.color = ra.length > 40 ? 'var(--due)' : '';
+    $('#sCPDai').style.color = ra.length > 40 ? 'var(--due)' : '';
   };
-  $('#cpO').oninput = ve;
+  $('#sCP').oninput = ve;
   ve();
+  $('#sB').onchange = () => { $('#sBinWrap').style.display = $('#sB').value === '__other' ? 'block' : 'none'; };
 
-  $('#cpThoi').onclick = closeSheet;
-  $('#cpLuu').onclick = () => {
-    if (!$('#cpO').value.includes('{TEN}')) {
-      $('#cpErr').textContent = 'Cú pháp phải có {TEN}, không thì cả nhóm chuyển khoản giống hệt nhau và người thu không biết ai là ai.';
-      $('#cpErr').style.display = 'block'; return;
+  // Dùng lại đúng bộ nạp người thu của form tạo mới (nó tìm theo id #fC).
+  napNguoiThu(r.scope).then(() => {
+    if (r.collector_member_id) $('#fC').value = String(r.collector_member_id);
+    if (khoa) $('#fC').disabled = true;
+  });
+
+  const bao = (t) => { $('#sErr').textContent = t; $('#sErr').style.display = 'block'; };
+
+  if ($('#sDong')) $('#sDong').onclick = () => submitting($('#sDong'), async () => {
+    await apiPatch(`/api/funds/${id}`, { status: 'closed' });
+    await drawQuy(); await refreshHome();
+  }, 'Đã đóng đợt thu');
+
+  if ($('#sMoLai')) $('#sMoLai').onclick = () => submitting($('#sMoLai'), async () => {
+    await apiPatch(`/api/funds/${id}`, { status: 'open' });
+    await drawQuy(); await refreshHome();
+  }, 'Đã mở lại đợt thu');
+
+  if ($('#sXoa')) $('#sXoa').onclick = () => {
+    openSheet(`<h3>Xoá đợt thu</h3>
+      <p class="sub">Xoá hẳn “${esc(r.title)}”.</p>
+      <div class="warn">Chưa ai tự khai nên không mất số liệu của ai, nhưng xoá rồi thì không lấy lại được.
+        Khoản chi đã gắn vào đợt này vẫn còn trong sổ chi, chỉ mất phần ghi thuộc đợt nào.</div>
+      <div class="sa"><button class="big c" id="xThoi">Thôi</button>
+        <button class="big go" id="xGo">Xoá hẳn</button></div>`);
+    $('#xThoi').onclick = () => suaDot(id);
+    $('#xGo').onclick = () => submitting($('#xGo'), async () => {
+      await apiDelete(`/api/funds/${id}`);
+      await drawQuy(); await refreshHome();
+    }, 'Đã xoá đợt thu');
+  };
+
+  $('#sThoi').onclick = closeSheet;
+  $('#sLuu').onclick = () => {
+    if (!$('#sCP').value.includes('{TEN}')) {
+      return bao('Cú pháp phải có {TEN}, không thì cả nhóm chuyển khoản giống hệt nhau và người thu không biết ai là ai.');
     }
-    submitting($('#cpLuu'), async () => {
-      await apiPatch(`/api/funds/${id}`, { syntax_template: $('#cpO').value });
-      await drawQuy();
-    }, 'Đã đổi cú pháp');
+    const than = {
+      title: $('#sT').value,
+      purpose: $('#sP').value,
+      opens_on: $('#sOpen').value || null,
+      closes_on: $('#sClose').value || null,
+      syntax_template: $('#sCP').value,
+    };
+    if (!khoa) {
+      const bin = $('#sB').value === '__other' ? $('#sBin').value.trim() : $('#sB').value;
+      if (!/^\d{6}$/.test(bin)) return bao('Mã ngân hàng phải đúng 6 chữ số.');
+      const tien = Number($('#sA').value || 0);
+      if (!(tien > 0)) return bao('Số tiền mỗi người phải lớn hơn 0.');
+      than.amount = tien;
+      than.bank_bin = bin;
+      than.account_no = $('#sAcc').value.trim();
+      than.account_name = $('#sAccName').value;
+      than.collector_member_id = $('#fC').value === '' ? null : Number($('#fC').value);
+      if (r.scope !== 'class') than.thuoc_quy = $('#sQ').value;
+    }
+    submitting($('#sLuu'), async () => {
+      await apiPatch(`/api/funds/${id}`, than);
+      await drawQuy(); await refreshHome();
+    }, 'Đã lưu');
   };
 }
 
@@ -1438,7 +1701,7 @@ function renderRound(r) {
         <div class="mut" style="margin-bottom:10px">Bản nháp — chưa ai trong nhóm thấy đợt này.</div>
         <div class="fi"><div class="k">Nội dung chuyển khoản của bạn</div><div class="v num">${esc(r.transfer_note)}</div></div>
         <button class="wide" data-openround="${r.id}">Mở đợt thu</button>
-        ${suaDuocDot(r) ? `<button class="wide ghost" data-cuphap="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa cú pháp chuyển khoản</button>` : ''}
+        ${suaDuocDot(r) ? `<button class="wide ghost" data-suadot="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa đợt thu</button>` : ''}
       </div>` : `
       <div class="qrw">
         <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
@@ -1459,7 +1722,7 @@ function renderRound(r) {
           <b class="num" style="color:var(--ink)">${r.declared_count}/${r.total_people}</b> người đã tự khai${r.verified_count ? `, người thu đã nhận <b class="num" style="color:var(--go)">${r.verified_count}</b>` : ''}.
           Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.</div>
         ${r.can_see_ledger ? `<button class="wide ghost" data-ledger="${r.id}" style="margin-top:12px;padding:11px;font-size:14px">Mở sổ ${r.i_am_collector ? 'của người thu' : 'theo dõi'}</button>` : ''}
-        ${suaDuocDot(r) ? `<button class="wide ghost" data-cuphap="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa cú pháp chuyển khoản</button>` : ''}
+        ${suaDuocDot(r) ? `<button class="wide ghost" data-suadot="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa đợt thu</button>` : ''}
       </div>`}
   </div>`;
 }

@@ -5,9 +5,9 @@
 -- Nếu báo "no such table: d1_migrations" thì nghĩa là chưa chạy tệp cuối
 -- (scripts/d1-parts/16-ghi-nho-va-kiem-tra.sql) — chạy nó rồi kiểm tra lại.
 --
--- Cột `bang_25` đếm theo DANH SÁCH TÊN chứ không đếm tất cả bảng trong lược đồ.
+-- Cột `bang_27` đếm theo DANH SÁCH TÊN chứ không đếm tất cả bảng trong lược đồ.
 -- Lý do: D1 thật có thêm bảng nội bộ của Cloudflare (bản chạy cục bộ thì không),
--- nên đếm tất cả ra 26 và báo sai oan. Đếm theo tên thì thêm bảng nội bộ nào
+-- nên đếm tất cả ra nhiều hơn và báo sai oan. Đếm theo tên thì thêm bảng nội bộ nào
 -- nữa cũng không ảnh hưởng.
 --
 -- CỐ Ý KHÔNG DÙNG UNION ALL. D1 từ chối câu lệnh có từ 6 nhánh hợp trở lên khi
@@ -19,9 +19,10 @@ WITH d AS (
     (SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (
        'activity','audit_log','cohorts','credentials','d1_migrations',
        'fund_declarations','fund_expenses','fund_rounds','groups','insights',
-       'invites','join_requests','links','member_profile','members','officers',
+       'invites','join_requests','lich_hoc','links','member_profile','members','officers',
        'otp_codes','plan_sections','plan_template_sections','plan_templates',
-       'plans','rate_events','roster','sessions','webauthn_challenges'))     AS bang,
+       'plans','rate_events','roster','sessions','thong_bao',
+       'webauthn_challenges'))                                              AS bang,
     (SELECT COUNT(*) FROM roster)                                           AS hoc_vien,
     (SELECT COUNT(*) FROM groups)                                           AS nhom,
     (SELECT COUNT(*) FROM roster WHERE phone IS NOT NULL)                   AS dien_thoai,
@@ -40,17 +41,17 @@ WITH d AS (
       WHERE g.no = 6 AND o.role = 'truong_nhom' AND o.superseded_at IS NULL) AS truong_nhom
 )
 SELECT
-  bang       || '/25'                     AS bang_25,
+  bang       || '/27'                     AS bang_27,
   hoc_vien   || '/134'                    AS hoc_vien_134,
   nhom       || '/10'                     AS nhom_10,
   dien_thoai || '/90'                     AS dien_thoai_90,
   nhom6      || '/14'                     AS nhom6_14,
   phan_bai   || '/8'                      AS phan_bai_8,
   co_cau     || '/2'                      AS co_cau_2,
-  migration  || '/10'                     AS migration_10,
+  migration  || '/11'                     AS migration_11,
   COALESCE(truong_nhom, '(chưa có)')      AS truong_nhom,
-  CASE WHEN bang = 25 AND hoc_vien = 134 AND nhom = 10 AND dien_thoai = 90
-        AND nhom6 = 14 AND phan_bai = 8 AND co_cau = 2 AND migration = 10
+  CASE WHEN bang = 27 AND hoc_vien = 134 AND nhom = 10 AND dien_thoai = 90
+        AND nhom6 = 14 AND phan_bai = 8 AND co_cau = 2 AND migration = 11
         AND truong_nhom = 'Ngô Phú Cường'
        THEN 'ĐÚNG HẾT' ELSE 'CÓ CHỖ SAI' END AS ket_qua
 FROM d;

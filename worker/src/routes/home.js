@@ -1,4 +1,5 @@
 import { json } from '../lib/http.js';
+import { isClassCommittee } from '../permissions.js';
 
 const PROFILE_FIELDS = ['sells_what', 'sells_to', 'needs', 'offers'];
 
@@ -96,7 +97,32 @@ export async function getHome(env, me) {
   const overall = sections.length ? Math.round(sections.reduce((s, x) => s + x.pct, 0) / sections.length) : 0;
   const mineCount = sections.filter(s => s.owner_member_id === me.id).length;
 
+  // Lịch học sắp tới và thông báo còn hiệu lực. Đọc chung một lượt với /api/home
+  // để tab Hôm nay không phải gọi thêm — màn này mở nhiều nhất, mỗi lượt gọi
+  // thừa là một lần chờ.
+  //
+  // Mốc thời gian để SQLite so, không dùng Date của JS: chuỗi ISO có 'T' ở vị
+  // trí 11 còn SQLite dùng dấu cách, so sánh chuỗi sẽ lệch (quy ước 1 CLAUDE.md).
+  const [lichRes, tbRes] = await Promise.all([
+    env.DB.prepare(
+      `SELECT id, ngay, tu_gio, den_gio, chu_de, giang_vien, ghi_chu
+         FROM lich_hoc
+        WHERE cohort_id = ? AND huy_luc IS NULL AND ngay >= date('now')
+        ORDER BY ngay, COALESCE(tu_gio, '00:00') LIMIT 6`
+    ).bind(me.cohort_id).all(),
+    env.DB.prepare(
+      `SELECT id, noi_dung, nguon, het_han FROM thong_bao
+        WHERE cohort_id = ? AND (het_han IS NULL OR het_han >= date('now'))
+        ORDER BY id DESC LIMIT 3`
+    ).bind(me.cohort_id).all(),
+  ]);
+
   return json({
+    lich_hoc: lichRes.results ?? [],
+    thong_bao: tbRes.results ?? [],
+    // Ai sửa được lịch: chỉ Ban cán sự lớp. Giao diện dùng cờ này để khỏi
+    // bày nút bấm vào là 403; máy chủ vẫn kiểm lại trong routes/lich.js.
+    can_sua_lich: await isClassCommittee(env, me.id),
     // email_verified quyết định có hiện nút đăng ký passkey hay không
     // (Đợt 5). Máy chủ vẫn chặn riêng ở postRegisterOptions.
     me: { id: me.id, full_name: me.full_name, group_id: me.group_id,

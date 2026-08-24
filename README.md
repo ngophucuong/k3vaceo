@@ -60,12 +60,12 @@ Không cần cài gì trên máy, không mở terminal. Cloudflare tự kéo cod
 
 Mở tab **Console** của cơ sở dữ liệu vừa tạo, dán toàn bộ nội dung tệp
 [`scripts/setup-d1.sql`](scripts/setup-d1.sql) vào rồi Execute. Tệp này gộp cả
-sáu migration thành một lần chạy, sinh tự động từ chính các migration đó nên
-không lệch. Chạy đúng một lần trên cơ sở dữ liệu trống.
+mười một migration thành một lần chạy, sinh tự động từ chính các migration đó
+nên không lệch. Chạy đúng một lần trên cơ sở dữ liệu trống.
 
 Kiểm tra lại: dán tiếp [`scripts/verify-d1.sql`](scripts/verify-d1.sql) vào
 Console. Nó trả về **một dòng**, mỗi cột đọc theo dạng "thực tế/mong đợi" — số
-bảng 23/23, danh sách gốc 134/134 người, 10/10 nhóm, 90/90 số điện thoại, Nhóm 6
+bảng 27/27, danh sách gốc 134/134 người, 10/10 nhóm, 90/90 số điện thoại, Nhóm 6
 có 14/14 thành viên và 8/8 phần bài, trưởng nhóm là Ngô Phú Cường. Cột cuối
 `ket_qua` phải là **ĐÚNG HẾT**.
 
@@ -254,7 +254,7 @@ npx wrangler d1 migrations apply k3vaceo --remote
 cd ..
 ```
 
-Sáu migration áp theo thứ tự:
+Mười một migration áp theo thứ tự:
 
 - `0001_init.sql` — toàn bộ bảng theo mục 3 SRS.
 - `0002_seed_roster.sql` — 134 người/10 nhóm từ danh sách gốc (sinh tự động, xem bên dưới).
@@ -262,6 +262,11 @@ Sáu migration áp theo thứ tự:
 - `0004_invite_kind_and_rate_limit.sql` — tách magic link khỏi link mời, thêm bảng đếm giới hạn tần suất.
 - `0005_webauthn_challenges.sql` — chỗ giữ challenge của passkey giữa hai chặng, cùng vài index.
 - `0006_wizard_and_presentation.sql` — bảng xin vào nhóm, hai cột phân công thuyết trình.
+- `0007_otp_and_self_onboarding.sql` — bảng `otp_codes` cho mã 6 số, và tự nhận diện tại `/dangnhap`.
+- `0008_fund_expenses.sql` — sổ chi của quỹ, hai cấp lớp và nhóm.
+- `0009_phone_self_set.sql` — đánh dấu số điện thoại do chính chủ sửa, để đối chiếu lúc đăng nhập.
+- `0010_khai_ho_va_quy_cap.sql` — tách "thu của ai" khỏi "tiền vào quỹ nào", và ghi ai khai hộ ai.
+- `0011_lich_hoc.sql` — lịch học của lớp và thông báo chung, kèm lịch tuần 3.
 
 ```bash
 cd worker
