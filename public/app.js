@@ -1593,11 +1593,14 @@ async function openLedger(roundId) {
   try { data = await apiGet(`/api/funds/${roundId}/ledger`); }
   catch (e) { closeSheet(); toast(errText(e)); return; }
 
-  const { round, people, i_am_collector } = data;
+  const { round, people, i_am_collector, pham_vi_xem } = data;
   const done = people.filter(p => p.verified).length;
+  const chiNhomMinh = pham_vi_xem === 'nhom-minh';
   openSheet(`
    <h3>${esc(round.title)}</h3>
-   <p class="sub">${vnMoney(round.amount)} đ mỗi người · người thu đã nhận ${done}/${people.length}.
+   ${chiNhomMinh ? `<div class="warn" style="margin-bottom:12px">Đây là đợt thu của <b>cả lớp</b>.
+     Bạn đang xem phần <b>${esc(HOME?.group?.label ?? 'nhóm mình')}</b> — ${people.length} người, không phải toàn lớp.</div>` : ''}
+   <p class="sub">${vnMoney(round.amount)} đ mỗi người · người thu đã nhận ${done}/${people.length}${chiNhomMinh ? ' trong nhóm bạn' : ''}.
      ${i_am_collector ? 'Soi sao kê xong thì bấm xác nhận từng người.' : 'Chỉ người thu mới xác nhận được đã nhận tiền.'}</p>
    <div class="warn" style="margin-bottom:14px">Không có nhắc nợ tự động. Ai chưa chuyển thì nhắn riêng.</div>
    <div class="card"><div class="cb" style="padding:2px 14px">

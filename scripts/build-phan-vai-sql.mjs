@@ -22,7 +22,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const CSV = path.join(ROOT, 'scripts', 'data', 'phan-vai.csv');
-const VAI_LOP = new Set(['lop_truong', 'lop_pho', 'thu_quy']);
+const VAI_LOP = new Set(['lop_truong', 'lop_pho', 'thu_quy', 'uy_vien']);
 const VAI_NHOM = new Set(['truong_nhom', 'pho_nhom']);
 const VAI_HOP_LE = new Set([...VAI_LOP, ...VAI_NHOM]);
 

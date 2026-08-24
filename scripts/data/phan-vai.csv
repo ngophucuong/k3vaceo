@@ -4,8 +4,13 @@
 # tên — vì trong lớp có hai người trùng tên (hai bà Phan Thị Thanh Nga), khoá
 # theo tên là có ngày gán nhầm người.
 #
-# vai_tro nhận năm giá trị:
-#   Cấp lớp (officers.group_id để trống):  lop_truong | lop_pho | thu_quy
+# Ba vai đầu cấp lớp là vai ĐIỀU HÀNH: mở được đợt thu của lớp và ghi được sổ
+# chi quỹ lớp. Vai uy_vien là thành viên Ban cán sự lớp phụ trách theo dõi và
+# báo cáo: xem được sổ thu của cả lớp nhưng KHÔNG mở đợt thu, KHÔNG ghi chi.
+# Tách vậy vì hai việc khác hẳn nhau về hậu quả.
+#
+# vai_tro nhận sáu giá trị:
+#   Cấp lớp (officers.group_id để trống):  lop_truong | lop_pho | thu_quy | uy_vien
 #   Cấp nhóm (tự suy nhóm từ danh sách):   truong_nhom | pho_nhom
 #
 # Nhóm của vai cấp nhóm KHÔNG ghi ở đây — script tự lấy từ cột nhóm của người
@@ -23,3 +28,4 @@
 vai_tro,stt,ho_ten,ghi_chu
 lop_truong,65,Lưu Minh Tiến,Lớp trưởng lớp CEO K03
 thu_quy,84,Vũ Thị Ngân Hà,"Thủ quỹ lớp. Thông báo của lớp ghi tên ngắn ""Vũ Thị Ngân"" và ghi Nhóm 1; danh sách Ban tổ chức chỉ có Vũ Thị Ngân Hà ở Nhóm 7. Nếu là hai người khác nhau thì sửa lại stt ở dòng này."
+uy_vien,71,Ngô Phú Cường,"Thành viên Ban cán sự lớp, phụ trách theo dõi và báo cáo Nhóm 6"

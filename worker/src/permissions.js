@@ -6,13 +6,38 @@
 // NULL. Hiện chưa ai giữ vai này — mục 11 điểm #6 SRS để ngỏ việc có mở tầng
 // lớp hay không. Kiểm tra vẫn viết đủ ở đây để lúc Ban cán sự lớp được thêm
 // vào thì quỹ lớp chạy được ngay, không phải sửa quyền.
-export async function isClassOfficer(env, memberId) {
+// Vai cấp lớp chia làm HAI mức, cố ý:
+//
+//   Điều hành  — lop_truong | lop_pho | thu_quy
+//                Mở đợt thu của lớp, ghi sổ chi quỹ lớp. Đụng tới tiền.
+//
+//   Uỷ viên    — uy_vien
+//                Thành viên Ban cán sự lớp phụ trách theo dõi và báo cáo.
+//                Xem được sổ thu của cả lớp, KHÔNG mở đợt thu và KHÔNG ghi chi.
+//
+// Tách ra vì hai việc khác hẳn nhau về hậu quả. Gộp lại thì hoặc là uỷ viên
+// không xem được gì (không báo cáo nổi), hoặc ai theo dõi cũng tiêu được tiền
+// của lớp. Cả hai đều sai.
+const VAI_DIEU_HANH = "('lop_truong', 'lop_pho', 'thu_quy')";
+const VAI_BAN_CAN_SU = "('lop_truong', 'lop_pho', 'thu_quy', 'uy_vien')";
+
+async function coVaiCapLop(env, memberId, danhSach) {
   const row = await env.DB.prepare(
     `SELECT 1 FROM officers
      WHERE group_id IS NULL AND member_id = ?
-       AND role IN ('lop_truong', 'lop_pho', 'thu_quy') AND superseded_at IS NULL`
+       AND role IN ${danhSach} AND superseded_at IS NULL`
   ).bind(memberId).first();
   return !!row;
+}
+
+// Được mở đợt thu của lớp và ghi sổ chi quỹ lớp.
+export async function isClassOfficer(env, memberId) {
+  return coVaiCapLop(env, memberId, VAI_DIEU_HANH);
+}
+
+// Thuộc Ban cán sự lớp ở bất kỳ mức nào — dùng cho quyền ĐỌC.
+export async function isClassCommittee(env, memberId) {
+  return coVaiCapLop(env, memberId, VAI_BAN_CAN_SU);
 }
 
 export async function isGroupOfficer(env, memberId, groupId) {

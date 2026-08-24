@@ -1,5 +1,5 @@
 import { json, error, readJson } from '../lib/http.js';
-import { isGroupOfficer, isClassOfficer, logAudit, logActivity } from '../permissions.js';
+import { isGroupOfficer, isClassOfficer, isClassCommittee, logAudit, logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 import { buildTransferNote, buildQrUrl, isValidBin, bankName, BANKS } from '../lib/vietqr.js';
 
@@ -27,13 +27,32 @@ async function canCreate(env, me, scope, groupId) {
 
 // Ai xem được sổ đầy đủ (ai đã khai, ai chưa): người thu của chính đợt đó,
 // cộng trưởng/phó nhóm với đợt của nhóm mình, cộng Ban cán sự lớp với đợt lớp.
-async function canSeeLedger(env, me, round) {
-  if (round.collector_member_id === me.id) return true;
-  if (round.scope === 'group' && round.group_id === me.group_id) {
-    return isGroupOfficer(env, me.id, me.group_id);
+// Trả về xem người này đọc được sổ tới đâu:
+//   'ca-dot'    — thấy toàn bộ danh sách của đợt
+//   'nhom-minh' — chỉ thấy phần nhóm mình
+//   null        — không được xem
+//
+// Chỗ 'nhom-minh' là thứ trước đây thiếu, và thiếu nó thì quỹ lớp không chạy
+// được trên thực tế: thủ quỹ mở MỘT đợt cho cả 134 người, nhưng đôn đốc thì
+// phải là mười trưởng nhóm, mỗi người lo 14 người của mình. Bản cũ chỉ cho
+// Ban cán sự lớp xem, nên trưởng nhóm không biết ai trong nhóm đã chuyển —
+// đành phải mở đợt riêng cho nhóm, và tiền của lớp lại đổ vào sổ nhóm.
+async function mucXemSo(env, me, round) {
+  if (round.collector_member_id === me.id) return 'ca-dot';
+
+  if (round.scope === 'group') {
+    if (round.group_id !== me.group_id) return null;
+    return (await isGroupOfficer(env, me.id, me.group_id)) ? 'ca-dot' : null;
   }
-  if (round.scope === 'class') return isClassOfficer(env, me.id);
-  return false;
+
+  // Đợt cấp lớp.
+  if (await isClassCommittee(env, me.id)) return 'ca-dot';
+  if (me.group_id && (await isGroupOfficer(env, me.id, me.group_id))) return 'nhom-minh';
+  return null;
+}
+
+async function canSeeLedger(env, me, round) {
+  return (await mucXemSo(env, me, round)) !== null;
 }
 
 async function shapeRound(env, round, me) {
@@ -273,14 +292,24 @@ export async function deleteDeclare(env, me, roundId, ip) {
 export async function getLedger(env, me, roundId) {
   const round = await loadRound(env, roundId);
   if (!round || !roundAppliesTo(round, me)) return error('not_found', 404);
-  if (!(await canSeeLedger(env, me, round))) return error('forbidden', 403);
+  const muc = await mucXemSo(env, me, round);
+  if (!muc) return error('forbidden', 403);
 
+  // Trưởng nhóm xem đợt cấp lớp thì CHỈ thấy nhóm mình — lọc ngay trong câu
+  // truy vấn chứ không lọc ở giao diện (nguyên tắc N6, và mục 6 CLAUDE.md:
+  // phân quyền kiểm ở máy chủ, không tin giao diện).
   const people = round.scope === 'class'
-    ? await env.DB.prepare(
-        `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
-         FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
-         WHERE m.cohort_id = ? AND m.is_active = 1 ORDER BY m.id`
-      ).bind(round.id, round.cohort_id).all()
+    ? (muc === 'nhom-minh'
+        ? await env.DB.prepare(
+            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
+             FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
+             WHERE m.cohort_id = ? AND m.group_id = ? AND m.is_active = 1 ORDER BY m.id`
+          ).bind(round.id, round.cohort_id, me.group_id).all()
+        : await env.DB.prepare(
+            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
+             FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
+             WHERE m.cohort_id = ? AND m.is_active = 1 ORDER BY m.id`
+          ).bind(round.id, round.cohort_id).all())
     : await env.DB.prepare(
         `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
          FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
@@ -288,8 +317,11 @@ export async function getLedger(env, me, roundId) {
       ).bind(round.id, round.group_id).all();
 
   return json({
-    round: { id: round.id, title: round.title, amount: round.amount, status: round.status },
+    round: { id: round.id, title: round.title, amount: round.amount, status: round.status, scope: round.scope },
     i_am_collector: round.collector_member_id === me.id,
+    // Nói rõ đang xem cả đợt hay chỉ nhóm mình, để không ai nhầm 14 người
+    // của Nhóm 6 là toàn bộ 134 người của lớp.
+    pham_vi_xem: muc,
     people: (people.results ?? []).map(p => ({
       id: p.id,
       full_name: p.full_name,
