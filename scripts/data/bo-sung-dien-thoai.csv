@@ -1,0 +1,68 @@
+# Bổ sung số điện thoại cho danh sách lớp K03
+# ═════════════════════════════════════════════════════════════════════════
+# CÁCH DÙNG: điền cột so_dien_thoai rồi commit tệp này. Workflow tự nạp vào
+# D1 và in ra đã cập nhật những ai.
+#
+#   · Dạng nào cũng được: 0912345678 / 0912 345 678 / +84912345678
+#   · Dòng để trống thì bỏ qua — điền được bao nhiêu nạp bấy nhiêu
+#   · Dòng bắt đầu bằng # là chú thích
+#   · CHỈ sửa cột so_dien_thoai. Cột stt là khoá — sửa là nạp nhầm người.
+#
+# VÌ SAO CẦN: số điện thoại là thứ chứng minh 'đúng là tôi' ở bước tự nhận
+# diện. Ai chưa có số thì chưa vào được — màn hình bảo họ nhắn trưởng nhóm.
+#
+# Khoá theo stt (số thứ tự trong danh sách gốc) chứ không theo tên, vì lớp có
+# hai người CÙNG TÊN 'Phan Thị Thanh Nga' ở hai nhóm khác nhau.
+#
+stt,ho_ten,so_dien_thoai,ghi_chu
+# ══ 5 dòng dưới đây đang SAI, không phải thiếu — xử lý trước ══
+76,Lê Trung Đức,,"Nhóm 6 — đang là ""098778525"", thiếu một chữ số"
+65,Lưu Minh Tiến,,"Nhóm 5 — đang TRÙNG số ""0914544449"" với người khác"
+102,Lê Minh Tiến,,"Nhóm 8 — đang TRÙNG số ""0914544449"" với người khác"
+67,Phan Thị Thanh Nga,,"Nhóm 6 — đang TRÙNG số ""0985981808"" với người khác"
+111,Phan Thị Thanh Nga,,"Nhóm 9 — đang TRÙNG số ""0985981808"" với người khác"
+# ══ 44 người chưa có số nào ══
+8,Nguyễn Thanh Bình,,Nhóm 1
+9,Lê Thị Thu Trang,,Nhóm 1
+10,Đinh Thị Giang,,Nhóm 1
+12,Nguyễn Khắc Dũng,,Nhóm 1
+21,Trần Huy Tùng,,Nhóm 2
+22,Trần Duy Hưng,,Nhóm 2
+23,Phương Thanh Vũ,,Nhóm 2
+24,Đỗ Văn Lương,,Nhóm 2
+33,Nguyễn Thị Kim Oanh,,Nhóm 3
+34,Nguyễn Kiều Oanh,,Nhóm 3
+35,Trần Thu Thùy,,Nhóm 3
+36,Chu Anh Tuấn,,Nhóm 3
+40,Trịnh Thái Thường,,Nhóm 4
+47,Tạ Duy Hưng,,Nhóm 4
+48,Nguyễn Nho Huân,,Nhóm 4
+49,Phạm Đăng Đề,,Nhóm 4
+52,Đào Văn Duy,,Nhóm 5
+61,Đậu Thị Lý,,Nhóm 5
+62,Cao Văn Hách,,Nhóm 5
+63,Nguyễn Quang Huy,,Nhóm 5
+66,Nguyễn Thị Thu Hương,,Nhóm 6
+72,Bùi Thị Huyền Trang,,Nhóm 6
+73,Trần Hoàng Hà,,Nhóm 6
+74,Đào Hồng Luật,,Nhóm 6
+75,Khương Quốc Chung,,Nhóm 6
+79,Lê Thị Bích Liên,,Nhóm 6
+84,Vũ Thị Ngân Hà,,Nhóm 7
+85,Nguyễn Thành Trung,,Nhóm 7
+88,Nguyễn Tuấn Long,,Nhóm 7
+89,Phạm Quý Hưng,,Nhóm 7
+92,Nguyễn Bảo Kiên,,Nhóm 8
+93,Hoàng Thị Thu Hiền,,Nhóm 8
+97,Nguyễn Thị Tùng Vân,,Nhóm 8
+104,Phùng Thanh Quân,,Nhóm 8
+110,Mai Mậu Thành,,Nhóm 9
+112,Đinh Khánh Toàn,,Nhóm 9
+114,Vũ Văn Trang,,Nhóm 9
+115,Nguyễn Minh Tưởng,,Nhóm 9
+119,Đỗ Ngọc Hân,,Nhóm 9
+121,Trần Thị Thủy,,Nhóm 10
+124,Nguyễn Thị Linh,,Nhóm 10
+126,Lâm Ngọc Thảo,,Nhóm 10
+129,Phạm Thị Hoa,,Nhóm 10
+131,Nguyễn Thị Hải,,Nhóm 10

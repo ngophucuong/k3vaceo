@@ -16,7 +16,8 @@ import { postLogout } from './routes/session.js';
 import { getPlan, patchSection, patchTopic } from './routes/plan.js';
 import { postInsight, deleteInsight } from './routes/insights.js';
 import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
-import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify } from './routes/onboard.js';
+import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
+         postVerifyMyEmail, postVerifyMyEmailConfirm } from './routes/onboard.js';
 import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify } from './routes/funds.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
@@ -116,6 +117,15 @@ export default {
       const ip = clientIp(request);
 
       if (pathname === '/api/home' && method === 'GET') return getHome(env, me);
+
+      // Xác minh email khi đã có phiên (người vào bằng link mời). Dùng phiên
+      // chứ không nhận email trong thân — không có chỗ nào để dò.
+      if (pathname === '/api/me/verify-email' && method === 'POST') {
+        return postVerifyMyEmail(request, env, ctx, me);
+      }
+      if (pathname === '/api/me/verify-email/confirm' && method === 'POST') {
+        return postVerifyMyEmailConfirm(request, env, me);
+      }
 
       if (pathname === '/api/members' && method === 'GET') return listMembers(env, me);
       if ((m = pathname.match(/^\/api\/members\/(\d+)$/)) && method === 'GET') {

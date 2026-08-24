@@ -226,34 +226,60 @@ không phải ĐÚNG HẾT.
 - **Số điện thoại Lê Trung Đức** trong roster là `098778525`, thiếu 1 số. Giữ
   nguyên trong `roster`, không đưa vào `members`. Cần hỏi lại.
 
-## Đăng nhập: không có vai "admin" riêng
+## Đăng nhập (Đợt 5 viết lại) — không có vai "admin" riêng
 
 Sản phẩm không có tài khoản quản trị. Quyền đến từ bảng `officers`; Ngô Phú
-Cường là `truong_nhom` của Nhóm 6 — vai cao nhất hiện có trong dữ liệu (vai cấp
-lớp còn để ngỏ, xem mục việc treo).
+Cường là `truong_nhom` của Nhóm 6 — vai cao nhất hiện có (vai cấp lớp còn để
+ngỏ, xem mục việc treo).
 
-Ba lối vào, không có mật khẩu ở lối nào (mục 4 SRS):
+**Lối vào chính: tự nhận diện tại `/vao`, không cần ai gửi gì.**
 
-1. **Link mời** `/i/<token>` — 14 ngày, dùng nhiều lần. Người đã có phiên phát
-   cho người khác bằng nút trong ứng dụng (`POST /api/members/:id/invite`).
-2. **Magic link qua email** `/dangnhap` — 15 phút, dùng một lần. Cần đủ bốn bí
-   mật `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, **`MAIL_FROM`** trên Worker;
-   thiếu thì trả 503 `mailer_not_configured`.
-3. **Passkey** — sau khi vào được lần đầu thì đăng ký trong tab Tài khoản.
+1. Gõ tên (không dấu cũng ra) → chọn đúng mình trong 134 người của `roster`
+2. Nhập **số điện thoại** để chứng minh đúng là mình. Ban tổ chức đã có sẵn số
+   này — **KHÔNG gửi gì tới nó**, chỉ đối chiếu. Tên thì cả lớp ai cũng biết,
+   số thì không, nên số đóng vai mật khẩu dùng một lần của bước này.
+3. Khai **email** → nhận **mã 6 số** qua thư (không SMS, không tốn tiền)
+4. Nhập mã → có phiên 90 ngày, `email_verified_at` được đặt
+5. **Passkey chỉ hiện sau bước 4** — chặn cả ở giao diện lẫn máy chủ
+   (`postRegisterOptions` trả 403 `email_chua_kiem_chung`)
 
-**Vòng luẩn quẩn của lần đầu tiên** và cách phá: muốn phát link mời thì phải
-đăng nhập đã. Dùng `.github/workflows/phat-link-moi.yml` — ghi thẳng lời mời
-vào D1 rồi in link ra log Actions. Kích hoạt bằng tab Actions (cần
-`actions:write`) hoặc sửa `.github/phat-link-moi.trigger` rồi đẩy lên.
+Đăng nhập lại: `/dangnhap` → nhập email → mã 6 số. Hoặc passkey.
 
-Link nằm trong log nên hạn mặc định chỉ 120 phút, và **mỗi lần chạy tự huỷ mọi
-lời mời chưa dùng trước đó của đúng người ấy** — token in ở lần chạy cũ chết
-ngay. `scripts/bootstrap-invite.mjs` làm cùng việc đó nhưng cần terminal.
+**Vì sao mã 6 số chứ không phải magic link**: bấm link trong app Gmail mở bằng
+trình duyệt nội bộ của app, cookie phiên rơi vào đó chứ không vào trình duyệt
+thật — người dùng quay lại Safari/Chrome thì vẫn chưa đăng nhập. Gõ 6 số thì
+không dính. Magic link của Đợt 2 vẫn còn route, giữ làm đường phụ.
 
-Đã kiểm nguyên luồng trên Worker cục bộ: token → `GET /api/invite/<token>` ra
-đúng hồ sơ → `POST .../claim` ra cookie phiên HttpOnly SameSite=Lax 90 ngày →
-`/api/home` đúng người → `POST /api/members/:id/invite` phát được link cho
-người khác. Token bịa thì 410.
+**Bảng `otp_codes` riêng, KHÔNG nhét vào `invites`**: `invites.token_hash` là
+UNIQUE, mà mã 6 số chỉ có một triệu khả năng nên xin nhiều lần là có ngày trùng
+mã → trùng hash → vỡ ràng buộc ngay giữa luồng đăng nhập. OTP còn cần đếm số
+lần nhập sai, thứ `invites` không có.
+
+Quy tắc an toàn đã cài: mã băm kèm `member_id`; tối đa 5 lần sai rồi mã chết;
+xin mã mới là mã cũ chết; dùng một lần bằng `UPDATE ... WHERE used_at IS NULL`
+rồi xét số dòng đổi; so hash hằng thời gian; email lạ trả lời **giống hệt**
+email có thật; số điện thoại sai **không nói lệch chỗ nào**. Cửa an ninh nằm ở
+`/api/onboard/start` chứ không ở `/api/onboard/check` — check chỉ để báo sớm.
+
+**Ai vào bằng link mời** thì có phiên nhưng `email_verified_at` còn trống, nên
+chưa mở được passkey. Tab Tài khoản có sẵn nút gửi mã để xác minh nốt
+(`/api/me/verify-email` — dùng phiên, không nhận email trong thân, nên không có
+chỗ nào để dò).
+
+**Dữ liệu chặn luồng này** — 49 dòng, xem `scripts/data/bo-sung-dien-thoai.csv`:
+- 44 người chưa có số nào (Nhóm 6: 6 người) → chưa tự nhận diện được
+- Lê Trung Đức: `098778525` thiếu một chữ số
+- `0914544449` dùng chung cho Lưu Minh Tiến (Nhóm 5) và Lê Minh Tiến (Nhóm 8)
+- `0985981808` dùng chung cho **hai người cùng tên** Phan Thị Thanh Nga, một ở
+  Nhóm 6 một ở Nhóm 9 — vì vậy CSV khoá theo `seq` chứ không theo tên
+
+Điền cột `so_dien_thoai` rồi commit là workflow `bo-sung-dien-thoai.yml` tự nạp.
+Nó chặn trước khi chạm D1 nếu có số sai khuôn hoặc hai người chung một số.
+
+**Vòng luẩn quẩn của lần đầu tiên** giờ chỉ còn với ai chưa có số điện thoại
+trong danh sách gốc. `.github/workflows/phat-link-moi.yml` vẫn còn để phá vòng
+đó khi cần (ghi thẳng lời mời vào D1, in link ra log Actions, hạn 120 phút, mỗi
+lần chạy tự huỷ lời mời cũ chưa dùng của đúng người ấy).
 
 ## Cách làm việc mà người dùng đang mong đợi
 

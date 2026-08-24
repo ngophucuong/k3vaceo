@@ -178,6 +178,44 @@ export async function postOtpVerify(request, env) {
   );
 }
 
+/* ══ Đã đăng nhập nhưng email chưa kiểm chứng ═════════════════════════════
+   Xảy ra với ai vào bằng LINK MỜI: link đó chứng minh trưởng nhóm đã gửi riêng
+   cho họ, đủ để cấp phiên, nhưng chưa chứng minh họ cầm hộp thư đã khai. Mà
+   passkey thì bắt buộc phải có đường lui bằng email, nên phải xác minh nốt.
+
+   Hai route này dùng PHIÊN chứ không nhận email trong thân — nhờ vậy không có
+   chỗ nào để dò xem email nào có trong lớp. */
+export async function postVerifyMyEmail(request, env, ctx, me) {
+  if (!(await allow(env, 'otp_request', clientIp(request), OTP_PER_HOUR))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+  if (!me.email) return error('email_required', 409);
+  if (me.email_verified_at) return json({ ok: true, da_kiem_chung: true });
+  if (!mailerConfigured(env)) return error('mailer_not_configured', 503);
+
+  await guiMa(env, ctx, me);
+  return json({ ok: true, email: che(me.email) });
+}
+
+export async function postVerifyMyEmailConfirm(request, env, me) {
+  if (!(await allow(env, 'otp_verify', clientIp(request), VERIFY_PER_HOUR))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+  const body = await readJson(request);
+  const code = String(body.code ?? '').replace(/\D/g, '');
+  if (code.length !== 6) return error('otp_invalid_format', 422);
+
+  const kq = await verifyOtp(env, me.id, code);
+  if (!kq.ok) {
+    const ma = kq.reason === 'otp_locked' ? 429 : kq.reason === 'otp_expired' ? 410 : 401;
+    return error(kq.reason, ma, kq.con_lai !== undefined ? { con_lai: kq.con_lai } : undefined);
+  }
+  await env.DB.prepare(
+    `UPDATE members SET email_verified_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+  ).bind(me.id).run();
+  return json({ ok: true });
+}
+
 /* ══ Dùng chung ═══════════════════════════════════════════════════════════ */
 
 // Đối chiếu roster_id + số điện thoại. Trả về { person, member } hoặc { loi }.

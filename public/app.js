@@ -56,6 +56,16 @@ const ERR_TEXT = {
   passkey_unknown: 'Passkey này chưa được đăng ký ở đây.',
   passkey_already_registered: 'Thiết bị này đã đăng ký passkey rồi.',
   challenge_invalid: 'Phiên đăng ký passkey hết hạn — bấm lại từ đầu.',
+  // Đợt 5 — tự nhận diện và OTP
+  phone_mismatch: 'Số điện thoại không khớp với số Ban tổ chức đang có. Kiểm tra lại, hoặc nhắn trưởng nhóm nếu bạn đã đổi số.',
+  phone_invalid: 'Số điện thoại phải đủ 10 chữ số và bắt đầu bằng 0.',
+  phone_missing_in_roster: 'Ban tổ chức chưa có số điện thoại của bạn nên chưa đối chiếu được.',
+  roster_not_found: 'Không tìm thấy tên này trong danh sách lớp.',
+  otp_wrong: 'Mã không đúng.',
+  otp_expired: 'Mã đã hết hạn hoặc đã dùng rồi — xin mã mới.',
+  otp_locked: 'Nhập sai quá nhiều lần, mã này bị huỷ. Xin mã mới.',
+  otp_invalid_format: 'Mã gồm đúng 6 chữ số.',
+  email_chua_kiem_chung: 'Cần xác minh email bằng mã trước khi thêm passkey.',
 };
 const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
 
@@ -189,40 +199,237 @@ async function renderMagicConsume(token) {
       <div class="err">Link đăng nhập chỉ dùng một lần và hết hạn sau 15 phút. Xin một link mới.</div>
       <div style="margin-top:16px"><button class="wide" id="again">Xin link mới</button></div>
     </div></div>`;
-    $('#again').onclick = renderLogin;
+    // Gán thẳng hàm thì đối tượng sự kiện chui vào tham số đầu và bị đổ
+    // vào ô email — bọc lại cho chắc.
+    $('#again').onclick = () => renderLogin();
   }
 }
 
-function renderLogin() {
+function renderLogin(emailSan) {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
     <div class="lb">k3vaceo · Khoá K03</div>
     <h1>Đăng nhập</h1>
-    <p class="sub">Nhập email bạn đã khai lúc nhận link mời. Chúng tôi gửi một đường dẫn đăng nhập tới hộp thư đó.</p>
-    <label class="f">Email</label><input id="lgEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
+    <p class="sub">Nhập email bạn đã khai. Chúng tôi gửi một mã 6 số tới hộp thư đó.</p>
+    <label class="f">Email</label><input id="lgEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160" value="${esc(emailSan ?? '')}">
     <div id="lgMsg" class="hintline" style="display:none"></div>
-    <button class="wide" id="lgSend">Gửi link đăng nhập</button>
+    <button class="wide" id="lgSend">Gửi mã đăng nhập</button>
     <button class="wide ghost" id="lgPasskey" style="margin-top:10px">Đăng nhập bằng passkey</button>
-    <div class="foot" style="padding:14px 0 0">Chưa từng nhận link mời? Nhắn trưởng hoặc phó nhóm — link mời riêng là lối vào đầu tiên.</div>
+    <div class="foot" style="padding:14px 0 0">Lần đầu vào? <a href="/vao" id="lgVao">Bấm đây để tự nhận diện</a> bằng tên và số điện thoại.</div>
   </div></div>`;
   $('#lgPasskey').onclick = loginWithPasskey;
+  $('#lgVao').onclick = e => { e.preventDefault(); history.pushState({}, '', '/vao'); renderVao(); };
   $('#lgSend').onclick = async () => {
     const email = $('#lgEmail').value.trim();
     if (!email) return;
     const btn = $('#lgSend');
     btn.disabled = true; btn.textContent = 'Đang gửi…';
     try {
-      await apiPost('/api/auth/email', { email });
-      $('#lgMsg').style.display = 'block';
-      $('#lgMsg').innerHTML = 'Nếu email này có trong lớp, đường dẫn đăng nhập vừa được gửi tới đó. Link sống 15 phút.';
-      btn.textContent = 'Đã gửi';
+      await apiPost('/api/auth/otp', { email });
+      renderNhapMa(email, 'Nếu email này có trong lớp, mã vừa được gửi tới đó.');
     } catch (e) {
       $('#lgMsg').style.display = 'block';
       $('#lgMsg').style.color = 'var(--due)';
       $('#lgMsg').textContent = errText(e);
-      btn.disabled = false; btn.textContent = 'Gửi link đăng nhập';
+      btn.disabled = false; btn.textContent = 'Gửi mã đăng nhập';
     }
   };
+}
+
+/* Màn nhập mã 6 số — dùng chung cho cả lần đầu lẫn đăng nhập lại.
+   inputmode="numeric" để điện thoại bật bàn phím số; autocomplete="one-time-code"
+   để iOS gợi ý mã ngay trên bàn phím, khỏi phải chuyển sang app Mail chép tay. */
+function renderNhapMa(email, loiNhan) {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+    <div class="lb">k3vaceo · Khoá K03</div>
+    <h1>Nhập mã 6 số</h1>
+    <p class="sub">${esc(loiNhan)} Mã sống 10 phút.</p>
+    <label class="f">Mã trong thư</label>
+    <input id="maOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+           placeholder="000000" style="font-size:28px;letter-spacing:8px;text-align:center">
+    <div id="maMsg" class="hintline" style="display:none"></div>
+    <button class="wide" id="maOk">Vào</button>
+    <button class="wide ghost" id="maLai" style="margin-top:10px">Gửi lại mã</button>
+    <div class="foot" style="padding:14px 0 0">Không thấy thư? Xem cả mục Spam.</div>
+  </div></div>`;
+  const oMa = $('#maOtp');
+  oMa.focus();
+  const bao = (t, do_ = true) => {
+    $('#maMsg').style.display = 'block';
+    $('#maMsg').style.color = do_ ? 'var(--due)' : '';
+    $('#maMsg').textContent = t;
+  };
+  const guiDi = async () => {
+    const code = oMa.value.replace(/\D/g, '');
+    if (code.length !== 6) return bao('Mã gồm đúng 6 chữ số.');
+    $('#maOk').disabled = true; $('#maOk').textContent = 'Đang kiểm…';
+    try {
+      const kq = await apiPost('/api/auth/otp/verify', { email, code });
+      history.replaceState({}, '', '/');
+      if (kq.lan_dau) sessionStorage.setItem('k3-vua-vao', '1');
+      boot();
+    } catch (e) {
+      const conLai = e?.data?.con_lai;
+      bao(errText(e) + (conLai !== undefined ? ` Còn ${conLai} lần thử.` : ''));
+      $('#maOk').disabled = false; $('#maOk').textContent = 'Vào';
+      oMa.select();
+    }
+  };
+  $('#maOk').onclick = guiDi;
+  oMa.onkeydown = e => { if (e.key === 'Enter') guiDi(); };
+  // Dán mã từ thư thì vào luôn, khỏi phải bấm nút.
+  oMa.oninput = () => { if (oMa.value.replace(/\D/g, '').length === 6) guiDi(); };
+  $('#maLai').onclick = async () => {
+    $('#maLai').disabled = true; $('#maLai').textContent = 'Đang gửi…';
+    try { await apiPost('/api/auth/otp', { email }); bao('Đã gửi mã mới.', false); }
+    catch (e) { bao(errText(e)); }
+    setTimeout(() => { $('#maLai').disabled = false; $('#maLai').textContent = 'Gửi lại mã'; }, 15000);
+  };
+}
+
+/* ═══════════ TỰ NHẬN DIỆN (/vao) ═══════════
+   Ba bước, theo đúng luồng đã chốt:
+     1. Gõ tên → chọn đúng mình trong danh sách gốc 134 người
+     2. Nhập số điện thoại — Ban tổ chức đã có sẵn, chỉ đối chiếu, KHÔNG gửi gì
+     3. Khai email → nhận mã 6 số → nhập mã → vào
+   Passkey chỉ hiện ở tab Tài khoản sau khi xong bước 3. */
+const VAO = { person: null };
+
+function vaoShell(title, sub, body) {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+    <div class="lb">k3vaceo · Khoá K03</div>
+    <h1>${esc(title)}</h1>
+    <p class="sub">${sub}</p>
+    ${body}
+  </div></div>`;
+}
+
+function renderVao() { vaoBuoc1(); }
+
+function vaoBuoc1() {
+  vaoShell('Bạn là ai?', 'Gõ tên bạn — không dấu cũng tìm ra.', `
+    <label class="f">Họ tên</label>
+    <input id="vTen" placeholder="ví dụ: cuong" autocomplete="name" maxlength="60">
+    <div id="vDs" style="margin-top:10px"></div>
+    <div class="foot" style="padding:14px 0 0">Đã từng vào rồi?
+      <a href="/dangnhap" id="vDn">Đăng nhập bằng email</a>.</div>`);
+  $('#vDn').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap'); renderLogin(); };
+
+  let hen;
+  $('#vTen').oninput = () => {
+    clearTimeout(hen);
+    const q = $('#vTen').value.trim();
+    if (q.length < 2) { $('#vDs').innerHTML = ''; return; }
+    // Chờ người ta gõ xong hẵng hỏi máy chủ — tìm kiếm có giới hạn 60 lần/giờ.
+    hen = setTimeout(async () => {
+      let ds = [];
+      try { ds = (await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q))).people; }
+      catch (e) { $('#vDs').innerHTML = `<div class="err">${esc(errText(e))}</div>`; return; }
+      if (!ds.length) {
+        $('#vDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp. Thử gõ ngắn hơn, hoặc nhắn trưởng nhóm.</div>`;
+        return;
+      }
+      $('#vDs').innerHTML = `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
+        <div class="fd"><div class="x"><b>${esc(p.full_name)}</b>
+          <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
+        </div><button class="lnk" data-rid="${p.roster_id}">là tôi</button></div>`).join('')}
+      </div></div>`;
+      document.querySelectorAll('#vDs [data-rid]').forEach(b => {
+        b.onclick = () => {
+          VAO.person = ds.find(x => String(x.roster_id) === b.dataset.rid);
+          vaoBuoc2();
+        };
+      });
+    }, 350);
+  };
+}
+
+function vaoBuoc2() {
+  const p = VAO.person;
+  vaoShell('Đúng là bạn chứ?',
+    `Nhập số điện thoại để đối chiếu với số Ban tổ chức đang giữ. <b>Không có tin nhắn nào được gửi tới số này</b> — chỉ dùng để xác nhận đúng người.`, `
+    <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
+      <b>${esc(p.full_name)}</b>
+      <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}${p.company ? '<br>' + esc(p.company) : ''}</div>
+    </div></div>
+    <label class="f">Số điện thoại</label>
+    <input id="vSdt" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="09xx xxx xxx">
+    <div id="vMsg" class="hintline" style="display:none"></div>
+    <button class="wide" id="vOk">Tiếp tục</button>
+    <button class="wide ghost" id="vLui" style="margin-top:10px">Không phải tôi, chọn lại</button>`);
+  $('#vLui').onclick = vaoBuoc1;
+
+  const tiep = async () => {
+    const phone = $('#vSdt').value.trim();
+    if (!phone) return;
+    $('#vOk').disabled = true; $('#vOk').textContent = 'Đang kiểm…';
+    try {
+      const kq = await apiPost('/api/onboard/check', { roster_id: p.roster_id, phone });
+      VAO.phone = phone;
+      VAO.daNhanCho = kq.da_nhan_cho;
+      VAO.goiYEmail = kq.goi_y_email;
+      vaoBuoc3();
+    } catch (e) {
+      // Chưa có số trong danh sách gốc là chuyện của dữ liệu, không phải người
+      // dùng gõ sai — nói khác đi kẻo họ ngồi thử lại cả buổi.
+      if (e?.data?.error === 'phone_missing_in_roster') return vaoThieuSo(e.data);
+      $('#vMsg').style.display = 'block';
+      $('#vMsg').style.color = 'var(--due)';
+      $('#vMsg').textContent = errText(e);
+      $('#vOk').disabled = false; $('#vOk').textContent = 'Tiếp tục';
+    }
+  };
+  $('#vOk').onclick = tiep;
+  $('#vSdt').onkeydown = e => { if (e.key === 'Enter') tiep(); };
+  $('#vSdt').focus();
+}
+
+function vaoThieuSo(d) {
+  vaoShell('Chưa đối chiếu được',
+    'Ban tổ chức chưa có số điện thoại của bạn trong danh sách lớp, nên chưa xác nhận được đúng người.', `
+    <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
+      <b>${esc(d.full_name ?? '')}</b>
+      <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(d.group_label ?? '')}</div>
+    </div></div>
+    <div class="mut">Nhắn trưởng nhóm bổ sung số của bạn vào danh sách lớp. Xong là bạn vào được ngay, không phải làm gì thêm.</div>
+    <button class="wide ghost" id="vLui2" style="margin-top:14px">Quay lại</button>`);
+  $('#vLui2').onclick = vaoBuoc1;
+}
+
+function vaoBuoc3() {
+  const p = VAO.person;
+  vaoShell(VAO.daNhanCho ? 'Chào bạn trở lại' : 'Email của bạn',
+    VAO.daNhanCho
+      ? `Bạn đã nhận hồ sơ này rồi${VAO.goiYEmail ? ` với email <b>${esc(VAO.goiYEmail)}</b>` : ''}. Nhập lại email đó để nhận mã đăng nhập.`
+      : 'Khai email để nhận mã đăng nhập. Đây cũng là đường vào lại khi bạn đổi máy, nên hãy dùng hộp thư bạn mở được.', `
+    <label class="f">Email</label>
+    <input id="vEmail" inputmode="email" autocomplete="email" maxlength="160" placeholder="ten@congty.vn">
+    <div id="vMsg3" class="hintline" style="display:none"></div>
+    <button class="wide" id="vGui">Gửi mã cho tôi</button>
+    <button class="wide ghost" id="vLui3" style="margin-top:10px">Quay lại</button>`);
+  $('#vLui3').onclick = vaoBuoc2;
+
+  const gui = async () => {
+    const email = $('#vEmail').value.trim();
+    if (!email) return;
+    $('#vGui').disabled = true; $('#vGui').textContent = 'Đang gửi…';
+    try {
+      await apiPost('/api/onboard/start', { roster_id: p.roster_id, phone: VAO.phone, email });
+      renderNhapMa(email, `Đã gửi mã tới ${esc(email)}.`);
+    } catch (e) {
+      $('#vMsg3').style.display = 'block';
+      $('#vMsg3').style.color = 'var(--due)';
+      $('#vMsg3').textContent = e?.data?.error === 'email_taken'
+        ? `Email này đã thuộc về ${e.data.taken_by}. Dùng email khác, hoặc nhắn trưởng nhóm nếu bị nhầm.`
+        : errText(e);
+      $('#vGui').disabled = false; $('#vGui').textContent = 'Gửi mã cho tôi';
+    }
+  };
+  $('#vGui').onclick = gui;
+  $('#vEmail').onkeydown = e => { if (e.key === 'Enter') gui(); };
+  $('#vEmail').focus();
 }
 
 /* ═══════════ WIZARD DỰNG NHÓM (/start) ═══════════
@@ -422,10 +629,12 @@ function renderNoSession() {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
     <div class="lb">k3vaceo · Khoá K03</div><h1>Chưa đăng nhập</h1>
-    <p class="sub">Mở đúng link mời riêng trưởng nhóm đã gửi, hoặc đăng nhập bằng email bạn đã khai.</p>
-    <button class="wide" id="toLogin">Đăng nhập bằng email</button>
+    <p class="sub">Lần đầu vào thì tự nhận diện bằng tên và số điện thoại — không cần ai gửi gì cho bạn.</p>
+    <button class="wide" id="toVao">Tôi là học viên K03, vào lần đầu</button>
+    <button class="wide ghost" id="toLogin" style="margin-top:10px">Đã có tài khoản — đăng nhập</button>
   </div></div>`;
-  $('#toLogin').onclick = renderLogin;
+  $('#toVao').onclick = () => { history.pushState({}, '', '/vao'); renderVao(); };
+  $('#toLogin').onclick = () => { history.pushState({}, '', '/dangnhap'); renderLogin(); };
 }
 
 /* ═══════════ KHUNG ỨNG DỤNG ═══════════ */
@@ -1321,8 +1530,66 @@ async function openMe() {
   drawPasskeyBox();
 }
 
+/* Xác minh email ngay trong tab Tài khoản — dành cho ai vào bằng link mời:
+   đã có phiên nhưng chưa chứng minh cầm hộp thư, nên chưa mở được passkey. */
+function veXacMinh(trangThai) {
+  const o = $('#pkXm');
+  if (!o) return;
+  if (trangThai !== 'da-gui') {
+    o.innerHTML = `<button class="wide ghost" id="pkGui" style="padding:11px;font-size:14px">Gửi mã xác minh</button>`;
+    $('#pkGui').onclick = async () => {
+      const b = $('#pkGui'); b.disabled = true; b.textContent = 'Đang gửi…';
+      try { await apiPost('/api/me/verify-email'); veXacMinh('da-gui'); }
+      catch (e) { toast(errText(e)); b.disabled = false; b.textContent = 'Gửi mã xác minh'; }
+    };
+    return;
+  }
+  o.innerHTML = `
+    <input id="pkMa" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"
+           style="font-size:22px;letter-spacing:6px;text-align:center">
+    <div id="pkMsg" class="hintline" style="display:none"></div>
+    <button class="wide" id="pkOk" style="margin-top:8px;padding:11px;font-size:14px">Xác minh</button>`;
+  const oMa = $('#pkMa'); oMa.focus();
+  const xong = async () => {
+    const code = oMa.value.replace(/\D/g, '');
+    if (code.length !== 6) return;
+    $('#pkOk').disabled = true; $('#pkOk').textContent = 'Đang kiểm…';
+    try {
+      await apiPost('/api/me/verify-email/confirm', { code });
+      HOME = await apiGet('/api/home');   // để lần vẽ sau thấy email_verified
+      toast('Đã xác minh email');
+      await drawPasskeyBox();
+    } catch (e) {
+      const conLai = e?.data?.con_lai;
+      $('#pkMsg').style.display = 'block';
+      $('#pkMsg').style.color = 'var(--due)';
+      $('#pkMsg').textContent = errText(e) + (conLai !== undefined ? ` Còn ${conLai} lần thử.` : '');
+      $('#pkOk').disabled = false; $('#pkOk').textContent = 'Xác minh';
+      oMa.select();
+    }
+  };
+  $('#pkOk').onclick = xong;
+  oMa.oninput = () => { if (oMa.value.replace(/\D/g, '').length === 6) xong(); };
+}
+
 async function drawPasskeyBox() {
   if (!$('#pkBox')) return;
+
+  // Điều kiện của Đợt 5: chưa chứng minh cầm hộp thư thì chưa mở passkey.
+  // Passkey gắn chặt vào thiết bị — mất máy mà không có đường email đã kiểm
+  // chứng thì không còn lối nào vào lại. Máy chủ cũng chặn riêng, đây chỉ là
+  // lớp giao diện cho đỡ bấm hụt.
+  if (!HOME?.me?.email_verified) {
+    $('#pkBox').innerHTML = `
+      <div class="eb" style="margin-bottom:8px">Passkey</div>
+      <div class="mut">Xác minh email trước đã. Chúng tôi gửi một mã 6 số tới
+        <b>${esc(HOME?.me?.email_che ?? 'email của bạn')}</b> — nhập xong là mở được passkey,
+        lần sau vào bằng vân tay hoặc khuôn mặt.</div>
+      <div id="pkXm" style="margin-top:10px"></div>`;
+    veXacMinh();
+    return;
+  }
+
   let list = [];
   try { list = (await apiGet('/api/passkey')).passkeys; } catch { /* không chặn màn tài khoản */ }
   if (!$('#pkBox')) return;
@@ -1368,6 +1635,7 @@ async function boot() {
   if ((m = location.pathname.match(/^\/i\/([^/]+)\/?$/))) return renderClaim(m[1]);
   if ((m = location.pathname.match(/^\/dangnhap\/([^/]+)\/?$/))) return renderMagicConsume(m[1]);
   if (location.pathname.replace(/\/$/, '') === '/dangnhap') return renderLogin();
+  if (location.pathname.replace(/\/$/, '') === '/vao') return renderVao();
   if (location.pathname.replace(/\/$/, '') === '/start') return renderStart();
 
   try {

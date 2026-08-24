@@ -1,0 +1,67 @@
+name: Bổ sung số điện thoại
+
+# Sửa scripts/data/bo-sung-dien-thoai.csv rồi commit là chạy. Không cần
+# terminal — sửa thẳng bằng trình soạn thảo web của GitHub cũng được.
+on:
+  push:
+    paths: ['scripts/data/bo-sung-dien-thoai.csv']
+  workflow_dispatch:
+
+concurrency:
+  group: bo-sung-dien-thoai
+  cancel-in-progress: false
+
+jobs:
+  nap:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      # Kiểm TRƯỚC khi chạm vào D1: số sai khuôn, hoặc hai người cùng một số,
+      # thì dừng ngay. Hai người chung số là hỏng đúng chỗ quan trọng nhất —
+      # bước tự nhận diện sẽ không phân biệt được ai với ai.
+      - name: Kiểm tệp CSV
+        run: node scripts/build-phone-sql.mjs
+
+      - name: Sinh SQL
+        id: sinh
+        run: |
+          node scripts/build-phone-sql.mjs --ra /tmp/sdt.sql
+          if [ -s /tmp/sdt.sql ]; then echo "co=1" >> "$GITHUB_OUTPUT"; else echo "Không có dòng nào để nạp."; fi
+
+      - name: Nạp lên D1 thật
+        if: steps.sinh.outputs.co == '1'
+        run: $WRANGLER --file=/tmp/sdt.sql
+
+      # Đọc lại từ D1 chứ không tin bước ghi. Con số phải giảm đi đúng bằng số
+      # dòng vừa nạp — không thì có gì đó không khớp.
+      - name: Đếm lại xem còn thiếu bao nhiêu
+        run: |
+          SQL="SELECT (SELECT COUNT(*) FROM roster WHERE phone IS NULL) AS con_thieu,
+                      (SELECT COUNT(*) FROM roster WHERE phone IS NOT NULL
+                         AND (phone NOT GLOB '0[0-9]*' OR LENGTH(phone) <> 10)) AS sai_khuon,
+                      (SELECT COUNT(*) FROM (SELECT phone FROM roster WHERE phone IS NOT NULL
+                         GROUP BY phone HAVING COUNT(*) > 1)) AS so_bi_trung;"
+          $WRANGLER --json --command "$SQL" > /tmp/kq.json
+          node --input-type=commonjs -e '
+            const raw = require("fs").readFileSync("/tmp/kq.json", "utf8");
+            const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
+            const kq = JSON.parse(raw.slice(d, c + 1));
+            const r = (Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || [])[0] || {};
+            console.log(`Còn thiếu số:      ${r.con_thieu}`);
+            console.log(`Còn sai khuôn:     ${r.sai_khuon}`);
+            console.log(`Số bị hai người dùng chung: ${r.so_bi_trung}`);
+            if (r.con_thieu === 0 && r.sai_khuon === 0 && r.so_bi_trung === 0)
+              console.log("\n✓ Cả 134 người đều có số riêng, đúng khuôn. Ai cũng tự nhận diện được.");
+            else
+              console.log("\nCòn dòng chưa xong — điền tiếp vào scripts/data/bo-sung-dien-thoai.csv rồi commit lại.");
+          '

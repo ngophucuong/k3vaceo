@@ -100,7 +100,10 @@ export async function getHome(env, me) {
     // email_verified quyết định có hiện nút đăng ký passkey hay không
     // (Đợt 5). Máy chủ vẫn chặn riêng ở postRegisterOptions.
     me: { id: me.id, full_name: me.full_name, group_id: me.group_id,
-          email_verified: !!me.email_verified_at },
+          email_verified: !!me.email_verified_at,
+          // Che bớt để người đứng cạnh không đọc được, nhưng vẫn đủ để chính
+          // chủ nhận ra hộp thư nào sẽ nhận mã.
+          email_che: me.email ? me.email.replace(/^(..)([^@]*)/, (_, a, b) => a + '•'.repeat(Math.max(3, b.length))) : null },
     group,
     cohort,
     action,
