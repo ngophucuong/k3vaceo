@@ -82,6 +82,31 @@ jobs:
           fi
           echo "✓ email của $HO_TEN nay là $thuc"
 
+      # `wrangler secret list` chỉ trả về TÊN bí mật, không trả giá trị — nên
+      # chạy được ở đây mà không lộ gì. Nhờ vậy khi Worker báo
+      # mailer_not_configured thì nói được ngay thiếu đúng cái nào, thay vì bắt
+      # người dùng mò cả bốn.
+      - name: Liệt kê tên bí mật đang có trên Worker
+        run: |
+          npx wrangler secret list --config worker/wrangler.toml > /tmp/bm.json 2>/dev/null || true
+          node --input-type=commonjs -e '
+            const fs = require("fs");
+            let ten = [];
+            try {
+              const raw = fs.readFileSync("/tmp/bm.json", "utf8");
+              const d = raw.indexOf("["), c = raw.lastIndexOf("]");
+              if (d >= 0 && c > d) ten = JSON.parse(raw.slice(d, c + 1)).map(x => x.name);
+            } catch (e) { console.log("(không đọc được danh sách bí mật:", String(e) + ")"); }
+            const can = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "MAIL_FROM"];
+            const tuychon = ["SMTP_PORT", "SMTP_SECURE"];
+            console.log("Bí mật đang có:", ten.length ? ten.join(", ") : "(không thấy cái nào)");
+            const thieu = can.filter(x => !ten.includes(x));
+            for (const x of can) console.log(`${ten.includes(x) ? "✓" : "✗"} ${x}  (bắt buộc)`);
+            for (const x of tuychon) console.log(`${ten.includes(x) ? "✓" : "·"} ${x}  (tuỳ chọn, mặc định ${x === "SMTP_PORT" ? "587" : "starttls"})`);
+            fs.writeFileSync("/tmp/thieu", thieu.join(", "));
+            if (thieu.length) console.log(`\n→ THIẾU: ${thieu.join(", ")}`);
+          '
+
       # Mở tail TRƯỚC khi gọi, vì thư gửi sau khi đã trả lời. Cả ba việc phải
       # nằm trong CÙNG một bước, không thì tiến trình nền chết theo bước trước.
       - name: Gọi thật rồi soi log Worker
@@ -117,7 +142,7 @@ jobs:
 
           echo
           if [ "$ma" = "503" ]; then
-            echo "::error::Worker trả 503 mailer_not_configured — thiếu ít nhất một trong bốn bí mật SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_FROM."
+            echo "::error::Worker trả 503 mailer_not_configured — thiếu bí mật: $(cat /tmp/thieu 2>/dev/null || echo 'xem bước liệt kê phía trên'). Thêm ở Cloudflare → Workers & Pages → k3vaceo-api → Settings → Variables and Secrets."
             exit 1
           fi
           if [ "$ma" != "200" ]; then
