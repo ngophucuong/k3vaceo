@@ -157,12 +157,38 @@ jobs:
           TAIL_PID=$!
           echo "chờ tail kết nối…"; sleep 10
 
-          echo "--- POST /api/auth/email ---"
+          # Thử ĐÚNG đường mà người dùng đi từ Đợt 5: /api/auth/otp gửi mã 6
+          # số. Bản trước gọi /api/auth/email — đó là magic link của Đợt 2, vẫn
+          # còn route nhưng không còn là lối chính, nên thử nó là thử nhầm chỗ:
+          # nó xanh mà người dùng vẫn không nhận được mã.
+          echo "--- POST /api/auth/otp (mã 6 số — lối chính) ---"
           ma=$(curl -s -o /tmp/tra.json -w '%{http_code}' -X POST \
                  -H 'Content-Type: application/json' \
                  -d "{\"email\":\"$EMAIL_MOI\"}" \
-                 https://k3vaceo.cuongngo.app/api/auth/email)
+                 https://k3vaceo.cuongngo.app/api/auth/otp)
           echo "HTTP $ma — $(cat /tmp/tra.json)"
+
+          # Trả lời của /api/auth/otp giống hệt nhau dù email có thật hay không
+          # (chống dò email), nên HTTP 200 KHÔNG chứng minh tìm thấy người. Đọc
+          # thẳng D1 xem mã có được sinh ra không — đây mới là bằng chứng.
+          echo "--- có sinh mã trong bảng otp_codes không ---"
+          $WRANGLER --json --command \
+            "SELECT COUNT(*) AS ma_vua_sinh FROM otp_codes o
+               JOIN members m ON m.id = o.member_id
+              WHERE m.email = '$EMAIL_MOI' AND o.created_at > datetime('now','-3 minutes')" \
+            > /tmp/dem.json || true
+          node --input-type=commonjs -e '
+            const raw = require("fs").readFileSync("/tmp/dem.json", "utf8");
+            const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
+            let n = -1;
+            try {
+              const kq = JSON.parse(raw.slice(d, c + 1));
+              n = ((Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || [])[0] || {}).ma_vua_sinh;
+            } catch (e) { console.log("(không đọc được:", String(e) + ")"); }
+            if (n > 0) console.log(`✓ đã sinh ${n} mã — Worker TÌM THẤY người này và có gọi gửi thư`);
+            else { console.log("✗ KHÔNG sinh mã nào — Worker không tìm thấy ai mang email này trong bảng members, nên không gửi gì cả"); }
+            require("fs").writeFileSync("/tmp/co-ma", String(n));
+          '
 
           echo "chờ Worker bắt tay SMTP xong (ctx.waitUntil chạy sau khi trả lời)…"
           sleep 30
@@ -210,6 +236,10 @@ jobs:
           if [ -n "$loi" ]; then
             echo "::error::Đủ bí mật SMTP nhưng gửi thư THẤT BẠI — xem dòng lỗi ở trên."; exit 1
           fi
-          echo "✓ Đủ bí mật SMTP và không thấy lỗi gửi. Kiểm tra hộp thư $EMAIL_MOI"
-          echo "  (cả mục Spam). Thư tên 'Đường dẫn đăng nhập k3vaceo', bên trong là"
-          echo "  MỘT ĐƯỜNG LINK sống 15 phút — sản phẩm không dùng mã OTP."
+          if [ "$(cat /tmp/co-ma 2>/dev/null)" = "0" ]; then
+            echo "::error::Không sinh mã nào. Email '$EMAIL_MOI' không khớp dòng nào trong bảng members (hoặc dòng ấy is_active = 0). Đây chính là lý do không có thư về: Worker cố tình trả lời giống hệt như khi gửi thành công, để người ngoài không dò được ai đã đăng ký."
+            exit 1
+          fi
+          echo "✓ Đủ bí mật SMTP, có sinh mã, và không thấy lỗi gửi."
+          echo "  Kiểm tra hộp thư $EMAIL_MOI, CẢ MỤC SPAM."
+          echo "  Thư tên 'Mã đăng nhập k3vaceo: <6 số>', mã sống 10 phút, dùng một lần." 
