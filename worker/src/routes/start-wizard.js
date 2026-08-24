@@ -25,7 +25,9 @@ export async function searchRoster(request, env) {
   // hàm bỏ dấu nên lọc trong JS — 134 dòng thì không đáng kể.
   const rows = await env.DB.prepare(
     `SELECT r.id, r.full_name, r.group_label, r.title, r.company,
-            (SELECT COUNT(*) FROM members m WHERE m.roster_id = r.id) AS member_count
+            (SELECT COUNT(*) FROM members m WHERE m.roster_id = r.id) AS member_count,
+            (SELECT g.label FROM members m JOIN groups g ON g.id = m.group_id
+              WHERE m.roster_id = r.id AND m.is_active = 1 LIMIT 1) AS nhom_that
      FROM roster r WHERE r.cohort_id = (SELECT id FROM cohorts WHERE code = 'K03')`
   ).all();
 
@@ -34,7 +36,13 @@ export async function searchRoster(request, env) {
     .filter(r => bare(r.full_name).includes(needle))
     .slice(0, 12)
     .map(r => ({
-      roster_id: r.id, full_name: r.full_name, group_label: r.group_label,
+      roster_id: r.id, full_name: r.full_name,
+      // Nhóm THẬT trước, danh sách gốc chỉ là đường lui. Danh sách gốc là bản
+      // ghi ngày 15/8 và không đổi khi Ban tổ chức chuyển ai sang nhóm khác
+      // giữa khoá; hiện nhóm cũ thì người ta tưởng ứng dụng ghi sai.
+      group_label: r.nhom_that || r.group_label,
+      group_label_goc: r.group_label,
+      da_chuyen_nhom: !!(r.nhom_that && r.nhom_that !== r.group_label),
       title: r.title, company: r.company, already_member: r.member_count > 0,
     }));
   return json({ people });

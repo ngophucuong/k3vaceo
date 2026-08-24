@@ -54,7 +54,9 @@ export async function postOnboardCheck(request, env) {
   return json({
     ok: true,
     full_name: person.full_name,
-    group_label: person.group_label,
+    // Nhóm THẬT trước, danh sách gốc chỉ là đường lui khi chưa có hồ sơ.
+    group_label: member?.group_label || person.group_label,
+    da_chuyen_nhom: !!(member?.group_label && member.group_label !== person.group_label),
     title: person.title,
     company: person.company,
     // Đã nhận chỗ rồi thì giao diện mời đăng nhập bằng email sẵn có, đỡ phải
@@ -262,8 +264,15 @@ async function doiChieu(env, body) {
   const person = await env.DB.prepare('SELECT * FROM roster WHERE id = ?').bind(rosterId).first();
   if (!person) return { loi: 'roster_not_found', ma: 404 };
 
+  // Lấy kèm nhãn nhóm THẬT của dòng members. Danh sách gốc là bản ghi ngày
+  // 15/8 và không đổi khi Ban tổ chức chuyển ai sang nhóm khác giữa khoá —
+  // Nguyễn Thị Tùng Vân là ca đầu tiên: gốc ghi Nhóm 8, thực tế ở Nhóm 6.
+  // Hiện nhóm cũ ở màn xác nhận thì người ta tưởng ứng dụng ghi sai.
   const member = await env.DB.prepare(
-    'SELECT id, full_name, email, claimed_at, phone, phone_self_set_at FROM members WHERE roster_id = ?'
+    `SELECT m.id, m.full_name, m.email, m.claimed_at, m.phone, m.phone_self_set_at,
+            g.label AS group_label
+       FROM members m LEFT JOIN groups g ON g.id = m.group_id
+      WHERE m.roster_id = ?`
   ).bind(rosterId).first();
 
   // Hai số được coi là hợp lệ để đối chiếu:

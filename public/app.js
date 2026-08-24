@@ -375,6 +375,8 @@ function vaoBuoc2() {
     <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
       <b>${esc(p.full_name)}</b>
       <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}${p.company ? '<br>' + esc(p.company) : ''}</div>
+      ${p.da_chuyen_nhom ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">
+        Danh sách ngày 15/8 ghi bạn ở ${esc(p.group_label_goc)}; bạn đã được chuyển sang ${esc(p.group_label)}.</div>` : ''}
     </div></div>
     <label class="f">Số điện thoại</label>
     <input id="vSdt" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="09xx xxx xxx">
