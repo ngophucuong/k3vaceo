@@ -16,6 +16,7 @@ import { postLogout } from './routes/session.js';
 import { getPlan, patchSection, patchTopic } from './routes/plan.js';
 import { postInsight, deleteInsight } from './routes/insights.js';
 import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
+import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify } from './routes/onboard.js';
 import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify } from './routes/funds.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
@@ -65,6 +66,23 @@ export default {
         }
         return postInviteClaim(request, env, m[1]);
       }
+      // Đợt 5 — tự nhận diện rồi OTP qua email. Ba chặng: đối chiếu số điện
+      // thoại (chỉ để báo sớm), khai email và nhận mã, rồi đổi mã lấy phiên.
+      if (pathname === '/api/onboard/check' && method === 'POST') {
+        return postOnboardCheck(request, env);
+      }
+      if (pathname === '/api/onboard/start' && method === 'POST') {
+        return postOnboardStart(request, env, ctx);
+      }
+      if (pathname === '/api/auth/otp' && method === 'POST') {
+        return postOtpRequest(request, env, ctx);
+      }
+      if (pathname === '/api/auth/otp/verify' && method === 'POST') {
+        return postOtpVerify(request, env);
+      }
+
+      // Magic link của Đợt 2 — giữ làm đường phụ cho ai đã quen, không quảng
+      // cáo trên giao diện nữa.
       if (pathname === '/api/auth/email' && method === 'POST') {
         return postEmailRequest(request, env, ctx);
       }

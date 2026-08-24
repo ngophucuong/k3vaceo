@@ -97,7 +97,10 @@ export async function getHome(env, me) {
   const mineCount = sections.filter(s => s.owner_member_id === me.id).length;
 
   return json({
-    me: { id: me.id, full_name: me.full_name, group_id: me.group_id },
+    // email_verified quyết định có hiện nút đăng ký passkey hay không
+    // (Đợt 5). Máy chủ vẫn chặn riêng ở postRegisterOptions.
+    me: { id: me.id, full_name: me.full_name, group_id: me.group_id,
+          email_verified: !!me.email_verified_at },
     group,
     cohort,
     action,

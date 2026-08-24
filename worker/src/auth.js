@@ -9,12 +9,14 @@
 // là còn hạn. Với liên kết 15 phút của Đợt 2 thì nó sống tới tận nửa đêm.
 
 import { parseCookies } from './lib/http.js';
-import { randomToken, sha256Hex } from './lib/crypto.js';
+import { randomToken, randomDigits, sha256Hex, equalsHex } from './lib/crypto.js';
 
 const SESSION_COOKIE = 's';
 const SESSION_DAYS = 90;
 const INVITE_DAYS = 14;
 const MAGIC_MINUTES = 15;
+const OTP_MINUTES = 10;
+export const OTP_MAX_ATTEMPTS = 5;
 
 export const INVITE_KIND = 'invite';
 export const MAGIC_KIND = 'magic';
@@ -103,4 +105,64 @@ export function sessionCookieHeader(token, isHttps, maxAgeSeconds = SESSION_DAYS
 
 export function clearSessionCookieHeader(isHttps) {
   return sessionCookieHeader('', isHttps, 0);
+}
+
+/* ══ OTP 6 số qua email (Đợt 5) ══════════════════════════════════════════
+   Khác magic link ở hai chỗ, và cả hai đều bắt buộc:
+
+   1. Mã 6 số chỉ có MỘT TRIỆU khả năng. Không đếm số lần nhập sai thì dò được
+      trong vài phút. Vì vậy mỗi mã có bộ đếm riêng, quá OTP_MAX_ATTEMPTS lần
+      là mã chết, phải xin mã mới.
+   2. Mã lưu dưới dạng băm kèm member_id — cùng một mã "123456" của hai người
+      khác nhau cho ra hai bản băm khác nhau, nên không ai lấy mã của mình đi
+      thử vào tài khoản người khác được.
+
+   Vì sao 6 số mà không phải link: bấm link trong app Gmail sẽ mở bằng trình
+   duyệt nội bộ của app, cookie phiên rơi vào đó chứ không vào trình duyệt
+   thật — người dùng quay lại Safari/Chrome thì vẫn chưa đăng nhập. Gõ 6 số
+   thì không dính. */
+
+export async function createOtp(env, memberId) {
+  // Xin mã mới là mã cũ chết ngay. Nếu để cả hai cùng sống thì kẻ dò có hai
+  // lần bộ đếm cho cùng một tài khoản.
+  await env.DB.prepare(
+    `UPDATE otp_codes SET used_at = datetime('now')
+     WHERE member_id = ? AND used_at IS NULL`
+  ).bind(memberId).run();
+
+  const code = randomDigits(6);
+  await env.DB.prepare(
+    `INSERT INTO otp_codes (member_id, code_hash, expires_at, created_at)
+     VALUES (?, ?, datetime('now', ?), datetime('now'))`
+  ).bind(memberId, await sha256Hex(`${memberId}:${code}`), `+${OTP_MINUTES} minutes`).run();
+
+  return { code, minutes: OTP_MINUTES };
+}
+
+export async function verifyOtp(env, memberId, code) {
+  const row = await env.DB.prepare(
+    `SELECT id, code_hash, attempts FROM otp_codes
+     WHERE member_id = ? AND used_at IS NULL AND expires_at > datetime('now')
+     ORDER BY id DESC LIMIT 1`
+  ).bind(memberId).first();
+  if (!row) return { ok: false, reason: 'otp_expired' };
+  if (row.attempts >= OTP_MAX_ATTEMPTS) return { ok: false, reason: 'otp_locked' };
+
+  if (!equalsHex(await sha256Hex(`${memberId}:${code}`), row.code_hash)) {
+    await env.DB.prepare('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?')
+      .bind(row.id).run();
+    const conLai = OTP_MAX_ATTEMPTS - (row.attempts + 1);
+    return conLai > 0
+      ? { ok: false, reason: 'otp_wrong', con_lai: conLai }
+      : { ok: false, reason: 'otp_locked' };
+  }
+
+  // Đánh dấu đã dùng bằng UPDATE ... WHERE used_at IS NULL rồi xét số dòng
+  // đổi được — hai request đến cùng lúc thì chỉ một cái thắng, giống hệt cách
+  // magic link chống dùng lại.
+  const res = await env.DB.prepare(
+    `UPDATE otp_codes SET used_at = datetime('now') WHERE id = ? AND used_at IS NULL`
+  ).bind(row.id).run();
+  if (!res.meta?.changes) return { ok: false, reason: 'otp_expired' };
+  return { ok: true };
 }

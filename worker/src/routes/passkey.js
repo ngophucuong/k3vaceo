@@ -57,6 +57,12 @@ async function takeChallenge(env, id, kind) {
 
 /* ══ Đăng ký passkey (phải đang đăng nhập) ══ */
 export async function postRegisterOptions(request, env, me) {
+  // Passkey chỉ mở sau khi đã chứng minh cầm hộp thư (Đợt 5). Lý do: passkey
+  // gắn chặt vào thiết bị — mất máy mà không có đường email đã kiểm chứng thì
+  // không còn lối nào vào lại. Giao diện đã ẩn nút, nhưng chặn ở máy chủ mới
+  // là chặn thật (quy ước 6: không tin giao diện).
+  if (!me.email_verified_at) return error('email_chua_kiem_chung', 403);
+
   const existing = await env.DB.prepare(
     'SELECT credential_id FROM credentials WHERE member_id = ?'
   ).bind(me.id).all();
