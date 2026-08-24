@@ -215,13 +215,49 @@ async function guiQuaResend(cf, { to, subject, text }) {
   console.log('Đã gửi qua Resend:', than.slice(0, 200));
 }
 
+// Hai đường gửi, thử lần lượt chứ không chọn một.
+//
+// Trước đây có RESEND_API_KEY là đi Resend và bỏ hẳn SMTP. Hỏng ở chỗ: Resend
+// từ chối 403 "domain is not verified" chừng nào cuongngo.cloud chưa xác minh
+// bên họ, mà việc ấy cần người thật vào thêm bản ghi DNS. Trong lúc chờ thì
+// không một lá thư nào đi được — dù tài khoản Hostinger vẫn gửi tốt (đã đo:
+// thư gửi thẳng từ máy chủ GitHub tới được hộp thư).
+//
+// Nên: Resend trước (đường HTTP, không vướng cổng 465 và không có socket để
+// bị cắt giữa chừng), hỏng thì lùi về SMTP. Chỉ khi CẢ HAI hỏng mới ném lỗi,
+// và câu lỗi ghi cả hai chỗ hỏng để lần sau khỏi phải đoán.
 export async function sendMail(env, { to, subject, text }) {
   const cf = resendCauHinh(env);
-  if (cf) return guiQuaResend(cf, { to, subject, text });
+  if (!cf) return guiQuaSmtp(env, { to, subject, text });
 
-  if (!mailerConfigured(env)) throw new Error('SMTP chưa được cấu hình');
+  try {
+    return await guiQuaResend(cf, { to, subject, text });
+  } catch (loiResend) {
+    // Không có đường SMTP nào để lùi về thì ném thẳng lỗi Resend.
+    const c = docCauHinhSmtp(env);
+    if (!(c.host && c.user && c.pass && c.from)) throw loiResend;
 
-  const { host, port, mode, user, pass, from } = docCauHinhSmtp(env);
+    try {
+      return await guiQuaSmtp(env, { to, subject, text });
+    } catch (loiSmtp) {
+      const err = new Error('cả hai đường gửi thư đều hỏng');
+      err.buoc = `Resend: ${loiResend?.buoc || loiResend?.message || loiResend}`
+               + ` | SMTP: ${loiSmtp?.buoc || loiSmtp?.message || loiSmtp}`;
+      throw err;
+    }
+  }
+}
+
+async function guiQuaSmtp(env, { to, subject, text }) {
+  // Kiểm riêng bộ bí mật SMTP, KHÔNG hỏi mailerConfigured(): hàm ấy trả true
+  // chỉ vì có RESEND_API_KEY, nên khi Resend hỏng mà SMTP trống thì ta lại đi
+  // mở socket tới host undefined và báo lỗi sai chỗ.
+  const cauHinh = docCauHinhSmtp(env);
+  if (!(cauHinh.host && cauHinh.user && cauHinh.pass && cauHinh.from)) {
+    throw new Error('SMTP chưa được cấu hình');
+  }
+
+  const { host, port, mode, user, pass, from } = cauHinh;
 
   let socket, writer, reader;
   try {
