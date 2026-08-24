@@ -264,6 +264,30 @@ jobs:
           timeout 60 node /tmp/gui-thang.cjs || echo "(hết giờ hoặc hỏng — xem dòng trên)"
           exit 0
 
+      # Chờ deploy của CHÍNH cú push này lên xong. Cùng một push kích hoạt cả
+      # deploy.yml lẫn workflow này, nên không chờ thì phép thử gọi trúng bản
+      # Worker cũ rồi kết luận sai — đã vấp bốn lần trong ngày 24/8, mỗi lần
+      # mất một vòng chẩn đoán. /api/health nay khai số hiệu commit đang chạy.
+      - name: Chờ bản vừa đẩy lên tới nơi
+        run: |
+          for lan in $(seq 1 40); do
+            dang=$(curl -s -m 10 https://k3vaceo.cuongngo.app/api/health \
+                   | node --input-type=commonjs -e '
+                       let t=""; process.stdin.on("data",d=>t+=d).on("end",()=>{
+                         try { const d=JSON.parse(t); console.log(`${d.version||"?"} ${d.mailer||"?"}`); }
+                         catch { console.log("? ?"); }
+                       });' 2>/dev/null)
+            sha=$(echo "$dang" | cut -d' ' -f1)
+            duong=$(echo "$dang" | cut -d' ' -f2)
+            if [ "$sha" = "$GITHUB_SHA" ]; then
+              echo "✓ bản đang chạy đúng là bản vừa đẩy (${sha:0:8}), đường gửi thư: $duong"
+              break
+            fi
+            echo "lần $lan: đang chạy ${sha:0:8}, chờ ${GITHUB_SHA:0:8}…"
+            [ "$lan" = "40" ] && echo "::warning::Chờ quá lâu, đo tiếp trên bản hiện có (${sha:0:8})."
+            sleep 6
+          done
+
       # Mở tail TRƯỚC khi gọi, vì thư gửi sau khi đã trả lời. Cả ba việc phải
       # nằm trong CÙNG một bước, không thì tiến trình nền chết theo bước trước.
       - name: Gọi thật rồi soi log Worker

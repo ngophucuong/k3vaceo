@@ -77,7 +77,7 @@ jobs:
         working-directory: worker
         run: |
           set -o pipefail
-          if npx wrangler deploy 2>&1 | tee /tmp/worker.log; then
+          if npx wrangler deploy --var COMMIT_SHA:"$GITHUB_SHA" 2>&1 | tee /tmp/worker.log; then
             echo "route_loi=" >> "$GITHUB_OUTPUT"
           elif grep -q 'workers/routes' /tmp/worker.log; then
             echo "route_loi=true" >> "$GITHUB_OUTPUT"
@@ -193,6 +193,7 @@ jobs:
               console.log(`${ok ? "✓" : "✗"} ${k}: ${JSON.stringify(d[k])} (mong đợi ${JSON.stringify(v)})`);
             }
             if (sai) { console.error(`::error::${sai} chỗ lệch ở /api/health.`); process.exit(1); }
+            console.log(`\n  bản đang chạy: ${String(d.version || "(chưa ghi)").slice(0, 8)} · đường gửi thư: ${d.mailer || "?"}`);
             console.log("\n✓ /api/health đúng hết. Ứng dụng đã chạy thật trên tên miền.");
           '
 

@@ -246,5 +246,12 @@ async function handleHealth(env) {
     groups_total: groups?.n ?? 0,
     group6_members: group6Members?.n ?? 0,
     group6_truong_nhom: group6Lead?.name ?? null,
+    // Số hiệu commit của bản ĐANG PHỤC VỤ. Không có nó thì mọi phép đo trên
+    // tên miền thật đều mù: cùng một cú push kích hoạt cả deploy lẫn workflow
+    // kiểm thử, nên phép thử hay gọi trúng bản cũ rồi kết luận sai — đã vấp
+    // bốn lần trong ngày 24/8. Nay bên kiểm thử chờ tới khi số này khớp.
+    version: env.COMMIT_SHA ?? null,
+    // Đường gửi thư đang dùng. Chỉ nói TÊN đường, không lộ khoá.
+    mailer: env.RESEND_API_KEY ? 'resend' : (env.SMTP_HOST ? 'smtp' : 'chưa cấu hình'),
   });
 }
