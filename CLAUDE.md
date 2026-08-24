@@ -182,8 +182,21 @@ không phải ĐÚNG HẾT.
     Console của D1, hoặc chạy `node scripts/build-setup-sql.mjs` để sinh lại
     `scripts/setup-d1.sql` (tệp gộp cả sáu migration, có sẵn phần ghi vào
     `d1_migrations` để wrangler sau này không áp đè).
-- **GỬI THƯ: SMTP TỪ WORKER LÀ NGÕ CỤT. Đường sống là Resend (HTTP).**
-  Đo thật trên tên miền thật ngày 24/8, lượt 20 của `kiem-tra-email.yml`:
+- **GỬI THƯ: ĐÃ CHẠY — qua Resend, xác nhận bằng hộp thư thật ngày 24/8.**
+  Ngô Phú Cường nhận được thư mã 6 số tại `ngophucuong@gmail.com`. Đây là bằng
+  chứng cuối cùng và là loại bằng chứng duy nhất đáng tin cho việc gửi thư:
+  thư nằm trong hộp thư, không phải một dòng log nói rằng nó đã đi.
+
+  Cấu hình đang chạy:
+  - Đường gửi: **Resend** (API HTTP), địa chỉ gửi `info@cuongngo.cloud`.
+  - Điều kiện đủ: tên miền `cuongngo.cloud` phải **verified** bên Resend. Thêm
+    tên miền trong bảng điều khiển là CHƯA đủ — phải thêm ba bản ghi DNS họ đưa
+    (DNS của tên miền này ở Hostinger) rồi bấm Verify. Chừng nào chưa verified,
+    Resend trả 403 `domain is not verified` và không một lá thư nào đi được.
+  - `/api/health` báo `mailer: resend` khi đang đi đường này.
+
+  **SMTP tự viết từ Worker là ngõ cụt, giữ làm bánh xe dự phòng thôi.**
+  Đo thật ngày 24/8, lượt 20 của `kiem-tra-email.yml`:
 
   ```
   Resend: HTTP 403 "The cuongngo.cloud domain is not verified"
@@ -216,15 +229,9 @@ không phải ĐÚNG HẾT.
   - `sendMail` thử Resend trước, hỏng thì lùi về SMTP; cả hai hỏng thì câu lỗi
     ghi cả hai vế. Giữ nhánh SMTP làm bánh xe dự phòng, không phải đường chính.
 
-  **Việc còn phải làm để thư đi được**: xác minh tên miền bên Resend. Thêm tên
-  miền trong bảng điều khiển Resend là chưa đủ — phải thêm ba bản ghi DNS họ
-  đưa rồi bấm Verify.
-  - Nên dùng **`cuongngo.app`** chứ không phải `cuongngo.cloud`: zone
-    `cuongngo.app` nằm sẵn trong Cloudflare (cùng chỗ với `k3vaceo.cuongngo.app`),
-    thêm bản ghi bằng vài cú bấm; còn `cuongngo.cloud` do Hostinger quản DNS.
-    Địa chỉ gửi đề xuất: `k3vaceo <noreply@cuongngo.app>`.
-  - Bản ghi Resend là TXT và MX nên **không proxy được** — Cloudflare tự để
-    DNS only, không có bẫy đám mây cam ở đây.
+  Nếu về sau muốn đổi địa chỉ gửi sang `noreply@cuongngo.app`: phải xác minh
+  thêm zone `cuongngo.app` bên Resend (zone này nằm trong Cloudflare nên thêm
+  bản ghi dễ hơn). Không bắt buộc — bản hiện tại đã chạy.
 
   Cấu hình đã có (giữ nguyên, không mất khi deploy):
   - **Hai bộ tên đều dùng được**: `SMTP_USER`/`SMTP_PASS`/`MAIL_FROM` hoặc
@@ -305,8 +312,9 @@ chỗ nào để dò).
 Điền cột `so_dien_thoai` rồi commit là workflow `bo-sung-dien-thoai.yml` tự nạp.
 Nó chặn trước khi chạm D1 nếu có số sai khuôn hoặc hai người chung một số.
 
-**Vòng luẩn quẩn của lần đầu tiên** giờ chỉ còn với ai chưa có số điện thoại
-trong danh sách gốc. `.github/workflows/phat-link-moi.yml` vẫn còn để phá vòng
+**Đường đăng nhập đã thông hết** từ 24/8: thư mã 6 số gửi được thật (xem mục
+gửi thư ở dưới). **Vòng luẩn quẩn của lần đầu tiên** giờ chỉ còn với ai chưa
+có số điện thoại trong danh sách gốc. `.github/workflows/phat-link-moi.yml` vẫn còn để phá vòng
 đó khi cần (ghi thẳng lời mời vào D1, in link ra log Actions, hạn 120 phút, mỗi
 lần chạy tự huỷ lời mời cũ chưa dùng của đúng người ấy).
 
