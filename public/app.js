@@ -776,6 +776,8 @@ function drawNay() {
     <h2>${esc(a.h)}</h2><p>${esc(a.p)}</p>
     <button class="cta ${a.done ? 'done' : ''}" id="heroCta">${esc(a.c)} <span>→</span></button>
   </div>
+  ${veThongBao()}
+  ${veLichHoc()}
   <div class="sect">
     <div class="eb">Cơ cấu nhóm</div>
     <div class="card">${['truong_nhom', 'pho_nhom'].map(role => {
@@ -793,8 +795,6 @@ function drawNay() {
     }).join('')}</div>
     ${iAmOfficer() ? `<button class="wide ghost" id="inviteBtn" style="margin-top:10px">Phát link mời cho người chưa đăng nhập</button>` : ''}
   </div>
-  ${veThongBao()}
-  ${veLichHoc()}
   <div class="sect" id="joinBox" style="display:none"></div>
   <div class="sect">
     <div class="eb">Đang diễn ra</div>
@@ -1049,9 +1049,53 @@ async function openInviteSheet() {
 }
 
 /* ─── Bài ─── */
+// Nhóm chưa có khung tám phần. Không phải lỗi — chỉ là chưa ai bắt đầu.
+// Nói rõ ai làm được việc ấy, và cho làm ngay tại chỗ nếu đúng người.
+function veBaiChuaCo() {
+  const toi = iAmOfficer();
+  $('#v-bai').innerHTML = `
+  <div class="card"><div class="cb">
+    <div style="font-weight:600;margin-bottom:6px">Nhóm chưa có khung bài</div>
+    <div class="mut">Kế hoạch kinh doanh chấm theo tám phần. Dựng khung một lần là cả nhóm
+      nhận phần, ghi tiến độ và xuất bản thảo Word được.</div>
+    ${toi ? '' : `<div class="mut" style="margin-top:10px">Việc này của trưởng hoặc phó nhóm.
+      Nhóm chưa có ai giữ vai thì người đầu tiên mở
+      <span class="ma">k3vaceo.cuongngo.app/start</span> sẽ nhận trưởng nhóm.</div>`}
+  </div></div>
+  ${toi ? `<button class="wide" id="baiDung" style="margin-top:12px">Dựng khung tám phần</button>` : ''}
+  <div class="foot">Đề tài sửa được sau, không cần chốt ngay lúc dựng.</div>`;
+
+  if ($('#baiDung')) $('#baiDung').onclick = () => {
+    openSheet(`
+     <h3>Dựng khung tám phần</h3>
+     <p class="sub">Tạo đủ tám phần theo hướng dẫn của giảng viên. Đề tài để trống cũng được, sửa sau.</p>
+     <label class="f">Sản phẩm / dịch vụ</label>
+     <input id="bkP" maxlength="300" placeholder="Cà phê đặc sản rang mộc">
+     <label class="f">Khách hàng mục tiêu</label>
+     <input id="bkC" maxlength="300" placeholder="Quán cà phê nhỏ ở Hà Nội">
+     <div class="sa"><button class="big c" id="bkThoi">Thôi</button>
+       <button class="big go" id="bkGo">Dựng khung</button></div>`);
+    $('#bkThoi').onclick = closeSheet;
+    $('#bkGo').onclick = () => submitting($('#bkGo'), async () => {
+      await apiPost('/api/wizard/plan', {
+        topic_product: $('#bkP').value, topic_customers: $('#bkC').value,
+      });
+      await drawBai(); await refreshHome();
+    }, 'Đã dựng khung tám phần');
+  };
+}
+
 async function drawBai() {
   if (!$('#v-bai').dataset.loaded) $('#v-bai').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
-  PLAN = await apiGet('/api/plan');
+  try {
+    PLAN = await apiGet('/api/plan');
+  } catch (e) {
+    // Nhóm chưa dựng khung bài thì /api/plan trả 404. Không bắt thì màn hình
+    // đứng nguyên ở "Đang tải…" — chín trong mười nhóm sẽ thấy đúng cảnh ấy
+    // khi mở ứng dụng lần đầu, và trông y như ứng dụng hỏng.
+    if (e?.data?.error === 'plan_not_found') { $('#v-bai').dataset.loaded = '1'; return veBaiChuaCo(); }
+    throw e;
+  }
   $('#v-bai').dataset.loaded = '1';
   const { plan, sections, suggestions, insights, overall_pct, can_assign } = PLAN;
   const pres = PLAN.presentation ?? { total_minutes: 0, limit_minutes: 20, speaker_count: 0 };
