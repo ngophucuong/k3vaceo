@@ -172,15 +172,32 @@ jobs:
           # KHÔNG in nguyên log: nếu lúc này có người khác đang bấm magic link
           # thì URL chứa token sẽ lọt vào đây. Chỉ lấy đúng dòng cần, và che
           # mọi token dạng /dangnhap/... hoặc /i/... cho chắc.
-          che() { sed -E 's#(dangnhap/|/i/)[A-Za-z0-9_-]{8,}#\1<token đã che>#g'; }
+          #
+          # Phải PARSE JSON chứ đừng grep: console.error gọi với hai đối số nên
+          # message là MẢNG hai chuỗi, grep tới dấu nháy đầu tiên là cắt mất
+          # đúng câu lỗi — đã vấp một lần.
+          cat > /tmp/doc-log.cjs <<'EOF'
+          const fs = require("fs");
+          const che = t => String(t).replace(/(dangnhap\/|\/i\/)[A-Za-z0-9_-]{8,}/g, "$1<token đã che>");
+          const ra = [];
+          for (const dong of fs.readFileSync("/tmp/tail.log", "utf8").split("\n")) {
+            const i = dong.indexOf("{");
+            if (i < 0) continue;
+            let e; try { e = JSON.parse(dong.slice(i)); } catch { continue; }
+            for (const l of e.logs || []) {
+              const t = [].concat(l.message || []).map(x =>
+                typeof x === "string" ? x : JSON.stringify(x)).join(" ");
+              if (l.level === "error" || /thất bại|Error|SMTP/i.test(t)) ra.push(`[${l.level}] ${che(t)}`);
+            }
+            for (const x of e.exceptions || []) ra.push(`[exception] ${che(x.name)}: ${che(x.message)}`);
+          }
+          fs.writeFileSync("/tmp/loi.txt", ra.join("\n"));
+          console.log(ra.length ? ra.join("\n") : "(không thấy lỗi nào trong log Worker)");
+          EOF
 
-          echo "--- lỗi gửi thư (nếu có) ---"
-          loi=$(grep -o 'Gửi thư đăng nhập thất bại[^"]*' /tmp/tail.log | che | head -5)
-          echo "${loi:-(không thấy dòng nào)}"
-
-          echo "--- ngoại lệ Worker (nếu có) ---"
-          grep -o '"exceptions":\[[^]]*\]' /tmp/tail.log | grep -v '"exceptions":\[\]' | che | head -5 \
-            || echo "(không có)"
+          echo "--- log Worker trong lúc gửi ---"
+          node /tmp/doc-log.cjs
+          loi=$(cat /tmp/loi.txt)
 
           echo
           if [ "$ma" = "503" ]; then
