@@ -24,6 +24,7 @@ import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, 
 import { getLich, postBuoi, patchBuoi, deleteBuoi, postThongBao,
          postThongBaoDaXem, deleteThongBao } from './routes/lich.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
+import { pushCauHinh } from './lib/webpush.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
@@ -264,6 +265,14 @@ export default {
 };
 
 async function handleHealth(env) {
+  // Trạng thái thông báo đẩy phải đọc được KHÔNG CẦN PHIÊN. /api/push/khoa
+  // nằm sau cửa đăng nhập, nên nếu chỉ có nó thì không cách nào kiểm từ bên
+  // ngoài xem ba khoá VAPID đã sang tới Worker chưa — mà đó đúng là chỗ hay
+  // hỏng: bí mật đặt ở GitHub mà chưa deploy thì Worker vẫn chưa thấy.
+  // Chỉ trả CÓ hay KHÔNG cùng tám ký tự đầu của khoá CÔNG KHAI (vốn không
+  // phải bí mật, ứng dụng đưa nó cho mọi trình duyệt) — đủ để đối chiếu đúng
+  // cặp khoá, không lộ gì thêm.
+  const pushCf = pushCauHinh(env);
   const [roster, groups, group6Members, group6Lead] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) AS n FROM roster').first(),
     env.DB.prepare('SELECT COUNT(*) AS n FROM groups').first(),
@@ -281,6 +290,7 @@ async function handleHealth(env) {
     groups_total: groups?.n ?? 0,
     group6_members: group6Members?.n ?? 0,
     group6_truong_nhom: group6Lead?.name ?? null,
+    push: pushCf ? { bat: true, khoa: pushCf.pub.slice(0, 8) } : { bat: false },
     // Số hiệu commit của bản ĐANG PHỤC VỤ. Không có nó thì mọi phép đo trên
     // tên miền thật đều mù: cùng một cú push kích hoạt cả deploy lẫn workflow
     // kiểm thử, nên phép thử hay gọi trúng bản cũ rồi kết luận sai — đã vấp
