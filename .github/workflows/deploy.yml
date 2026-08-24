@@ -135,14 +135,29 @@ jobs:
         id: kiemtra
         if: steps.check.outputs.skip != 'true'
         run: |
-          for lan in 1 2 3 4 5 6; do
+          # Chờ tới khi /api/health trả về ĐÚNG BẢN VỪA DEPLOY, không phải chỉ
+          # chờ HTTP 200. Cloudflare mất vài chục giây để lan bản mới ra rìa
+          # mạng, mà bước này chạy chỉ 8 giây sau lệnh deploy — bản cũ vẫn trả
+          # 200 ngon lành. Lần trước chính chỗ này in "đã chạy thật" trong khi
+          # đo trúng bản trước đó. Có đo được version thì mới nói được câu ấy.
+          khop=0
+          for lan in $(seq 1 12); do
             code=$(curl -s -o /tmp/health.json -w '%{http_code}' \
                    -H 'Accept: application/json' \
                    https://k3vaceo.cuongngo.app/api/health || echo 000)
-            echo "lần $lan: HTTP $code"
-            [ "$code" = "200" ] && break
-            [ "$lan" = "6" ] || sleep 20
+            ver=$(node --input-type=commonjs -e '
+              try {
+                const d = JSON.parse(require("fs").readFileSync("/tmp/health.json","utf8"));
+                process.stdout.write(String(d.version || ""));
+              } catch { process.stdout.write(""); }
+            ' 2>/dev/null)
+            echo "lần $lan: HTTP $code · bản đang chạy ${ver:-(chưa ghi)}"
+            if [ "$code" = "200" ] && [ "$ver" = "$GITHUB_SHA" ]; then khop=1; break; fi
+            [ "$lan" = "12" ] || sleep 15
           done
+          if [ "$code" = "200" ] && [ "$khop" != "1" ]; then
+            echo "::warning::Tên miền sống nhưng /api/health vẫn trả bản ${ver:-(chưa ghi)} chứ không phải $GITHUB_SHA sau 3 phút. Những dòng ✓ dưới đây đo trên BẢN CŨ — chưa chứng minh được bản vừa deploy đã lên."
+          fi
           echo "--- nội dung nhận được (2000 ký tự đầu) ---"
           head -c 2000 /tmp/health.json 2>/dev/null; echo
 
@@ -182,7 +197,7 @@ jobs:
           fi
           echo "✓ Worker Route phủ toàn bộ /api/*"
 
-          node --input-type=commonjs -e '
+          KHOP="$khop" node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
             const mong = { ok: true, roster_total: 134, groups_total: 10,
                            group6_members: 14, group6_truong_nhom: "Ngô Phú Cường" };
@@ -194,7 +209,9 @@ jobs:
             }
             if (sai) { console.error(`::error::${sai} chỗ lệch ở /api/health.`); process.exit(1); }
             console.log(`\n  bản đang chạy: ${String(d.version || "(chưa ghi)").slice(0, 8)} · đường gửi thư: ${d.mailer || "?"}`);
-            console.log("\n✓ /api/health đúng hết. Ứng dụng đã chạy thật trên tên miền.");
+            console.log(process.env.KHOP === "1"
+              ? "\n✓ /api/health đúng hết, và đúng bản vừa deploy. Ứng dụng đã chạy thật trên tên miền."
+              : "\n✓ /api/health đúng hết — nhưng đo trên BẢN CŨ, xem cảnh báo phía trên.");
           '
 
       # Route đang chạy được (đã tạo sẵn trên dashboard), nhưng wrangler không
