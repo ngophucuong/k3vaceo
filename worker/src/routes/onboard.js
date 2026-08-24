@@ -290,7 +290,11 @@ async function doiChieu(env, body) {
   // biết đường xin link mời, chứ báo "sai số" thì họ gõ lại cả buổi.
   if (!soDoiChieu.length) {
     return { loi: 'phone_missing_in_roster', ma: 409,
-             them: { full_name: person.full_name, group_label: person.group_label } };
+             // Nhóm THẬT ở đây nữa. Sót chỗ này thì người đã chuyển nhóm đọc
+             // câu "chưa đối chiếu được" kèm tên nhóm CŨ — vừa sai vừa đúng
+             // lúc họ đang bối rối nhất.
+             them: { full_name: person.full_name,
+                     group_label: member?.group_label || person.group_label } };
   }
 
   if (!isValidVnPhone(body.phone)) return { loi: 'phone_invalid', ma: 422 };

@@ -162,22 +162,32 @@ export async function bulkMembers(request, env, me, ip) {
       : await env.DB.prepare('SELECT id FROM members WHERE full_name = ? AND group_id = ?').bind(fullName, me.group_id).first();
     if (exists) continue;
 
+    // RETURNING để người gọi biết id vừa tạo. Thêm một người xong thì việc kế
+    // tiếp gần như luôn là phát link mời cho đúng người ấy — không có id thì
+    // phải đi dò lại theo tên, mà tên thì có thể trùng.
     stmts.push(env.DB.prepare(
       `INSERT INTO members (cohort_id, group_id, roster_id, full_name, title, company, phone,
                             claimed_at, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1, datetime('now'), datetime('now'))`
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1, datetime('now'), datetime('now'))
+       RETURNING id, full_name`
     ).bind(me.cohort_id, me.group_id, rosterId, fullName,
            cleanText(raw.title, 120), cleanText(raw.company, 160), cleanText(raw.phone, 30)));
     added++;
   }
-  if (stmts.length) await env.DB.batch(stmts);
+  const created = [];
+  if (stmts.length) {
+    const kq = await env.DB.batch(stmts);
+    for (const r of kq) for (const d of (r?.results ?? [])) created.push({ id: d.id, full_name: d.full_name });
+  }
 
   await logActivity(env, {
     cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
     verb: 'wizard.members', objectType: 'group', objectId: me.group_id,
-    summary: `nhập hồ sơ ${added} thành viên từ danh sách lớp`,
+    summary: added === 1 && created[0]
+      ? `thêm ${created[0].full_name} vào nhóm`
+      : `nhập hồ sơ ${added} thành viên từ danh sách lớp`,
   });
-  return json({ ok: true, added });
+  return json({ ok: true, added, created });
 }
 
 /* ══ Bước 6+7: khung bài và đề tài ══ */

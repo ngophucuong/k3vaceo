@@ -1313,6 +1313,104 @@ function openInsightAdd() {
 }
 
 /* ─── Nhóm ─── */
+// Thêm người vào nhóm mình. Ca có thật: Ban tổ chức chuyển Nguyễn Thị Tùng Vân
+// từ Nhóm 8 sang Nhóm 6 giữa khoá, mà trong ứng dụng không có đường nào làm
+// việc ấy — phải chạy workflow ghi thẳng vào D1. Không ổn để lâu.
+//
+// Danh sách gốc GIỮ NGUYÊN nhóm cũ: đó là bản ghi Ban tổ chức phát ngày 15/8.
+// Bảng thành viên mới là "ai đang thực sự ở nhóm nào".
+function openThemNguoi() {
+  openSheet(`
+   <h3>Thêm người vào nhóm</h3>
+   <p class="sub">Tìm trong danh sách 134 người của lớp. Gõ không dấu cũng ra.</p>
+   <label class="f">Tên người cần thêm</label>
+   <input id="tnQ" placeholder="vd: tung van" autocomplete="off" maxlength="60">
+   <div id="tnHits" style="margin-top:8px"></div>
+   <div id="tnErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="tnThoi">Thôi</button></div>`);
+  $('#tnThoi').onclick = closeSheet;
+
+  let timer;
+  $('#tnQ').oninput = () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const q = $('#tnQ').value.trim();
+      if (q.length < 2) { $('#tnHits').innerHTML = ''; return; }
+      let people;
+      try { ({ people } = await apiGet(`/api/wizard/roster/search?q=${encodeURIComponent(q)}`)); }
+      catch (e) { $('#tnErr').textContent = errText(e); $('#tnErr').style.display = 'block'; return; }
+
+      $('#tnHits').innerHTML = people.length
+        ? people.map(p => `<button class="opt" data-them='${esc(JSON.stringify(p))}'
+              ${p.already_member ? 'disabled style="opacity:.5"' : ''}>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:14.5px">${esc(p.full_name)}</div>
+              <div style="font-size:12.5px;color:var(--ink2)">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
+            </div>
+            ${p.already_member ? '<span class="tg">đã có nhóm</span>' : ''}</button>`).join('')
+        : `<div class="mut" style="padding:6px 2px">Không có tên nào khớp trong danh sách lớp.</div>`;
+
+      document.querySelectorAll('#tnHits [data-them]').forEach(b => {
+        b.onclick = () => xacNhanThem(JSON.parse(b.dataset.them));
+      });
+    }, 250);
+  };
+  setTimeout(() => $('#tnQ')?.focus(), 200);
+}
+
+function xacNhanThem(p) {
+  const nhomToi = HOME?.group?.label || 'nhóm mình';
+  const doiNhom = p.group_label !== nhomToi;
+  openSheet(`
+   <h3>Thêm vào ${esc(nhomToi)}</h3>
+   <div class="card" style="margin-bottom:12px"><div class="cb" style="padding:12px 14px">
+     <b>${esc(p.full_name)}</b>
+     <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}${p.company ? '<br>' + esc(p.company) : ''}</div>
+   </div></div>
+   ${doiNhom ? `<div class="warn">Danh sách Ban tổ chức ghi người này ở <b>${esc(p.group_label)}</b>.
+     Chỉ thêm khi Ban tổ chức đã thật sự chuyển họ sang ${esc(nhomToi)} — thêm nhầm là kéo người
+     của nhóm khác vào chỗ mình.</div>` : ''}
+   <div class="mut" style="margin-top:12px">Thêm xong sẽ có ngay link mời để gửi qua Zalo.
+     Danh sách gốc của Ban tổ chức giữ nguyên, không sửa.</div>
+   <div id="xtErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="xtLui">Chọn lại</button>
+     <button class="big go" id="xtGo">Thêm vào nhóm</button></div>`);
+  $('#xtLui').onclick = openThemNguoi;
+  $('#xtGo').onclick = async () => {
+    const nut = $('#xtGo');
+    nut.disabled = true; nut.textContent = 'Đang thêm…';
+    let kq;
+    try {
+      kq = await apiPost('/api/wizard/members', { members: [{
+        roster_id: p.roster_id, full_name: p.full_name, title: p.title, company: p.company,
+      }] });
+    } catch (e) {
+      $('#xtErr').textContent = errText(e); $('#xtErr').style.display = 'block';
+      nut.disabled = false; nut.textContent = 'Thêm vào nhóm'; return;
+    }
+    const nguoi = (kq.created ?? [])[0];
+    await drawNhom(); await refreshHome();
+    if (!nguoi) { closeSheet(); toast('Người này đã có trong nhóm'); return; }
+
+    // Thêm xong thì việc kế tiếp gần như luôn là gửi link — làm nốt tại chỗ,
+    // đừng bắt đi tìm nút khác.
+    let link = null;
+    try { link = await apiPost(`/api/members/${nguoi.id}/invite`); } catch { /* vẫn thêm được */ }
+    openSheet(`<h3>Đã thêm ${esc(nguoi.full_name)}</h3>
+      ${link ? `<p class="sub">Gửi link dưới đây cho họ qua Zalo. Mở link là vào thẳng, không cần mã.</p>
+        <div class="card"><div class="cb" style="word-break:break-all;font-size:13px">${esc(link.url)}</div></div>`
+        : `<p class="sub">Chưa lấy được link mời. Mở hồ sơ của họ trong tab Nhóm rồi bấm
+           "Phát lại link mời cho người này".</p>`}
+      <div class="sa"><button class="big c" id="tnDong">Đóng</button>
+        ${link ? `<button class="big go" id="tnChep">Chép link</button>` : ''}</div>`);
+    $('#tnDong').onclick = closeSheet;
+    if ($('#tnChep')) $('#tnChep').onclick = async () => {
+      try { await navigator.clipboard.writeText(link.url); toast('Đã chép link'); }
+      catch { toast('Chép tay giúp nhé'); }
+    };
+  };
+}
+
 async function drawNhom() {
   if (!$('#v-nhom').dataset.loaded) $('#v-nhom').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
   MEMBERS = (await apiGet('/api/members')).members;
@@ -1349,7 +1447,10 @@ async function drawNhom() {
         ${officer ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" data-invite="${m.id}">Phát lại link mời cho người này</button>` : ''}
       </div>`).join('')}
   </div>
+  ${officer ? `<button class="wide ghost" id="themNguoi" style="margin-top:12px">+ Thêm người vào nhóm</button>` : ''}
   <div class="foot">Ai biết số điện thoại người còn trống thì điền hộ, chính chủ sửa lại sau.</div>`;
+
+  if ($('#themNguoi')) $('#themNguoi').onclick = openThemNguoi;
 
   document.querySelectorAll('#v-nhom [data-toggle]').forEach(btn => {
     btn.onclick = () => {
