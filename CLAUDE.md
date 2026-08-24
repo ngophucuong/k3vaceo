@@ -182,10 +182,23 @@ không phải ĐÚNG HẾT.
     Console của D1, hoặc chạy `node scripts/build-setup-sql.mjs` để sinh lại
     `scripts/setup-d1.sql` (tệp gộp cả sáu migration, có sẵn phần ghi vào
     `d1_migrations` để wrangler sau này không áp đè).
-- **SMTP chưa chạy được — đo thật ngày 24/8**: gọi `POST /api/auth/email` trên
-  tên miền thật trả **503 `mailer_not_configured`**. `wrangler secret list` cho
-  thấy Worker **chỉ có `SMTP_HOST`**, thiếu `SMTP_USER`, `SMTP_PASS`,
-  `MAIL_FROM` — cả ba đều bắt buộc.
+- **SMTP ĐÃ GỬI ĐƯỢC — đo thật ngày 24/8.** Nhà cung cấp: Hostinger,
+  `smtp.hostinger.com:465`, tài khoản `info@cuongngo.cloud`. Tên miền
+  `cuongngo.cloud` đã có đủ SPF / DKIM (3 CNAME) / DMARC `p=none` / MX Hostinger.
+  - Lượt 1: **503 `mailer_not_configured`** — Worker chỉ có `SMTP_HOST`.
+  - Lượt 3 (ngay sau khi đồng bộ bí mật): HTTP 200 nhưng log Worker vẫn có
+    `Gửi thư đăng nhập thất bại`.
+  - Lượt 4, **cùng cấu hình, không sửa gì**: HTTP 200 và log sạch. Vì `sendMail`
+    có `expect(reader, [250], 'kết thúc thư')` sau DATA, log sạch nghĩa là máy
+    chủ đã **nhận thư**, không phải chỉ "không thấy lỗi". Đây là lần đầu tiên
+    client SMTP bắt tay TLS thành công với máy chủ thật.
+  - Chênh lệch lượt 3 / lượt 4 chưa giải thích chắc chắn. Giả thuyết hợp lý
+    nhất: `wrangler secret put` tạo bản triển khai mới, lượt 3 gọi trúng lúc
+    bí mật vừa ghi xong chưa lan hết. Nếu về sau gặp lại thì nghi chỗ này
+    trước, và chờ lâu hơn 5 giây sau khi đồng bộ.
+  - **Hai bộ tên đều dùng được**: `SMTP_USER`/`SMTP_PASS`/`MAIL_FROM` hoặc
+    `SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_FROM_EMAIL`. Đặt nhầm bộ cho triệu
+    chứng y hệt như chưa đặt gì — 503 — nên rất khó đoán.
   - **Cạm bẫy đáng ngờ**: `wrangler deploy` ghi đè toàn bộ `vars` bằng đúng
     những gì có trong `wrangler.toml` (hiện chỉ `RP_ID`), nên **biến dạng
     plaintext đặt trên dashboard bị xoá sạch sau mỗi lần deploy**. Chỉ *Secret*
