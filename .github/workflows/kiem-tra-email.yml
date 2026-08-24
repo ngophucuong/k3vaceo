@@ -42,6 +42,39 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Đồng bộ TRƯỚC khi thử, để workflow này tự chủ. Nếu không thì có cái bẫy
+      # thứ tự: đặt secret ở GitHub xong chạy thử ngay vẫn hỏng, vì giá trị chỉ
+      # sang Worker khi deploy.yml chạy. Bỏ qua tên không đặt — đẩy chuỗi rỗng
+      # lên là tạo bí mật rỗng, trông như "đã có" mà không dùng được.
+      - name: Đồng bộ bí mật SMTP từ GitHub sang Worker
+        working-directory: worker
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+        run: |
+          da=
+          for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
+                      SMTP_USER SMTP_PASS MAIL_FROM \
+                      SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL; do
+            [ -z "${!name}" ] && continue
+            printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null
+            da="$da $name"
+          done
+          if [ -z "$da" ]; then
+            echo "::warning::Không có bí mật SMTP nào trong GitHub — giữ nguyên những gì Worker đang có."
+          else
+            echo "✓ đã đẩy từ GitHub sang Worker:$da"
+          fi
+          # `wrangler secret put` tạo một bản triển khai mới; chờ vài giây cho lan.
+          sleep 5
+
       - name: Chuẩn bị bộ đọc kết quả
         run: |
           cat > /tmp/doc-so.cjs <<'EOF'
