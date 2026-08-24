@@ -47,10 +47,10 @@ SELECT
   nhom6      || '/14'                     AS nhom6_14,
   phan_bai   || '/8'                      AS phan_bai_8,
   co_cau     || '/2'                      AS co_cau_2,
-  migration  || '/9'                      AS migration_9,
+  migration  || '/10'                     AS migration_10,
   COALESCE(truong_nhom, '(chưa có)')      AS truong_nhom,
   CASE WHEN bang = 25 AND hoc_vien = 134 AND nhom = 10 AND dien_thoai = 90
-        AND nhom6 = 14 AND phan_bai = 8 AND co_cau = 2 AND migration = 9
+        AND nhom6 = 14 AND phan_bai = 8 AND co_cau = 2 AND migration = 10
         AND truong_nhom = 'Ngô Phú Cường'
        THEN 'ĐÚNG HẾT' ELSE 'CÓ CHỖ SAI' END AS ket_qua
 FROM d;

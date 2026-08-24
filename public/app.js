@@ -84,6 +84,10 @@ const ERR_TEXT = {
   category_invalid: 'Hạng mục chi không hợp lệ.',
   spent_on_invalid: 'Ngày chi chưa đúng — chọn lại trên lịch.',
   round_invalid: 'Đợt thu đã chọn không thuộc sổ này.',
+  tu_khai_di: 'Đây là hồ sơ của chính bạn — dùng nút "Tôi đã chuyển" ở tab Quỹ.',
+  khong_phai_khai_ho: 'Người này tự khai chứ không phải ai khai hộ, nên bạn không gỡ được.',
+  member_not_in_round: 'Người này không thuộc đợt thu ấy.',
+  thuoc_quy_khoa: 'Đợt đã mở rồi thì không đổi được sổ nhận tiền — số dư hai sổ sẽ nhảy cùng lúc.',
 };
 const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
 
@@ -1420,7 +1424,7 @@ function renderRound(r) {
   <div class="card">
     <div class="cb">
       <div style="font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">
-        ${esc(r.title)}${r.scope === 'class' ? ' · quỹ lớp' : ''}${r.status === 'draft' ? ' · bản nháp' : ''}${r.status === 'closed' ? ' · đã đóng' : ''}</div>
+        ${esc(r.title)}${r.scope === 'class' ? ' · cả lớp' : ''}${r.scope === 'group' && r.thuoc_quy === 'lop' ? ' · thu hộ quỹ lớp' : ''}${r.status === 'draft' ? ' · bản nháp' : ''}${r.status === 'closed' ? ' · đã đóng' : ''}</div>
       <div class="amt">${vnMoney(r.amount)}<small> đ / người</small></div>
       ${r.purpose ? `<div class="mut" style="margin-top:11px">${esc(r.purpose)}</div>` : ''}
       ${r.collector_name ? `<div class="mut" style="margin-top:5px">Người thu: <b style="color:var(--ink)">${esc(r.collector_name)}</b></div>` : ''}
@@ -1498,6 +1502,9 @@ function openFundCreate() {
    <p class="sub">Số tài khoản đặt riêng cho từng đợt, không dùng chung toàn hệ thống. Tạo xong còn ở bản nháp — xem lại rồi mới mở.</p>
    ${coLop ? `<label class="f">Đợt này thu của ai</label>
    <select id="fS"><option value="group">Nhóm mình</option><option value="class">Cả lớp</option></select>` : ''}
+   <label class="f">Tiền thu về thuộc quỹ nào</label>
+   <select id="fQ"><option value="nhom">Quỹ nhóm</option><option value="lop">Quỹ lớp</option></select>
+   <div class="hintline" id="fQHint"></div>
    <label class="f">Tiêu đề</label><input id="fT" maxlength="120" placeholder="Kiến tập nhà máy Bắc Ninh">
    <label class="f">Mục đích</label><input id="fP" maxlength="300" placeholder="Xe và ăn trưa">
    <label class="f">Số tiền mỗi người (đ)</label><input id="fA" type="number" min="1000" step="1000" inputmode="numeric" placeholder="350000">
@@ -1543,7 +1550,24 @@ function openFundCreate() {
   $('#fB').onchange = () => { $('#fBinWrap').style.display = $('#fB').value === '__other' ? 'block' : 'none'; };
   // Đổi phạm vi thì đổi luôn danh sách người thu: đợt nhóm chỉ chọn được người
   // trong nhóm, đợt lớp chọn được cả khoá (máy chủ cũng kiểm lại y hệt).
-  if ($('#fS')) $('#fS').onchange = () => napNguoiThu($('#fS').value);
+  if ($('#fS')) $('#fS').onchange = () => { napNguoiThu($('#fS').value); veQuy(); };
+
+  // Hai câu hỏi khác nhau, cố ý tách: THU CỦA AI quyết định ai nhìn thấy và ai
+  // phải đóng; TIỀN VÀO QUỸ NÀO quyết định số dư sổ nào thay đổi. Trưởng nhóm
+  // thu hộ quỹ lớp là chuyện thường — tiền vào tài khoản thủ quỹ lớp nên phải
+  // cộng vào sổ lớp, dù người đóng là 14 người của nhóm.
+  const veQuy = () => {
+    const capLop = $('#fS') && $('#fS').value === 'class';
+    if (capLop) { $('#fQ').value = 'lop'; $('#fQ').disabled = true; }
+    else $('#fQ').disabled = false;
+    $('#fQHint').innerHTML = capLop
+      ? 'Đợt thu của cả lớp thì tiền đương nhiên thuộc quỹ lớp.'
+      : ($('#fQ').value === 'lop'
+          ? '<b>Thu hộ quỹ lớp.</b> Nhóm bạn đóng, nhưng tiền vào tài khoản người thu của lớp — nên cộng vào <b>Sổ quỹ lớp</b>, không cộng vào sổ nhóm.'
+          : 'Tiền của nhóm, cộng vào <b>Sổ quỹ nhóm</b>.');
+  };
+  $('#fQ').onchange = veQuy;
+  veQuy();
   $('#fCancel').onclick = closeSheet;
   $('#fSave').onclick = async () => {
     const bin = $('#fB').value === '__other' ? $('#fBin').value.trim() : $('#fB').value;
@@ -1563,6 +1587,7 @@ function openFundCreate() {
         collector_member_id: $('#fC').value === '' ? null : Number($('#fC').value),
         closes_on: $('#fClose').value || null,
         syntax_template: $('#fCP').value,
+        thuoc_quy: $('#fQ').value,
       });
       await drawQuy();
     }, 'Đã tạo bản nháp — xem lại rồi mở');
@@ -1596,6 +1621,9 @@ async function openLedger(roundId) {
   const { round, people, i_am_collector, pham_vi_xem } = data;
   const done = people.filter(p => p.verified).length;
   const chiNhomMinh = pham_vi_xem === 'nhom-minh';
+  // Bày nút khai hộ cho người thu và cho trưởng/phó nhóm. Máy chủ kiểm lại
+  // đầy đủ trong khaiHoDuoc(); đây chỉ để khỏi bày nút bấm vào là 403.
+  const khaiHoDuoc = i_am_collector || chiNhomMinh || !!FUNDS?.can_create_group || !!FUNDS?.can_create_class;
   openSheet(`
    <h3>${esc(round.title)}</h3>
    ${chiNhomMinh ? `<div class="warn" style="margin-bottom:12px">Đây là đợt thu của <b>cả lớp</b>.
@@ -1603,19 +1631,41 @@ async function openLedger(roundId) {
    <p class="sub">${vnMoney(round.amount)} đ mỗi người · người thu đã nhận ${done}/${people.length}${chiNhomMinh ? ' trong nhóm bạn' : ''}.
      ${i_am_collector ? 'Soi sao kê xong thì bấm xác nhận từng người.' : 'Chỉ người thu mới xác nhận được đã nhận tiền.'}</p>
    <div class="warn" style="margin-bottom:14px">Không có nhắc nợ tự động. Ai chưa chuyển thì nhắn riêng.</div>
+   ${khaiHoDuoc ? `<div class="foot" style="padding:0 0 12px">Ai gửi ảnh chuyển khoản qua Zalo mà chưa mở ứng dụng bao giờ
+     thì bấm <b>khai hộ</b>. Nó ghi là <b>đã tự khai</b> kèm tên bạn — vẫn chờ người thu soi sao kê rồi mới thành
+     <b>người thu đã nhận</b>.</div>` : ''}
    <div class="card"><div class="cb" style="padding:2px 14px">
      ${people.map(p => `<div class="fd">
        ${avatar(p.full_name)}
        <div class="x"><b>${esc(p.full_name)}</b>
-         <div style="font-size:11.5px;margin-top:2px" class="${p.verified ? 'st-ok' : p.declared ? 'st-mid' : 'st-no'}">${esc(p.status_label)}</div></div>
-       <div style="display:flex;gap:6px;align-items:center">
+         <div style="font-size:11.5px;margin-top:2px" class="${p.verified ? 'st-ok' : p.declared ? 'st-mid' : 'st-no'}">${esc(p.status_label)}${
+           p.khai_ho_boi && !p.verified ? ` · do ${esc(short(p.khai_ho_boi))} khai hộ` : ''}</div></div>
+       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
          ${p.phone ? `<a class="tg" href="tel:${esc(p.phone)}">gọi</a>` : ''}
+         ${khaiHoDuoc && !p.verified
+            ? (p.declared
+                ? (p.khai_ho_boi ? `<button class="tg" data-bokhai="${p.id}">bỏ khai hộ</button>` : '')
+                : `<button class="tg" data-khaiho="${p.id}">khai hộ</button>`)
+            : ''}
          ${i_am_collector ? `<button class="tg ${p.verified ? 'go' : ''}" data-verify="${p.id}" data-undo="${p.verified ? '1' : '0'}">${p.verified ? 'bỏ xác nhận' : 'đã nhận'}</button>` : ''}
        </div></div>`).join('')}
    </div></div>
    <div class="sa"><button class="big c" id="ldClose">Đóng</button></div>`);
 
   $('#ldClose').onclick = closeSheet;
+  const khai = async (btn, memberId, bo) => {
+    btn.disabled = true;
+    try { await apiPost(`/api/funds/${roundId}/declare-for`, { member_id: memberId, bo }); }
+    catch (e) { toast(errText(e)); btn.disabled = false; return; }
+    await openLedger(roundId);
+    await drawQuy();
+  };
+  document.querySelectorAll('.sheet [data-khaiho]').forEach(b => {
+    b.onclick = () => khai(b, Number(b.dataset.khaiho), false);
+  });
+  document.querySelectorAll('.sheet [data-bokhai]').forEach(b => {
+    b.onclick = () => khai(b, Number(b.dataset.bokhai), true);
+  });
   document.querySelectorAll('.sheet [data-verify]').forEach(b => {
     b.onclick = async () => {
       b.disabled = true;

@@ -19,7 +19,8 @@ import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
 import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
          postVerifyMyEmail, postVerifyMyEmailConfirm } from './routes/onboard.js';
 import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify,
-         listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers } from './routes/funds.js';
+         listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
+         postDeclareFor } from './routes/funds.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
@@ -196,6 +197,11 @@ export default {
       }
       if ((m = pathname.match(/^\/api\/funds\/(\d+)\/declare$/)) && method === 'DELETE') {
         return deleteDeclare(env, me, Number(m[1]), ip);
+      }
+      // Khai hộ: trưởng nhóm ghi giúp người chưa mở ứng dụng bao giờ. Dừng ở
+      // "đã tự khai", không chạm tới "người thu đã nhận".
+      if ((m = pathname.match(/^\/api\/funds\/(\d+)\/declare-for$/)) && method === 'POST') {
+        return postDeclareFor(request, env, me, Number(m[1]), ip);
       }
       if ((m = pathname.match(/^\/api\/funds\/(\d+)\/ledger$/)) && method === 'GET') {
         return getLedger(env, me, Number(m[1]));

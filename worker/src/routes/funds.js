@@ -99,6 +99,7 @@ async function shapeRound(env, round, me) {
     total_people: totalRow?.n ?? 0,
     transfer_note: note,
     syntax_template: round.syntax_template || '{TEN} N{NHOM}',
+    thuoc_quy: round.thuoc_quy || (round.scope === 'class' ? 'lop' : 'nhom'),
     qr_url: buildQrUrl(round, note),
     can_see_ledger: await canSeeLedger(env, me, round),
   };
@@ -157,6 +158,13 @@ export async function postFund(request, env, me, ip) {
   const cuPhap = cleanText(body.syntax_template, 60) ?? '{TEN} N{NHOM}';
   if (!cuPhap.includes('{TEN}')) return error('syntax_thieu_ten', 422);
 
+  // Tiền của đợt này thuộc quỹ nào. Đợt cấp lớp thì đương nhiên là quỹ lớp.
+  // Đợt cấp nhóm thì được chọn: trưởng nhóm thu hộ quỹ lớp là chuyện thường —
+  // tiền vào tài khoản thủ quỹ lớp, nên phải cộng vào sổ lớp chứ không phải
+  // sổ nhóm, dù người đóng là 14 người của nhóm.
+  const thuocQuy = scope === 'class' ? 'lop'
+    : (body.thuoc_quy === 'lop' ? 'lop' : 'nhom');
+
   let collectorId = null;
   if (body.collector_member_id !== null && body.collector_member_id !== undefined && body.collector_member_id !== '') {
     collectorId = Number(body.collector_member_id);
@@ -171,20 +179,21 @@ export async function postFund(request, env, me, ip) {
   const row = await env.DB.prepare(
     `INSERT INTO fund_rounds
        (cohort_id, scope, group_id, title, purpose, amount, bank_bin, bank_name, account_no,
-        account_name, collector_member_id, syntax_template, opens_on, closes_on, status, created_by, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, datetime('now'))
+        account_name, collector_member_id, syntax_template, thuoc_quy, opens_on, closes_on,
+        status, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, datetime('now'))
      RETURNING id`
   ).bind(
     me.cohort_id, scope, groupId, title, cleanText(body.purpose, 300), amount,
     bankBin, bankName(bankBin) ?? cleanText(body.bank_name, 60), accountNo,
     cleanText(body.account_name, 120), collectorId,
-    cuPhap,
+    cuPhap, thuocQuy,
     cleanText(body.opens_on, 20), cleanText(body.closes_on, 20), me.id
   ).first();
 
   await logAudit(env, {
     actorId: me.id, action: 'fund.create', targetType: 'fund_round', targetId: row.id,
-    after: { scope, title, amount, bank_bin: bankBin, account_no: accountNo, collector: collectorId }, ip,
+    after: { scope, thuoc_quy: thuocQuy, title, amount, bank_bin: bankBin, account_no: accountNo, collector: collectorId }, ip,
   });
 
   return json({ ok: true, id: row.id });
@@ -208,6 +217,13 @@ export async function patchFund(request, env, me, roundId, ip) {
   // Cú pháp chuyển khoản sửa được cả sau khi tạo. Người thu hay phát hiện
   // mình cần thêm chữ ("Quylop", "Dot2"...) sau khi đã nhìn sao kê thật; bắt
   // huỷ đợt rồi tạo lại chỉ vì mấy chữ ấy là vô lý.
+  // Đổi sổ nhận tiền chỉ khi còn BẢN NHÁP. Đợt đã mở mà đổi thì số dư hai sổ
+  // nhảy cùng lúc, người xem không hiểu tiền chạy đi đâu.
+  if ('thuoc_quy' in body) {
+    if (round.status !== 'draft') return error('thuoc_quy_khoa', 409);
+    if (round.scope === 'class' && body.thuoc_quy !== 'lop') return error('thuoc_quy_invalid', 422);
+    next.thuoc_quy = body.thuoc_quy === 'lop' ? 'lop' : 'nhom';
+  }
   if ('syntax_template' in body) {
     const cp = cleanText(body.syntax_template, 60);
     if (!cp) return error('syntax_required', 422);
@@ -219,9 +235,10 @@ export async function patchFund(request, env, me, roundId, ip) {
 
   await env.DB.prepare(
     `UPDATE fund_rounds SET status = ?, opens_on = ?, closes_on = ?, purpose = ?, title = ?,
-       syntax_template = ? WHERE id = ?`
+       syntax_template = ?, thuoc_quy = ? WHERE id = ?`
   ).bind(next.status, next.opens_on, next.closes_on, next.purpose, next.title,
-         next.syntax_template ?? round.syntax_template, round.id).run();
+         next.syntax_template ?? round.syntax_template,
+         next.thuoc_quy ?? round.thuoc_quy, round.id).run();
 
   await logAudit(env, {
     actorId: me.id, action: 'fund.update', targetType: 'fund_round', targetId: round.id,
@@ -256,7 +273,8 @@ export async function postDeclare(request, env, me, roundId, ip) {
   await env.DB.prepare(
     `INSERT INTO fund_declarations (round_id, member_id, declared_at, note)
      VALUES (?, ?, datetime('now'), ?)
-     ON CONFLICT(round_id, member_id) DO UPDATE SET declared_at = excluded.declared_at, note = excluded.note`
+     ON CONFLICT(round_id, member_id) DO UPDATE SET declared_at = excluded.declared_at,
+       note = excluded.note, declared_by = NULL`
   ).bind(round.id, me.id, cleanText(body.note, 200)).run();
 
   await logAudit(env, { actorId: me.id, action: 'fund.declare', targetType: 'fund_round', targetId: round.id, ip });
@@ -301,17 +319,22 @@ export async function getLedger(env, me, roundId) {
   const people = round.scope === 'class'
     ? (muc === 'nhom-minh'
         ? await env.DB.prepare(
-            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
+            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note,
+                    (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi,
+                (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
              FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
              WHERE m.cohort_id = ? AND m.group_id = ? AND m.is_active = 1 ORDER BY m.id`
           ).bind(round.id, round.cohort_id, me.group_id).all()
         : await env.DB.prepare(
-            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
+            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note,
+                    (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi,
+                (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
              FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
              WHERE m.cohort_id = ? AND m.is_active = 1 ORDER BY m.id`
           ).bind(round.id, round.cohort_id).all())
     : await env.DB.prepare(
-        `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note
+        `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note,
+                (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
          FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
          WHERE m.group_id = ? AND m.is_active = 1 ORDER BY m.id`
       ).bind(round.id, round.group_id).all();
@@ -329,6 +352,7 @@ export async function getLedger(env, me, roundId) {
       declared: !!p.declared_at,
       verified: !!p.verified_at,
       note: p.note,
+      khai_ho_boi: p.khai_ho_boi ?? null,
       status_label: p.verified_at ? LABEL_VERIFIED : (p.declared_at ? LABEL_DECLARED : 'chưa khai'),
     })),
   });
@@ -429,9 +453,16 @@ async function canManageExpense(env, me, scope, groupId) {
 // thật đã vào quỹ — lời tự khai để riêng một dòng "đang chờ đối chiếu", đúng
 // ràng buộc câu chữ mục 6.4 SRS. Cộng dồn theo mức đóng của từng đợt.
 async function summarizeScope(env, cohortId, scope, groupId) {
+  // Tiền chảy theo THUOC_QUY, không theo scope. Một đợt do trưởng Nhóm 6 mở để
+  // thu quỹ lớp (scope='group', thuoc_quy='lop') phải cộng vào sổ LỚP — tiền
+  // nằm ở tài khoản thủ quỹ lớp chứ không ở nhóm. Trước đây cộng theo scope
+  // nên sổ nhóm phình lên bằng tiền của lớp.
+  //
+  // COALESCE cho các đợt tạo trước migration 0010, lúc cột chưa tồn tại.
+  const cuaLop = `COALESCE(r.thuoc_quy, CASE WHEN r.scope = 'class' THEN 'lop' ELSE 'nhom' END) = 'lop'`;
   const where = scope === 'class'
-    ? { sql: `r.cohort_id = ? AND r.scope = 'class'`, args: [cohortId] }
-    : { sql: `r.cohort_id = ? AND r.scope = 'group' AND r.group_id = ?`, args: [cohortId, groupId] };
+    ? { sql: `r.cohort_id = ? AND ${cuaLop}`, args: [cohortId] }
+    : { sql: `r.cohort_id = ? AND r.group_id = ? AND NOT (${cuaLop})`, args: [cohortId, groupId] };
 
   const thu = await env.DB.prepare(
     `SELECT
@@ -667,4 +698,84 @@ export async function getClassMembers(env, me) {
      ORDER BY g.no, m.full_name`
   ).bind(me.cohort_id).all();
   return json({ members: rows.results ?? [] });
+}
+
+
+/* ─────────────────────────── Khai hộ (Đợt 6b) ───────────────────────────
+ * Nhiều học viên gửi ảnh chuyển khoản qua Zalo mà chưa từng mở ứng dụng.
+ * Trước nay chỉ chính chủ tự khai được, nên trưởng nhóm không ghi lại được và
+ * bảng tiến độ báo cáo lên lớp thành sai.
+ *
+ * Khai hộ dừng ở "đã tự khai", KHÔNG chạm tới "người thu đã nhận" (mục 6.4
+ * SRS). Ảnh chụp là lời khai của người chuyển; chỉ người thu soi sao kê mới
+ * xác nhận được tiền đã vào. Giữ ranh giới ấy là giữ đúng ý nghĩa cả hai nhãn.
+ *
+ * Ai khai hộ được: trưởng/phó nhóm với người trong nhóm mình, người thu của
+ * chính đợt ấy, và Ban cán sự lớp với đợt cấp lớp. Cùng tinh thần "sửa hộ" ở
+ * ma trận mục 2.2 — và cũng như sửa hộ, luôn ghi rõ ai làm.
+ */
+async function khaiHoDuoc(env, me, round, target) {
+  if (round.collector_member_id === me.id) return true;
+  if (target.group_id === me.group_id && (await isGroupOfficer(env, me.id, me.group_id))) return true;
+  if (round.scope === 'class') return isClassCommittee(env, me.id);
+  return false;
+}
+
+// Người được khai hộ phải nằm trong phạm vi đợt thu, y như lúc xác nhận.
+async function nguoiTrongDot(env, round, memberId) {
+  return round.scope === 'class'
+    ? env.DB.prepare('SELECT id, full_name, group_id FROM members WHERE id = ? AND cohort_id = ? AND is_active = 1')
+        .bind(memberId, round.cohort_id).first()
+    : env.DB.prepare('SELECT id, full_name, group_id FROM members WHERE id = ? AND group_id = ? AND is_active = 1')
+        .bind(memberId, round.group_id).first();
+}
+
+export async function postDeclareFor(request, env, me, roundId, ip) {
+  const round = await loadRound(env, roundId);
+  if (!round || !roundAppliesTo(round, me)) return error('not_found', 404);
+
+  const body = await readJson(request);
+  const memberId = Number(body.member_id);
+  if (!Number.isInteger(memberId) || memberId <= 0) return error('member_invalid', 422);
+  if (memberId === me.id) return error('tu_khai_di', 422);
+
+  const target = await nguoiTrongDot(env, round, memberId);
+  if (!target) return error('member_not_in_round', 422);
+  if (!(await khaiHoDuoc(env, me, round, target))) return error('forbidden', 403);
+
+  const bo = body.bo === true;
+  if (bo) {
+    // Chỉ gỡ được lời khai do CHÍNH MÌNH khai hộ. Không đụng tới lời tự khai
+    // của người ta, cũng không đụng tới xác nhận của người thu.
+    const cu = await env.DB.prepare(
+      'SELECT declared_by, verified_at FROM fund_declarations WHERE round_id = ? AND member_id = ?'
+    ).bind(round.id, memberId).first();
+    if (cu?.verified_at) return error('already_verified', 409);
+    if (!cu?.declared_by) return error('khong_phai_khai_ho', 409);
+    await env.DB.prepare('DELETE FROM fund_declarations WHERE round_id = ? AND member_id = ?')
+      .bind(round.id, memberId).run();
+  } else {
+    await env.DB.prepare(
+      `INSERT INTO fund_declarations (round_id, member_id, declared_at, note, declared_by)
+       VALUES (?, ?, datetime('now'), ?, ?)
+       ON CONFLICT(round_id, member_id) DO UPDATE SET
+         declared_at = COALESCE(fund_declarations.declared_at, excluded.declared_at),
+         note = excluded.note,
+         declared_by = CASE WHEN fund_declarations.declared_at IS NULL
+                            THEN excluded.declared_by ELSE fund_declarations.declared_by END`
+    ).bind(round.id, memberId, cleanText(body.note, 200), me.id).run();
+  }
+
+  await logAudit(env, {
+    actorId: me.id, action: bo ? 'fund.undeclare_for' : 'fund.declare_for',
+    targetType: 'fund_round', targetId: round.id, after: { member_id: memberId }, ip,
+  });
+  // Nhật ký công khai: khai hộ ai cũng nhìn thấy, không làm lén được.
+  await logActivity(env, {
+    cohortId: me.cohort_id, groupId: target.group_id, actorId: me.id,
+    verb: bo ? 'fund.undeclare_for' : 'fund.declare_for',
+    objectType: 'fund_round', objectId: round.id,
+    summary: bo ? `bỏ khai hộ cho ${target.full_name}` : `khai hộ ${target.full_name} đã chuyển "${round.title}"`,
+  });
+  return json({ ok: true, status_label: bo ? 'chưa khai' : LABEL_DECLARED });
 }
