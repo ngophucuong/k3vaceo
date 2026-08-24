@@ -282,6 +282,18 @@ jobs:
                  -d "{\"email\":\"$EMAIL_MOI\"}" \
                  https://k3vaceo.cuongngo.app/api/auth/otp)
           echo "HTTP $ma — $(cat /tmp/tra.json)"
+          # Phúc đáp 502 nay kèm hong_o_buoc — chỗ duy nhất đọc được, vì
+          # wrangler tail im lặng suốt (API token nhiều khả năng thiếu quyền
+          # Workers Tail). In nổi bật lên.
+          if grep -q hong_o_buoc /tmp/tra.json 2>/dev/null; then
+            echo
+            echo "════════════════════════════════════════════════"
+            echo "  SMTP HỎNG Ở BƯỚC: $(node --input-type=commonjs -e '
+              const d = JSON.parse(require("fs").readFileSync("/tmp/tra.json","utf8"));
+              console.log(d.hong_o_buoc || "(không rõ)");
+            ')"
+            echo "════════════════════════════════════════════════"
+          fi
 
           # Trả lời của /api/auth/otp giống hệt nhau dù email có thật hay không
           # (chống dò email), nên HTTP 200 KHÔNG chứng minh tìm thấy người. Đọc

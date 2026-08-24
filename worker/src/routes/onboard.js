@@ -118,8 +118,8 @@ export async function postOnboardStart(request, env, ctx) {
 
   try {
     await guiMa(env, ctx, { id: member.id, full_name: person.full_name, email });
-  } catch {
-    return error('mail_send_failed', 502);
+  } catch (err) {
+    return error('mail_send_failed', 502, err?.buoc ? { hong_o_buoc: err.buoc } : undefined);
   }
   return json({ ok: true, email: che(email) });
 }
@@ -153,8 +153,8 @@ export async function postOtpRequest(request, env, ctx) {
   // của chính mình rồi.
   try {
     await guiMa(env, ctx, member);
-  } catch {
-    return error('mail_send_failed', 502);
+  } catch (err) {
+    return error('mail_send_failed', 502, err?.buoc ? { hong_o_buoc: err.buoc } : undefined);
   }
   return cungMotCau;
 }
@@ -227,8 +227,8 @@ export async function postVerifyMyEmail(request, env, ctx, me) {
 
   try {
     await guiMa(env, ctx, me);
-  } catch {
-    return error('mail_send_failed', 502);
+  } catch (err) {
+    return error('mail_send_failed', 502, err?.buoc ? { hong_o_buoc: err.buoc } : undefined);
   }
   return json({ ok: true, email: che(me.email) });
 }
@@ -323,6 +323,7 @@ async function guiMa(env, ctx, member) {
     console.error('Gửi mã đăng nhập thất bại:', String(err));
     throw err;
   }
+  // (LoiSmtp mang theo .buoc — ba chỗ gọi dưới trả nó về trong phúc đáp.)
 }
 
 // Che email khi hiển thị lại: "ngophucuong@gmail.com" → "ng•••••••@gmail.com".

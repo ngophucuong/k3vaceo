@@ -70,11 +70,22 @@ async function send(writer, line) {
   await writer.write(enc.encode(line + '\r\n'));
 }
 
+// Lỗi SMTP mang theo TÊN BƯỚC. Không có nó thì chỉ biết "gửi hỏng" mà không
+// biết hỏng ở đâu — và cách duy nhất để biết là đọc log Worker, thứ hoá ra
+// không đọc được (wrangler tail im lặng suốt ngày 24/8, nhiều khả năng API
+// token thiếu quyền Workers Tail). Tên bước không lộ gì bí mật nhưng chỉ đúng
+// chỗ hỏng, nên trả thẳng về trong phúc đáp HTTP.
+class LoiSmtp extends Error {
+  constructor(buoc, ma, text) {
+    super(`SMTP ${buoc} thất bại: ${text || '(không có phúc đáp)'}`);
+    this.buoc = buoc;
+    this.ma = ma ?? null;
+  }
+}
+
 async function expect(reader, okCodes, step) {
   const reply = await readReply(reader);
-  if (!okCodes.includes(reply.code)) {
-    throw new Error(`SMTP ${step} thất bại: ${reply.text || '(không có phúc đáp)'}`);
-  }
+  if (!okCodes.includes(reply.code)) throw new LoiSmtp(step, reply.code, reply.text);
   return reply;
 }
 
@@ -205,15 +216,21 @@ export async function sendMail(env, { to, subject, text }) {
 
   const { host, port, mode, user, pass, from } = docCauHinhSmtp(env);
 
-  let socket = connect(
-    { hostname: host, port },
-    mode === 'tls' ? { secureTransport: 'on' }
-      : mode === 'starttls' ? { secureTransport: 'starttls' }
-      : {}
-  );
-
-  let writer = socket.writable.getWriter();
-  let reader = socket.readable.getReader();
+  let socket, writer, reader;
+  try {
+    socket = connect(
+      { hostname: host, port },
+      mode === 'tls' ? { secureTransport: 'on' }
+        : mode === 'starttls' ? { secureTransport: 'starttls' }
+        : {}
+    );
+    writer = socket.writable.getWriter();
+    reader = socket.readable.getReader();
+  } catch (err) {
+    // Không mở nổi socket: chặn cổng, chặn IP, hoặc bắt tay TLS đổ. Đánh dấu
+    // riêng vì cách chữa hoàn toàn khác với lỗi trong lòng phiên SMTP.
+    throw new LoiSmtp(`mở kết nối tới ${host}:${port} (${mode})`, null, String(err));
+  }
 
   try {
     await expect(reader, [220], 'chào hỏi');
