@@ -236,7 +236,7 @@ async function doiChieu(env, body) {
   //      phone_self_set_at) — dành cho ai bị ghi sai số hoặc chưa có số nào:
   //      vào bằng link mời, sửa đúng số của mình, từ lần sau tự vào được.
   // Cố ý không nhận số do người cùng nhóm sửa hộ: nhận thì A sửa số của B
-  // thành số mình rồi vào /vao nhận là B, đổi luôn email đăng nhập của B.
+  // thành số mình rồi đăng nhập ở /dangnhap nhận là B, đổi luôn email đăng nhập của B.
   const soHopLe = [person.phone];
   if (member?.phone && member.phone_self_set_at) soHopLe.push(member.phone);
   const soDoiChieu = soHopLe.filter(Boolean);

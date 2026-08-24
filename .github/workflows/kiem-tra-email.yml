@@ -59,21 +59,49 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
         run: |
-          da=
+          # KHÔNG để bước này đánh hỏng cả job. Nó chỉ là dây an toàn — deploy.yml
+          # đã đồng bộ bí mật ở mỗi lần deploy rồi. Mà nó lại hay hỏng vì tranh
+          # chấp: cùng một cú push kích hoạt cả deploy.yml lẫn workflow này, nên
+          # `wrangler secret put` chạy trúng lúc deploy đang dở sẽ nhận
+          #   "Secret edit failed ... the latest version isn't currently deployed".
+          # Hỏng ở đây mà dừng cả job thì mất luôn phép thử gửi thư — thứ duy
+          # nhất ta thật sự cần biết.
+          da= ; hong=
           for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
                       SMTP_USER SMTP_PASS MAIL_FROM \
                       SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL; do
             [ -z "${!name}" ] && continue
-            printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null
-            da="$da $name"
+            for lan in 1 2 3 4; do
+              if printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null 2>/tmp/loi-secret; then
+                da="$da $name"; break
+              fi
+              if [ "$lan" = "4" ]; then
+                hong="$hong $name"
+                echo "::warning::Không đặt được $name sau 4 lần — $(tr -d '\n' < /tmp/loi-secret | tail -c 200)"
+              else
+                sleep $((lan * 10))
+              fi
+            done
           done
-          if [ -z "$da" ]; then
-            echo "::warning::Không có bí mật SMTP nào trong GitHub — giữ nguyên những gì Worker đang có."
-          else
-            echo "✓ đã đẩy từ GitHub sang Worker:$da"
-          fi
+          [ -n "$da" ] && echo "✓ đã đẩy từ GitHub sang Worker:$da"
+          [ -n "$hong" ] && echo "· không đẩy được:$hong (dùng giá trị Worker đang có)"
+          [ -z "$da$hong" ] && echo "::warning::Không có bí mật SMTP nào trong GitHub — giữ nguyên những gì Worker đang có."
           # `wrangler secret put` tạo một bản triển khai mới; chờ vài giây cho lan.
           sleep 5
+          exit 0
+
+      # Bí mật chỉ có tác dụng trên BẢN ĐANG CHẠY. `wrangler secret put` tạo một
+      # version mới mỗi lần gọi, và nếu version ấy không được đưa ra chạy thì bí
+      # mật nằm ở bản treo còn người dùng vẫn gặp bản cũ. Đối chiếu hai thứ đó.
+      - name: Bản đang chạy có phải bản mới nhất không
+        working-directory: worker
+        run: |
+          echo "--- version mới nhất đã tải lên ---"
+          npx wrangler versions list 2>&1 | tail -12 || true
+          echo
+          echo "--- bản đang phục vụ người dùng ---"
+          npx wrangler deployments list 2>&1 | tail -12 || true
+          exit 0
 
       - name: Chuẩn bị bộ đọc kết quả
         run: |

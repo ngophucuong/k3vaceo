@@ -12,7 +12,7 @@
 // Một chỗ đáng chú ý: hai người này ở Nhóm 5 và Nhóm 7, mà mới chỉ Nhóm 6 có
 // dòng trong bảng members. Nên trước khi gán vai phải tạo hồ sơ cho họ từ
 // danh sách gốc — tạo với claimed_at để trống, tức "hồ sơ có sẵn nhưng chưa ai
-// nhận". Lúc họ tự vào bằng /vao, luồng onboard tìm thấy dòng này theo
+// nhận". Lúc họ tự đăng nhập ở /dangnhap, luồng onboard tìm thấy dòng này theo
 // roster_id và gắn email vào, không tạo trùng.
 
 import { readFileSync, writeFileSync } from 'node:fs';

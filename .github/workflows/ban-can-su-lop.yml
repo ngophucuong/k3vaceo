@@ -67,5 +67,5 @@ jobs:
               process.exit(1);
             }
             console.log("\n✓ ĐÚNG HẾT. Ban cán sự lớp đã có quyền tạo đợt thu quỹ lớp và ghi sổ chi quỹ lớp.");
-            console.log("  Họ vẫn phải tự vào ứng dụng ở /vao để nhận hồ sơ trước khi dùng được.");
+            console.log("  Họ vẫn phải tự đăng nhập ở /dangnhap để nhận hồ sơ trước khi dùng được.");
           '

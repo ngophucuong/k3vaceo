@@ -57,7 +57,7 @@ const ERR_TEXT = {
   passkey_already_registered: 'Thiết bị này đã đăng ký passkey rồi.',
   challenge_invalid: 'Phiên đăng ký passkey hết hạn — bấm lại từ đầu.',
   // Đợt 5 — tự nhận diện và OTP
-  phone_mismatch: 'Số điện thoại không khớp với số Ban tổ chức đang có. Kiểm tra lại; nếu bạn đã đổi số thì xin trưởng nhóm một link mời, vào rồi tự sửa số trong tab Tài khoản là lần sau tự vào được.',
+  phone_mismatch: 'Số điện thoại không khớp với số Ban tổ chức đang có. Kiểm tra lại; nếu bạn đã đổi số thì xin trưởng nhóm một link mời, đăng nhập rồi tự sửa số trong tab Tài khoản là lần sau tự đăng nhập được.',
   phone_invalid: 'Số điện thoại phải đủ 10 chữ số và bắt đầu bằng 0.',
   phone_missing_in_roster: 'Ban tổ chức chưa có số điện thoại của bạn nên chưa đối chiếu được.',
   roster_not_found: 'Không tìm thấy tên này trong danh sách lớp.',
@@ -193,7 +193,7 @@ async function renderClaim(token) {
 /* ═══════════ ĐĂNG NHẬP LẠI BẰNG EMAIL ═══════════ */
 async function renderMagicConsume(token) {
   document.body.classList.add('noapp');
-  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard"><h1>Đang đưa bạn vào…</h1></div></div>`;
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard"><h1>Đang đăng nhập…</h1></div></div>`;
   try {
     await apiPost(`/api/auth/email/${encodeURIComponent(token)}`);
     history.replaceState({}, '', '/');
@@ -220,10 +220,10 @@ function renderLogin(emailSan) {
     <div id="lgMsg" class="hintline" style="display:none"></div>
     <button class="wide" id="lgSend">Gửi mã đăng nhập</button>
     <button class="wide ghost" id="lgPasskey" style="margin-top:10px">Đăng nhập bằng passkey</button>
-    <div class="foot" style="padding:14px 0 0">Lần đầu vào? <a href="/vao" id="lgVao">Bấm đây để tự nhận diện</a> bằng tên và số điện thoại.</div>
+    <div class="foot" style="padding:14px 0 0">Lần đầu đăng nhập? <a href="/dangnhap" id="lgVao">Bấm đây để tự nhận diện</a> bằng tên và số điện thoại.</div>
   </div></div>`;
   $('#lgPasskey').onclick = loginWithPasskey;
-  $('#lgVao').onclick = e => { e.preventDefault(); history.pushState({}, '', '/vao'); renderVao(); };
+  $('#lgVao').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap'); renderVao(); };
   $('#lgSend').onclick = async () => {
     const email = $('#lgEmail').value.trim();
     if (!email) return;
@@ -254,7 +254,7 @@ function renderNhapMa(email, loiNhan) {
     <input id="maOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
            placeholder="000000" style="font-size:28px;letter-spacing:8px;text-align:center">
     <div id="maMsg" class="hintline" style="display:none"></div>
-    <button class="wide" id="maOk">Vào</button>
+    <button class="wide" id="maOk">Đăng nhập</button>
     <button class="wide ghost" id="maLai" style="margin-top:10px">Gửi lại mã</button>
     <div class="foot" style="padding:14px 0 0">Không thấy thư? Xem cả mục Spam.</div>
   </div></div>`;
@@ -277,13 +277,13 @@ function renderNhapMa(email, loiNhan) {
     } catch (e) {
       const conLai = e?.data?.con_lai;
       bao(errText(e) + (conLai !== undefined ? ` Còn ${conLai} lần thử.` : ''));
-      $('#maOk').disabled = false; $('#maOk').textContent = 'Vào';
+      $('#maOk').disabled = false; $('#maOk').textContent = 'Đăng nhập';
       oMa.select();
     }
   };
   $('#maOk').onclick = guiDi;
   oMa.onkeydown = e => { if (e.key === 'Enter') guiDi(); };
-  // Dán mã từ thư thì vào luôn, khỏi phải bấm nút.
+  // Dán mã từ thư thì đăng nhập luôn, khỏi phải bấm nút.
   oMa.oninput = () => { if (oMa.value.replace(/\D/g, '').length === 6) guiDi(); };
   $('#maLai').onclick = async () => {
     $('#maLai').disabled = true; $('#maLai').textContent = 'Đang gửi…';
@@ -293,11 +293,11 @@ function renderNhapMa(email, loiNhan) {
   };
 }
 
-/* ═══════════ TỰ NHẬN DIỆN (/vao) ═══════════
+/* ═══════════ TỰ NHẬN DIỆN (/dangnhap) ═══════════
    Ba bước, theo đúng luồng đã chốt:
      1. Gõ tên → chọn đúng mình trong danh sách gốc 134 người
      2. Nhập số điện thoại — Ban tổ chức đã có sẵn, chỉ đối chiếu, KHÔNG gửi gì
-     3. Khai email → nhận mã 6 số → nhập mã → vào
+     3. Khai email → nhận mã 6 số → nhập mã → xong
    Passkey chỉ hiện ở tab Tài khoản sau khi xong bước 3. */
 const VAO = { person: null };
 
@@ -318,9 +318,9 @@ function vaoBuoc1() {
     <label class="f">Họ tên</label>
     <input id="vTen" placeholder="ví dụ: cuong" autocomplete="name" maxlength="60">
     <div id="vDs" style="margin-top:10px"></div>
-    <div class="foot" style="padding:14px 0 0">Đã từng vào rồi?
-      <a href="/dangnhap" id="vDn">Đăng nhập bằng email</a>.</div>`);
-  $('#vDn').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap'); renderLogin(); };
+    <div class="foot" style="padding:14px 0 0">Đã khai email rồi?
+      <a href="/dangnhap/email" id="vDn">Đăng nhập bằng email</a>.</div>`);
+  $('#vDn').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap/email'); renderLogin(); };
 
   let hen;
   $('#vTen').oninput = () => {
@@ -398,9 +398,9 @@ function vaoThieuSo(d) {
       <b>${esc(d.full_name ?? '')}</b>
       <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(d.group_label ?? '')}</div>
     </div></div>
-    <div class="mut">Nhắn trưởng nhóm bổ sung số của bạn vào danh sách lớp. Xong là bạn vào được ngay, không phải làm gì thêm.</div>
-    <div class="mut" style="margin-top:10px">Hoặc xin trưởng nhóm một <b>link mời</b>. Vào bằng link rồi tự điền số của mình
-      trong tab Tài khoản — từ lần sau bạn tự vào được ở đây, không phải xin nữa.</div>
+    <div class="mut">Nhắn trưởng nhóm bổ sung số của bạn vào danh sách lớp. Xong là bạn đăng nhập được ngay, không phải làm gì thêm.</div>
+    <div class="mut" style="margin-top:10px">Hoặc xin trưởng nhóm một <b>link mời</b>. Đăng nhập bằng link rồi tự điền số của mình
+      trong tab Tài khoản — từ lần sau bạn tự đăng nhập được ở đây, không phải xin nữa.</div>
     <button class="wide ghost" id="vLui2" style="margin-top:14px">Quay lại</button>`);
   $('#vLui2').onclick = vaoBuoc1;
 }
@@ -410,7 +410,7 @@ function vaoBuoc3() {
   vaoShell(VAO.daNhanCho ? 'Chào bạn trở lại' : 'Email của bạn',
     VAO.daNhanCho
       ? `Bạn đã nhận hồ sơ này rồi${VAO.goiYEmail ? ` với email <b>${esc(VAO.goiYEmail)}</b>` : ''}. Nhập lại email đó để nhận mã đăng nhập.`
-      : 'Khai email để nhận mã đăng nhập. Đây cũng là đường vào lại khi bạn đổi máy, nên hãy dùng hộp thư bạn mở được.', `
+      : 'Khai email để nhận mã đăng nhập. Đây cũng là đường đăng nhập lại khi bạn đổi máy, nên hãy dùng hộp thư bạn mở được.', `
     <label class="f">Email</label>
     <input id="vEmail" inputmode="email" autocomplete="email" maxlength="160" placeholder="ten@congty.vn">
     <div id="vMsg3" class="hintline" style="display:none"></div>
@@ -614,7 +614,7 @@ async function wzStep5() {
   wzShell('Phát link mời', 'Xong rồi. Chép khối dưới đây dán thẳng vào Zalo nhóm — mỗi người một link riêng.', `
     <div class="card"><div class="cb" style="padding:0 14px" id="wzLines">Đang sinh link…</div></div>
     <button class="wide" id="wzCopy" style="margin-top:12px">Chép cả khối</button>
-    <button class="wide ghost" id="wzDone" style="margin-top:10px">Vào ứng dụng</button>`);
+    <button class="wide ghost" id="wzDone" style="margin-top:10px">Mở ứng dụng</button>`);
 
   let data;
   try { data = await apiPost('/api/wizard/invites'); }
@@ -636,12 +636,12 @@ function renderNoSession() {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
     <div class="lb">k3vaceo · Khoá K03</div><h1>Chưa đăng nhập</h1>
-    <p class="sub">Lần đầu vào thì tự nhận diện bằng tên và số điện thoại — không cần ai gửi gì cho bạn.</p>
-    <button class="wide" id="toVao">Tôi là học viên K03, vào lần đầu</button>
-    <button class="wide ghost" id="toLogin" style="margin-top:10px">Đã có tài khoản — đăng nhập</button>
+    <p class="sub">Lần đầu đăng nhập thì tự nhận diện bằng tên và số điện thoại — không cần ai gửi gì cho bạn.</p>
+    <button class="wide" id="toVao">Tôi là học viên K03, đăng nhập lần đầu</button>
+    <button class="wide ghost" id="toLogin" style="margin-top:10px">Đã khai email rồi — đăng nhập bằng email</button>
   </div></div>`;
-  $('#toVao').onclick = () => { history.pushState({}, '', '/vao'); renderVao(); };
-  $('#toLogin').onclick = () => { history.pushState({}, '', '/dangnhap'); renderLogin(); };
+  $('#toVao').onclick = () => { history.pushState({}, '', '/dangnhap'); renderVao(); };
+  $('#toLogin').onclick = () => { history.pushState({}, '', '/dangnhap/email'); renderLogin(); };
 }
 
 /* ═══════════ KHUNG ỨNG DỤNG ═══════════ */
@@ -739,7 +739,7 @@ function drawNay() {
         ${iAmOfficer() ? `<button class="ico" data-role="${role}" data-label="${esc(label)}" aria-label="Sửa ${esc(label)}">✎</button>` : ''}
       </div>`;
     }).join('')}</div>
-    ${iAmOfficer() ? `<button class="wide ghost" id="inviteBtn" style="margin-top:10px">Phát link mời cho người chưa vào</button>` : ''}
+    ${iAmOfficer() ? `<button class="wide ghost" id="inviteBtn" style="margin-top:10px">Phát link mời cho người chưa đăng nhập</button>` : ''}
   </div>
   <div class="sect" id="joinBox" style="display:none"></div>
   <div class="sect">
@@ -1070,7 +1070,7 @@ async function drawNhom() {
     ${MEMBERS.map(m => `
       <button class="mrow" data-toggle="${m.id}">
         ${avatar(m.full_name)}
-        <div class="b"><div class="nm">${esc(m.full_name)}${m.claimed ? '' : '<span class="tg due" style="font-size:10px;padding:1px 7px">chưa vào</span>'}</div>
+        <div class="b"><div class="nm">${esc(m.full_name)}${m.claimed ? '' : '<span class="tg due" style="font-size:10px;padding:1px 7px">chưa đăng nhập</span>'}</div>
           <div class="co">${esc(m.title || '')}${m.title && m.company ? ' · ' : ''}${esc(m.company || '')}</div></div>
         <span class="ring ${m.profile_filled === 4 ? 'full' : 'part'}">${m.profile_filled === 4 ? '✓' : m.profile_filled}</span>
       </button>
@@ -1136,7 +1136,7 @@ async function openMemberEdit(id) {
    ${own ? `<label class="f">Email</label><input id="eEmail" value="${esc(m.email)}" inputmode="email" maxlength="160">
             <div class="hintline">Dùng để tự đăng nhập lại nếu mất link mời.</div>` : ''}
    <label class="f">Điện thoại</label><input id="eP" value="${esc(m.phone)}" placeholder="09xx xxx xxx" inputmode="tel" maxlength="30">
-   ${own ? `<div class="hintline">Sửa đúng số của bạn ở đây thì lần sau tự vào được ở màn “Tôi là ai”, không cần xin link mời nữa.</div>` : ''}
+   ${own ? `<div class="hintline">Sửa đúng số của bạn ở đây thì lần sau tự đăng nhập được ở màn Đăng nhập, không cần xin link mời nữa.</div>` : ''}
    <label class="f">Chức vụ</label><input id="eT" value="${esc(m.title)}" maxlength="120">
    <label class="f">Đơn vị</label><input id="eC" value="${esc(m.company)}" maxlength="160">
    <label class="f">Bán gì</label><input id="eA" value="${esc(m.profile.sells_what)}" maxlength="80">
@@ -1825,9 +1825,17 @@ function renderApp() {
 async function boot() {
   let m;
   if ((m = location.pathname.match(/^\/i\/([^/]+)\/?$/))) return renderClaim(m[1]);
+  // /dangnhap là CỬA CHÍNH — màn tự nhận diện bằng tên và số điện thoại.
+  // /dangnhap/email là đường cho ai đã khai email rồi. Phải xét trước nhánh
+  // magic link, không thì 'email' bị nhận nhầm là token.
+  if (location.pathname.replace(/\/$/, '') === '/dangnhap/email') return renderLogin();
   if ((m = location.pathname.match(/^\/dangnhap\/([^/]+)\/?$/))) return renderMagicConsume(m[1]);
-  if (location.pathname.replace(/\/$/, '') === '/dangnhap') return renderLogin();
-  if (location.pathname.replace(/\/$/, '') === '/vao') return renderVao();
+  if (location.pathname.replace(/\/$/, '') === '/dangnhap') return renderVao();
+  // /vao là địa chỉ cũ đã phát cho lớp — giữ sống, lặng lẽ đổi sang /dangnhap.
+  if (location.pathname.replace(/\/$/, '') === '/vao') {
+    history.replaceState({}, '', '/dangnhap');
+    return renderVao();
+  }
   if (location.pathname.replace(/\/$/, '') === '/start') return renderStart();
 
   try {
@@ -1843,4 +1851,14 @@ async function boot() {
 }
 
 addEventListener('hashchange', route);
+
+// Nút Back của trình duyệt. Các màn trước khi đăng nhập đổi đường dẫn bằng
+// pushState, mà không bắt popstate thì bấm Back chỉ đổi thanh địa chỉ còn màn
+// hình đứng nguyên — người dùng tưởng máy treo. Trong ứng dụng (đã đăng nhập)
+// thì tab chạy bằng hash nên route() lo, gọi boot() ở đó là tải lại thừa.
+addEventListener('popstate', () => {
+  if (document.body.classList.contains('noapp')) boot();
+  else route();
+});
+
 boot();
