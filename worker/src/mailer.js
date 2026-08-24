@@ -82,11 +82,23 @@ function dotStuff(body) {
   return body.split('\r\n').map(l => (l.startsWith('.') ? '.' + l : l)).join('\r\n');
 }
 
+// Tên hiển thị có dấu cũng phải mã hoá RFC 2047 y như tiêu đề — ví dụ ghi
+// trong chính tệp này từng là "Nhóm 6 K03 <...>", đúng kiểu sẽ vỡ. Từ khoá:
+// encoded-word KHÔNG được nằm trong chuỗi có nháy kép, nên bỏ nháy trước.
+export function encodeFrom(v) {
+  const m = String(v).match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  if (!m) return String(v).trim();
+  const dc = m[2];
+  const ten = m[1].replace(/^"(.*)"$/, '$1').trim();
+  if (!ten) return dc;
+  return /^[\x20-\x7E]*$/.test(ten) ? `${ten} <${dc}>` : `=?UTF-8?B?${b64(ten)}?= <${dc}>`;
+}
+
 function buildMessage({ from, to, subject, text }) {
   // Tiêu đề tiếng Việt phải mã hoá RFC 2047, nếu không dấu sẽ vỡ ở phía nhận.
   const encodedSubject = `=?UTF-8?B?${b64(subject)}?=`;
   const headers = [
-    `From: ${from}`,
+    `From: ${encodeFrom(from)}`,
     `To: ${to}`,
     `Subject: ${encodedSubject}`,
     `Date: ${new Date().toUTCString()}`,
