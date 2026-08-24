@@ -94,14 +94,33 @@ export function encodeFrom(v) {
   return /^[\x20-\x7E]*$/.test(ten) ? `${ten} <${dc}>` : `=?UTF-8?B?${b64(ten)}?= <${dc}>`;
 }
 
+function addressOnly(v) {
+  const m = String(v).match(/<([^>]+)>/);
+  return m ? m[1] : String(v).trim();
+}
+
 function buildMessage({ from, to, subject, text }) {
   // Tiêu đề tiếng Việt phải mã hoá RFC 2047, nếu không dấu sẽ vỡ ở phía nhận.
   const encodedSubject = `=?UTF-8?B?${b64(subject)}?=`;
+
+  // Message-ID là BẮT BUỘC trên thực tế, dù RFC 5322 chỉ khuyến nghị. Máy chủ
+  // thư bình thường tự thêm hộ, còn client tự viết như cái này thì không ai
+  // thêm hộ cả. Gmail coi thư thiếu Message-ID là dấu hiệu spam rất mạnh và
+  // thường vứt lặng lẽ — không vào Spam, không báo lỗi, không bounce. Đúng
+  // triệu chứng đã gặp: Hostinger trả 250 (đã nhận thư) mà hộp thư trống trơn.
+  // Phần miền lấy từ địa chỉ gửi để khớp với SPF/DKIM của cuongngo.cloud.
+  const mienGui = addressOnly(from).split('@')[1] || 'k3vaceo';
+  const messageId = `<${crypto.randomUUID()}@${mienGui}>`;
+
   const headers = [
     `From: ${encodeFrom(from)}`,
     `To: ${to}`,
     `Subject: ${encodedSubject}`,
     `Date: ${new Date().toUTCString()}`,
+    `Message-ID: ${messageId}`,
+    // Thư máy sinh. Nói thẳng ra để bộ lọc khỏi đoán, và để hệ thống trả lời
+    // tự động (nghỉ phép, out-of-office) không dội thư lại vào hộp người gửi.
+    'Auto-Submitted: auto-generated',
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
@@ -109,11 +128,6 @@ function buildMessage({ from, to, subject, text }) {
   // Base64 cho thân thư để khỏi lo dòng dài và ký tự có dấu.
   const encodedBody = b64(text).replace(/(.{76})/g, '$1\r\n');
   return headers.join('\r\n') + '\r\n\r\n' + dotStuff(encodedBody);
-}
-
-function addressOnly(v) {
-  const m = String(v).match(/<([^>]+)>/);
-  return m ? m[1] : String(v).trim();
 }
 
 export async function sendMail(env, { to, subject, text }) {
