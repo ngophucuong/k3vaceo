@@ -43,7 +43,10 @@ export async function postEmailRequest(request, env, ctx) {
   // xong mới thấy màn hình phản hồi.
   const job = sendMail(env, { to: member.email, subject: 'Đường dẫn đăng nhập k3vaceo', text })
     .catch(err => console.error('Gửi thư đăng nhập thất bại:', String(err)));
-  if (ctx?.waitUntil) ctx.waitUntil(job); else await job;
+  // CHỜ gửi xong rồi mới trả lời — xem chú thích dài trong routes/onboard.js:
+  // đẩy việc gửi sang ctx.waitUntil thì Cloudflare dọn Worker đi giữa lúc còn
+  // đang bắt tay SMTP, thư chết lặng lẽ mà log không có dòng nào.
+  await job;
 
   return sameAnswer;
 }

@@ -116,7 +116,11 @@ export async function postOnboardStart(request, env, ctx) {
     ).bind(email, member.id).run();
   }
 
-  await guiMa(env, ctx, { id: member.id, full_name: person.full_name, email });
+  try {
+    await guiMa(env, ctx, { id: member.id, full_name: person.full_name, email });
+  } catch {
+    return error('mail_send_failed', 502);
+  }
   return json({ ok: true, email: che(email) });
 }
 
@@ -144,7 +148,14 @@ export async function postOtpRequest(request, env, ctx) {
   if (!member) return cungMotCau;
   if (!mailerConfigured(env)) return error('mailer_not_configured', 503);
 
-  await guiMa(env, ctx, member);
+  // Gửi hỏng thì nói thật. Vẫn không lộ email nào có thật: câu này chỉ xuất
+  // hiện khi đã tìm thấy người, mà tới được đây thì người dùng gõ đúng email
+  // của chính mình rồi.
+  try {
+    await guiMa(env, ctx, member);
+  } catch {
+    return error('mail_send_failed', 502);
+  }
   return cungMotCau;
 }
 
@@ -214,7 +225,11 @@ export async function postVerifyMyEmail(request, env, ctx, me) {
   if (me.email_verified_at) return json({ ok: true, da_kiem_chung: true });
   if (!mailerConfigured(env)) return error('mailer_not_configured', 503);
 
-  await guiMa(env, ctx, me);
+  try {
+    await guiMa(env, ctx, me);
+  } catch {
+    return error('mail_send_failed', 502);
+  }
   return json({ ok: true, email: che(me.email) });
 }
 
@@ -291,12 +306,23 @@ async function guiMa(env, ctx, member) {
     'Nếu bạn không yêu cầu đăng nhập thì bỏ qua thư này.',
   ].join('\n');
 
-  // Gửi sau khi đã trả lời để người dùng không phải ngồi chờ SMTP bắt tay.
-  // Hệ quả: HTTP 200 KHÔNG chứng minh thư đã đi — chỗ duy nhất lộ ra sự thật
-  // là dòng console.error này trong log Worker.
-  const job = sendMail(env, { to: member.email, subject: `Mã đăng nhập k3vaceo: ${code}`, text })
-    .catch(err => console.error('Gửi mã đăng nhập thất bại:', String(err)));
-  if (ctx?.waitUntil) ctx.waitUntil(job); else await job;
+  // CHỜ gửi xong rồi mới trả lời, và để lỗi nổi lên cho người gọi.
+  //
+  // Bản cũ đẩy việc gửi sang ctx.waitUntil cho người dùng khỏi ngồi đợi SMTP
+  // bắt tay. Đó chính là chỗ hỏng, đo được ngày 24/8: log Worker không hề có
+  // dòng báo đã gửi xong, mà cũng không có dòng lỗi nào. Cả hai cùng vắng
+  // nghĩa là hàm không chạy tới cuối — Cloudflare dọn Worker đi giữa lúc còn
+  // đang bắt tay, nên chẳng có gì để ghi. Thư chết lặng lẽ, người dùng thấy
+  // "đã gửi" mà hộp thư trống suốt cả buổi.
+  //
+  // Cũng KHÔNG nuốt lỗi bằng .catch nữa. Nuốt thì màn hình vẫn báo đã gửi
+  // trong khi thư chưa đi — che mất đúng thứ cần biết.
+  try {
+    await sendMail(env, { to: member.email, subject: `Mã đăng nhập k3vaceo: ${code}`, text });
+  } catch (err) {
+    console.error('Gửi mã đăng nhập thất bại:', String(err));
+    throw err;
+  }
 }
 
 // Che email khi hiển thị lại: "ngophucuong@gmail.com" → "ng•••••••@gmail.com".
