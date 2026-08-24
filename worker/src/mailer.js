@@ -267,6 +267,11 @@ async function guiQuaSmtp(env, { to, subject, text }) {
         : mode === 'starttls' ? { secureTransport: 'starttls' }
         : {}
     );
+    // connect() TRẢ VỀ NGAY, kết nối dựng sau. Không chờ socket.opened thì lỗi
+    // nối mạng không nổi lên ở đây mà nổi ở lần read() đầu tiên, dưới dạng
+    // "Stream was cancelled." — một câu không cho biết gì. Đã mất một lượt
+    // chạy thật vì câu ấy (24/8, lượt 19). Chờ opened thì lấy được lý do gốc.
+    await socket.opened;
     writer = socket.writable.getWriter();
     reader = socket.readable.getReader();
   } catch (err) {
@@ -276,7 +281,17 @@ async function guiQuaSmtp(env, { to, subject, text }) {
   }
 
   try {
-    await expect(reader, [220], 'chào hỏi');
+    // Lời chào 220 là bằng chứng đầu tiên rằng ta thật sự đang nói chuyện với
+    // một máy chủ SMTP. Không có nó thì kết nối đã đứt trước khi máy chủ kịp
+    // nói gì — nói rõ ra, đừng để lọt một câu lỗi trần trụi của runtime.
+    try {
+      await expect(reader, [220], 'chào hỏi');
+    } catch (err) {
+      if (err instanceof LoiSmtp) throw err;
+      throw new LoiSmtp(
+        `chờ lời chào của ${host}:${port} (${mode}) — kết nối đứt trước khi máy chủ nói gì`,
+        null, String(err));
+    }
 
     // EHLO phải là tên miền đầy đủ. Bản cũ gửi 'k3vaceo' — không có dấu chấm,
     // không phải tên miền nào cả. Máy chủ nhận vẫn cho qua nhưng ghi lại trong
