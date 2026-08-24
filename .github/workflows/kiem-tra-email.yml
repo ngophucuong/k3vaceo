@@ -276,6 +276,15 @@ jobs:
           # số. Bản trước gọi /api/auth/email — đó là magic link của Đợt 2, vẫn
           # còn route nhưng không còn là lối chính, nên thử nó là thử nhầm chỗ:
           # nó xanh mà người dùng vẫn không nhận được mã.
+          # Dọn hạn mức của chính địa chỉ này trước khi gọi. Không dọn thì phép
+          # thử tự chặn mình sau năm lượt — và tệ hơn, nó ăn mất phần của người
+          # dùng thật đang ngồi thử ở đầu kia (lượt 15 vấp đúng chỗ này: 429,
+          # chưa kịp chạm tới SMTP).
+          em=$(printf '%s' "$EMAIL_MOI" | sed "s/'/''/g")
+          $WRANGLER --command \
+            "DELETE FROM rate_events WHERE bucket IN ('otp_email','otp_request')
+               AND (ip = '$em' OR created_at > datetime('now','-2 hours'))" >/dev/null 2>&1 || true
+
           echo "--- POST /api/auth/otp (mã 6 số — lối chính) ---"
           ma=$(curl -s -o /tmp/tra.json -w '%{http_code}' -X POST \
                  -H 'Content-Type: application/json' \
@@ -358,7 +367,7 @@ jobs:
             exit 1
           fi
           if [ "$ma" != "200" ]; then
-            echo "::error::Không gọi được /api/auth/email (HTTP $ma)."; exit 1
+            echo "::error::Không gọi được /api/auth/otp (HTTP $ma)."; exit 1
           fi
           if [ -n "$loi" ]; then
             echo "::error::Đủ bí mật SMTP nhưng gửi thư THẤT BẠI — xem dòng lỗi ở trên."; exit 1
