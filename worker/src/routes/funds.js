@@ -79,6 +79,7 @@ async function shapeRound(env, round, me) {
     verified_count: counts?.verified ?? 0,
     total_people: totalRow?.n ?? 0,
     transfer_note: note,
+    syntax_template: round.syntax_template || '{TEN} N{NHOM}',
     qr_url: buildQrUrl(round, note),
     can_see_ledger: await canSeeLedger(env, me, round),
   };
@@ -134,6 +135,9 @@ export async function postFund(request, env, me, ip) {
   const accountNo = cleanText(body.account_no, 32);
   if (!accountNo || !/^[0-9A-Za-z]+$/.test(accountNo)) return error('account_no_invalid', 422);
 
+  const cuPhap = cleanText(body.syntax_template, 60) ?? '{TEN} N{NHOM}';
+  if (!cuPhap.includes('{TEN}')) return error('syntax_thieu_ten', 422);
+
   let collectorId = null;
   if (body.collector_member_id !== null && body.collector_member_id !== undefined && body.collector_member_id !== '') {
     collectorId = Number(body.collector_member_id);
@@ -155,7 +159,7 @@ export async function postFund(request, env, me, ip) {
     me.cohort_id, scope, groupId, title, cleanText(body.purpose, 300), amount,
     bankBin, bankName(bankBin) ?? cleanText(body.bank_name, 60), accountNo,
     cleanText(body.account_name, 120), collectorId,
-    cleanText(body.syntax_template, 60) ?? '{TEN} N{NHOM}',
+    cuPhap,
     cleanText(body.opens_on, 20), cleanText(body.closes_on, 20), me.id
   ).first();
 
@@ -182,10 +186,23 @@ export async function patchFund(request, env, me, roundId, ip) {
   if ('opens_on' in body) next.opens_on = cleanText(body.opens_on, 20);
   if ('purpose' in body) next.purpose = cleanText(body.purpose, 300);
   if ('title' in body) next.title = cleanText(body.title, 120) ?? round.title;
+  // Cú pháp chuyển khoản sửa được cả sau khi tạo. Người thu hay phát hiện
+  // mình cần thêm chữ ("Quylop", "Dot2"...) sau khi đã nhìn sao kê thật; bắt
+  // huỷ đợt rồi tạo lại chỉ vì mấy chữ ấy là vô lý.
+  if ('syntax_template' in body) {
+    const cp = cleanText(body.syntax_template, 60);
+    if (!cp) return error('syntax_required', 422);
+    // Thiếu {TEN} thì mọi người chuyển khoản giống hệt nhau, người thu soi sao
+    // kê không biết ai là ai — hỏng đúng công dụng của cú pháp.
+    if (!cp.includes('{TEN}')) return error('syntax_thieu_ten', 422);
+    next.syntax_template = cp;
+  }
 
   await env.DB.prepare(
-    `UPDATE fund_rounds SET status = ?, opens_on = ?, closes_on = ?, purpose = ?, title = ? WHERE id = ?`
-  ).bind(next.status, next.opens_on, next.closes_on, next.purpose, next.title, round.id).run();
+    `UPDATE fund_rounds SET status = ?, opens_on = ?, closes_on = ?, purpose = ?, title = ?,
+       syntax_template = ? WHERE id = ?`
+  ).bind(next.status, next.opens_on, next.closes_on, next.purpose, next.title,
+         next.syntax_template ?? round.syntax_template, round.id).run();
 
   await logAudit(env, {
     actorId: me.id, action: 'fund.update', targetType: 'fund_round', targetId: round.id,

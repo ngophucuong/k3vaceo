@@ -232,11 +232,9 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(243,243,24
 .navin{max-width:var(--wrap);margin:0 auto;display:flex;padding:7px 8px 9px;gap:4px}
 .nb{flex:1;padding:8px 2px;border-radius:10px;font-size:11.5px;font-weight:500;color:var(--ink3);
   display:flex;flex-direction:column;align-items:center;gap:5px;transition:.18s}
-.nb .g{width:18px;height:18px;border-radius:5px;box-shadow:inset 0 0 0 1.6px currentColor;transition:.18s}
-.nb[data-v=bai] .g{border-radius:3px;box-shadow:inset 0 0 0 1.6px currentColor,inset 0 5px 0 -3.6px currentColor}
-.nb[data-v=nhom] .g{border-radius:50%}
-.nb[data-v=kho] .g{border-radius:3px 8px 3px 3px}
-.nb[data-v=quy] .g{border-radius:5px;box-shadow:inset 0 0 0 1.6px currentColor,inset 0 0 0 5px transparent,0 0 0 0}
+/* Icon là SVG nét (xem bảng ICON trong app.js), không còn là khối bo góc bằng
+   box-shadow nữa. Chỉ cần định kích thước; màu theo currentColor của nút. */
+.nb .g{width:20px;height:20px;display:block;transition:.18s}
 .nb.on{color:var(--ink);font-weight:600;background:var(--surf);box-shadow:var(--sh)}
 
 /* ─── SHEET ─── */

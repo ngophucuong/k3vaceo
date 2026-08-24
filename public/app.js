@@ -3,7 +3,7 @@ const $ = s => document.querySelector(s);
 
 // Phải thoát cả dấu nháy: chuỗi này được nhúng vào bên trong thuộc tính HTML
 // (href="...", value="..."), nên bỏ sót dấu " là thoát ra khỏi thuộc tính và
-// gắn được onmouseover — bất kỳ ai gắn liên kết vào Kho cũng chèn được mã
+// gắn được onmouseover — bất kỳ ai gắn liên kết vào Tư liệu cũng chèn được mã
 // chạy trên máy đồng đội.
 const ESC_MAP = { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' };
 const esc = s => String(s ?? '').replace(/[<>&"']/g, c => ESC_MAP[c]);
@@ -20,6 +20,16 @@ function toast(t) {
 }
 
 const vnMoney = n => Number(n ?? 0).toLocaleString('vi-VN');
+
+/* Dựng nội dung chuyển khoản từ cú pháp — bản sao đúng logic của
+   buildTransferNote trong worker/src/lib/vietqr.js: thay chỗ trống, bỏ dấu,
+   viết hoa, gộp khoảng trắng. Chép lại ở đây để xem trước hiện ngay lúc gõ mà
+   không phải hỏi máy chủ từng ký tự. Sửa một bên thì phải sửa bên kia. */
+const boDau = t => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/đ/g, 'd').replace(/Đ/g, 'D');
+const dungNoiDung = (cuPhap, ten, nhom) =>
+  boDau(String(cuPhap || '{TEN} N{NHOM}').replace(/\{TEN\}/g, ten ?? '').replace(/\{NHOM\}/g, nhom ?? ''))
+    .toUpperCase().replace(/\s+/g, ' ').trim();
 
 /* ═══════════ WEBAUTHN — đổi qua lại base64url ↔ ArrayBuffer ═══════════
    Trình duyệt mới có PublicKeyCredential.parseCreationOptionsFromJSON() làm
@@ -53,6 +63,8 @@ const ERR_TEXT = {
   account_no_invalid: 'Số tài khoản chỉ gồm chữ và số.',
   collector_not_found: 'Người thu phải là thành viên trong nhóm.',
   title_required: 'Cần đặt tên cho đợt thu.',
+  syntax_required: 'Cần có cú pháp nội dung chuyển khoản.',
+  syntax_thieu_ten: 'Cú pháp phải có {TEN}, không thì cả nhóm chuyển khoản giống hệt nhau và người thu không biết ai là ai.',
   passkey_verify_failed: 'Không xác thực được passkey. Thử lại hoặc dùng email.',
   passkey_unknown: 'Passkey này chưa được đăng ký ở đây.',
   passkey_already_registered: 'Thiết bị này đã đăng ký passkey rồi.',
@@ -151,7 +163,7 @@ async function renderClaim(token) {
       <div style="margin-top:16px"><button class="wide" id="claimHome">Về trang chính</button></div>`;
     // Gắn bằng thuộc tính DOM chứ không viết onclick="" vào HTML: CSP đặt
     // script-src 'self' để chặn mọi handler nội tuyến — đó là lớp phòng thủ
-    // thứ hai cho đúng loại lỗi XSS đã từng có ở Kho.
+    // thứ hai cho đúng loại lỗi XSS đã từng có ở Tư liệu.
     $('#claimHome').onclick = () => { location.href = '/'; };
     return;
   }
@@ -648,6 +660,39 @@ function renderNoSession() {
 /* ═══════════ KHUNG ỨNG DỤNG ═══════════ */
 const VIEWS = ['nay', 'bai', 'nhom', 'kho', 'quy'];
 
+/* Icon thanh điều hướng. Bản trước vẽ bằng CSS — mỗi tab là một khối bo góc
+   khác nhau, nên năm tab trông gần như y hệt và không gợi ra thứ gì. Nay vẽ
+   bằng SVG nét, mỗi hình nói đúng việc của tab đó.
+
+   Dùng currentColor để tự đổi màu theo trạng thái chọn, stroke-width 1.6 khớp
+   với độ dày cũ, và vẽ trên khung 20×20 cho nét rơi đúng nửa pixel. Nhúng
+   thẳng vào chuỗi HTML chứ không tải tệp ngoài: mục 8 SRS cấm build step, mà
+   thêm một lượt tải chỉ để lấy năm hình nhỏ cũng không đáng. */
+const svg = (d, them = '') => `<svg class="g" viewBox="0 0 20 20" fill="none" aria-hidden="true"
+  stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${d}${them}</svg>`;
+
+const ICON = {
+  // Hôm nay: tờ lịch, có dấu ngày đang tới.
+  nay: svg(`<rect x="2.8" y="4.2" width="14.4" height="13" rx="2.4"/>
+            <path d="M2.8 8.2h14.4M6.6 2.8v2.8M13.4 2.8v2.8"/>
+            <circle cx="10" cy="12.4" r="1.5" fill="currentColor" stroke="none"/>`),
+  // Bài: trang giấy có dòng chữ — bản kế hoạch kinh doanh tám phần.
+  bai: svg(`<path d="M4.6 2.8h6.6l4.2 4.2v10.2a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8V4.6a1.8 1.8 0 0 1 1.8-1.8Z"/>
+            <path d="M11 2.9V7.2h4.3M6.4 11h7.2M6.4 14.2h4.8"/>`),
+  // Nhóm: hai người.
+  nhom: svg(`<circle cx="8" cy="7.2" r="2.9"/>
+             <path d="M2.9 16.8a5.1 5.1 0 0 1 10.2 0"/>
+             <path d="M13.6 4.7a2.9 2.9 0 0 1 0 5.5M14.6 16.8a5 5 0 0 0-1.4-3.5"/>`),
+  // Tư liệu: tập tài liệu xếp chồng — ứng dụng chỉ giữ đường dẫn, không giữ file.
+  kho: svg(`<path d="M6.2 2.8h6l3.6 3.6v8.4a1.8 1.8 0 0 1-1.8 1.8H6.2a1.8 1.8 0 0 1-1.8-1.8V4.6a1.8 1.8 0 0 1 1.8-1.8Z"/>
+            <path d="M11.9 2.9v3.7h3.7"/>
+            <path d="M2.6 6.6v9.6a2.4 2.4 0 0 0 2.4 2.4h7.6"/>`),
+  // Quỹ: tờ tiền.
+  quy: svg(`<rect x="2.4" y="5.2" width="15.2" height="9.6" rx="2"/>
+            <circle cx="10" cy="10" r="2.4"/>
+            <path d="M5.4 8.2v3.6M14.6 8.2v3.6"/>`),
+};
+
 function shellHtml() {
   return `
   <header><div class="wrap">
@@ -667,11 +712,11 @@ function shellHtml() {
     <section class="view" id="v-quy"></section>
   </main>
   <nav><div class="navin">
-    <button class="nb" data-v="nay"><span class="g"></span>Hôm nay</button>
-    <button class="nb" data-v="bai"><span class="g"></span>Bài</button>
-    <button class="nb" data-v="nhom"><span class="g"></span>Nhóm</button>
-    <button class="nb" data-v="kho"><span class="g"></span>Kho</button>
-    <button class="nb" data-v="quy"><span class="g"></span>Quỹ</button>
+    <button class="nb" data-v="nay">${ICON.nay}Hôm nay</button>
+    <button class="nb" data-v="bai">${ICON.bai}Bài</button>
+    <button class="nb" data-v="nhom">${ICON.nhom}Nhóm</button>
+    <button class="nb" data-v="kho">${ICON.kho}Tư liệu</button>
+    <button class="nb" data-v="quy">${ICON.quy}Quỹ</button>
   </div></nav>`;
 }
 
@@ -1182,7 +1227,7 @@ async function openOfficerEdit(role, label) {
   }, 'Đã cập nhật cơ cấu');
 }
 
-/* ─── Kho ─── */
+/* ─── Tư liệu (mã trong nguồn vẫn là 'kho' — đổi id sẽ vỡ đường dẫn và API) ─── */
 const KHO_FILTERS = [['all', 'Tất cả'], ['bai', 'Cho bài'], ['buoi', 'Theo buổi'], ['lop', 'Lớp K03']];
 async function drawKho(tag) {
   if (!$('#v-kho').dataset.loaded) $('#v-kho').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
@@ -1190,7 +1235,7 @@ async function drawKho(tag) {
   $('#v-kho').dataset.loaded = '1';
   $('#v-kho').innerHTML = `
   <div class="foot" style="padding:0 2px 14px">
-    Kho chỉ giữ đường dẫn. File vẫn nằm ở Drive của người làm ra nó — ứng dụng không chứa,
+    Tư liệu chỉ giữ đường dẫn. File vẫn nằm ở Drive của người làm ra nó — ứng dụng không chứa,
     không sao lưu, không đứng tên.
   </div>
   <div class="fl">${KHO_FILTERS.map(([k, l]) => `<button class="fc ${tag === k ? 'on' : ''}" data-tag="${k}">${l}</button>`).join('')}</div>
@@ -1230,7 +1275,7 @@ function openLinkAdd() {
         url: $('#lU').value.trim(), title: $('#lN').value, kind: $('#lK').value, tag: $('#lT').value,
       });
       await drawKho('all'); await refreshHome();
-    }, 'Đã gắn vào Kho');
+    }, 'Đã gắn vào Tư liệu');
   };
 }
 
@@ -1285,6 +1330,9 @@ async function drawQuy() {
   document.querySelectorAll('#v-quy [data-openround]').forEach(b => {
     b.onclick = () => confirmOpenRound(Number(b.dataset.openround));
   });
+  document.querySelectorAll('#v-quy [data-cuphap]').forEach(b => {
+    b.onclick = () => suaCuPhap(Number(b.dataset.cuphap));
+  });
   document.querySelectorAll('#v-quy [data-soquy]').forEach(b => {
     b.onclick = () => openSoChi(b.dataset.soquy);
   });
@@ -1313,6 +1361,58 @@ function renderSoQuy(s, scope, canChi) {
   </div>`;
 }
 
+// Ai sửa được cú pháp của một đợt: đúng những người tạo được đợt cùng cấp ấy.
+// Máy chủ kiểm lại y hệt bằng canCreate, đây chỉ là để khỏi bày nút vô ích.
+function suaDuocDot(r) {
+  return r.scope === 'class' ? !!FUNDS?.can_create_class : !!FUNDS?.can_create_group;
+}
+
+function suaCuPhap(id) {
+  const r = FUNDS.rounds.find(x => x.id === id);
+  openSheet(`
+   <h3>Cú pháp chuyển khoản</h3>
+   <p class="sub">Quyết định dòng nội dung mà cả ${r.scope === 'class' ? 'lớp' : 'nhóm'} sẽ gõ khi chuyển tiền,
+     và là thứ người thu đọc trên sao kê để biết ai đã chuyển.</p>
+   <label class="f">Cú pháp</label>
+   <input id="cpO" maxlength="60" value="${esc(r.syntax_template)}" spellcheck="false">
+   <div class="hintline"><b>{TEN}</b> thay bằng họ tên người chuyển, <b>{NHOM}</b> thay bằng số nhóm.
+     Chữ khác gõ thẳng vào. Ví dụ <span class="ma">{TEN} Nhom {NHOM} Quylop</span>.</div>
+   <div class="card" style="margin-top:8px"><div class="cb" style="padding:11px 14px">
+     <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)">Bạn sẽ thấy</div>
+     <div id="cpXem" class="num" style="font-size:15px;font-weight:600;margin-top:4px;word-break:break-word"></div>
+     <div id="cpDai" class="foot" style="padding:6px 0 0"></div>
+   </div></div>
+   ${r.status === 'open' ? `<div class="warn" style="margin-top:12px">Đợt này đã mở. Đổi cú pháp thì mã QR của
+     người CHƯA chuyển sẽ đổi theo, còn ai đã chuyển rồi vẫn giữ nội dung cũ trên sao kê — người thu nhớ để ý
+     cả hai kiểu.</div>` : ''}
+   <div id="cpErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="cpThoi">Thôi</button>
+     <button class="big go" id="cpLuu">Lưu</button></div>`);
+
+  const ve = () => {
+    const ra = dungNoiDung($('#cpO').value, HOME?.me?.full_name ?? '', HOME?.group?.no ?? '');
+    $('#cpXem').textContent = ra || '(trống)';
+    $('#cpDai').textContent = ra.length > 40
+      ? `${ra.length} ký tự — hơi dài, vài ngân hàng sẽ cắt bớt. Nên rút gọn.`
+      : `${ra.length} ký tự.`;
+    $('#cpDai').style.color = ra.length > 40 ? 'var(--due)' : '';
+  };
+  $('#cpO').oninput = ve;
+  ve();
+
+  $('#cpThoi').onclick = closeSheet;
+  $('#cpLuu').onclick = () => {
+    if (!$('#cpO').value.includes('{TEN}')) {
+      $('#cpErr').textContent = 'Cú pháp phải có {TEN}, không thì cả nhóm chuyển khoản giống hệt nhau và người thu không biết ai là ai.';
+      $('#cpErr').style.display = 'block'; return;
+    }
+    submitting($('#cpLuu'), async () => {
+      await apiPatch(`/api/funds/${id}`, { syntax_template: $('#cpO').value });
+      await drawQuy();
+    }, 'Đã đổi cú pháp');
+  };
+}
+
 function renderRound(r) {
   const dots = Array.from({ length: r.total_people }, (_, i) =>
     `<i class="${i < r.declared_count ? 'd' : ''}"${i < r.verified_count ? ' data-v="1"' : ''}></i>`).join('');
@@ -1332,7 +1432,9 @@ function renderRound(r) {
 
     ${r.status === 'draft' ? `<div class="cb" style="border-top:1px solid var(--line)">
         <div class="mut" style="margin-bottom:10px">Bản nháp — chưa ai trong nhóm thấy đợt này.</div>
+        <div class="fi"><div class="k">Nội dung chuyển khoản của bạn</div><div class="v num">${esc(r.transfer_note)}</div></div>
         <button class="wide" data-openround="${r.id}">Mở đợt thu</button>
+        ${suaDuocDot(r) ? `<button class="wide ghost" data-cuphap="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa cú pháp chuyển khoản</button>` : ''}
       </div>` : `
       <div class="qrw">
         <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
@@ -1353,6 +1455,7 @@ function renderRound(r) {
           <b class="num" style="color:var(--ink)">${r.declared_count}/${r.total_people}</b> người đã tự khai${r.verified_count ? `, người thu đã nhận <b class="num" style="color:var(--go)">${r.verified_count}</b>` : ''}.
           Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.</div>
         ${r.can_see_ledger ? `<button class="wide ghost" data-ledger="${r.id}" style="margin-top:12px;padding:11px;font-size:14px">Mở sổ ${r.i_am_collector ? 'của người thu' : 'theo dõi'}</button>` : ''}
+        ${suaDuocDot(r) ? `<button class="wide ghost" data-cuphap="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa cú pháp chuyển khoản</button>` : ''}
       </div>`}
   </div>`;
 }
@@ -1410,9 +1513,32 @@ function openFundCreate() {
    <select id="fC"><option value="">— chưa chọn —</option>
      ${(members ?? []).map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('')}</select>
    <label class="f">Ngày đóng</label><input id="fClose" type="date">
+   <label class="f">Cú pháp nội dung chuyển khoản</label>
+   <input id="fCP" maxlength="60" value="{TEN} N{NHOM}" spellcheck="false">
+   <div class="hintline"><b>{TEN}</b> thay bằng họ tên người chuyển, <b>{NHOM}</b> thay bằng số nhóm.
+     Chữ khác gõ thẳng vào. Ví dụ <span class="ma">{TEN} Nhom {NHOM} Quylop</span>.</div>
+   <div class="card" style="margin-top:8px"><div class="cb" style="padding:11px 14px">
+     <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)">Bạn sẽ thấy</div>
+     <div id="fCPXem" class="num" style="font-size:15px;font-weight:600;margin-top:4px;word-break:break-word"></div>
+     <div id="fCPDai" class="foot" style="padding:6px 0 0"></div>
+   </div></div>
    <div id="fErr" class="errline" style="display:none"></div>
    <div class="sa"><button class="big c" id="fCancel">Thôi</button>
      <button class="big go" id="fSave">Tạo bản nháp</button></div>`);
+
+  // Xem trước dựng bằng chính tên người đang đăng nhập, nên nhìn là biết ngay
+  // cú pháp ra cái gì trên sao kê — không phải tưởng tượng.
+  const veXemTruoc = () => {
+    const ra = dungNoiDung($('#fCP').value, HOME?.me?.full_name ?? 'NGUYEN VAN A', HOME?.group?.no ?? 6);
+    $('#fCPXem').textContent = ra || '(trống)';
+    // Nhiều ngân hàng cắt nội dung chuyển khoản khá sớm. Không chặn, chỉ nhắc.
+    $('#fCPDai').textContent = ra.length > 40
+      ? `${ra.length} ký tự — hơi dài, vài ngân hàng sẽ cắt bớt. Nên rút gọn.`
+      : `${ra.length} ký tự.`;
+    $('#fCPDai').style.color = ra.length > 40 ? 'var(--due)' : '';
+  };
+  $('#fCP').oninput = veXemTruoc;
+  veXemTruoc();
 
   $('#fB').onchange = () => { $('#fBinWrap').style.display = $('#fB').value === '__other' ? 'block' : 'none'; };
   // Đổi phạm vi thì đổi luôn danh sách người thu: đợt nhóm chỉ chọn được người
@@ -1424,6 +1550,10 @@ function openFundCreate() {
     if (!/^\d{6}$/.test(bin)) {
       $('#fErr').textContent = 'Mã ngân hàng phải đúng 6 chữ số.'; $('#fErr').style.display = 'block'; return;
     }
+    if (!$('#fCP').value.includes('{TEN}')) {
+      $('#fErr').textContent = 'Cú pháp phải có {TEN}, không thì cả nhóm chuyển khoản giống hệt nhau và người thu không biết ai là ai.';
+      $('#fErr').style.display = 'block'; return;
+    }
     await submitting($('#fSave'), async () => {
       await apiPost('/api/funds', {
         scope: $('#fS') ? $('#fS').value : 'group',
@@ -1432,6 +1562,7 @@ function openFundCreate() {
         bank_bin: bin, account_no: $('#fAcc').value.trim(), account_name: $('#fAccName').value,
         collector_member_id: $('#fC').value === '' ? null : Number($('#fC').value),
         closes_on: $('#fClose').value || null,
+        syntax_template: $('#fCP').value,
       });
       await drawQuy();
     }, 'Đã tạo bản nháp — xem lại rồi mở');
