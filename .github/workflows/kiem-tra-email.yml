@@ -1,0 +1,131 @@
+name: Đổi email và thử đăng nhập bằng email
+
+# Hai việc trong một lượt: đổi email của một người trong bảng members, rồi thử
+# đúng luồng "đăng nhập lại bằng email" trên tên miền thật.
+#
+# Vì sao phải bắt log Worker: handler gửi thư bằng ctx.waitUntil, tức là TRẢ
+# LỜI TRƯỚC rồi mới bắt tay SMTP. HTTP 200 chỉ chứng minh có đủ bí mật SMTP,
+# KHÔNG chứng minh thư đi được. Chỗ duy nhất lộ ra sự thật là dòng
+# console.error trong Worker — nên vừa gọi vừa mở `wrangler tail`.
+on:
+  workflow_dispatch:
+    inputs:
+      ho_ten:
+        description: 'Họ tên đúng như trong bảng members'
+        type: string
+        default: 'Ngô Phú Cường'
+      email_moi:
+        description: 'Email mới (để trống thì chỉ thử, không đổi)'
+        type: string
+        default: ''
+  push:
+    paths: ['.github/kiem-tra-email.trigger']
+
+concurrency:
+  group: kiem-tra-email
+  cancel-in-progress: false
+
+jobs:
+  thu:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
+      HO_TEN: ${{ inputs.ho_ten || 'Ngô Phú Cường' }}
+      EMAIL_MOI: ${{ inputs.email_moi || 'ngophucuong@gmail.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      - name: Chuẩn bị bộ đọc kết quả
+        run: |
+          cat > /tmp/doc-so.cjs <<'EOF'
+          const raw = require("fs").readFileSync(process.argv[2], "utf8");
+          const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
+          if (d < 0 || c < d) { console.error("Không tìm thấy JSON:\n" + raw.slice(0, 1000)); process.exit(1); }
+          const kq = JSON.parse(raw.slice(d, c + 1));
+          const dong = (Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || []);
+          process.stdout.write(String(dong.length ? dong[0][process.argv[3]] : ""));
+          EOF
+
+      # Bảng members có UNIQUE(cohort_id, email) — đổi trúng email người khác
+      # là lỗi ràng buộc, mà tệ hơn: email là lối đăng nhập nên trùng email là
+      # trùng luôn lối vào. Kiểm trước cho ra lỗi dễ hiểu.
+      - name: Kiểm email mới chưa ai dùng
+        run: |
+          ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
+          em=$(printf '%s' "$EMAIL_MOI" | sed "s/'/''/g")
+          $WRANGLER --json --command "SELECT COUNT(*) AS n FROM members
+            WHERE email = '$em' AND full_name <> '$ten';" > /tmp/tr.json
+          n=$(node /tmp/doc-so.cjs /tmp/tr.json n)
+          if [ "$n" != "0" ]; then
+            echo "::error::Email $EMAIL_MOI đã thuộc về $n người khác trong lớp."; exit 1
+          fi
+          echo "✓ email chưa ai dùng"
+
+      - name: Đổi email rồi đọc lại
+        run: |
+          ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
+          em=$(printf '%s' "$EMAIL_MOI" | sed "s/'/''/g")
+          $WRANGLER --command "UPDATE members SET email = '$em', updated_at = datetime('now')
+            WHERE full_name = '$ten';" >/dev/null
+          $WRANGLER --json --command "SELECT email FROM members
+            WHERE full_name = '$ten' AND is_active = 1;" > /tmp/em.json
+          thuc=$(node /tmp/doc-so.cjs /tmp/em.json email)
+          if [ "$thuc" != "$EMAIL_MOI" ]; then
+            echo "::error::Đọc lại ra '$thuc' chứ không phải '$EMAIL_MOI'."; exit 1
+          fi
+          echo "✓ email của $HO_TEN nay là $thuc"
+
+      # Mở tail TRƯỚC khi gọi, vì thư gửi sau khi đã trả lời. Cả ba việc phải
+      # nằm trong CÙNG một bước, không thì tiến trình nền chết theo bước trước.
+      - name: Gọi thật rồi soi log Worker
+        run: |
+          npx wrangler tail --config worker/wrangler.toml --format json > /tmp/tail.log 2>&1 &
+          TAIL_PID=$!
+          echo "chờ tail kết nối…"; sleep 10
+
+          echo "--- POST /api/auth/email ---"
+          ma=$(curl -s -o /tmp/tra.json -w '%{http_code}' -X POST \
+                 -H 'Content-Type: application/json' \
+                 -d "{\"email\":\"$EMAIL_MOI\"}" \
+                 https://k3vaceo.cuongngo.app/api/auth/email)
+          echo "HTTP $ma — $(cat /tmp/tra.json)"
+
+          echo "chờ Worker bắt tay SMTP xong (ctx.waitUntil chạy sau khi trả lời)…"
+          sleep 30
+          kill $TAIL_PID 2>/dev/null || true
+          sleep 2
+
+          # KHÔNG in nguyên log: nếu lúc này có người khác đang bấm magic link
+          # thì URL chứa token sẽ lọt vào đây. Chỉ lấy đúng dòng cần, và che
+          # mọi token dạng /dangnhap/... hoặc /i/... cho chắc.
+          che() { sed -E 's#(dangnhap/|/i/)[A-Za-z0-9_-]{8,}#\1<token đã che>#g'; }
+
+          echo "--- lỗi gửi thư (nếu có) ---"
+          loi=$(grep -o 'Gửi thư đăng nhập thất bại[^"]*' /tmp/tail.log | che | head -5)
+          echo "${loi:-(không thấy dòng nào)}"
+
+          echo "--- ngoại lệ Worker (nếu có) ---"
+          grep -o '"exceptions":\[[^]]*\]' /tmp/tail.log | grep -v '"exceptions":\[\]' | che | head -5 \
+            || echo "(không có)"
+
+          echo
+          if [ "$ma" = "503" ]; then
+            echo "::error::Worker trả 503 mailer_not_configured — thiếu ít nhất một trong bốn bí mật SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_FROM."
+            exit 1
+          fi
+          if [ "$ma" != "200" ]; then
+            echo "::error::Không gọi được /api/auth/email (HTTP $ma)."; exit 1
+          fi
+          if [ -n "$loi" ]; then
+            echo "::error::Đủ bí mật SMTP nhưng gửi thư THẤT BẠI — xem dòng lỗi ở trên."; exit 1
+          fi
+          echo "✓ Đủ bí mật SMTP và không thấy lỗi gửi. Kiểm tra hộp thư $EMAIL_MOI"
+          echo "  (cả mục Spam). Thư tên 'Đường dẫn đăng nhập k3vaceo', bên trong là"
+          echo "  MỘT ĐƯỜNG LINK sống 15 phút — sản phẩm không dùng mã OTP."

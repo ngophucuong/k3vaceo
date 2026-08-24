@@ -5,7 +5,7 @@ name: Deploy lên Cloudflare
 on:
   push:
     branches: [claude/read-content-deployment-plan-dpsv8m]
-    paths-ignore: ['**.md', '.github/nap-du-lieu.trigger', '.github/phat-link-moi.trigger']
+    paths-ignore: ['**.md', '.github/nap-du-lieu.trigger', '.github/phat-link-moi.trigger', '.github/kiem-tra-email.trigger']
   workflow_dispatch:
 
 concurrency:
