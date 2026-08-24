@@ -24,8 +24,19 @@ import { mailerConfigured, sendMail } from '../mailer.js';
 import { clientIp, allow } from '../lib/ratelimit.js';
 
 const CHECK_PER_HOUR = 20;   // đối chiếu số điện thoại
-const OTP_PER_HOUR = 5;      // xin mã — mỗi lần là một lá thư gửi đi
 const VERIFY_PER_HOUR = 20;  // nhập mã
+
+// Xin mã: hai lần khoá, cố ý khác nhau về chất.
+//
+// Điều thật sự cần chặn là dội thư vào MỘT hộp thư, nên khoá chặt theo email —
+// 5 lần/giờ cho một địa chỉ là quá đủ cho người dùng thật.
+//
+// Khoá theo IP thì phải lỏng. Bản trước để 5 lần/giờ chung cho cả IP, và đó là
+// lỗi thiết kế với lớp 134 người: cả một công ty ngồi sau một địa chỉ IP, năm
+// người xin mã xong là người thứ sáu bị khoá oan suốt một giờ mà không hiểu vì
+// sao. Giữ mức IP đủ cao để chỉ chặn máy quét, không chặn người.
+const OTP_PER_HOUR = 40;         // theo IP — chỉ để chặn máy quét
+const OTP_PER_EMAIL_HOUR = 5;    // theo email — chặn dội thư, đây mới là cửa thật
 
 /* ══ Bước 2: đối chiếu số điện thoại ══════════════════════════════════════
    Chỉ để giao diện báo sớm cho người dùng. KHÔNG phải cửa an ninh — cửa thật
@@ -69,6 +80,12 @@ export async function postOnboardStart(request, env, ctx) {
   const email = normalizeEmail(body.email);
   if (!email || !isValidEmail(email)) return error('email_invalid', 422);
 
+  // Khoá theo email — cửa thật chặn dội thư. Đặt sau khi đã đối chiếu số điện
+  // thoại nên không dùng để dò được gì.
+  if (!(await allow(env, 'otp_email', email, OTP_PER_EMAIL_HOUR))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+
   // Email là lối đăng nhập, nên trùng email là trùng luôn lối vào.
   const taken = await env.DB.prepare(
     'SELECT full_name FROM members WHERE cohort_id = ? AND email = ? AND roster_id IS NOT ?'
@@ -109,7 +126,11 @@ export async function postOtpRequest(request, env, ctx) {
   const email = normalizeEmail(body.email);
   if (!email || !isValidEmail(email)) return error('email_invalid', 422);
 
-  if (!(await allow(env, 'otp_request', clientIp(request), OTP_PER_HOUR))) {
+  // Khoá theo email đặt TRƯỚC khi tra cơ sở dữ liệu, và áp cho mọi email dù có
+  // thật hay không — nếu chỉ áp cho email có thật thì chính cái khoá ấy lộ ra
+  // địa chỉ nào đã đăng ký.
+  if (!(await allow(env, 'otp_email', email, OTP_PER_EMAIL_HOUR)) ||
+      !(await allow(env, 'otp_request', clientIp(request), OTP_PER_HOUR))) {
     return error('rate_limited', 429, { retry_after_minutes: 60 });
   }
 

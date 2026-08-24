@@ -1,0 +1,77 @@
+name: Soi dữ liệu thật (chỉ đọc)
+
+# Không ghi gì, không gửi thư. Chỉ đọc D1 thật để trả lời câu hỏi hay gặp
+# nhất: "tôi bấm xin mã mà không thấy thư — hệ thống có gửi không?"
+#
+# Ba khả năng, và ba dòng dưới đây phân biệt được:
+#   · có dòng trong otp_codes  → Worker CÓ sinh mã và có gọi gửi thư
+#   · không có dòng nào        → chưa tới bước khai email, hoặc bị khoá tần suất
+#   · rate_events dày đặc      → chạm trần, phải chờ hết giờ
+on:
+  push:
+    paths: ['.github/soi-du-lieu.trigger']
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Email cần soi'
+        type: string
+        default: 'ngophucuong@gmail.com'
+
+concurrency:
+  group: soi-du-lieu
+  cancel-in-progress: false
+
+jobs:
+  soi:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
+      EMAIL: ${{ inputs.email || 'ngophucuong@gmail.com' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      - name: Đọc
+        run: |
+          em=$(printf '%s' "$EMAIL" | sed "s/'/''/g")
+
+          echo "════ Hồ sơ của $EMAIL ════"
+          $WRANGLER --command \
+            "SELECT m.id, m.full_name, g.label AS nhom, m.is_active,
+                    COALESCE(m.claimed_at,'(chưa nhận chỗ)') AS nhan_cho,
+                    COALESCE(m.email_verified_at,'(chưa xác minh email)') AS xac_minh
+               FROM members m LEFT JOIN groups g ON g.id = m.group_id
+              WHERE m.email = '$em'" 2>&1 | tail -20
+
+          echo
+          echo "════ Mã đã sinh trong 3 giờ qua ════"
+          echo "Mỗi dòng ở đây = một lần Worker THẬT SỰ gọi gửi thư."
+          $WRANGLER --command \
+            "SELECT o.created_at AS luc_sinh, o.expires_at AS het_han,
+                    o.attempts AS so_lan_nhap_sai,
+                    COALESCE(o.used_at,'(chưa dùng)') AS da_dung
+               FROM otp_codes o JOIN members m ON m.id = o.member_id
+              WHERE m.email = '$em' AND o.created_at > datetime('now','-3 hours')
+              ORDER BY o.id DESC LIMIT 10" 2>&1 | tail -25
+
+          echo
+          echo "════ Đã chạm trần tần suất chưa (1 giờ gần nhất) ════"
+          echo "otp_email theo địa chỉ thư: trần 5. otp_request theo IP: trần 40."
+          $WRANGLER --command \
+            "SELECT bucket AS o_khoa, ip AS khoa_theo, COUNT(*) AS so_lan,
+                    MAX(created_at) AS gan_nhat
+               FROM rate_events
+              WHERE created_at > datetime('now','-1 hour')
+              GROUP BY bucket, ip ORDER BY so_lan DESC LIMIT 15" 2>&1 | tail -25
+
+          echo
+          echo "Cách đọc:"
+          echo "  · Có dòng trong bảng giữa  → thư ĐÃ được gửi đi, lỗi nằm ở khâu nhận."
+          echo "  · Bảng giữa trống          → chưa tới bước khai email, hoặc bị khoá."
+          echo "  · otp_email đạt 5          → chạm trần, chờ hết giờ hoặc dùng link mời."

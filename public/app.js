@@ -42,7 +42,7 @@ const ERR_TEXT = {
   forbidden_assign: 'Chỉ trưởng hoặc phó nhóm mới giao được phần bài.',
   last_officer: 'Không bỏ trống được: nhóm phải còn ít nhất một trưởng hoặc phó.',
   url_must_be_https: 'Đường dẫn phải bắt đầu bằng https://',
-  rate_limited: 'Bạn thử hơi nhiều lần. Chờ một lát rồi làm lại.',
+  rate_limited: 'Bạn xin mã hơi nhiều lần rồi. Chờ khoảng một tiếng rồi thử lại — hoặc xin trưởng nhóm một link mời để vào ngay.',
   mailer_not_configured: 'Chưa cấu hình gửi thư — nhắn trưởng nhóm để lấy link mời.',
   only_collector: 'Chỉ người thu của đợt này mới xác nhận đã nhận tiền.',
   already_verified: 'Người thu đã xác nhận nhận được tiền của bạn — không bỏ khai được nữa.',
