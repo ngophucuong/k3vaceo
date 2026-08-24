@@ -6,4 +6,4 @@ Mỗi lần chạy tự huỷ link cũ chưa dùng của đúng người đó, n
 chạy trước chết ngay. Chỉ dùng cho lần đầu hoặc khi kẹt ngoài ứng dụng —
 vào được rồi thì phát link cho người khác bằng nút trong ứng dụng.
 
-lần: 1
+lần: 2
