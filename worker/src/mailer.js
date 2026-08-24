@@ -94,6 +94,44 @@ export function encodeFrom(v) {
   return /^[\x20-\x7E]*$/.test(ten) ? `${ten} <${dc}>` : `=?UTF-8?B?${b64(ten)}?= <${dc}>`;
 }
 
+// Mã hoá quoted-printable (RFC 2045 mục 6.7). Trước đây dùng base64 cho thân
+// thư — hợp lệ, nhưng thư chỉ có văn bản thuần mà mã hoá base64 là chuyện người
+// gửi tử tế gần như không bao giờ làm, nên bộ lọc coi đó là dấu hiệu spam. Đo
+// được ngày 24/8: cùng tài khoản Hostinger, thư văn bản thuần gửi từ máy chủ
+// GitHub thì tới hộp thư, thư base64 gửi từ Worker thì biến mất không dấu vết.
+// Quoted-printable giữ được dấu tiếng Việt mà thư vẫn đọc được bằng mắt.
+function quotedPrintable(text) {
+  const byte = new TextEncoder().encode(text);
+  const ra = [];
+  let dong = '';
+
+  const xuong = (mem) => { ra.push(mem ? dong + '=' : dong); dong = ''; };
+
+  for (let i = 0; i < byte.length; i++) {
+    const b = byte[i];
+
+    // Xuống dòng thật giữ nguyên. \r\n trong nguồn tính là một lần.
+    if (b === 0x0A) { xuong(false); continue; }
+    if (b === 0x0D) { if (byte[i + 1] === 0x0A) i++; xuong(false); continue; }
+
+    // Ký tự in được ASCII đi thẳng, trừ dấu '=' phải tự mã hoá.
+    // Ngoài ra khoảng trắng và tab không được đứng cuối dòng.
+    const cuoiDong = i + 1 >= byte.length || byte[i + 1] === 0x0D || byte[i + 1] === 0x0A;
+    const laTrang = b === 0x20 || b === 0x09;
+    const thang = b >= 33 && b <= 126 && b !== 0x3D;
+
+    const manh = (thang || (laTrang && !cuoiDong))
+      ? String.fromCharCode(b)
+      : '=' + b.toString(16).toUpperCase().padStart(2, '0');
+
+    // Dòng tối đa 76 ký tự KỂ CẢ dấu '=' báo ngắt mềm ở cuối.
+    if (dong.length + manh.length > 75) xuong(true);
+    dong += manh;
+  }
+  ra.push(dong);
+  return ra.join('\r\n');
+}
+
 function addressOnly(v) {
   const m = String(v).match(/<([^>]+)>/);
   return m ? m[1] : String(v).trim();
@@ -118,16 +156,11 @@ function buildMessage({ from, to, subject, text }) {
     `Subject: ${encodedSubject}`,
     `Date: ${new Date().toUTCString()}`,
     `Message-ID: ${messageId}`,
-    // Thư máy sinh. Nói thẳng ra để bộ lọc khỏi đoán, và để hệ thống trả lời
-    // tự động (nghỉ phép, out-of-office) không dội thư lại vào hộp người gửi.
-    'Auto-Submitted: auto-generated',
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: base64',
+    'Content-Transfer-Encoding: quoted-printable',
   ];
-  // Base64 cho thân thư để khỏi lo dòng dài và ký tự có dấu.
-  const encodedBody = b64(text).replace(/(.{76})/g, '$1\r\n');
-  return headers.join('\r\n') + '\r\n\r\n' + dotStuff(encodedBody);
+  return headers.join('\r\n') + '\r\n\r\n' + dotStuff(quotedPrintable(text));
 }
 
 export async function sendMail(env, { to, subject, text }) {
@@ -148,7 +181,12 @@ export async function sendMail(env, { to, subject, text }) {
   try {
     await expect(reader, [220], 'chào hỏi');
 
-    await send(writer, 'EHLO k3vaceo');
+    // EHLO phải là tên miền đầy đủ. Bản cũ gửi 'k3vaceo' — không có dấu chấm,
+    // không phải tên miền nào cả. Máy chủ nhận vẫn cho qua nhưng ghi lại trong
+    // header Received, và bộ lọc phía sau trừ điểm nặng chỗ ấy. Lấy miền của
+    // chính địa chỉ gửi để khớp với SPF/DKIM.
+    const tenMay = addressOnly(from).split('@')[1] || 'k3vaceo.cuongngo.app';
+    await send(writer, `EHLO ${tenMay}`);
     await expect(reader, [250], 'EHLO');
 
     if (mode === 'starttls') {
@@ -161,7 +199,7 @@ export async function sendMail(env, { to, subject, text }) {
       socket = socket.startTls();
       writer = socket.writable.getWriter();
       reader = socket.readable.getReader();
-      await send(writer, 'EHLO k3vaceo');
+      await send(writer, `EHLO ${tenMay}`);
       await expect(reader, [250], 'EHLO sau STARTTLS');
     }
 
