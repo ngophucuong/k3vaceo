@@ -182,36 +182,65 @@ không phải ĐÚNG HẾT.
     Console của D1, hoặc chạy `node scripts/build-setup-sql.mjs` để sinh lại
     `scripts/setup-d1.sql` (tệp gộp cả sáu migration, có sẵn phần ghi vào
     `d1_migrations` để wrangler sau này không áp đè).
-- **SMTP ĐÃ GỬI ĐƯỢC — đo thật ngày 24/8.** Nhà cung cấp: Hostinger,
-  `smtp.hostinger.com:465`, tài khoản `info@cuongngo.cloud`. Tên miền
-  `cuongngo.cloud` đã có đủ SPF / DKIM (3 CNAME) / DMARC `p=none` / MX Hostinger.
-  - Lượt 1: **503 `mailer_not_configured`** — Worker chỉ có `SMTP_HOST`.
-  - Lượt 3 (ngay sau khi đồng bộ bí mật): HTTP 200 nhưng log Worker vẫn có
-    `Gửi thư đăng nhập thất bại`.
-  - Lượt 4, **cùng cấu hình, không sửa gì**: HTTP 200 và log sạch. Vì `sendMail`
-    có `expect(reader, [250], 'kết thúc thư')` sau DATA, log sạch nghĩa là máy
-    chủ đã **nhận thư**, không phải chỉ "không thấy lỗi". Đây là lần đầu tiên
-    client SMTP bắt tay TLS thành công với máy chủ thật.
-  - Chênh lệch lượt 3 / lượt 4 chưa giải thích chắc chắn. Giả thuyết hợp lý
-    nhất: `wrangler secret put` tạo bản triển khai mới, lượt 3 gọi trúng lúc
-    bí mật vừa ghi xong chưa lan hết. Nếu về sau gặp lại thì nghi chỗ này
-    trước, và chờ lâu hơn 5 giây sau khi đồng bộ.
+- **GỬI THƯ: SMTP TỪ WORKER LÀ NGÕ CỤT. Đường sống là Resend (HTTP).**
+  Đo thật trên tên miền thật ngày 24/8, lượt 20 của `kiem-tra-email.yml`:
+
+  ```
+  Resend: HTTP 403 "The cuongngo.cloud domain is not verified"
+  | SMTP:  mở kết nối tới <host>:<port> (tls)
+  ```
+
+  Vế SMTP là bằng chứng dứt điểm: `socket.opened` KHÔNG bao giờ giải quyết,
+  tức Worker **không mở nổi kết nối TLS tới smtp.hostinger.com:465**. Không
+  phải sai mật khẩu, không phải máy chủ từ chối thư — kết nối chưa từng dựng
+  được. Đổi sang máy chủ SMTP khác (Gmail chẳng hạn) rất có thể vấp y hệt, và
+  phải trả giá bằng một mật khẩu ứng dụng nằm trong bí mật của Worker.
+
+  Ba niềm tin sai đã bị bác bỏ trong ngày, ghi lại để đừng tin lại:
+  1. *"Log sạch nghĩa là gửi được."* Sai — `wrangler tail` im lặng suốt ngày,
+     nhiều khả năng API token thiếu quyền Workers Tail. Đọc một cái đồng hồ
+     chết. Mọi kết luận dựa trên nó đều vô giá trị, kể cả câu "lượt 4 đã bắt
+     tay TLS thành công" từng ghi ở đây.
+  2. *"`ctx.waitUntil` bị cắt giữa chừng là gốc rễ."* Đã bỏ waitUntil, chờ gửi
+     xong mới trả lời — vẫn hỏng. Không phải gốc.
+  3. *"Thư sai khuôn nên Gmail vứt."* Message-ID, quoted-printable, EHLO đúng
+     tên miền — sửa cả ba, vẫn hỏng, vì thư chưa bao giờ rời khỏi Worker.
+
+  Cách bắt lỗi nói thật, đừng gỡ đi:
+  - `connect()` của Workers TRẢ VỀ NGAY, kết nối dựng sau. **Phải `await
+    socket.opened`**, không thì lỗi mạng nổi lên ở lần `read()` đầu dưới dạng
+    `"Stream was cancelled."` — một câu không cho biết gì. Mất một lượt chạy
+    thật vì câu ấy.
+  - Lỗi gửi thư mang theo `.buoc`, và ba chỗ trả 502 kèm `hong_o_buoc`. Đây là
+    đường duy nhất đọc được sự thật khi log Worker câm.
+  - `sendMail` thử Resend trước, hỏng thì lùi về SMTP; cả hai hỏng thì câu lỗi
+    ghi cả hai vế. Giữ nhánh SMTP làm bánh xe dự phòng, không phải đường chính.
+
+  **Việc còn phải làm để thư đi được**: xác minh tên miền bên Resend. Thêm tên
+  miền trong bảng điều khiển Resend là chưa đủ — phải thêm ba bản ghi DNS họ
+  đưa rồi bấm Verify.
+  - Nên dùng **`cuongngo.app`** chứ không phải `cuongngo.cloud`: zone
+    `cuongngo.app` nằm sẵn trong Cloudflare (cùng chỗ với `k3vaceo.cuongngo.app`),
+    thêm bản ghi bằng vài cú bấm; còn `cuongngo.cloud` do Hostinger quản DNS.
+    Địa chỉ gửi đề xuất: `k3vaceo <noreply@cuongngo.app>`.
+  - Bản ghi Resend là TXT và MX nên **không proxy được** — Cloudflare tự để
+    DNS only, không có bẫy đám mây cam ở đây.
+
+  Cấu hình đã có (giữ nguyên, không mất khi deploy):
   - **Hai bộ tên đều dùng được**: `SMTP_USER`/`SMTP_PASS`/`MAIL_FROM` hoặc
     `SMTP_USERNAME`/`SMTP_PASSWORD`/`SMTP_FROM_EMAIL`. Đặt nhầm bộ cho triệu
     chứng y hệt như chưa đặt gì — 503 — nên rất khó đoán.
-  - **Cạm bẫy đáng ngờ**: `wrangler deploy` ghi đè toàn bộ `vars` bằng đúng
-    những gì có trong `wrangler.toml` (hiện chỉ `RP_ID`), nên **biến dạng
-    plaintext đặt trên dashboard bị xoá sạch sau mỗi lần deploy**. Chỉ *Secret*
-    (đã mã hoá) mới sống sót. Đặt bí mật SMTP dưới dạng Variable là mất.
-  - **Cách chắc chắn nhất**: đặt sáu giá trị vào GitHub Secrets, workflow
-    `deploy.yml` có sẵn bước đồng bộ chúng sang Worker ở mỗi lần deploy —
-    không bao giờ mất nữa.
-  - Client SMTP đã kiểm thử trọn giao thức bằng server giả, **chưa lần nào bắt
-    tay TLS với máy chủ thật** — nên sau khi có đủ bí mật vẫn phải thử lại.
-  - Thử lại bằng `.github/workflows/kiem-tra-email.yml`: nó đổi email, gọi thật,
-    và mở `wrangler tail` để bắt dòng `console.error` — cần thiết vì handler gửi
-    thư bằng `ctx.waitUntil`, tức trả lời TRƯỚC rồi mới bắt tay SMTP, nên HTTP
-    200 KHÔNG chứng minh thư đi được.
+  - `wrangler deploy` ghi đè toàn bộ `vars` bằng đúng những gì có trong
+    `wrangler.toml` (hiện chỉ `RP_ID`), nên **biến dạng plaintext đặt trên
+    dashboard bị xoá sạch sau mỗi lần deploy**. Chỉ *Secret* (đã mã hoá) mới
+    sống sót. Đặt bí mật SMTP dưới dạng Variable là mất.
+  - **Cách chắc chắn nhất**: đặt giá trị vào GitHub Secrets, `deploy.yml` có
+    sẵn bước đồng bộ sang Worker ở mỗi lần deploy — không bao giờ mất nữa.
+  - Thử lại bằng `.github/workflows/kiem-tra-email.yml`: nó đổi email, tự dọn
+    hạn mức của địa chỉ ấy, gọi thật, và in `hong_o_buoc` nổi bật.
+  - **Phép đối chứng đã có**: thư gửi thẳng từ máy chủ GitHub bằng cùng tài
+    khoản Hostinger thì TỚI hộp thư. Nên Hostinger và Gmail đều bình thường;
+    chỗ hỏng nằm đúng ở đoạn Worker → cổng 465.
 - **Email của Ngô Phú Cường nay là `ngophucuong@gmail.com`** (đổi 24/8, đã đọc
   lại từ D1 thật để xác nhận).
 - **Ảnh QR chưa hiển thị thật lần nào** (sandbox không có mạng). Tiêu chí
