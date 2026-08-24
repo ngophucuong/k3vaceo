@@ -18,7 +18,8 @@ INSERT OR IGNORE INTO d1_migrations (name) VALUES
   ('0008_fund_expenses.sql'),
   ('0009_phone_self_set.sql'),
   ('0010_khai_ho_va_quy_cap.sql'),
-  ('0011_lich_hoc.sql');
+  ('0011_lich_hoc.sql'),
+  ('0012_thong_bao_nhom_va_push.sql');
 
 -- Kiểm tra: dán tiếp scripts/verify-d1.sql — một dòng, cột cuối "ket_qua"
 -- phải là "ĐÚNG HẾT".

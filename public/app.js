@@ -118,7 +118,7 @@ const iAmOfficer = () => !!HOME?.officers?.some(o => o.member_id === HOME.me.id)
 
 async function refreshHome() {
   HOME = await apiGet('/api/home');
-  drawHead(); drawNay();
+  drawHead(); drawNay(); veChamDo();
 }
 async function ensureMembers() {
   if (!MEMBERS.length) MEMBERS = (await apiGet('/api/members')).members;
@@ -738,6 +738,27 @@ function route() {
   if (v === 'nhom') drawNhom();
   if (v === 'kho') drawKho('all');
   if (v === 'quy') drawQuy();
+  if (v === 'nay') danhDauDaXem();
+}
+
+// Chấm đỏ trên tab Hôm nay. Đây là đường báo tin chạy trên MỌI máy — không cần
+// quyền, không cần cài gì, không phụ thuộc Apple hay Google. Thông báo đẩy chỉ
+// là lớp thêm cho ai đã cài ứng dụng lên màn hình chính.
+function veChamDo() {
+  const nut = document.querySelector('.nb[data-v="nay"]');
+  if (!nut) return;
+  nut.classList.toggle('cham', (HOME?.thong_bao_moi ?? 0) > 0);
+}
+
+// Chỉ đánh dấu khi người ta THẬT SỰ đang đứng ở tab Hôm nay. refreshHome() gọi
+// drawNay() sau đủ thứ thao tác ở tab khác; đánh dấu ở đó thì chấm đỏ tắt trong
+// khi người dùng chưa hề nhìn thấy thông báo.
+async function danhDauDaXem() {
+  if (!(HOME?.thong_bao_moi > 0)) return;
+  try { await apiPost('/api/thong-bao/da-xem'); } catch { return; }
+  HOME.thong_bao_moi = 0;
+  (HOME.thong_bao ?? []).forEach(t => { t.moi = 0; });
+  veChamDo(); drawNay();
 }
 const go = v => { location.hash = '#/' + v; };
 
@@ -877,18 +898,22 @@ function veLichHoc() {
 
 function veThongBao() {
   const ds = HOME.thong_bao ?? [];
-  const sua = !!HOME.can_sua_lich;
-  if (!ds.length && !sua) return '';
+  const dangLop = !!HOME.can_sua_lich;          // Ban cán sự lớp
+  const dangNhom = iAmOfficer();                 // trưởng / phó nhóm
+  if (!ds.length && !dangLop && !dangNhom) return '';
+
+  const goDuoc = t => (t.group_id == null ? dangLop : dangNhom);
   return `
   <div class="sect">
-    <div class="eb">Thông báo của lớp</div>
+    <div class="eb">Thông báo${HOME.thong_bao_moi ? ` <span class="c">${HOME.thong_bao_moi} mới</span>` : ''}</div>
     ${ds.length ? ds.map(t => `<div class="warn" style="margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">
       <div style="flex:1;min-width:0">${esc(t.noi_dung)}
-        ${t.nguon ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:4px;font-weight:400">${esc(t.nguon)}</div>` : ''}</div>
-      ${sua ? `<button class="ico" data-xoatb="${t.id}" aria-label="Gỡ thông báo">✕</button>` : ''}
+        <div style="font-size:11.5px;color:var(--ink3);margin-top:4px;font-weight:400">
+          ${t.group_id == null ? 'Cả lớp' : 'Riêng nhóm'}${t.nguon ? ' · ' + esc(t.nguon) : ''}${t.moi ? ' · mới' : ''}</div></div>
+      ${goDuoc(t) ? `<button class="ico" data-xoatb="${t.id}" aria-label="Gỡ thông báo">✕</button>` : ''}
     </div>`).join('')
       : '<div class="card"><div class="cb mut">Chưa có thông báo nào.</div></div>'}
-    ${sua ? `<button class="wide ghost" id="tbThem" style="margin-top:2px">+ Thêm thông báo</button>` : ''}
+    ${dangLop || dangNhom ? `<button class="wide ghost" id="tbThem" style="margin-top:2px">+ Thêm thông báo</button>` : ''}
   </div>`;
 }
 
@@ -941,25 +966,44 @@ function suaBuoi(id) {
 }
 
 function themThongBao() {
+  const dangLop = !!HOME.can_sua_lich;
+  const nhom = HOME?.group?.no ? `Nhóm ${HOME.group.no}` : 'nhóm mình';
   openSheet(`
    <h3>Thêm thông báo</h3>
-   <p class="sub">Thứ cả lớp cần biết mà không gắn vào một buổi cụ thể. Đây không phải chỗ nhắn tin —
+   <p class="sub">Thứ cần biết mà không gắn vào một buổi cụ thể. Đây không phải chỗ nhắn tin —
      nguyên tắc N1: Zalo để bàn, ứng dụng để chốt.</p>
+   ${dangLop ? `<label class="f">Ai nhận</label>
+   <select id="tbCap"><option value="nhom">${esc(nhom)} — chỉ nhóm mình</option>
+     <option value="lop">Cả lớp — 134 người</option></select>
+   <div class="hintline" id="tbCapHint"></div>` : `<div class="hintline">Thông báo này chỉ ${esc(nhom)} thấy.</div>`}
    <label class="f">Nội dung</label>
    <textarea id="tbND" rows="4" maxlength="1000" placeholder="Chương trình tham quan kiến tập chuyển sang chiều thứ Sáu 11/9/2026."></textarea>
-   <label class="f">Ai phát</label><input id="tbNguon" maxlength="60" value="Ban tổ chức">
+   <label class="f">Ai phát</label><input id="tbNguon" maxlength="60" value="${dangLop ? 'Ban tổ chức' : esc(nhom)}">
    <label class="f">Ẩn sau ngày</label><input id="tbHan" type="date">
    <div class="hintline">Quá ngày này thì thông báo tự thôi hiện. Để trống là hiện mãi.</div>
    <div id="tbErr" class="errline" style="display:none"></div>
    <div class="sa"><button class="big c" id="tbThoi">Thôi</button>
      <button class="big go" id="tbLuu">Đăng</button></div>`);
   $('#tbThoi').onclick = closeSheet;
+
+  if ($('#tbCap')) {
+    const ve = () => {
+      const lop = $('#tbCap').value === 'lop';
+      $('#tbCapHint').innerHTML = lop
+        ? '<b>Cả 134 người nhận.</b> Ai đã bật thông báo đẩy sẽ nhận ngay trên điện thoại. Đăng nhầm khó rút lại.'
+        : 'Chỉ người trong nhóm bạn thấy. Nhóm khác không đọc được.';
+      $('#tbNguon').value = lop ? 'Ban tổ chức' : (HOME?.group?.label || '');
+    };
+    $('#tbCap').onchange = ve; ve();
+  }
+
   $('#tbLuu').onclick = () => {
     if (!$('#tbND').value.trim()) {
       $('#tbErr').textContent = 'Phải có nội dung.'; $('#tbErr').style.display = 'block'; return;
     }
     submitting($('#tbLuu'), async () => {
       await apiPost('/api/thong-bao', {
+        cap: $('#tbCap') ? $('#tbCap').value : 'nhom',
         noi_dung: $('#tbND').value, nguon: $('#tbNguon').value, het_han: $('#tbHan').value || null,
       });
       await refreshHome();
@@ -2342,6 +2386,7 @@ async function openMe() {
    <p class="sub">${esc(HOME.group?.label ?? '')} · Khoá K03</p>
    <button class="wide ghost" id="meEdit" style="margin-bottom:14px">Sửa hồ sơ của tôi</button>
    <div id="pkBox" class="mut" style="margin-bottom:14px">Đang xem passkey…</div>
+   <div id="pushBox" class="mut" style="margin-bottom:14px">Đang xem thông báo…</div>
    <div class="sa"><button class="big c" id="meClose">Đóng</button>
      <button class="big go" id="meLogout" style="background:var(--due)">Đăng xuất</button></div>`);
   $('#meClose').onclick = closeSheet;
@@ -2355,6 +2400,106 @@ async function openMe() {
     renderNoSession();
   };
   drawPasskeyBox();
+  veHopThongBao();
+}
+
+/* ─── Thông báo đẩy ───
+   Lệch nguyên tắc N1 mục 1.3 SRS, có chủ ý: Ngô Phú Cường quyết ngày 24/8.
+   Phần còn lại của N1 giữ nguyên — vẫn không có chat, và thông báo đẩy chỉ
+   mang đúng một việc: "có thông báo mới, mở ứng dụng ra xem". */
+
+function pushDungDuoc() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+}
+
+// iOS chỉ cho nhận thông báo đẩy khi ứng dụng ĐÃ được cài lên màn hình chính.
+// Mở trong Safari bình thường thì Notification có tồn tại nhưng xin quyền luôn
+// bị từ chối, không kèm lý do — nên phải tự nhận ra và nói trước.
+function laIosChuaCai() {
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const daCai = window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true;
+  return ios && !daCai;
+}
+
+async function veHopThongBao() {
+  const box = $('#pushBox');
+  if (!box) return;
+
+  if (!pushDungDuoc()) {
+    box.innerHTML = 'Trình duyệt này không nhận được thông báo đẩy. Chấm đỏ trên tab Hôm nay vẫn báo cho bạn.';
+    return;
+  }
+  let tt;
+  try { tt = await apiGet('/api/push/trang-thai'); } catch { box.textContent = ''; return; }
+  if (!tt.bat) {
+    box.innerHTML = 'Thông báo đẩy chưa được bật ở máy chủ.';
+    return;
+  }
+  if (laIosChuaCai()) {
+    box.innerHTML = `<b style="color:var(--ink)">Muốn nhận thông báo trên iPhone?</b><br>
+      Bấm nút Chia sẻ ở Safari → <b>Thêm vào MH chính</b>, rồi mở ứng dụng từ biểu tượng vừa hiện.
+      iPhone chỉ cho nhận thông báo khi mở theo đường ấy.`;
+    return;
+  }
+
+  const daBat = Notification.permission === 'granted' && tt.so_thiet_bi > 0;
+  box.innerHTML = `
+    <div style="margin-bottom:8px">${daBat
+      ? `<b style="color:var(--ink)">Đang nhận thông báo</b> trên ${tt.so_thiet_bi} thiết bị.`
+      : 'Nhận thông báo khi lớp hoặc nhóm có tin mới.'}</div>
+    <button class="wide ghost" id="pushNut" style="padding:11px;font-size:14px">
+      ${daBat ? 'Tắt trên máy này' : 'Bật thông báo'}</button>`;
+  $('#pushNut').onclick = daBat ? tatThongBao : batThongBao;
+}
+
+async function batThongBao() {
+  const nut = $('#pushNut');
+  nut.disabled = true; nut.textContent = 'Đang xin quyền…';
+  try {
+    if ((await Notification.requestPermission()) !== 'granted') {
+      toast('Bạn đã từ chối. Bật lại trong cài đặt trình duyệt.');
+      return veHopThongBao();
+    }
+    const { khoa_cong_khai } = await apiGet('/api/push/khoa');
+    if (!khoa_cong_khai) { toast('Máy chủ chưa cấu hình'); return veHopThongBao(); }
+
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,               // Chrome bắt buộc; đặt false là bị từ chối
+      applicationServerKey: b64urlSangBytes(khoa_cong_khai),
+    });
+    const j = sub.toJSON();
+    await apiPost('/api/push/dang-ky', {
+      endpoint: sub.endpoint, p256dh: j.keys?.p256dh, auth: j.keys?.auth,
+    });
+    toast('Đã bật thông báo');
+  } catch (e) {
+    toast(errText(e) || 'Không bật được thông báo');
+  }
+  veHopThongBao();
+}
+
+async function tatThongBao() {
+  const nut = $('#pushNut');
+  nut.disabled = true; nut.textContent = 'Đang tắt…';
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await apiPost('/api/push/huy', { endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }
+    toast('Đã tắt trên máy này');
+  } catch (e) { toast(errText(e)); }
+  veHopThongBao();
+}
+
+// applicationServerKey phải là byte thô, không phải chuỗi base64url — truyền
+// chuỗi vào thì subscribe() ném InvalidCharacterError.
+function b64urlSangBytes(s) {
+  const p = (s + '='.repeat((4 - (s.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
+  return Uint8Array.from(atob(p), c => c.charCodeAt(0));
 }
 
 /* Xác minh email ngay trong tab Tài khoản — dành cho ai vào bằng link mời:
@@ -2455,6 +2600,16 @@ function renderApp() {
   drawHead();
   drawNay();
   route();
+  veChamDo();
+  dangKySw();
+}
+
+// Đăng ký service worker. Nó KHÔNG cache gì — chỉ để nhận thông báo đẩy và
+// để iPhone chịu cài ứng dụng lên màn hình chính. Hỏng thì bỏ qua, ứng dụng
+// vẫn chạy y nguyên.
+function dangKySw() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
 
 async function boot() {

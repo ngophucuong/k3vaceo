@@ -109,23 +109,29 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+
         run: |
-          if [ -z "$SMTP_HOST" ]; then
-            echo "Không có bí mật SMTP trong GitHub — bỏ qua, giữ nguyên bí mật đã đặt trên Cloudflare."
-            exit 0
-          fi
           da=
+          # Duyệt hết rồi bỏ qua cái nào chưa đặt, thay vì dừng sớm khi thiếu
+          # SMTP_HOST: bản cũ làm thế, nên ai chỉ đặt khoá VAPID mà chưa đặt
+          # SMTP sẽ không bao giờ được đồng bộ khoá đẩy — thông báo im lặng
+          # không chạy, và chỗ hỏng nằm ở một workflow chứ không ở mã.
           for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
                       SMTP_USER SMTP_PASS MAIL_FROM \
                       SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL \
-                      RESEND_API_KEY; do
+                      RESEND_API_KEY \
+                      VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
             # Bỏ qua cái không đặt: đẩy chuỗi rỗng lên là tạo ra một bí mật rỗng,
             # trông như "đã có" mà thực ra không dùng được.
             [ -z "${!name}" ] && continue
             printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null
             da="$da $name"
           done
-          echo "✓ đã đồng bộ:$da"
+          [ -n "$da" ] && echo "✓ đã đồng bộ:$da" \
+            || echo "Không có bí mật nào trong GitHub — giữ nguyên bí mật đã đặt trên Cloudflare." 
 
       # Chứng chỉ SSL của custom domain mất vài phút mới cấp xong, nên thử lại
       # vài lượt chứ đừng kết luận vội. Và phân biệt cho rõ: trả về JSON là

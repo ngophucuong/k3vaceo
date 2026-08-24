@@ -1,0 +1,17 @@
+{
+  "name": "k3vaceo — Nhóm 6, lớp CEO K03",
+  "short_name": "k3vaceo",
+  "description": "Công cụ làm việc nhóm: bài tám phần, quỹ, lịch học, thông báo của lớp.",
+  "lang": "vi",
+  "start_url": "/nay",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14161A",
+  "theme_color": "#14161A",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

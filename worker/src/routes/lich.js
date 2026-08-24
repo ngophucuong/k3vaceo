@@ -1,6 +1,7 @@
 import { json, error, readJson } from '../lib/http.js';
-import { isClassCommittee, logAudit } from '../permissions.js';
+import { isClassCommittee, isGroupOfficer, logAudit, logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
+import { guiThongBaoDay } from './push.js';
 
 // Lịch học và thông báo của lớp. Đọc thì ai cũng đọc được — đây là thứ cả 134
 // người cần. Ghi thì chỉ Ban cán sự lớp, vì lịch sai một ngày là cả lớp đi
@@ -123,30 +124,83 @@ export async function deleteBuoi(env, me, id, ip) {
   return json({ ok: true });
 }
 
-export async function postThongBao(request, env, me, ip) {
-  if (!(await phaiLaBanCanSu(env, me))) return error('forbidden', 403);
+// Thông báo có hai cấp, và quyền đăng khác nhau:
+//   cap = 'lop'  → cả khoá đọc, chỉ Ban cán sự lớp đăng
+//   cap = 'nhom' → chỉ nhóm mình đọc, trưởng/phó nhóm đăng
+// Mặc định là 'nhom': đăng nhầm cho 134 người khó rút lại hơn nhiều so với
+// đăng nhầm trong nhóm mình.
+export async function postThongBao(request, env, me, ctx, ip) {
   const body = await readJson(request);
+  const capLop = body.cap === 'lop';
+
+  if (capLop) {
+    if (!(await phaiLaBanCanSu(env, me))) return error('forbidden', 403);
+  } else if (!(await isGroupOfficer(env, me.id, me.group_id))) {
+    return error('forbidden', 403);
+  }
+
   const noiDung = cleanText(body.noi_dung, 1000);
   if (!noiDung) return error('noi_dung_required', 422);
   const hetHan = cleanText(body.het_han, 10);
   if (hetHan && !ngayHopLe(hetHan)) return error('ngay_invalid', 422);
 
   const row = await env.DB.prepare(
-    `INSERT INTO thong_bao (cohort_id, noi_dung, nguon, het_han, created_by)
-     VALUES (?, ?, ?, ?, ?) RETURNING id`
-  ).bind(me.cohort_id, noiDung, cleanText(body.nguon, 60), hetHan || null, me.id).first();
+    `INSERT INTO thong_bao (cohort_id, group_id, noi_dung, nguon, het_han, created_by)
+     VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
+  ).bind(me.cohort_id, capLop ? null : me.group_id, noiDung,
+         cleanText(body.nguon, 60), hetHan || null, me.id).first();
 
   await logAudit(env, {
-    actorId: me.id, action: 'thongbao.create', targetType: 'thong_bao', targetId: row.id, ip,
+    actorId: me.id, action: 'thongbao.create', targetType: 'thong_bao', targetId: row.id,
+    after: { cap: capLop ? 'lop' : 'nhom' }, ip,
   });
-  return json({ ok: true, id: row.id });
+  if (!capLop) {
+    await logActivity(env, {
+      cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+      verb: 'thongbao.create', objectType: 'thong_bao', objectId: row.id,
+      summary: 'đăng một thông báo cho nhóm',
+    });
+  }
+
+  // Đẩy thông báo cho ai đã đăng ký. Không chặn phúc đáp: người đăng không
+  // phải ngồi chờ 134 lượt gọi tới máy chủ đẩy, và đẩy hỏng cũng không được
+  // làm hỏng việc đăng — thông báo đã nằm trong D1, mở ứng dụng ra là thấy.
+  const day = guiThongBaoDay(env, me, { id: row.id, noi_dung: noiDung, capLop });
+  if (ctx?.waitUntil) ctx.waitUntil(day); else await day.catch(() => {});
+
+  return json({ ok: true, id: row.id, cap: capLop ? 'lop' : 'nhom' });
+}
+
+// Đánh dấu đã xem: ghi lại ID thông báo lớn nhất mà người này ĐƯỢC PHÉP thấy.
+// Không nhận số từ máy khách — gửi một số to là tắt vĩnh viễn chấm đỏ của
+// chính mình, và tệ hơn là bỏ lỡ thông báo thật.
+//
+// Không ghi mốc thời gian: datetime('now') chỉ tới giây, nên thông báo đăng
+// đúng giây ấy có created_at BẰNG mốc và lọt qua phép so sánh. ID tăng đơn
+// điệu nên không có chuyện bằng nhau.
+export async function postThongBaoDaXem(env, me) {
+  await env.DB.prepare(
+    `UPDATE members SET thong_bao_xem_id = (
+       SELECT COALESCE(MAX(id), 0) FROM thong_bao
+        WHERE cohort_id = ? AND (group_id IS NULL OR group_id = ?)
+     ) WHERE id = ?`
+  ).bind(me.cohort_id, me.group_id, me.id).run();
+  return json({ ok: true });
 }
 
 export async function deleteThongBao(env, me, id, ip) {
-  if (!(await phaiLaBanCanSu(env, me))) return error('forbidden', 403);
-  const cu = await env.DB.prepare('SELECT * FROM thong_bao WHERE id = ? AND cohort_id = ?')
-    .bind(id, me.cohort_id).first();
+  // Lọc theo phạm vi ĐỌC trước: thông báo nội bộ của nhóm khác phải "không tồn
+  // tại" chứ không phải "bị từ chối" — 403 là xác nhận id đó có thật (N6).
+  const cu = await env.DB.prepare(
+    `SELECT * FROM thong_bao WHERE id = ? AND cohort_id = ?
+       AND (group_id IS NULL OR group_id = ?)`
+  ).bind(id, me.cohort_id, me.group_id).first();
   if (!cu) return error('not_found', 404);
+
+  const duoc = cu.group_id === null
+    ? await phaiLaBanCanSu(env, me)
+    : await isGroupOfficer(env, me.id, me.group_id);
+  if (!duoc) return error('forbidden', 403);
   await env.DB.prepare('DELETE FROM thong_bao WHERE id = ?').bind(id).run();
   await logAudit(env, {
     actorId: me.id, action: 'thongbao.delete', targetType: 'thong_bao', targetId: id, ip,

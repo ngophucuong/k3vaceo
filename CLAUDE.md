@@ -34,7 +34,11 @@ Chưa làm: những thứ SRS mục 1.4 đã xếp ngoài phạm vi v1 (chat, th
 
 Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sai kỹ thuật:
 
-- **N1 — Zalo để bàn, ứng dụng để chốt.** Không chat, không thông báo đẩy.
+- **N1 — Zalo để bàn, ứng dụng để chốt.** Không chat. ~~Không thông báo đẩy~~
+  → **đã lệch có chủ ý ngày 24/8**, Ngô Phú Cường quyết sau khi được nêu rõ đây
+  là đổi bản chất sản phẩm chứ không phải thêm tính năng. Phần "không chat" GIỮ
+  NGUYÊN, và thông báo đẩy chỉ mang đúng một việc — "có tin mới, mở ứng dụng ra
+  xem" — chứ không thành kênh nhắn tin thứ hai bên cạnh Zalo.
 - **N2 — Ứng dụng không giữ file.** Chỉ lưu URL. Không upload.
 - **N3 — Ứng dụng không giữ tiền.** Tiền vào thẳng tài khoản người thu.
 - **N4 — Tự giác là chính.** Không xác minh email, không OTP, không đối soát.
@@ -151,6 +155,46 @@ lộ khi chạm D1 thật. Đừng vấp lại.
 Bí mật đã đặt sẵn trong repo: `CLOUDFLARE_API_TOKEN` (quyền D1:Edit) và
 `CLOUDFLARE_ACCOUNT_ID`. Workflow tự kiểm tra và **đánh hỏng job** nếu kết quả
 không phải ĐÚNG HẾT.
+
+## Thông báo đẩy (Đợt 7) — cần ba bí mật thì mới chạy
+
+Mã đã xong và đã kiểm. Chưa gửi được vì **chưa có khoá VAPID**:
+
+```bash
+node scripts/tao-khoa-vapid.mjs
+```
+
+rồi đặt `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` vào GitHub
+Secrets — `deploy.yml` tự đồng bộ sang Worker mỗi lần deploy. Chưa có thì
+`/api/push/khoa` trả `bat:false`, giao diện ẩn nút, mọi thứ khác chạy bình
+thường.
+
+**Đổi khoá về sau = mọi đăng ký hiện có chết**: trình duyệt gắn đăng ký với
+đúng khoá công khai lúc đăng ký. Sinh một lần rồi giữ.
+
+Ba lớp báo tin, xếp từ chắc chắn nhất:
+
+1. **Chấm đỏ trên tab Hôm nay** — chạy trên mọi máy, không cần quyền, không
+   cần cài gì. Đây là lớp thật sự đáng tin.
+2. **PWA** (`manifest.webmanifest` + `sw.js`) — cài lên màn hình chính. Service
+   worker CỐ Ý không cache gì: cache sai một lần là người dùng chạy bản cũ
+   hàng tuần và cách chữa duy nhất là bảo họ xoá dữ liệu trình duyệt.
+3. **Web Push** — tự viết trong `worker/src/lib/webpush.js`, không thêm thư
+   viện (mọi thư viện web-push đều dựng cho Node chứ không cho Workers).
+
+**iPhone chỉ nhận thông báo khi ứng dụng ĐÃ cài lên màn hình chính.** Mở trong
+Safari thường thì xin quyền luôn bị từ chối, không kèm lý do — giao diện tự
+nhận ra và nói trước thay vì để người dùng bấm vào chỗ chết.
+
+Ba chỗ trong Web Push sai là "gửi đi mà không ai nhận", không báo lỗi:
+- Thứ tự trong `info` của HKDF: khoá công khai TRÌNH DUYỆT trước, máy chủ sau.
+- Chữ ký ES256 phải là `r||s` 64 byte, không phải DER. WebCrypto trả đúng dạng
+  cần; bê mã từ Node sang thì hay dính DER.
+- `aud` của JWT là ORIGIN của endpoint, không phải cả URL.
+
+Vì vậy phép kiểm là **giải mã ngược**: đóng vai trình duyệt, giải gói ra và so
+từng ký tự — cộng một phép đối chứng sai khoá phải hỏng, để chắc phép kiểm có
+răng. Xem `scripts/tao-khoa-vapid.mjs` và bộ kiểm ở thư mục scratchpad.
 
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 

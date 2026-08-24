@@ -22,7 +22,8 @@ import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, 
          listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
          postDeclareFor, deleteFund } from './routes/funds.js';
 import { getLich, postBuoi, patchBuoi, deleteBuoi, postThongBao,
-         deleteThongBao } from './routes/lich.js';
+         postThongBaoDaXem, deleteThongBao } from './routes/lich.js';
+import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
@@ -225,7 +226,15 @@ export default {
       if ((m = pathname.match(/^\/api\/lich\/(\d+)$/)) && method === 'DELETE') {
         return deleteBuoi(env, me, Number(m[1]), ip);
       }
-      if (pathname === '/api/thong-bao' && method === 'POST') return postThongBao(request, env, me, ip);
+      if (pathname === '/api/thong-bao' && method === 'POST') return postThongBao(request, env, me, ctx, ip);
+      if (pathname === '/api/thong-bao/da-xem' && method === 'POST') return postThongBaoDaXem(env, me);
+
+      // Thông báo đẩy. Khoá công khai VAPID không phải bí mật — trình duyệt
+      // cần nó để đăng ký, nên trả thẳng.
+      if (pathname === '/api/push/khoa' && method === 'GET') return getPushKhoa(env);
+      if (pathname === '/api/push/trang-thai' && method === 'GET') return getPushTrangThai(env, me);
+      if (pathname === '/api/push/dang-ky' && method === 'POST') return postPushDangKy(request, env, me);
+      if (pathname === '/api/push/huy' && method === 'POST') return postPushHuy(request, env, me);
       if ((m = pathname.match(/^\/api\/thong-bao\/(\d+)$/)) && method === 'DELETE') {
         return deleteThongBao(env, me, Number(m[1]), ip);
       }

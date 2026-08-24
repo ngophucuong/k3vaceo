@@ -110,16 +110,25 @@ export async function getHome(env, me) {
         WHERE cohort_id = ? AND huy_luc IS NULL AND ngay >= date('now')
         ORDER BY ngay, COALESCE(tu_gio, '00:00') LIMIT 6`
     ).bind(me.cohort_id).all(),
+    // Thông báo hai cấp: group_id NULL là của cả lớp, có số là của riêng nhóm
+    // ấy. Người Nhóm 5 không được thấy thông báo nội bộ của Nhóm 6 (N6).
     env.DB.prepare(
-      `SELECT id, noi_dung, nguon, het_han FROM thong_bao
-        WHERE cohort_id = ? AND (het_han IS NULL OR het_han >= date('now'))
-        ORDER BY id DESC LIMIT 3`
-    ).bind(me.cohort_id).all(),
+      `SELECT id, noi_dung, nguon, het_han, group_id, created_at,
+              id > COALESCE(?, 0) AS moi
+         FROM thong_bao
+        WHERE cohort_id = ? AND (group_id IS NULL OR group_id = ?)
+          AND (het_han IS NULL OR het_han >= date('now'))
+        ORDER BY id DESC LIMIT 5`
+    ).bind(me.thong_bao_xem_id ?? 0, me.cohort_id, me.group_id).all(),
   ]);
 
   return json({
     lich_hoc: lichRes.results ?? [],
     thong_bao: tbRes.results ?? [],
+    // Số thông báo chưa xem — giao diện chấm đỏ lên tab Hôm nay. Đây là đường
+    // báo tin chạy được trên MỌI máy, không cần quyền, không cần cài gì; thông
+    // báo đẩy chỉ là lớp thêm cho ai cài ứng dụng lên màn hình chính.
+    thong_bao_moi: (tbRes.results ?? []).filter(t => t.moi).length,
     // Ai sửa được lịch: chỉ Ban cán sự lớp. Giao diện dùng cờ này để khỏi
     // bày nút bấm vào là 403; máy chủ vẫn kiểm lại trong routes/lich.js.
     can_sua_lich: await isClassCommittee(env, me.id),
