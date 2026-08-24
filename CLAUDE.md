@@ -182,9 +182,25 @@ không phải ĐÚNG HẾT.
     Console của D1, hoặc chạy `node scripts/build-setup-sql.mjs` để sinh lại
     `scripts/setup-d1.sql` (tệp gộp cả sáu migration, có sẵn phần ghi vào
     `d1_migrations` để wrangler sau này không áp đè).
-- **SMTP cá nhân**: người dùng chọn dùng SMTP riêng nhưng chưa cho biết nhà
-  cung cấp/host/tài khoản. Client SMTP đã kiểm thử trọn giao thức bằng server
-  giả, chưa bắt tay TLS với máy chủ thật.
+- **SMTP chưa chạy được — đo thật ngày 24/8**: gọi `POST /api/auth/email` trên
+  tên miền thật trả **503 `mailer_not_configured`**. `wrangler secret list` cho
+  thấy Worker **chỉ có `SMTP_HOST`**, thiếu `SMTP_USER`, `SMTP_PASS`,
+  `MAIL_FROM` — cả ba đều bắt buộc.
+  - **Cạm bẫy đáng ngờ**: `wrangler deploy` ghi đè toàn bộ `vars` bằng đúng
+    những gì có trong `wrangler.toml` (hiện chỉ `RP_ID`), nên **biến dạng
+    plaintext đặt trên dashboard bị xoá sạch sau mỗi lần deploy**. Chỉ *Secret*
+    (đã mã hoá) mới sống sót. Đặt bí mật SMTP dưới dạng Variable là mất.
+  - **Cách chắc chắn nhất**: đặt sáu giá trị vào GitHub Secrets, workflow
+    `deploy.yml` có sẵn bước đồng bộ chúng sang Worker ở mỗi lần deploy —
+    không bao giờ mất nữa.
+  - Client SMTP đã kiểm thử trọn giao thức bằng server giả, **chưa lần nào bắt
+    tay TLS với máy chủ thật** — nên sau khi có đủ bí mật vẫn phải thử lại.
+  - Thử lại bằng `.github/workflows/kiem-tra-email.yml`: nó đổi email, gọi thật,
+    và mở `wrangler tail` để bắt dòng `console.error` — cần thiết vì handler gửi
+    thư bằng `ctx.waitUntil`, tức trả lời TRƯỚC rồi mới bắt tay SMTP, nên HTTP
+    200 KHÔNG chứng minh thư đi được.
+- **Email của Ngô Phú Cường nay là `ngophucuong@gmail.com`** (đổi 24/8, đã đọc
+  lại từ D1 thật để xác nhận).
 - **Ảnh QR chưa hiển thị thật lần nào** (sandbox không có mạng). Tiêu chí
   nghiệm thu "QR quét được bằng ba app ngân hàng" phải làm bằng điện thoại thật.
 - **Danh mục 26 mã ngân hàng** trong `lib/vietqr.js` chép theo bộ BIN Napas
