@@ -22,6 +22,10 @@ on:
         description: 'Link sống được bao nhiêu phút'
         type: string
         default: '120'
+      nhom:
+        description: 'Chưa có trong bảng members thì thêm vào nhóm số mấy (để trống là không thêm)'
+        type: string
+        default: ''
   push:
     paths: ['.github/phat-link-moi.trigger']
 
@@ -36,8 +40,12 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
-      HO_TEN: ${{ inputs.ho_ten || 'Ngô Phú Cường' }}
-      SO_PHUT: ${{ inputs.so_phut || '120' }}
+      # Để trống ở đây: bước "Đọc tham số" bên dưới lấy từ inputs nếu bấm tay,
+      # còn nếu kích hoạt bằng cách sửa tệp .trigger thì đọc từ chính tệp ấy.
+      # Không thế thì đẩy tệp trigger lên chỉ phát được link cho đúng một người.
+      HO_TEN_IN: ${{ inputs.ho_ten || '' }}
+      SO_PHUT_IN: ${{ inputs.so_phut || '' }}
+      NHOM_IN: ${{ inputs.nhom || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -52,6 +60,26 @@ jobs:
           fi
 
       - run: npm ci
+
+      # Bấm tay thì lấy từ inputs. Đẩy tệp .trigger thì đọc từ tệp — GitHub
+      # không cho truyền tham số qua đường push, mà phiên Claude Code lại không
+      # có quyền actions:write để bấm Run workflow. Đọc từ tệp là đường duy
+      # nhất phát được link cho một người bất kỳ mà không phải sửa workflow.
+      - name: Đọc tham số
+        run: |
+          doc() {
+            grep -m1 "^$1:" .github/phat-link-moi.trigger 2>/dev/null \
+              | cut -d: -f2- | sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+          }
+          ten="${HO_TEN_IN:-$(doc ho_ten)}";  ten="${ten:-Ngô Phú Cường}"
+          phut="${SO_PHUT_IN:-$(doc so_phut)}"; phut="${phut:-120}"
+          nhom="${NHOM_IN:-$(doc nhom)}"
+          case "$phut" in ''|*[!0-9]*) echo "::error::so_phut phải là số."; exit 1;; esac
+          case "$nhom" in ''|[1-9]|10) : ;; *) echo "::error::nhom phải là số 1–10 hoặc để trống."; exit 1;; esac
+          printf 'HO_TEN=%s\n' "$ten"  >> "$GITHUB_ENV"
+          printf 'SO_PHUT=%s\n' "$phut" >> "$GITHUB_ENV"
+          printf 'NHOM=%s\n'   "$nhom" >> "$GITHUB_ENV"
+          echo "Phát link cho: $ten · hạn $phut phút · thêm vào nhóm: ${nhom:-(không)}"
 
       # Bảng chữ cái bỏ các ký tự dễ đọc nhầm (0/O, 1/l/I) — link này có khi
       # phải đọc qua điện thoại. Giống hệt scripts/bootstrap-invite.mjs.
@@ -81,6 +109,47 @@ jobs:
           process.stdout.write(String(dong.length ? dong[0][process.argv[3]] : ""));
           EOF
 
+      # Chưa có trong members mà có trong danh sách gốc thì thêm vào nhóm đã
+      # chỉ định. Đây là đường cho người được Ban tổ chức chuyển sang nhóm khác
+      # giữa khoá: danh sách gốc vẫn ghi nhóm cũ (giữ nguyên, đó là bản ghi
+      # ngày 15/8), còn members mới là "ai đang thực sự ở nhóm nào".
+      - name: Thêm vào nhóm từ danh sách gốc (nếu cần)
+        if: env.NHOM != ''
+        run: |
+          ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
+          $WRANGLER --json --command "SELECT COUNT(*) AS n FROM members
+            WHERE full_name = '$ten' AND is_active = 1;" > /tmp/co.json
+          if [ "$(node /tmp/doc-so.cjs /tmp/co.json n)" != "0" ]; then
+            echo "Đã có trong bảng members rồi — không thêm nữa."; exit 0
+          fi
+
+          # Trong lớp có hai người trùng tên (hai bà Phan Thị Thanh Nga), nên
+          # bắt buộc đúng MỘT dòng khớp; không thì dừng chứ đừng đoán.
+          $WRANGLER --json --command "SELECT COUNT(*) AS n FROM roster
+            WHERE full_name = '$ten';" > /tmp/ros.json
+          nr=$(node /tmp/doc-so.cjs /tmp/ros.json n)
+          if [ "$nr" != "1" ]; then
+            echo "::error::Danh sách gốc có $nr người tên '$HO_TEN' (cần đúng 1). Trùng tên thì phải thêm tay theo số thứ tự."
+            exit 1
+          fi
+
+          $WRANGLER --command "INSERT INTO members
+              (cohort_id, group_id, roster_id, full_name, title, company, phone,
+               claimed_at, is_active, created_at, updated_at)
+            SELECT r.cohort_id, g.id, r.id, r.full_name, r.title, r.company, r.phone,
+                   NULL, 1, datetime('now'), datetime('now')
+              FROM roster r, groups g
+             WHERE r.full_name = '$ten' AND g.no = $NHOM AND g.cohort_id = r.cohort_id;" >/dev/null
+
+          $WRANGLER --json --command "SELECT g.no AS n FROM members m
+            JOIN groups g ON g.id = m.group_id
+            WHERE m.full_name = '$ten' AND m.is_active = 1;" > /tmp/da.json
+          da=$(node /tmp/doc-so.cjs /tmp/da.json n)
+          if [ "$da" != "$NHOM" ]; then
+            echo "::error::Thêm xong đọc lại thấy nhóm '$da' chứ không phải $NHOM."; exit 1
+          fi
+          echo "✓ đã thêm '$HO_TEN' vào Nhóm $NHOM"
+
       - name: Kiểm tra người này có trong bảng members
         run: |
           ten=$(printf '%s' "$HO_TEN" | sed "s/'/''/g")
@@ -88,7 +157,7 @@ jobs:
             WHERE full_name = '$ten' AND is_active = 1;" > /tmp/co.json
           n=$(node /tmp/doc-so.cjs /tmp/co.json n)
           if [ "$n" != "1" ]; then
-            echo "::error::Tìm thấy $n người tên '$HO_TEN' trong bảng members (cần đúng 1). Kiểm tra lại họ tên, gõ y hệt kể cả dấu."
+            echo "::error::Tìm thấy $n người tên '$HO_TEN' trong bảng members (cần đúng 1). Kiểm tra lại họ tên, gõ y hệt kể cả dấu; hoặc đặt 'nhom:' trong tệp kích hoạt để thêm họ từ danh sách gốc."
             exit 1
           fi
           echo "✓ tìm thấy đúng 1 người"
