@@ -203,7 +203,14 @@ async function guiQuaResend(cf, { to, subject, text }) {
     body: JSON.stringify({ from: cf.from, to: [addressOnly(to)], subject, text }),
   });
   const than = await tra.text();
-  if (!tra.ok) throw new Error(`Resend từ chối (HTTP ${tra.status}): ${than.slice(0, 300)}`);
+  if (!tra.ok) {
+    // Gắn tên bước y như lỗi SMTP, để phúc đáp 502 chỉ được đúng chỗ hỏng.
+    // Lỗi hay gặp nhất là 403 kèm "domain is not verified" — chưa xác minh
+    // tên miền gửi bên Resend, chữa bằng cách thêm mấy bản ghi DNS họ đưa.
+    const err = new Error(`Resend từ chối (HTTP ${tra.status}): ${than.slice(0, 300)}`);
+    err.buoc = `Resend trả HTTP ${tra.status}: ${than.replace(/\s+/g, ' ').slice(0, 200)}`;
+    throw err;
+  }
   // Ghi lại mã thư để tra được về sau, y như mã hàng đợi của SMTP.
   console.log('Đã gửi qua Resend:', than.slice(0, 200));
 }
