@@ -1,0 +1,25 @@
+# Phân vai — ai giữ chức gì, cả cấp lớp lẫn cấp nhóm.
+#
+# Cột stt là SỐ THỨ TỰ trong danh sách 134 người của Ban tổ chức, không phải
+# tên — vì trong lớp có hai người trùng tên (hai bà Phan Thị Thanh Nga), khoá
+# theo tên là có ngày gán nhầm người.
+#
+# vai_tro nhận năm giá trị:
+#   Cấp lớp (officers.group_id để trống):  lop_truong | lop_pho | thu_quy
+#   Cấp nhóm (tự suy nhóm từ danh sách):   truong_nhom | pho_nhom
+#
+# Nhóm của vai cấp nhóm KHÔNG ghi ở đây — script tự lấy từ cột nhóm của người
+# ấy trong danh sách gốc. Ghi tay thì có ngày lệch với dữ liệu thật.
+#
+# Đường bình thường để một nhóm có trưởng nhóm là người đầu tiên của nhóm mở
+# k3vaceo.cuongngo.app/start và dựng không gian nhóm — làm xong họ TỰ ĐỘNG
+# thành trưởng nhóm, rồi tự đặt phó nhóm trong tab Nhóm. Tệp này chỉ dùng khi
+# đường ấy không đi được: nhóm chưa ai dựng mà cần có người phụ trách ngay,
+# hoặc dựng nhầm người và cả nhóm không ai sửa được.
+#
+# Sửa tệp này rồi đẩy lên là workflow phan-vai.yml tự nạp. Nạp lại nhiều lần
+# được: bản cũ của cùng một vai sẽ bị đánh dấu hết hiệu lực (superseded_at),
+# không xoá, để còn lần theo lịch sử.
+vai_tro,stt,ho_ten,ghi_chu
+lop_truong,65,Lưu Minh Tiến,Lớp trưởng lớp CEO K03
+thu_quy,84,Vũ Thị Ngân Hà,"Thủ quỹ lớp. Thông báo của lớp ghi tên ngắn ""Vũ Thị Ngân"" và ghi Nhóm 1; danh sách Ban tổ chức chỉ có Vũ Thị Ngân Hà ở Nhóm 7. Nếu là hai người khác nhau thì sửa lại stt ở dòng này."

@@ -1,14 +1,19 @@
-name: Gán Ban cán sự lớp
+name: Phân vai (Ban cán sự lớp và trưởng/phó nhóm)
 
-# Sửa scripts/data/ban-can-su-lop.csv rồi commit là chạy. Không cần terminal —
-# sửa thẳng bằng trình soạn thảo web của GitHub cũng được.
+# Sửa scripts/data/phan-vai.csv rồi commit là chạy. Không cần terminal — sửa
+# thẳng bằng trình soạn thảo web của GitHub cũng được.
+#
+# Đường BÌNH THƯỜNG để một nhóm có trưởng nhóm là người đầu tiên của nhóm mở
+# /start và dựng không gian nhóm; làm xong họ tự động thành trưởng nhóm rồi tự
+# đặt phó nhóm trong ứng dụng. Workflow này là đường vòng cho lúc đường ấy
+# không đi được — chưa ai dựng, hoặc dựng nhầm người.
 on:
   push:
-    paths: ['scripts/data/ban-can-su-lop.csv']
+    paths: ['scripts/data/phan-vai.csv']
   workflow_dispatch:
 
 concurrency:
-  group: ban-can-su-lop
+  group: phan-vai
   cancel-in-progress: false
 
 jobs:
@@ -29,35 +34,36 @@ jobs:
       # Kiểm TRƯỚC khi chạm vào D1: vai lạ, số thứ tự ngoài 1–134, hoặc một vai
       # gán cho hai người thì dừng ngay.
       - name: Kiểm tệp CSV
-        run: node scripts/build-officer-sql.mjs
+        run: node scripts/build-phan-vai-sql.mjs
 
       - name: Sinh SQL
-        run: node scripts/build-officer-sql.mjs --ra /tmp/bcs.sql
+        run: node scripts/build-phan-vai-sql.mjs --ra /tmp/vai.sql
 
       # Nạp bằng --file (đường import của D1 tự cắt lô), rồi đọc kết quả bằng
       # --command ở bước sau: --file KHÔNG trả về dòng nào của SELECT.
       - name: Nạp lên D1 thật
-        run: $WRANGLER --file=/tmp/bcs.sql
+        run: $WRANGLER --file=/tmp/vai.sql
 
       # Đọc lại từ D1 chứ không tin bước ghi. Tên trong CSV lệch tên trong danh
       # sách gốc thì không câu nào chạm được dòng nào, và chỗ này sẽ bắt được.
       - name: Đọc lại xem ai đang giữ vai gì
         run: |
-          SQL="SELECT o.role AS vai, m.full_name AS nguoi, g.label AS nhom_dang_o,
+          SQL="SELECT o.role AS vai, m.full_name AS nguoi,
+                      COALESCE(gv.label, '(cấp lớp)') AS pham_vi,
                       COALESCE(m.email, '(chưa khai email)') AS email,
                       o.effective_from AS tu_ngay
                  FROM officers o
                  JOIN members m ON m.id = o.member_id
-                 LEFT JOIN groups g ON g.id = m.group_id
-                WHERE o.group_id IS NULL AND o.superseded_at IS NULL
-                ORDER BY o.role;"
+                 LEFT JOIN groups gv ON gv.id = o.group_id
+                WHERE o.superseded_at IS NULL AND o.member_id IS NOT NULL
+                ORDER BY gv.no, o.role;"
           $WRANGLER --json --command "$SQL" > /tmp/kq.json
           node --input-type=commonjs -e '
             const raw = require("fs").readFileSync("/tmp/kq.json", "utf8");
             const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
             const kq = JSON.parse(raw.slice(d, c + 1));
             const rows = (Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || []);
-            const canCo = require("fs").readFileSync("scripts/data/ban-can-su-lop.csv", "utf8")
+            const canCo = require("fs").readFileSync("scripts/data/phan-vai.csv", "utf8")
               .split("\n").filter(l => l.trim() && !l.trimStart().startsWith("#")).length - 1;
             if (!rows.length) { console.error("✗ Không có vai cấp lớp nào — kiểm tra lại họ tên trong CSV."); process.exit(1); }
             for (const r of rows)
