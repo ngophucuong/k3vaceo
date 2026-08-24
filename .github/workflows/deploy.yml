@@ -87,8 +87,14 @@ jobs:
             exit 1
           fi
 
-      # Bí mật SMTP là tuỳ chọn ở đây: nếu bạn đã đặt thẳng trên dashboard
-      # Cloudflare thì bỏ trống chỗ này, `wrangler deploy` không xoá bí mật cũ.
+      # Đây là chỗ ĐÁNG TIN NHẤT để đặt cấu hình SMTP. Lý do: `wrangler deploy`
+      # ghi đè toàn bộ `vars` bằng đúng những gì có trong wrangler.toml, nên
+      # biến plaintext đặt tay trên dashboard bị xoá sau mỗi lần deploy. Chỉ
+      # Secret mới sống sót — và đồng bộ ở đây thì lần deploy nào cũng có lại.
+      #
+      # Nhận cả hai bộ tên: bộ ngắn (SMTP_USER/SMTP_PASS/MAIL_FROM) và bộ dài
+      # (SMTP_USERNAME/SMTP_PASSWORD/SMTP_FROM_EMAIL) hay gặp ở bảng điều khiển
+      # nhà cung cấp hosting. mailer.js đọc được cả hai.
       - name: Đồng bộ bí mật SMTP cho Worker
         if: steps.check.outputs.skip != 'true'
         working-directory: worker
@@ -99,14 +105,25 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
         run: |
           if [ -z "$SMTP_HOST" ]; then
             echo "Không có bí mật SMTP trong GitHub — bỏ qua, giữ nguyên bí mật đã đặt trên Cloudflare."
             exit 0
           fi
-          for name in SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASS MAIL_FROM; do
-            printf '%s' "${!name}" | npx wrangler secret put "$name"
+          da=
+          for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
+                      SMTP_USER SMTP_PASS MAIL_FROM \
+                      SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL; do
+            # Bỏ qua cái không đặt: đẩy chuỗi rỗng lên là tạo ra một bí mật rỗng,
+            # trông như "đã có" mà thực ra không dùng được.
+            [ -z "${!name}" ] && continue
+            printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null
+            da="$da $name"
           done
+          echo "✓ đã đồng bộ:$da"
 
       # Chứng chỉ SSL của custom domain mất vài phút mới cấp xong, nên thử lại
       # vài lượt chứ đừng kết luận vội. Và phân biệt cho rõ: trả về JSON là

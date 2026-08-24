@@ -97,14 +97,23 @@ jobs:
               const d = raw.indexOf("["), c = raw.lastIndexOf("]");
               if (d >= 0 && c > d) ten = JSON.parse(raw.slice(d, c + 1)).map(x => x.name);
             } catch (e) { console.log("(không đọc được danh sách bí mật:", String(e) + ")"); }
-            const can = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS", "MAIL_FROM"];
-            const tuychon = ["SMTP_PORT", "SMTP_SECURE"];
+            // Mỗi thứ chấp nhận nhiều tên — mailer.js đọc được cả hai bộ.
+            const can = [["SMTP_HOST"], ["SMTP_USER", "SMTP_USERNAME"],
+                         ["SMTP_PASS", "SMTP_PASSWORD"], ["MAIL_FROM", "SMTP_FROM_EMAIL"]];
+            const tuychon = [["SMTP_PORT"], ["SMTP_SECURE"]];
             console.log("Bí mật đang có:", ten.length ? ten.join(", ") : "(không thấy cái nào)");
-            const thieu = can.filter(x => !ten.includes(x));
-            for (const x of can) console.log(`${ten.includes(x) ? "✓" : "✗"} ${x}  (bắt buộc)`);
-            for (const x of tuychon) console.log(`${ten.includes(x) ? "✓" : "·"} ${x}  (tuỳ chọn, mặc định ${x === "SMTP_PORT" ? "587" : "starttls"})`);
-            fs.writeFileSync("/tmp/thieu", thieu.join(", "));
-            if (thieu.length) console.log(`\n→ THIẾU: ${thieu.join(", ")}`);
+            const co = bo => bo.find(x => ten.includes(x));
+            for (const bo of can) {
+              const c = co(bo);
+              console.log(`${c ? "✓ " + c : "✗ " + bo.join(" hoặc ")}  (bắt buộc)`);
+            }
+            for (const bo of tuychon) {
+              const c = co(bo);
+              console.log(`${c ? "✓ " + c : "· " + bo[0]}  (tuỳ chọn — cổng mặc định 587, và cổng 465 tự hiểu là TLS)`);
+            }
+            const thieu = can.filter(bo => !co(bo)).map(bo => bo.join(" hoặc "));
+            fs.writeFileSync("/tmp/thieu", thieu.join("; "));
+            if (thieu.length) console.log(`\n→ THIẾU: ${thieu.join("; ")}`);
           '
 
       # Mở tail TRƯỚC khi gọi, vì thư gửi sau khi đã trả lời. Cả ba việc phải

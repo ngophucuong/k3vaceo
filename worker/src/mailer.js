@@ -6,17 +6,38 @@
 // 465 (TLS ngay từ đầu) — cấu hình bằng SMTP_PORT + SMTP_SECURE.
 //
 // Biến môi trường (đặt bằng `wrangler secret put`, đừng để trong wrangler.toml):
-//   SMTP_HOST     smtp.gmail.com
-//   SMTP_PORT     587
-//   SMTP_SECURE   starttls | tls | plain   (plain chỉ dùng khi kiểm thử cục bộ)
-//   SMTP_USER     địa chỉ đăng nhập
-//   SMTP_PASS     mật khẩu ứng dụng (Gmail/Outlook bắt bật xác minh 2 bước trước)
-//   MAIL_FROM     "Nhóm 6 K03 <ten@gmail.com>"
+//   SMTP_HOST     smtp.hostinger.com
+//   SMTP_PORT     465 (TLS) hoặc 587 (STARTTLS)
+//   SMTP_SECURE   starttls | tls | plain — bỏ trống thì suy từ cổng
+//   SMTP_USER     địa chỉ đăng nhập      (nhận cả tên SMTP_USERNAME)
+//   SMTP_PASS     mật khẩu               (nhận cả tên SMTP_PASSWORD)
+//   MAIL_FROM     "Tên hiển thị <ten@ten-mien.com>"  (nhận cả SMTP_FROM_EMAIL)
 
 import { connect } from 'cloudflare:sockets';
 
+// Chấp nhận hai bộ tên cho cùng một thứ. Bộ ngắn là bộ chính; bộ dài
+// (SMTP_USERNAME / SMTP_PASSWORD / SMTP_FROM_EMAIL) là tên hay gặp ở bảng điều
+// khiển của nhà cung cấp hosting. Đặt nhầm sang bộ kia đã xảy ra một lần và
+// triệu chứng rất khó đoán: Worker trả 503 mailer_not_configured y như khi
+// chưa đặt gì cả.
+export function docCauHinhSmtp(env) {
+  const port = Number(env.SMTP_PORT || 587);
+  return {
+    host: env.SMTP_HOST,
+    port,
+    // Cổng 465 là TLS NGAY TỪ ĐẦU, không phải STARTTLS. Suy mặc định từ cổng
+    // để bớt một biến phải nhớ — đặt lệch cặp cổng/chế độ thì bắt tay treo
+    // hoặc lỗi khó hiểu chứ không báo thẳng ra.
+    mode: (env.SMTP_SECURE || (port === 465 ? 'tls' : 'starttls')).toLowerCase(),
+    user: env.SMTP_USER || env.SMTP_USERNAME,
+    pass: env.SMTP_PASS || env.SMTP_PASSWORD,
+    from: env.MAIL_FROM || env.SMTP_FROM_EMAIL,
+  };
+}
+
 export function mailerConfigured(env) {
-  return !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS && env.MAIL_FROM);
+  const c = docCauHinhSmtp(env);
+  return !!(c.host && c.user && c.pass && c.from);
 }
 
 const enc = new TextEncoder();
@@ -86,9 +107,7 @@ function addressOnly(v) {
 export async function sendMail(env, { to, subject, text }) {
   if (!mailerConfigured(env)) throw new Error('SMTP chưa được cấu hình');
 
-  const host = env.SMTP_HOST;
-  const port = Number(env.SMTP_PORT || 587);
-  const mode = (env.SMTP_SECURE || 'starttls').toLowerCase();
+  const { host, port, mode, user, pass, from } = docCauHinhSmtp(env);
 
   let socket = connect(
     { hostname: host, port },
@@ -123,20 +142,20 @@ export async function sendMail(env, { to, subject, text }) {
     {
       await send(writer, 'AUTH LOGIN');
       await expect(reader, [334], 'AUTH LOGIN');
-      await send(writer, b64(env.SMTP_USER));
+      await send(writer, b64(user));
       await expect(reader, [334], 'gửi tài khoản');
-      await send(writer, b64(env.SMTP_PASS));
+      await send(writer, b64(pass));
       await expect(reader, [235], 'gửi mật khẩu');
     }
 
-    await send(writer, `MAIL FROM:<${addressOnly(env.MAIL_FROM)}>`);
+    await send(writer, `MAIL FROM:<${addressOnly(from)}>`);
     await expect(reader, [250], 'MAIL FROM');
     await send(writer, `RCPT TO:<${addressOnly(to)}>`);
     await expect(reader, [250, 251], 'RCPT TO');
     await send(writer, 'DATA');
     await expect(reader, [354], 'DATA');
 
-    await send(writer, buildMessage({ from: env.MAIL_FROM, to, subject, text }) + '\r\n.');
+    await send(writer, buildMessage({ from, to, subject, text }) + '\r\n.');
     await expect(reader, [250], 'kết thúc thư');
 
     await send(writer, 'QUIT');
