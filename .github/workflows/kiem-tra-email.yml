@@ -177,6 +177,90 @@ jobs:
             if (thieu.length) console.log(`\n→ THIẾU: ${thieu.join("; ")}`);
           '
 
+      # PHÉP THỬ ĐỐI CHỨNG. Worker báo Hostinger đã nhận thư (mã 250) mà hộp
+      # thư vẫn trống. Hai khả năng còn lại rất khác nhau, và chỉ phép này tách
+      # được chúng:
+      #   a) Worker gửi ra thứ gì đó Hostinger nhận rồi vứt → gửi từ runner sẽ
+      #      TỚI NƠI, và ta so hai lá thư để tìm chỗ khác nhau.
+      #   b) Bản thân Hostinger không chuyển được thư tới Gmail → gửi từ runner
+      #      cũng KHÔNG tới, và mọi việc phải làm nằm ở phía nhà cung cấp.
+      # Runner dùng thư viện tls chuẩn của Node, không dính gì tới Cloudflare.
+      - name: Đối chứng — gửi thẳng từ runner tới Hostinger
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+        run: |
+          cat > /tmp/gui-thang.cjs <<'EOF'
+          const tls = require("tls");
+          const host = process.env.SMTP_HOST || "smtp.hostinger.com";
+          const port = Number(process.env.SMTP_PORT || 465);
+          const user = process.env.SMTP_USER || process.env.SMTP_USERNAME;
+          const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+          const from = process.env.MAIL_FROM || process.env.SMTP_FROM_EMAIL;
+          const to   = process.env.EMAIL_MOI;
+          if (!user || !pass || !from) { console.log("(thiếu bí mật, bỏ qua phép đối chứng)"); process.exit(0); }
+          const dcGui = (String(from).match(/<([^>]+)>/) || [null, String(from).trim()])[1];
+
+          // Che mật khẩu và tài khoản khi in đối thoại ra log công khai.
+          const che = t => String(t)
+            .split(Buffer.from(pass).toString("base64")).join("<mật khẩu>")
+            .split(Buffer.from(user).toString("base64")).join("<tài khoản>");
+
+          const s = tls.connect({ host, port, servername: host });
+          let dem = "", cho = null;
+          const doi = () => new Promise(r => { cho = r; });
+          s.on("data", d => {
+            dem += d.toString();
+            const dong = dem.split("\r\n").filter(Boolean);
+            const cuoi = dong[dong.length - 1];
+            if (cuoi && /^\d{3} /.test(cuoi)) { const t = dem; dem = ""; const f = cho; cho = null; f && f(t); }
+          });
+          const noi = async (lenh, nhan) => {
+            if (lenh !== null) { console.log("→ " + che(nhan || lenh).split("\r\n")[0]); s.write(lenh + "\r\n"); }
+            const tra = await doi();
+            console.log("← " + che(tra).trim().split("\n").map(x => x.trim()).join(" | "));
+            return tra;
+          };
+
+          (async () => {
+            await noi(null);
+            await noi("EHLO runner.github");
+            await noi("AUTH LOGIN");
+            await noi(Buffer.from(user).toString("base64"), "<tài khoản>");
+            await noi(Buffer.from(pass).toString("base64"), "<mật khẩu>");
+            await noi(`MAIL FROM:<${dcGui}>`);
+            await noi(`RCPT TO:<${to}>`);
+            await noi("DATA");
+            const uuid = require("crypto").randomUUID();
+            const mien = dcGui.split("@")[1];
+            const thu = [
+              `From: ${from}`, `To: ${to}`,
+              "Subject: =?UTF-8?B?" + Buffer.from("Doi chung tu runner GitHub").toString("base64") + "?=",
+              `Date: ${new Date().toUTCString()}`,
+              `Message-ID: <${uuid}@${mien}>`,
+              "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "",
+              "Thu nay gui thang tu GitHub runner, khong di qua Cloudflare Worker.",
+              `Message-ID: ${uuid}@${mien}`, "",
+            ].join("\r\n");
+            console.log(`→ (thân thư, Message-ID ${uuid}@${mien})`);
+            s.write(thu + "\r\n.\r\n");
+            const ket = await doi();
+            console.log("← " + ket.trim());
+            console.log("\nMÃ HÀNG ĐỢI (đưa cho hỗ trợ Hostinger để tra): " + ket.trim());
+            s.write("QUIT\r\n");
+            s.end();
+          })().catch(e => { console.log("✗ hỏng: " + che(String(e))); process.exit(0); });
+          EOF
+          echo "--- đối thoại SMTP từ runner ---"
+          timeout 60 node /tmp/gui-thang.cjs || echo "(hết giờ hoặc hỏng — xem dòng trên)"
+          exit 0
+
       # Mở tail TRƯỚC khi gọi, vì thư gửi sau khi đã trả lời. Cả ba việc phải
       # nằm trong CÙNG một bước, không thì tiến trình nền chết theo bước trước.
       - name: Gọi thật rồi soi log Worker

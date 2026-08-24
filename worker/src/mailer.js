@@ -182,7 +182,15 @@ export async function sendMail(env, { to, subject, text }) {
     await expect(reader, [354], 'DATA');
 
     await send(writer, buildMessage({ from, to, subject, text }) + '\r\n.');
-    await expect(reader, [250], 'kết thúc thư');
+    const nhanThu = await expect(reader, [250], 'kết thúc thư');
+
+    // Ghi lại nguyên văn câu 250 cuối cùng. Hầu hết máy chủ trả kèm mã hàng
+    // đợi ("250 Ok: queued as 4abc..."), và đó là thứ DUY NHẤT truy vết được
+    // khi thư biến mất sau lúc nhà cung cấp đã nhận: đưa mã ấy cho bộ phận hỗ
+    // trợ là họ tra được thư đi đâu. Không có nó thì chỉ biết "đã nhận" rồi
+    // thôi — đúng cái ngõ cụt đã gặp ngày 24/8.
+    // KHÔNG ghi tiêu đề hay thân thư: tiêu đề có chứa mã 6 số.
+    console.log('SMTP đã nhận thư:', nhanThu.text.replace(/\s+/g, ' ').slice(0, 300));
 
     await send(writer, 'QUIT');
   } finally {
