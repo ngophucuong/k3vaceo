@@ -58,6 +58,7 @@ jobs:
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           # KHÔNG để bước này đánh hỏng cả job. Nó chỉ là dây an toàn — deploy.yml
           # đã đồng bộ bí mật ở mỗi lần deploy rồi. Mà nó lại hay hỏng vì tranh
@@ -69,7 +70,8 @@ jobs:
           da= ; hong=
           for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
                       SMTP_USER SMTP_PASS MAIL_FROM \
-                      SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL; do
+                      SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL \
+                      RESEND_API_KEY; do
             [ -z "${!name}" ] && continue
             for lan in 1 2 3 4; do
               if printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null 2>/tmp/loi-secret; then
@@ -195,6 +197,7 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
           SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           cat > /tmp/gui-thang.cjs <<'EOF'
           const tls = require("tls");

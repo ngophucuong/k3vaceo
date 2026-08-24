@@ -108,6 +108,7 @@ jobs:
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           SMTP_FROM_EMAIL: ${{ secrets.SMTP_FROM_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
         run: |
           if [ -z "$SMTP_HOST" ]; then
             echo "Không có bí mật SMTP trong GitHub — bỏ qua, giữ nguyên bí mật đã đặt trên Cloudflare."
@@ -116,7 +117,8 @@ jobs:
           da=
           for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
                       SMTP_USER SMTP_PASS MAIL_FROM \
-                      SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL; do
+                      SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL \
+                      RESEND_API_KEY; do
             # Bỏ qua cái không đặt: đẩy chuỗi rỗng lên là tạo ra một bí mật rỗng,
             # trông như "đã có" mà thực ra không dùng được.
             [ -z "${!name}" ] && continue

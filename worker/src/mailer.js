@@ -36,6 +36,8 @@ export function docCauHinhSmtp(env) {
 }
 
 export function mailerConfigured(env) {
+  // Có Resend là gửi được, không cần bí mật SMTP nào.
+  if (env.RESEND_API_KEY && (env.MAIL_FROM || env.SMTP_FROM_EMAIL)) return true;
   const c = docCauHinhSmtp(env);
   return !!(c.host && c.user && c.pass && c.from);
 }
@@ -163,7 +165,42 @@ function buildMessage({ from, to, subject, text }) {
   return headers.join('\r\n') + '\r\n\r\n' + dotStuff(quotedPrintable(text));
 }
 
+// ── Đường gửi thứ hai: API HTTP ──────────────────────────────────────────
+//
+// Client SMTP tự viết ở dưới đã chứng minh là mong manh: ngày 24/8, cùng một
+// tài khoản Hostinger, thư gửi từ máy chủ GitHub bằng thư viện chuẩn thì tới
+// nơi, thư gửi từ Worker thì Hostinger nhận (trả 250) rồi biến mất. Đã sửa ba
+// chỗ khác biệt tìm được mà vẫn chưa chắc ăn.
+//
+// Nên mở sẵn một đường không dính SMTP: gọi API HTTP của dịch vụ thư giao
+// dịch. Không TCP tự viết, không TLS tự viết, không bắt tay nhiều nhịp — chỉ
+// một lượt fetch, và có bảng theo dõi từng lá thư đi tới đâu.
+//
+// Bật bằng cách đặt đúng MỘT bí mật: RESEND_API_KEY. Có nó thì dùng đường này,
+// không có thì rơi về SMTP như cũ. Không đổi dòng nào ở chỗ gọi.
+function resendCauHinh(env) {
+  return env.RESEND_API_KEY ? {
+    key: env.RESEND_API_KEY,
+    from: env.MAIL_FROM || env.SMTP_FROM_EMAIL,
+  } : null;
+}
+
+async function guiQuaResend(cf, { to, subject, text }) {
+  const tra = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${cf.key}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ from: cf.from, to: [addressOnly(to)], subject, text }),
+  });
+  const than = await tra.text();
+  if (!tra.ok) throw new Error(`Resend từ chối (HTTP ${tra.status}): ${than.slice(0, 300)}`);
+  // Ghi lại mã thư để tra được về sau, y như mã hàng đợi của SMTP.
+  console.log('Đã gửi qua Resend:', than.slice(0, 200));
+}
+
 export async function sendMail(env, { to, subject, text }) {
+  const cf = resendCauHinh(env);
+  if (cf) return guiQuaResend(cf, { to, subject, text });
+
   if (!mailerConfigured(env)) throw new Error('SMTP chưa được cấu hình');
 
   const { host, port, mode, user, pass, from } = docCauHinhSmtp(env);
