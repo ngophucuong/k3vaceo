@@ -57,7 +57,7 @@ const ERR_TEXT = {
   passkey_already_registered: 'Thiết bị này đã đăng ký passkey rồi.',
   challenge_invalid: 'Phiên đăng ký passkey hết hạn — bấm lại từ đầu.',
   // Đợt 5 — tự nhận diện và OTP
-  phone_mismatch: 'Số điện thoại không khớp với số Ban tổ chức đang có. Kiểm tra lại, hoặc nhắn trưởng nhóm nếu bạn đã đổi số.',
+  phone_mismatch: 'Số điện thoại không khớp với số Ban tổ chức đang có. Kiểm tra lại; nếu bạn đã đổi số thì xin trưởng nhóm một link mời, vào rồi tự sửa số trong tab Tài khoản là lần sau tự vào được.',
   phone_invalid: 'Số điện thoại phải đủ 10 chữ số và bắt đầu bằng 0.',
   phone_missing_in_roster: 'Ban tổ chức chưa có số điện thoại của bạn nên chưa đối chiếu được.',
   roster_not_found: 'Không tìm thấy tên này trong danh sách lớp.',
@@ -66,6 +66,11 @@ const ERR_TEXT = {
   otp_locked: 'Nhập sai quá nhiều lần, mã này bị huỷ. Xin mã mới.',
   otp_invalid_format: 'Mã gồm đúng 6 chữ số.',
   email_chua_kiem_chung: 'Cần xác minh email bằng mã trước khi thêm passkey.',
+  // Đợt 6 — sổ chi
+  scope_invalid: 'Không xác định được sổ quỹ nào.',
+  category_invalid: 'Hạng mục chi không hợp lệ.',
+  spent_on_invalid: 'Ngày chi chưa đúng — chọn lại trên lịch.',
+  round_invalid: 'Đợt thu đã chọn không thuộc sổ này.',
 };
 const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
 
@@ -394,6 +399,8 @@ function vaoThieuSo(d) {
       <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(d.group_label ?? '')}</div>
     </div></div>
     <div class="mut">Nhắn trưởng nhóm bổ sung số của bạn vào danh sách lớp. Xong là bạn vào được ngay, không phải làm gì thêm.</div>
+    <div class="mut" style="margin-top:10px">Hoặc xin trưởng nhóm một <b>link mời</b>. Vào bằng link rồi tự điền số của mình
+      trong tab Tài khoản — từ lần sau bạn tự vào được ở đây, không phải xin nữa.</div>
     <button class="wide ghost" id="vLui2" style="margin-top:14px">Quay lại</button>`);
   $('#vLui2').onclick = vaoBuoc1;
 }
@@ -1129,6 +1136,7 @@ async function openMemberEdit(id) {
    ${own ? `<label class="f">Email</label><input id="eEmail" value="${esc(m.email)}" inputmode="email" maxlength="160">
             <div class="hintline">Dùng để tự đăng nhập lại nếu mất link mời.</div>` : ''}
    <label class="f">Điện thoại</label><input id="eP" value="${esc(m.phone)}" placeholder="09xx xxx xxx" inputmode="tel" maxlength="30">
+   ${own ? `<div class="hintline">Sửa đúng số của bạn ở đây thì lần sau tự vào được ở màn “Tôi là ai”, không cần xin link mời nữa.</div>` : ''}
    <label class="f">Chức vụ</label><input id="eT" value="${esc(m.title)}" maxlength="120">
    <label class="f">Đơn vị</label><input id="eC" value="${esc(m.company)}" maxlength="160">
    <label class="f">Bán gì</label><input id="eA" value="${esc(m.profile.sells_what)}" maxlength="80">
@@ -1235,6 +1243,8 @@ async function drawQuy() {
   const { rounds, can_create_group, can_create_class } = FUNDS;
 
   $('#v-quy').innerHTML = `
+  ${renderSoQuy(FUNDS.so_quy?.group, 'group', FUNDS.can_chi_group)}
+  ${renderSoQuy(FUNDS.so_quy?.class, 'class', FUNDS.can_chi_class)}
   ${rounds.length ? rounds.map(r => renderRound(r)).join('') : `
     <div class="card"><div class="cb">
       <div style="font-weight:600;margin-bottom:4px">Chưa có khoản thu nào</div>
@@ -1274,7 +1284,32 @@ async function drawQuy() {
   document.querySelectorAll('#v-quy [data-openround]').forEach(b => {
     b.onclick = () => confirmOpenRound(Number(b.dataset.openround));
   });
+  document.querySelectorAll('#v-quy [data-soquy]').forEach(b => {
+    b.onclick = () => openSoChi(b.dataset.soquy);
+  });
   if ($('#newFund')) $('#newFund').onclick = openFundCreate;
+}
+
+// Thẻ số dư. Chỉ "người thu đã nhận" mới cộng vào tiền thật; lời tự khai để
+// riêng một dòng nhạt hơn — ràng buộc câu chữ mục 6.4 SRS, không phải chi tiết
+// trình bày. Sổ chưa có gì thì không hiện, khỏi bày một thẻ toàn số 0.
+function renderSoQuy(s, scope, canChi) {
+  if (!s) return '';
+  if (!s.so_dot && !s.so_khoan_chi) return '';
+  const ten = scope === 'class' ? 'Sổ quỹ lớp' : 'Sổ quỹ nhóm';
+  const am = s.con_lai < 0;
+  return `
+  <div class="card">
+    <div class="cb">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">${ten}</div>
+      <div class="amt" style="color:${am ? 'var(--due)' : 'var(--go)'}">${vnMoney(s.con_lai)}<small> đ còn lại</small></div>
+      <div class="fi" style="margin-top:12px"><div class="k">Người thu đã nhận</div><div class="v num">${vnMoney(s.da_nhan)} đ</div></div>
+      ${s.cho_doi_chieu ? `<div class="fi"><div class="k">Mới tự khai, chờ đối chiếu</div><div class="v num" style="color:var(--ink2)">${vnMoney(s.cho_doi_chieu)} đ</div></div>` : ''}
+      <div class="fi" style="margin-bottom:0"><div class="k">Đã chi (${s.so_khoan_chi} khoản)</div><div class="v num">${vnMoney(s.da_chi)} đ</div></div>
+      ${am ? `<div class="warn" style="margin-top:12px"><b>Chi vượt số đã nhận.</b> Kiểm tra lại: có khoản người thu chưa xác nhận, hoặc có khoản chi ghi nhầm.</div>` : ''}
+      <button class="wide ghost" data-soquy="${scope}" style="margin-top:12px;padding:11px;font-size:14px">Mở sổ chi${canChi ? ' và ghi khoản mới' : ''}</button>
+    </div>
+  </div>`;
 }
 
 function renderRound(r) {
@@ -1353,9 +1388,12 @@ function confirmOpenRound(id) {
 function openFundCreate() {
   const banks = FUNDS.banks;
   const members = MEMBERS.length ? MEMBERS : null;
+  const coLop = !!FUNDS.can_create_class;
   openSheet(`
    <h3>Tạo đợt thu</h3>
    <p class="sub">Số tài khoản đặt riêng cho từng đợt, không dùng chung toàn hệ thống. Tạo xong còn ở bản nháp — xem lại rồi mới mở.</p>
+   ${coLop ? `<label class="f">Đợt này thu của ai</label>
+   <select id="fS"><option value="group">Nhóm mình</option><option value="class">Cả lớp</option></select>` : ''}
    <label class="f">Tiêu đề</label><input id="fT" maxlength="120" placeholder="Kiến tập nhà máy Bắc Ninh">
    <label class="f">Mục đích</label><input id="fP" maxlength="300" placeholder="Xe và ăn trưa">
    <label class="f">Số tiền mỗi người (đ)</label><input id="fA" type="number" min="1000" step="1000" inputmode="numeric" placeholder="350000">
@@ -1376,6 +1414,9 @@ function openFundCreate() {
      <button class="big go" id="fSave">Tạo bản nháp</button></div>`);
 
   $('#fB').onchange = () => { $('#fBinWrap').style.display = $('#fB').value === '__other' ? 'block' : 'none'; };
+  // Đổi phạm vi thì đổi luôn danh sách người thu: đợt nhóm chỉ chọn được người
+  // trong nhóm, đợt lớp chọn được cả khoá (máy chủ cũng kiểm lại y hệt).
+  if ($('#fS')) $('#fS').onchange = () => napNguoiThu($('#fS').value);
   $('#fCancel').onclick = closeSheet;
   $('#fSave').onclick = async () => {
     const bin = $('#fB').value === '__other' ? $('#fBin').value.trim() : $('#fB').value;
@@ -1384,7 +1425,7 @@ function openFundCreate() {
     }
     await submitting($('#fSave'), async () => {
       await apiPost('/api/funds', {
-        scope: 'group',
+        scope: $('#fS') ? $('#fS').value : 'group',
         title: $('#fT').value, purpose: $('#fP').value,
         amount: Number($('#fA').value || 0),
         bank_bin: bin, account_no: $('#fAcc').value.trim(), account_name: $('#fAccName').value,
@@ -1394,12 +1435,24 @@ function openFundCreate() {
       await drawQuy();
     }, 'Đã tạo bản nháp — xem lại rồi mở');
   };
-  ensureMembers().then(list => {
-    if (!members && $('#fC')) {
-      $('#fC').innerHTML = `<option value="">— chưa chọn —</option>` +
-        list.map(m => `<option value="${m.id}">${esc(m.full_name)}</option>`).join('');
-    }
-  });
+  napNguoiThu('group');
+}
+
+// Nạp danh sách người thu theo phạm vi. Giữ lại lựa chọn cũ nếu người ấy vẫn
+// còn trong danh sách mới, để đổi qua đổi lại không mất công chọn lần nữa.
+async function napNguoiThu(scope) {
+  const sel = $('#fC');
+  if (!sel) return;
+  const dangChon = sel.value;
+  let list;
+  try {
+    list = scope === 'class'
+      ? (await apiGet('/api/funds/class-members')).members
+      : await ensureMembers();
+  } catch { return; }
+  sel.innerHTML = `<option value="">— chưa chọn —</option>` +
+    list.map(m => `<option value="${m.id}">${esc(m.full_name)}${m.group_no ? ' · nhóm ' + m.group_no : ''}</option>`).join('');
+  if (dangChon && list.some(m => String(m.id) === dangChon)) sel.value = dangChon;
 }
 
 async function openLedger(roundId) {
@@ -1438,6 +1491,141 @@ async function openLedger(roundId) {
       } catch (e) { toast(errText(e)); b.disabled = false; }
     };
   });
+}
+
+/* ─── Sổ chi ─── */
+let SOCHI = null;
+
+// Sổ chi mở cho cả phạm vi xem, khác sổ thu (chỉ người thu và Ban cán sự lớp)
+// — giấu khoản chi đi thì mất luôn lý do tồn tại của cái sổ.
+async function openSoChi(scope) {
+  openSheet(`<h3>Sổ chi</h3><p class="sub">Đang tải…</p>`);
+  try { SOCHI = await apiGet(`/api/funds/expenses?scope=${encodeURIComponent(scope)}`); }
+  catch (e) { closeSheet(); toast(errText(e)); return; }
+  veSoChi();
+}
+
+function veSoChi() {
+  const { scope, summary: s, expenses, can_manage } = SOCHI;
+  const ten = scope === 'class' ? 'Sổ chi quỹ lớp' : 'Sổ chi quỹ nhóm';
+  openSheet(`
+   <h3>${ten}</h3>
+   <p class="sub">Người thu đã nhận ${vnMoney(s.da_nhan)} đ · đã chi ${vnMoney(s.da_chi)} đ ·
+     còn lại <b style="color:${s.con_lai < 0 ? 'var(--due)' : 'var(--go)'}">${vnMoney(s.con_lai)} đ</b>.</p>
+   ${can_manage ? `<button class="wide" id="scNew" style="margin-bottom:14px">+ Ghi khoản chi</button>` : ''}
+   ${expenses.length ? `<div class="card"><div class="cb" style="padding:2px 0">
+     ${expenses.map(e => `<div class="of">
+       <div class="rl">${esc(e.spent_on || (e.created_at || '').slice(0, 10))}</div>
+       <div style="flex:1;min-width:0">
+         <div class="nm">${esc(e.title)}</div>
+         <div class="co">${vnMoney(e.amount)} đ${e.category_label ? ' · ' + esc(e.category_label) : ''}${e.payee ? ' · ' + esc(e.payee) : ''}</div>
+         ${e.note ? `<div class="co">${esc(e.note)}</div>` : ''}
+         <div class="src">${e.round_title ? 'từ đợt “' + esc(e.round_title) + '” · ' : ''}${esc(e.created_by_name || '—')} ghi${e.updated_at ? ' · đã sửa' : ''}</div>
+         ${e.receipt_url ? `<div class="src"><a class="lnk" href="${esc(e.receipt_url)}" target="_blank" rel="noopener noreferrer">xem hoá đơn</a></div>` : ''}
+       </div>
+       ${can_manage ? `<div style="display:flex;gap:6px">
+         <button class="tg" data-scedit="${e.id}">sửa</button>
+         <button class="tg" data-scdel="${e.id}">xoá</button></div>` : ''}
+     </div>`).join('')}
+   </div></div>` : `<div class="card"><div class="cb">
+     <div style="font-weight:600;margin-bottom:4px">Chưa ghi khoản chi nào</div>
+     <div class="mut">${can_manage ? 'Tiêu gì cho quỹ thì ghi vào đây, cả nhóm cùng thấy.' : 'Người giữ quỹ sẽ ghi vào đây khi có khoản chi.'}</div>
+   </div></div>`}
+   <div class="foot">Ứng dụng không giữ tiền và không đối chiếu sao kê. Đây là sổ tay chung —
+     ghi lại việc đã xảy ra ở ngoài đời để ai cũng xem được, không phải chứng từ kế toán.</div>
+   <div class="sa"><button class="big c" id="scClose">Đóng</button></div>`);
+
+  $('#scClose').onclick = closeSheet;
+  if ($('#scNew')) $('#scNew').onclick = () => formChi(null);
+  document.querySelectorAll('.sheet [data-scedit]').forEach(b => {
+    b.onclick = () => formChi(SOCHI.expenses.find(x => x.id === Number(b.dataset.scedit)));
+  });
+  document.querySelectorAll('.sheet [data-scdel]').forEach(b => {
+    b.onclick = () => xoaChi(SOCHI.expenses.find(x => x.id === Number(b.dataset.scdel)));
+  });
+}
+
+async function taiLaiSoChi() {
+  SOCHI = await apiGet(`/api/funds/expenses?scope=${encodeURIComponent(SOCHI.scope)}`);
+  veSoChi();
+  await drawQuy();
+}
+
+function formChi(e) {
+  const suaLai = !!e;
+  const dotCungSo = (FUNDS?.rounds ?? []).filter(r => r.scope === SOCHI.scope && r.status !== 'draft');
+  openSheet(`
+   <h3>${suaLai ? 'Sửa khoản chi' : 'Ghi khoản chi'}</h3>
+   <p class="sub">Cả ${SOCHI.scope === 'class' ? 'lớp' : 'nhóm'} đều xem được khoản này. Ghi rõ để sau khỏi phải nhớ lại.</p>
+   <label class="f">Chi vào việc gì</label>
+   <input id="cT" maxlength="120" placeholder="In 40 bộ tài liệu buổi 9" value="${esc(e?.title ?? '')}">
+   <label class="f">Số tiền (đ)</label>
+   <input id="cA" type="number" min="1000" step="1000" inputmode="numeric" placeholder="480000" value="${e?.amount ?? ''}">
+   <label class="f">Hạng mục</label>
+   <select id="cC"><option value="">— không chọn —</option>
+     ${(SOCHI.categories ?? []).map(c => `<option value="${c.key}"${e?.category === c.key ? ' selected' : ''}>${esc(c.label)}</option>`).join('')}</select>
+   <label class="f">Ngày chi</label><input id="cD" type="date" value="${esc(e?.spent_on ?? '')}">
+   <label class="f">Trả cho ai</label>
+   <input id="cP" maxlength="120" placeholder="Cửa hàng in Minh Anh" value="${esc(e?.payee ?? '')}">
+   ${dotCungSo.length ? `<label class="f">Tiêu từ đợt thu nào (không bắt buộc)</label>
+   <select id="cR"><option value="">— không gắn đợt nào —</option>
+     ${dotCungSo.map(r => `<option value="${r.id}"${e?.round_id === r.id ? ' selected' : ''}>${esc(r.title)}</option>`).join('')}</select>` : ''}
+   <label class="f">Đường dẫn ảnh hoá đơn</label>
+   <input id="cU" maxlength="2000" inputmode="url" placeholder="https://drive.google.com/..." value="${esc(e?.receipt_url ?? '')}">
+   <div class="hintline">Ứng dụng không giữ file. Chụp hoá đơn để trên Drive rồi dán đường dẫn vào đây.</div>
+   <label class="f">Ghi chú</label><textarea id="cN" maxlength="300" rows="2">${esc(e?.note ?? '')}</textarea>
+   <div id="cErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="cCancel">Thôi</button>
+     <button class="big go" id="cSave">${suaLai ? 'Lưu' : 'Ghi vào sổ'}</button></div>`);
+
+  $('#cCancel').onclick = veSoChi;
+  $('#cSave').onclick = async () => {
+    const than = {
+      scope: SOCHI.scope,
+      title: $('#cT').value,
+      amount: Number($('#cA').value || 0),
+      category: $('#cC').value || null,
+      spent_on: $('#cD').value || null,
+      payee: $('#cP').value || null,
+      round_id: $('#cR') ? ($('#cR').value || null) : null,
+      receipt_url: $('#cU').value.trim() || null,
+      note: $('#cN').value || null,
+    };
+    if (!than.title.trim()) { loiChi('Cần ghi chi vào việc gì.'); return; }
+    if (!Number.isInteger(than.amount) || than.amount <= 0) { loiChi('Số tiền phải là số nguyên dương.'); return; }
+    // Khoá nút trong lúc gửi: bấm đúp ở đây là thành hai khoản chi trùng nhau.
+    const nut = $('#cSave'), chu = nut.textContent;
+    nut.disabled = true; nut.textContent = 'Đang lưu…';
+    try {
+      if (suaLai) await apiPatch(`/api/funds/expenses/${e.id}`, than);
+      else await apiPost('/api/funds/expenses', than);
+    } catch (err) { loiChi(errText(err)); nut.disabled = false; nut.textContent = chu; return; }
+    await taiLaiSoChi();
+    toast(suaLai ? 'Đã lưu' : 'Đã ghi vào sổ chi');
+  };
+}
+
+function loiChi(t) { $('#cErr').textContent = t; $('#cErr').style.display = 'block'; }
+
+function xoaChi(e) {
+  openSheet(`
+   <h3>Xoá khoản chi</h3>
+   <p class="sub">“${esc(e.title)}” — ${vnMoney(e.amount)} đ.</p>
+   <div class="warn">Xoá xong số dư đổi ngay. Việc xoá vẫn hiện trong nhật ký nhóm và nhật ký hệ thống,
+     nên nếu chỉ ghi nhầm số thì nên sửa chứ đừng xoá.</div>
+   <div class="sa"><button class="big c" id="xcCancel">Thôi</button>
+     <button class="big go" id="xcGo">Xoá khỏi sổ</button></div>`);
+  $('#xcCancel').onclick = veSoChi;
+  // Cố ý không dùng submitting(): nó đóng sheet sau khi xong, mà ở đây muốn
+  // quay lại sổ chi để thấy số dư mới và xoá tiếp nếu cần.
+  $('#xcGo').onclick = async () => {
+    const nut = $('#xcGo');
+    nut.disabled = true; nut.textContent = 'Đang xoá…';
+    try { await apiDelete(`/api/funds/expenses/${e.id}`); }
+    catch (err) { toast(errText(err)); nut.disabled = false; nut.textContent = 'Xoá khỏi sổ'; return; }
+    await taiLaiSoChi();
+    toast('Đã xoá khỏi sổ chi');
+  };
 }
 
 /* ─── Passkey ─── */
@@ -1517,10 +1705,14 @@ async function openMe() {
    ${avatar(HOME.me.full_name)}
    <h3 style="margin-top:12px">${esc(HOME.me.full_name)}</h3>
    <p class="sub">${esc(HOME.group?.label ?? '')} · Khoá K03</p>
+   <button class="wide ghost" id="meEdit" style="margin-bottom:14px">Sửa hồ sơ của tôi</button>
    <div id="pkBox" class="mut" style="margin-bottom:14px">Đang xem passkey…</div>
    <div class="sa"><button class="big c" id="meClose">Đóng</button>
      <button class="big go" id="meLogout" style="background:var(--due)">Đăng xuất</button></div>`);
   $('#meClose').onclick = closeSheet;
+  // Đường sửa hồ sơ ngắn nhất: ai vào bằng link mời vì danh sách lớp ghi sai
+  // số của họ thì chữa ngay tại đây, không phải đi vòng qua tab Nhóm.
+  $('#meEdit').onclick = () => openMemberEdit(HOME.me.id);
   $('#meLogout').onclick = async () => {
     await apiPost('/api/auth/logout');
     closeSheet();

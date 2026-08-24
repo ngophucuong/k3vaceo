@@ -13,7 +13,10 @@ INSERT OR IGNORE INTO d1_migrations (name) VALUES
   ('0003_seed_group6.sql'),
   ('0004_invite_kind_and_rate_limit.sql'),
   ('0005_webauthn_challenges.sql'),
-  ('0006_wizard_and_presentation.sql');
+  ('0006_wizard_and_presentation.sql'),
+  ('0007_otp_and_self_onboarding.sql'),
+  ('0008_fund_expenses.sql'),
+  ('0009_phone_self_set.sql');
 
 -- Kiểm tra: dán tiếp scripts/verify-d1.sql — một dòng, cột cuối "ket_qua"
 -- phải là "ĐÚNG HẾT".

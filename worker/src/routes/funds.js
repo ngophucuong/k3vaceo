@@ -101,11 +101,21 @@ export async function listFunds(env, me) {
   const rounds = [];
   for (const r of all) rounds.push(await shapeRound(env, r, me));
 
+  // Số dư hai sổ đi kèm luôn, để tab Quỹ hiện được "còn lại bao nhiêu" mà
+  // không phải gọi thêm lượt nữa. Sổ nhóm chỉ có khi người này thuộc một nhóm.
+  const soQuy = {
+    group: me.group_id ? await summarizeScope(env, me.cohort_id, 'group', me.group_id) : null,
+    class: await summarizeScope(env, me.cohort_id, 'class', null),
+  };
+
   return json({
     rounds,
     banks: BANKS,
+    so_quy: soQuy,
     can_create_group: await isGroupOfficer(env, me.id, me.group_id),
     can_create_class: await isClassOfficer(env, me.id),
+    can_chi_group: me.group_id ? await canManageExpense(env, me, 'group', me.group_id) : false,
+    can_chi_class: await canManageExpense(env, me, 'class', null),
   });
 }
 
@@ -313,4 +323,299 @@ export async function postVerify(request, env, me, roundId, ip) {
     targetType: 'fund_round', targetId: round.id, after: { member_id: memberId }, ip,
   });
   return json({ ok: true, status_label: undo ? LABEL_DECLARED : LABEL_VERIFIED });
+}
+
+/* ─────────────────────── Sổ chi và số dư (Đợt 6) ───────────────────────
+ * Phần thu ở trên trả lời "ai đã chuyển tiền". Phần dưới trả lời câu mà
+ * người giữ tiền bị hỏi nhiều nhất: "quỹ còn bao nhiêu, tiêu vào những gì".
+ *
+ * Nguyên tắc N3 vẫn nguyên: ứng dụng không giữ tiền, chỉ ghi lại việc đã xảy
+ * ra ở ngoài đời. Nguyên tắc N4 nên không có bước duyệt chi — thay vào đó mọi
+ * khoản chi hiện công khai cho cả phạm vi đó xem, minh bạch thay cho phê duyệt.
+ */
+
+export const EXPENSE_CATEGORIES = [
+  { key: 'in_an', label: 'In ấn, tài liệu' },
+  { key: 'an_uong', label: 'Ăn uống, nước' },
+  { key: 'di_lai', label: 'Đi lại, thuê xe' },
+  { key: 'dia_diem', label: 'Thuê địa điểm' },
+  { key: 'qua_tang', label: 'Quà tặng, hoa' },
+  { key: 'hoc_lieu', label: 'Học liệu, phần mềm' },
+  { key: 'khac', label: 'Khác' },
+];
+const CATEGORY_KEYS = new Set(EXPENSE_CATEGORIES.map(c => c.key));
+const CATEGORY_LABEL = Object.fromEntries(EXPENSE_CATEGORIES.map(c => [c.key, c.label]));
+
+// Phạm vi hợp lệ của người đang đăng nhập: 'class' thì ai cùng khoá cũng
+// thuộc; 'group' thì chỉ nhóm của chính mình (nguyên tắc N6 — nhóm 8 không
+// đọc được gì của nhóm 6).
+function scopeOf(me, raw) {
+  if (raw === 'class') return { scope: 'class', groupId: null };
+  if (raw === 'group' || raw === undefined || raw === null || raw === '') {
+    return me.group_id ? { scope: 'group', groupId: me.group_id } : null;
+  }
+  return null;
+}
+
+// Ai được ghi khoản chi: Ban cán sự lớp với sổ lớp, trưởng/phó nhóm với sổ
+// nhóm, cộng người thu của bất kỳ đợt nào trong sổ ấy — người cầm tiền thật
+// phải ghi được, kể cả khi họ không giữ vai gì.
+async function canManageExpense(env, me, scope, groupId) {
+  if (scope === 'class') {
+    if (await isClassOfficer(env, me.id)) return true;
+    const row = await env.DB.prepare(
+      `SELECT 1 FROM fund_rounds WHERE cohort_id = ? AND scope = 'class' AND collector_member_id = ?`
+    ).bind(me.cohort_id, me.id).first();
+    return !!row;
+  }
+  if (groupId !== me.group_id) return false;
+  if (await isGroupOfficer(env, me.id, groupId)) return true;
+  const row = await env.DB.prepare(
+    `SELECT 1 FROM fund_rounds WHERE scope = 'group' AND group_id = ? AND collector_member_id = ?`
+  ).bind(groupId, me.id).first();
+  return !!row;
+}
+
+// Số tiền của một phạm vi. Chỉ khoản "người thu đã nhận" mới tính là tiền
+// thật đã vào quỹ — lời tự khai để riêng một dòng "đang chờ đối chiếu", đúng
+// ràng buộc câu chữ mục 6.4 SRS. Cộng dồn theo mức đóng của từng đợt.
+async function summarizeScope(env, cohortId, scope, groupId) {
+  const where = scope === 'class'
+    ? { sql: `r.cohort_id = ? AND r.scope = 'class'`, args: [cohortId] }
+    : { sql: `r.cohort_id = ? AND r.scope = 'group' AND r.group_id = ?`, args: [cohortId, groupId] };
+
+  const thu = await env.DB.prepare(
+    `SELECT
+       COALESCE(SUM(CASE WHEN d.verified_at IS NOT NULL THEN r.amount ELSE 0 END), 0) AS da_nhan,
+       COALESCE(SUM(CASE WHEN d.verified_at IS NULL AND d.declared_at IS NOT NULL THEN r.amount ELSE 0 END), 0) AS cho_doi_chieu,
+       COUNT(DISTINCT r.id) AS so_dot
+     FROM fund_rounds r
+     LEFT JOIN fund_declarations d ON d.round_id = r.id
+     WHERE ${where.sql} AND r.status <> 'draft'`
+  ).bind(...where.args).first();
+
+  const chiWhere = scope === 'class'
+    ? { sql: `cohort_id = ? AND scope = 'class'`, args: [cohortId] }
+    : { sql: `cohort_id = ? AND scope = 'group' AND group_id = ?`, args: [cohortId, groupId] };
+  const chi = await env.DB.prepare(
+    `SELECT COALESCE(SUM(amount), 0) AS tong, COUNT(*) AS so_khoan FROM fund_expenses WHERE ${chiWhere.sql}`
+  ).bind(...chiWhere.args).first();
+
+  const daNhan = thu?.da_nhan ?? 0;
+  const tongChi = chi?.tong ?? 0;
+  return {
+    scope,
+    da_nhan: daNhan,
+    cho_doi_chieu: thu?.cho_doi_chieu ?? 0,
+    da_chi: tongChi,
+    con_lai: daNhan - tongChi,
+    so_dot: thu?.so_dot ?? 0,
+    so_khoan_chi: chi?.so_khoan ?? 0,
+  };
+}
+
+function shapeExpense(row) {
+  return {
+    id: row.id,
+    scope: row.scope,
+    title: row.title,
+    category: row.category,
+    category_label: row.category ? (CATEGORY_LABEL[row.category] ?? row.category) : null,
+    amount: row.amount,
+    spent_on: row.spent_on,
+    payee: row.payee,
+    note: row.note,
+    receipt_url: row.receipt_url,
+    round_id: row.round_id,
+    round_title: row.round_title ?? null,
+    created_by_name: row.created_by_name ?? null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// Sổ chi mở cho cả phạm vi xem — khác sổ thu (chỉ người thu và Ban cán sự
+// lớp). Xem khoản chi không lộ chuyện riêng của ai; giấu đi thì mất luôn lý do
+// tồn tại của cái sổ.
+export async function listExpenses(env, me, url) {
+  const sel = scopeOf(me, url.searchParams.get('scope'));
+  if (!sel) return error('scope_invalid', 422);
+
+  const where = sel.scope === 'class'
+    ? { sql: `e.cohort_id = ? AND e.scope = 'class'`, args: [me.cohort_id] }
+    : { sql: `e.cohort_id = ? AND e.scope = 'group' AND e.group_id = ?`, args: [me.cohort_id, sel.groupId] };
+
+  const rows = await env.DB.prepare(
+    `SELECT e.*, m.full_name AS created_by_name, r.title AS round_title
+     FROM fund_expenses e
+     LEFT JOIN members m ON m.id = e.created_by
+     LEFT JOIN fund_rounds r ON r.id = e.round_id
+     WHERE ${where.sql}
+     ORDER BY COALESCE(e.spent_on, date(e.created_at)) DESC, e.id DESC`
+  ).bind(...where.args).all();
+
+  return json({
+    scope: sel.scope,
+    summary: await summarizeScope(env, me.cohort_id, sel.scope, sel.groupId),
+    expenses: (rows.results ?? []).map(shapeExpense),
+    categories: EXPENSE_CATEGORIES,
+    can_manage: await canManageExpense(env, me, sel.scope, sel.groupId),
+  });
+}
+
+// Đọc và kiểm phần thân dùng chung cho tạo mới và sửa. Trả { loi } khi hỏng.
+async function readExpenseBody(env, me, body, sel) {
+  const title = cleanText(body.title, 120);
+  if (!title) return { loi: 'title_required' };
+
+  const amount = Number(body.amount);
+  if (!Number.isInteger(amount) || amount <= 0 || amount > 1_000_000_000) return { loi: 'amount_invalid' };
+
+  const category = cleanText(body.category, 20);
+  if (category && !CATEGORY_KEYS.has(category)) return { loi: 'category_invalid' };
+
+  // Ngày chi do người dùng gõ, nên chỉ nhận đúng khuôn YYYY-MM-DD rồi để
+  // SQLite tự soi bằng date() — chuỗi rác lọt vào là mọi phép sắp xếp sai.
+  const spentOn = cleanText(body.spent_on, 10);
+  if (spentOn && !/^\d{4}-\d{2}-\d{2}$/.test(spentOn)) return { loi: 'spent_on_invalid' };
+  if (spentOn) {
+    const ok = await env.DB.prepare(`SELECT date(?) IS NOT NULL AS ok`).bind(spentOn).first();
+    if (!ok?.ok) return { loi: 'spent_on_invalid' };
+  }
+
+  // Nguyên tắc N2 — ứng dụng không giữ file. Ảnh hoá đơn nằm trên Drive, ở
+  // đây chỉ có đường dẫn, và bắt buộc https như mọi liên kết trong Kho.
+  const receiptUrl = cleanText(body.receipt_url, 2000);
+  if (receiptUrl && !/^https:\/\/[^\s/]+\./i.test(receiptUrl)) return { loi: 'url_must_be_https' };
+
+  let roundId = null;
+  if (body.round_id !== null && body.round_id !== undefined && body.round_id !== '') {
+    roundId = Number(body.round_id);
+    if (!Number.isInteger(roundId) || roundId <= 0) return { loi: 'round_invalid' };
+    const r = await loadRound(env, roundId);
+    if (!r || r.cohort_id !== me.cohort_id || r.scope !== sel.scope ||
+        (sel.scope === 'group' && r.group_id !== sel.groupId)) return { loi: 'round_invalid' };
+  }
+
+  return {
+    title, amount, category, spentOn, receiptUrl, roundId,
+    payee: cleanText(body.payee, 120),
+    note: cleanText(body.note, 300),
+  };
+}
+
+export async function postExpense(request, env, me, ip) {
+  const body = await readJson(request);
+  const sel = scopeOf(me, body.scope);
+  if (!sel) return error('scope_invalid', 422);
+  if (!(await canManageExpense(env, me, sel.scope, sel.groupId))) return error('forbidden', 403);
+
+  const v = await readExpenseBody(env, me, body, sel);
+  if (v.loi) return error(v.loi, 422);
+
+  const row = await env.DB.prepare(
+    `INSERT INTO fund_expenses
+       (cohort_id, scope, group_id, round_id, title, category, amount, spent_on, payee, note,
+        receipt_url, created_by, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+     RETURNING id`
+  ).bind(
+    me.cohort_id, sel.scope, sel.groupId, v.roundId, v.title, v.category, v.amount,
+    v.spentOn, v.payee, v.note, v.receiptUrl, me.id
+  ).first();
+
+  await logAudit(env, {
+    actorId: me.id, action: 'expense.create', targetType: 'fund_expense', targetId: row.id,
+    after: { scope: sel.scope, title: v.title, amount: v.amount, spent_on: v.spentOn }, ip,
+  });
+  await logActivity(env, {
+    cohortId: me.cohort_id, groupId: sel.scope === 'group' ? sel.groupId : me.group_id, actorId: me.id,
+    verb: 'expense.create', objectType: 'fund_expense', objectId: row.id,
+    summary: `ghi khoản chi "${v.title}"`,
+  });
+
+  return json({ ok: true, id: row.id });
+}
+
+async function loadExpense(env, me, id) {
+  const row = await env.DB.prepare('SELECT * FROM fund_expenses WHERE id = ?').bind(id).first();
+  if (!row || row.cohort_id !== me.cohort_id) return null;
+  // Nguyên tắc N6: khoản chi của nhóm khác coi như không tồn tại. Trả 404 chứ
+  // không 403 — 403 là xác nhận id đó có thật (quy ước mục 6 CLAUDE.md).
+  if (row.scope === 'group' && row.group_id !== me.group_id) return null;
+  return row;
+}
+
+export async function patchExpense(request, env, me, id, ip) {
+  const cur = await loadExpense(env, me, id);
+  if (!cur) return error('not_found', 404);
+  const sel = { scope: cur.scope, groupId: cur.group_id };
+  if (!(await canManageExpense(env, me, sel.scope, sel.groupId))) return error('forbidden', 403);
+
+  const body = await readJson(request);
+  // Sửa từng phần: field nào không gửi thì giữ nguyên giá trị cũ.
+  const merged = {
+    title: 'title' in body ? body.title : cur.title,
+    amount: 'amount' in body ? body.amount : cur.amount,
+    category: 'category' in body ? body.category : cur.category,
+    spent_on: 'spent_on' in body ? body.spent_on : cur.spent_on,
+    payee: 'payee' in body ? body.payee : cur.payee,
+    note: 'note' in body ? body.note : cur.note,
+    receipt_url: 'receipt_url' in body ? body.receipt_url : cur.receipt_url,
+    round_id: 'round_id' in body ? body.round_id : cur.round_id,
+  };
+  const v = await readExpenseBody(env, me, merged, sel);
+  if (v.loi) return error(v.loi, 422);
+
+  await env.DB.prepare(
+    `UPDATE fund_expenses SET title = ?, category = ?, amount = ?, spent_on = ?, payee = ?,
+       note = ?, receipt_url = ?, round_id = ?, updated_at = datetime('now')
+     WHERE id = ?`
+  ).bind(v.title, v.category, v.amount, v.spentOn, v.payee, v.note, v.receiptUrl, v.roundId, id).run();
+
+  await logAudit(env, {
+    actorId: me.id, action: 'expense.update', targetType: 'fund_expense', targetId: id,
+    before: { title: cur.title, amount: cur.amount, spent_on: cur.spent_on },
+    after: { title: v.title, amount: v.amount, spent_on: v.spentOn }, ip,
+  });
+  return json({ ok: true });
+}
+
+// Xoá hẳn dòng, nhưng audit_log giữ nguyên nội dung cũ và nhật ký nhóm ghi
+// công khai — sổ tiền mà xoá không dấu vết thì không còn là sổ.
+export async function deleteExpense(env, me, id, ip) {
+  const cur = await loadExpense(env, me, id);
+  if (!cur) return error('not_found', 404);
+  if (!(await canManageExpense(env, me, cur.scope, cur.group_id))) return error('forbidden', 403);
+
+  await env.DB.prepare('DELETE FROM fund_expenses WHERE id = ?').bind(id).run();
+
+  await logAudit(env, {
+    actorId: me.id, action: 'expense.delete', targetType: 'fund_expense', targetId: id,
+    before: {
+      title: cur.title, amount: cur.amount, spent_on: cur.spent_on, payee: cur.payee,
+      note: cur.note, receipt_url: cur.receipt_url, category: cur.category, round_id: cur.round_id,
+    }, ip,
+  });
+  await logActivity(env, {
+    cohortId: me.cohort_id, groupId: cur.scope === 'group' ? cur.group_id : me.group_id, actorId: me.id,
+    verb: 'expense.delete', objectType: 'fund_expense', objectId: id,
+    summary: `xoá khoản chi "${cur.title}"`,
+  });
+  return json({ ok: true });
+}
+
+// Danh sách người trong khoá để chọn người thu cho đợt quỹ LỚP. Chặn bằng
+// isClassOfficer — chỉ ai tạo được đợt lớp mới cần danh sách này, và giữ
+// nguyên tắc N6 với người còn lại (nhóm khác vẫn không đọc được gì thêm:
+// tên và số nhóm là thứ cả lớp đã biết, không kèm điện thoại hay email).
+export async function getClassMembers(env, me) {
+  if (!(await isClassOfficer(env, me.id))) return error('forbidden', 403);
+  const rows = await env.DB.prepare(
+    `SELECT m.id, m.full_name, g.no AS group_no
+     FROM members m LEFT JOIN groups g ON g.id = m.group_id
+     WHERE m.cohort_id = ? AND m.is_active = 1
+     ORDER BY g.no, m.full_name`
+  ).bind(me.cohort_id).all();
+  return json({ members: rows.results ?? [] });
 }

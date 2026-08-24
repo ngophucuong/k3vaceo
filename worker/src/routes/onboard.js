@@ -226,21 +226,31 @@ async function doiChieu(env, body) {
   const person = await env.DB.prepare('SELECT * FROM roster WHERE id = ?').bind(rosterId).first();
   if (!person) return { loi: 'roster_not_found', ma: 404 };
 
-  // Ban tổ chức chưa có số của người này (44/134 người). Không đối chiếu được
-  // thì không cho qua — nhưng nói rõ để họ biết đường nhắn trưởng nhóm, chứ
-  // báo "sai số" thì họ gõ lại cả buổi.
-  if (!person.phone) {
+  const member = await env.DB.prepare(
+    'SELECT id, full_name, email, claimed_at, phone, phone_self_set_at FROM members WHERE roster_id = ?'
+  ).bind(rosterId).first();
+
+  // Hai số được coi là hợp lệ để đối chiếu:
+  //   1. Số Ban tổ chức ghi trong danh sách gốc (roster.phone).
+  //   2. Số mà CHÍNH CHỦ đã tự sửa trong hồ sơ (members.phone có dấu
+  //      phone_self_set_at) — dành cho ai bị ghi sai số hoặc chưa có số nào:
+  //      vào bằng link mời, sửa đúng số của mình, từ lần sau tự vào được.
+  // Cố ý không nhận số do người cùng nhóm sửa hộ: nhận thì A sửa số của B
+  // thành số mình rồi vào /vao nhận là B, đổi luôn email đăng nhập của B.
+  const soHopLe = [person.phone];
+  if (member?.phone && member.phone_self_set_at) soHopLe.push(member.phone);
+  const soDoiChieu = soHopLe.filter(Boolean);
+
+  // Không có số nào để soi (44/134 người trong danh sách gốc). Nói rõ để họ
+  // biết đường xin link mời, chứ báo "sai số" thì họ gõ lại cả buổi.
+  if (!soDoiChieu.length) {
     return { loi: 'phone_missing_in_roster', ma: 409,
              them: { full_name: person.full_name, group_label: person.group_label } };
   }
 
   if (!isValidVnPhone(body.phone)) return { loi: 'phone_invalid', ma: 422 };
   // Cố tình KHÔNG nói lệch ở chỗ nào — nói ra là biến ô này thành công cụ dò số.
-  if (!phonesMatch(person.phone, body.phone)) return { loi: 'phone_mismatch', ma: 401 };
-
-  const member = await env.DB.prepare(
-    'SELECT id, full_name, email, claimed_at FROM members WHERE roster_id = ?'
-  ).bind(rosterId).first();
+  if (!soDoiChieu.some(so => phonesMatch(so, body.phone))) return { loi: 'phone_mismatch', ma: 401 };
 
   return { person, member: member ?? null };
 }

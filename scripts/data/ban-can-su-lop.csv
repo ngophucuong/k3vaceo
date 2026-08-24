@@ -1,0 +1,14 @@
+# Ban cán sự lớp — vai cấp lớp (officers có group_id để trống).
+#
+# Cột stt là SỐ THỨ TỰ trong danh sách 134 người của Ban tổ chức, không phải
+# tên — vì trong lớp có hai người trùng tên (hai bà Phan Thị Thanh Nga), khoá
+# theo tên là có ngày gán nhầm người.
+#
+# vai_tro nhận đúng ba giá trị: lop_truong | lop_pho | thu_quy
+#
+# Sửa tệp này rồi sửa .github/ban-can-su-lop.trigger và đẩy lên là workflow tự nạp.
+# Nạp lại nhiều lần được: bản cũ của cùng một vai sẽ bị đánh dấu hết hiệu lực
+# (superseded_at), không xoá, để còn lần theo lịch sử.
+vai_tro,stt,ho_ten,ghi_chu
+lop_truong,65,Lưu Minh Tiến,Lớp trưởng lớp CEO K03
+thu_quy,84,Vũ Thị Ngân Hà,"Thủ quỹ lớp. Thông báo của lớp ghi tên ngắn ""Vũ Thị Ngân"" và ghi Nhóm 1; danh sách Ban tổ chức chỉ có Vũ Thị Ngân Hà ở Nhóm 7. Nếu là hai người khác nhau thì sửa lại stt ở dòng này."

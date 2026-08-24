@@ -18,7 +18,8 @@ import { postInsight, deleteInsight } from './routes/insights.js';
 import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
 import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
          postVerifyMyEmail, postVerifyMyEmailConfirm } from './routes/onboard.js';
-import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify } from './routes/funds.js';
+import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify,
+         listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers } from './routes/funds.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
@@ -173,6 +174,17 @@ export default {
 
       if (pathname === '/api/funds' && method === 'GET') return listFunds(env, me);
       if (pathname === '/api/funds' && method === 'POST') return postFund(request, env, me, ip);
+      // Sổ chi phải đứng trước /api/funds/:id — tuy 'expenses' không khớp \d+
+      // nên không thật sự tranh chấp, xếp trước cho khỏi phải nghĩ lại sau này.
+      if (pathname === '/api/funds/class-members' && method === 'GET') return getClassMembers(env, me);
+      if (pathname === '/api/funds/expenses' && method === 'GET') return listExpenses(env, me, url);
+      if (pathname === '/api/funds/expenses' && method === 'POST') return postExpense(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/funds\/expenses\/(\d+)$/)) && method === 'PATCH') {
+        return patchExpense(request, env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/funds\/expenses\/(\d+)$/)) && method === 'DELETE') {
+        return deleteExpense(env, me, Number(m[1]), ip);
+      }
       if ((m = pathname.match(/^\/api\/funds\/(\d+)$/)) && method === 'PATCH') {
         return patchFund(request, env, me, Number(m[1]), ip);
       }

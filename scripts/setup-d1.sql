@@ -10,7 +10,7 @@
 -- Chạy đúng một lần trên một cơ sở dữ liệu trống. Chạy lần hai sẽ báo lỗi
 -- "table already exists" — đó là dấu hiệu tốt, nghĩa là dữ liệu cũ còn nguyên.
 --
--- Gồm 6 migration: 0001_init.sql, 0002_seed_roster.sql, 0003_seed_group6.sql, 0004_invite_kind_and_rate_limit.sql, 0005_webauthn_challenges.sql, 0006_wizard_and_presentation.sql
+-- Gồm 9 migration: 0001_init.sql, 0002_seed_roster.sql, 0003_seed_group6.sql, 0004_invite_kind_and_rate_limit.sql, 0005_webauthn_challenges.sql, 0006_wizard_and_presentation.sql, 0007_otp_and_self_onboarding.sql, 0008_fund_expenses.sql, 0009_phone_self_set.sql
 -- ═══════════════════════════════════════════════════════════════
 
 
@@ -575,6 +575,120 @@ CREATE INDEX ix_join_requests_group ON join_requests(group_id, status);
 ALTER TABLE plan_sections ADD COLUMN present_member_id INTEGER;
 ALTER TABLE plan_sections ADD COLUMN present_minutes INTEGER;
 
+-- ─────────────────────────────────────────────────────────────
+-- 0007_otp_and_self_onboarding.sql
+-- ─────────────────────────────────────────────────────────────
+-- Đợt 5 — tự nhận diện bằng tên + số điện thoại, rồi OTP 6 số qua email.
+--
+-- Vì sao KHÔNG nhét mã OTP vào bảng invites như magic link: cột
+-- invites.token_hash là UNIQUE. Mã 6 số chỉ có một triệu khả năng, nên cùng
+-- một người xin mã nhiều lần là có ngày trùng mã → trùng hash → vỡ ràng buộc
+-- UNIQUE ngay giữa luồng đăng nhập. Thêm nữa OTP cần đếm số lần nhập sai, thứ
+-- mà invites không có. Tách bảng riêng là đúng bản chất.
+CREATE TABLE otp_codes (
+  id         INTEGER PRIMARY KEY,
+  member_id  INTEGER NOT NULL,
+  code_hash  TEXT NOT NULL,              -- sha256("<member_id>:<mã 6 số>")
+  attempts   INTEGER NOT NULL DEFAULT 0, -- nhập sai mấy lần; quá ngưỡng thì mã chết
+  expires_at TEXT NOT NULL,
+  used_at    TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Tra "mã còn sống mới nhất của người này" — đường truy vấn duy nhất khi xác
+-- minh, chạy mỗi lần ai đó gõ 6 số.
+CREATE INDEX ix_otp_member ON otp_codes(member_id, used_at, expires_at);
+
+-- Mốc chứng minh chính chủ cầm hộp thư đó, khác hẳn "có điền email".
+-- Nút đăng ký passkey chỉ hiện khi cột này khác NULL.
+ALTER TABLE members ADD COLUMN email_verified_at TEXT;
+
+-- Ngô Phú Cường đã nhận và mở thư đăng nhập thật ngày 24/8 (magic link của
+-- Đợt 2, trước khi có cột này), tức đã chứng minh cầm hộp thư. Không đánh dấu
+-- thì chính người dựng lại là người duy nhất không đăng ký được passkey.
+UPDATE members
+   SET email_verified_at = datetime('now')
+ WHERE email IS NOT NULL AND claimed_at IS NOT NULL;
+
+-- ─────────────────────────────────────────────────────────────
+-- 0008_fund_expenses.sql
+-- ─────────────────────────────────────────────────────────────
+-- Đợt 6: sổ chi của quỹ.
+--
+-- Lệch có chủ ý so với DDL nguyên văn mục 3 SRS: SRS chỉ tả phần THU
+-- (fund_rounds + fund_declarations). Thực tế quỹ lớp và quỹ nhóm còn phải chi
+-- ra, và nếu không ghi được khoản chi thì "số dư quỹ" là con số không ai tính
+-- được — người giữ tiền phải kê tay ra Zalo, đúng cái mà nguyên tắc N1 muốn
+-- tránh (Zalo để bàn, ứng dụng để chốt).
+--
+-- Ba quyết định thiết kế, ghi lại để sau khỏi phải đoán:
+--
+-- 1. Khoản chi gắn vào PHẠM VI (quỹ lớp / quỹ của một nhóm), không bắt buộc
+--    gắn vào một đợt thu. Quỹ là một cái nồi chảy liên tục: tiền thu đợt 1 có
+--    thể tiêu ở tuần thứ ba. Cột round_id vẫn có, để trống được, chỉ dùng khi
+--    người ghi muốn nói rõ "khoản này tiêu từ đợt thu ấy".
+--
+-- 2. receipt_url là URL, không phải tệp — nguyên tắc N2, ứng dụng không giữ
+--    file. Ảnh hoá đơn để trên Drive rồi dán đường dẫn vào đây.
+--
+-- 3. Không có bước duyệt chi. Nguyên tắc N4 — tự giác là chính. Ai ghi, ghi
+--    lúc nào, sửa gì đều nằm trong audit_log và hiện công khai cho cả phạm vi
+--    đó xem; minh bạch thay cho phê duyệt.
+
+CREATE TABLE fund_expenses (
+  id          INTEGER PRIMARY KEY,
+  cohort_id   INTEGER NOT NULL REFERENCES cohorts(id),
+  scope       TEXT    NOT NULL CHECK (scope IN ('class', 'group')),
+  group_id    INTEGER REFERENCES groups(id),
+  round_id    INTEGER REFERENCES fund_rounds(id),
+  title       TEXT    NOT NULL,
+  category    TEXT,
+  amount      INTEGER NOT NULL CHECK (amount > 0),
+  spent_on    TEXT,
+  payee       TEXT,
+  note        TEXT,
+  receipt_url TEXT,
+  created_by  INTEGER NOT NULL REFERENCES members(id),
+  created_at  TEXT DEFAULT (datetime('now')),
+  updated_at  TEXT,
+
+  -- Quỹ nhóm bắt buộc có group_id, quỹ lớp bắt buộc không có: chặn ngay ở
+  -- lược đồ để không bao giờ có khoản chi "lơ lửng" không thuộc sổ nào.
+  CHECK ((scope = 'group' AND group_id IS NOT NULL) OR (scope = 'class' AND group_id IS NULL))
+);
+
+CREATE INDEX ix_expense_scope ON fund_expenses(cohort_id, scope, group_id, spent_on);
+CREATE INDEX ix_expense_round ON fund_expenses(round_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- 0009_phone_self_set.sql
+-- ─────────────────────────────────────────────────────────────
+-- Đợt 6: cho người có số điện thoại sai trong danh sách gốc tự chữa được.
+--
+-- Vấn đề: màn tự nhận diện /vao đối chiếu số người dùng gõ với roster.phone.
+-- Ai bị Ban tổ chức ghi sai số (Lê Trung Đức: 098778525, thiếu một chữ số) hay
+-- không có số nào (44/134 người) thì vĩnh viễn không tự vào được — mỗi lần lại
+-- phải xin một link mời. Họ vào bằng link mời, sửa đúng số của mình trong hồ
+-- sơ, nhưng lần sau /vao vẫn không nhận vì nó chỉ soi bảng roster.
+--
+-- Cách chữa: cho /vao chấp nhận cả số trong members.phone. Nhưng members.phone
+-- thì người CÙNG NHÓM cũng sửa hộ được (ma trận mục 2.2 SRS cho phép), nên nếu
+-- nhận bừa thì thành lỗ hổng: A sửa số của B thành số của A, rồi vào /vao nhận
+-- mình là B và đổi luôn email đăng nhập của B.
+--
+-- Nên thêm cột này: chỉ đánh dấu khi CHÍNH CHỦ tự sửa số của mình. /vao chỉ
+-- chấp nhận members.phone khi cột này khác NULL. Người sửa hộ không tạo được
+-- dấu này, nên đường sửa hộ không mở ra lối chiếm tài khoản.
+
+ALTER TABLE members ADD COLUMN phone_self_set_at TEXT;
+
+-- Ai đã tự nhận chỗ và đang có số khác số Ban tổ chức ghi thì số ấy do chính
+-- họ điền lúc nhận chỗ — đánh dấu luôn, khỏi bắt sửa lại lần nữa.
+UPDATE members SET phone_self_set_at = datetime('now')
+ WHERE claimed_at IS NOT NULL
+   AND phone IS NOT NULL
+   AND phone <> COALESCE((SELECT r.phone FROM roster r WHERE r.id = members.roster_id), '');
+
 
 -- ─────────────────────────────────────────────────────────────
 -- Đánh dấu đã áp, để wrangler không chạy lại lên dữ liệu thật
@@ -590,4 +704,7 @@ INSERT OR IGNORE INTO d1_migrations (name) VALUES
   ('0003_seed_group6.sql'),
   ('0004_invite_kind_and_rate_limit.sql'),
   ('0005_webauthn_challenges.sql'),
-  ('0006_wizard_and_presentation.sql');
+  ('0006_wizard_and_presentation.sql'),
+  ('0007_otp_and_self_onboarding.sql'),
+  ('0008_fund_expenses.sql'),
+  ('0009_phone_self_set.sql');

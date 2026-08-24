@@ -1,0 +1,71 @@
+name: Gán Ban cán sự lớp
+
+# Sửa scripts/data/ban-can-su-lop.csv rồi commit là chạy. Không cần terminal —
+# sửa thẳng bằng trình soạn thảo web của GitHub cũng được.
+on:
+  push:
+    paths: ['scripts/data/ban-can-su-lop.csv']
+  workflow_dispatch:
+
+concurrency:
+  group: ban-can-su-lop
+  cancel-in-progress: false
+
+jobs:
+  nap:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER: npx wrangler d1 execute k3vaceo --remote --yes --config worker/wrangler.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+
+      # Kiểm TRƯỚC khi chạm vào D1: vai lạ, số thứ tự ngoài 1–134, hoặc một vai
+      # gán cho hai người thì dừng ngay.
+      - name: Kiểm tệp CSV
+        run: node scripts/build-officer-sql.mjs
+
+      - name: Sinh SQL
+        run: node scripts/build-officer-sql.mjs --ra /tmp/bcs.sql
+
+      # Nạp bằng --file (đường import của D1 tự cắt lô), rồi đọc kết quả bằng
+      # --command ở bước sau: --file KHÔNG trả về dòng nào của SELECT.
+      - name: Nạp lên D1 thật
+        run: $WRANGLER --file=/tmp/bcs.sql
+
+      # Đọc lại từ D1 chứ không tin bước ghi. Tên trong CSV lệch tên trong danh
+      # sách gốc thì không câu nào chạm được dòng nào, và chỗ này sẽ bắt được.
+      - name: Đọc lại xem ai đang giữ vai gì
+        run: |
+          SQL="SELECT o.role AS vai, m.full_name AS nguoi, g.label AS nhom_dang_o,
+                      COALESCE(m.email, '(chưa khai email)') AS email,
+                      o.effective_from AS tu_ngay
+                 FROM officers o
+                 JOIN members m ON m.id = o.member_id
+                 LEFT JOIN groups g ON g.id = m.group_id
+                WHERE o.group_id IS NULL AND o.superseded_at IS NULL
+                ORDER BY o.role;"
+          $WRANGLER --json --command "$SQL" > /tmp/kq.json
+          node --input-type=commonjs -e '
+            const raw = require("fs").readFileSync("/tmp/kq.json", "utf8");
+            const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
+            const kq = JSON.parse(raw.slice(d, c + 1));
+            const rows = (Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || []);
+            const canCo = require("fs").readFileSync("scripts/data/ban-can-su-lop.csv", "utf8")
+              .split("\n").filter(l => l.trim() && !l.trimStart().startsWith("#")).length - 1;
+            if (!rows.length) { console.error("✗ Không có vai cấp lớp nào — kiểm tra lại họ tên trong CSV."); process.exit(1); }
+            for (const r of rows)
+              console.log(`${String(r.vai).padEnd(11)} → ${r.nguoi} (${r.nhom_dang_o || "chưa có nhóm"}) · ${r.email} · từ ${r.tu_ngay}`);
+            if (rows.length !== canCo) {
+              console.error(`\n✗ CSV có ${canCo} vai nhưng D1 chỉ nhận ${rows.length}. Thường là họ tên viết lệch so với danh sách gốc.`);
+              process.exit(1);
+            }
+            console.log("\n✓ ĐÚNG HẾT. Ban cán sự lớp đã có quyền tạo đợt thu quỹ lớp và ghi sổ chi quỹ lớp.");
+            console.log("  Họ vẫn phải tự vào ứng dụng ở /vao để nhận hồ sơ trước khi dùng được.");
+          '

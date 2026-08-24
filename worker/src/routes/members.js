@@ -90,10 +90,18 @@ export async function patchMember(request, env, me, targetId) {
     if (taken) return error('email_taken', 409, { taken_by: taken.full_name });
   }
 
+  // Chính chủ tự đổi số của mình thì đánh dấu — màn tự nhận diện /vao chỉ tin
+  // số có dấu này (xem migration 0009). Người cùng nhóm sửa hộ KHÔNG tạo được
+  // dấu, nên đường sửa hộ không biến thành lối chiếm tài khoản.
+  const tuDoiSo = me.id === target.id && next.phone && next.phone !== target.phone;
+
   try {
     await env.DB.prepare(
-      `UPDATE members SET title = ?, company = ?, phone = ?, email = ?, updated_at = datetime('now') WHERE id = ?`
-    ).bind(next.title, next.company, next.phone, next.email, target.id).run();
+      `UPDATE members SET title = ?, company = ?, phone = ?, email = ?,
+         phone_self_set_at = CASE WHEN ? = 1 THEN datetime('now') ELSE phone_self_set_at END,
+         updated_at = datetime('now')
+       WHERE id = ?`
+    ).bind(next.title, next.company, next.phone, next.email, tuDoiSo ? 1 : 0, target.id).run();
   } catch (err) {
     if (String(err).includes('UNIQUE')) return error('email_taken', 409);
     throw err;
