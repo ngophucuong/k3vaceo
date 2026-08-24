@@ -111,6 +111,7 @@ const apiDelete = p => api(p, { method: 'DELETE' });
 /* ═══════════ TRẠNG THÁI ═══════════ */
 let HOME = null;      // /api/home gần nhất
 let PLAN = null;      // /api/plan gần nhất
+let KHO_CAN_LOP = false;  // mình có đăng được tư liệu cấp lớp không
 let MEMBERS = [];     // /api/members gần nhất
 
 const iAmOfficer = () => !!HOME?.officers?.some(o => o.member_id === HOME.me.id);
@@ -1441,23 +1442,50 @@ async function openOfficerEdit(role, label) {
 
 /* ─── Tư liệu (mã trong nguồn vẫn là 'kho' — đổi id sẽ vỡ đường dẫn và API) ─── */
 const KHO_FILTERS = [['all', 'Tất cả'], ['bai', 'Cho bài'], ['buoi', 'Theo buổi'], ['lop', 'Lớp K03']];
+// Một dòng tư liệu. Tách ra hàm riêng vì nay vẽ ở hai chỗ: mục của lớp và
+// mục của nhóm.
+function veDongTuLieu(r) {
+  const than = `<span class="ext">${esc(r.kind)}</span>
+    <div class="b"><div class="t">${esc(r.title)}</div>
+    <div class="m">${r.url ? vnDate(r.created_at) : 'chưa có đường dẫn — điền khi có'}</div></div>`;
+  return r.url
+    ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${than}
+        <span style="color:var(--ink3)">↗</span></a>`
+    : `<div class="rs" style="cursor:default">${than}</div>`;
+}
+
 async function drawKho(tag) {
   if (!$('#v-kho').dataset.loaded) $('#v-kho').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
-  const { links } = await apiGet(tag && tag !== 'all' ? `/api/links?tag=${encodeURIComponent(tag)}` : '/api/links');
+  const kq = await apiGet(tag && tag !== 'all' ? `/api/links?tag=${encodeURIComponent(tag)}` : '/api/links');
+  const links = kq.links;
+  KHO_CAN_LOP = !!kq.can_dang_lop;
   $('#v-kho').dataset.loaded = '1';
+
+  // Tư liệu của LỚP để riêng và để TRÊN. Trộn chung thì không ai phân biệt
+  // được đâu là bản Ban tổ chức phát cho cả khoá, đâu là ghi chép riêng của
+  // nhóm — mà hai thứ ấy có sức nặng khác hẳn nhau.
+  const cuaLop = links.filter(r => r.scope === 'class');
+  const cuaNhom = links.filter(r => r.scope !== 'class');
+
   $('#v-kho').innerHTML = `
   <div class="foot" style="padding:0 2px 14px">
     Tư liệu chỉ giữ đường dẫn. File vẫn nằm ở Drive của người làm ra nó — ứng dụng không chứa,
     không sao lưu, không đứng tên.
   </div>
   <div class="fl">${KHO_FILTERS.map(([k, l]) => `<button class="fc ${tag === k ? 'on' : ''}" data-tag="${k}">${l}</button>`).join('')}</div>
-  <div class="card">${links.length ? links.map(r => r.url
-      ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">
-          <span class="ext">${esc(r.kind)}</span><div class="b"><div class="t">${esc(r.title)}</div>
-          <div class="m">${vnDate(r.created_at)}</div></div><span style="color:var(--ink3)">↗</span></a>`
-      : `<div class="rs" style="cursor:default"><span class="ext">${esc(r.kind)}</span>
-          <div class="b"><div class="t">${esc(r.title)}</div><div class="m">chưa có đường dẫn — điền khi có</div></div></div>`
-    ).join('') : '<div class="cb mut">Chưa có liên kết nào trong mục này.</div>'}</div>
+
+  ${cuaLop.length ? `<div class="sect">
+    <div class="eb">Tư liệu của lớp <span class="c">${cuaLop.length}</span></div>
+    <div class="card">${cuaLop.map(veDongTuLieu).join('')}</div>
+    <div class="foot">Ban cán sự lớp đăng, cả mười nhóm cùng thấy.</div>
+  </div>` : ''}
+
+  <div class="sect">
+    ${cuaLop.length ? `<div class="eb">Tư liệu của nhóm${HOME?.group?.no ? ' ' + HOME.group.no : ''}</div>` : ''}
+    <div class="card">${cuaNhom.length ? cuaNhom.map(veDongTuLieu).join('')
+      : '<div class="cb mut">Chưa có liên kết nào trong mục này.</div>'}</div>
+  </div>
+
   <button class="wide ghost" style="margin-top:12px" id="addLinkBtn">+ Gắn một liên kết</button>
   <div class="foot"></div>`;
 
@@ -1473,10 +1501,21 @@ function openLinkAdd() {
    <label class="f">Gọi là gì</label><input id="lN" maxlength="200" placeholder="Báo cáo thị trường FMCG 2025">
    <label class="f">Loại</label><select id="lK"><option>DRIVE</option><option>SHEET</option><option>DOCX</option><option>PDF</option><option>WEB</option></select>
    <label class="f">Dùng cho</label><select id="lT"><option value="bai">Cho bài</option><option value="buoi">Theo buổi</option><option value="lop">Lớp K03</option></select>
+   ${KHO_CAN_LOP ? `<label class="f">Ai thấy được</label>
+   <select id="lS"><option value="group">Chỉ nhóm mình</option><option value="class">Cả lớp — cả mười nhóm</option></select>
+   <div class="hintline" id="lSHint"></div>` : ''}
    <div id="lErr" class="errline" style="display:none"></div>
    <div class="sa"><button class="big c" id="lCancel">Thôi</button>
      <button class="big go" id="lSave">Gắn vào</button></div>`);
   $('#lCancel').onclick = closeSheet;
+  if ($('#lS')) {
+    const veHint = () => {
+      $('#lSHint').innerHTML = $('#lS').value === 'class'
+        ? '<b>Cả lớp thấy.</b> Dùng cho thứ Ban tổ chức phát chung: slide bài giảng, mẫu kế hoạch kinh doanh.'
+        : 'Chỉ nhóm bạn thấy. Nhóm khác không đọc được.';
+    };
+    $('#lS').onchange = veHint; veHint();
+  }
   $('#lSave').onclick = async () => {
     if (!/^https:\/\//i.test($('#lU').value.trim())) {
       $('#lErr').textContent = 'Cần đường dẫn bắt đầu bằng https://';
@@ -1485,6 +1524,7 @@ function openLinkAdd() {
     await submitting($('#lSave'), async () => {
       await apiPost('/api/links', {
         url: $('#lU').value.trim(), title: $('#lN').value, kind: $('#lK').value, tag: $('#lT').value,
+        scope: $('#lS') ? $('#lS').value : 'group',
       });
       await drawKho('all'); await refreshHome();
     }, 'Đã gắn vào Tư liệu');
