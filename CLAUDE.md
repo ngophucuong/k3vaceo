@@ -316,6 +316,25 @@ Với **đợt thu**, "xong" còn phải CẤT BỚT chứ không chỉ thêm d�
 - người thu đã nhận đủ của **tất cả** → chip `.xongchip` "✓ đã thu đủ" ở đầu
   thẻ, dòng tổng đổi thành "Đợt này xong".
 
+## Tư liệu: sửa được, và vai cấp lớp đã có người
+
+`PATCH /api/links/:id` (thêm 25/8) sửa `url`, `title`, `kind`, `tag`. **Cố ý
+không cho đổi `scope`**: biến liên kết của nhóm thành của lớp là đem dữ liệu
+nhóm cho 134 người xem (N6) — muốn đổi thì gỡ rồi đăng lại để nhật ký ghi rõ.
+Cho phép **xoá trắng** `url` trở lại: thà trống còn hơn một đường dẫn hỏng.
+Sửa và gỡ dùng CHUNG `layLienKetSuaDuoc()`, không tách hai bản sao.
+
+**Ngô Phú Cường nay có vai `uy_vien` cấp lớp** (migration 0013) — mở khoá việc
+đăng và sửa Tư liệu cấp lớp cùng thông báo cấp lớp. Chọn `uy_vien` vì đó là vai
+thật ngoài đời và là vai thấp nhất đủ dùng: nó **không** mở quỹ lớp, vì
+`isClassOfficer` chỉ nhận `lop_truong` / `lop_pho` / `thu_quy`.
+
+Migration 0013 nạp thư mục Drive `CEO_VCCI` của Ban tổ chức: 3 thư mục theo
+buổi (có đường dẫn thật, đọc từ thanh URL trong ảnh chụp) và 8 tệp bên trong
+(chỉ có tên, chờ dán link). **Không dùng `UNION ALL`** — D1 từ chối từ 6 nhánh
+trở lên khi chạy qua tệp, và **bản cục bộ cũng từ chối y hệt**, không chỉ D1
+thật như đã ghi ở mục trên.
+
 ## Vai nhóm: ba, không phải hai
 
 `truong_nhom` · `pho_nhom` · **`tieu_bieu`** ("thành viên tiêu biểu", thêm
@@ -478,7 +497,10 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
   điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn, thêm dòng `officers` với
   `group_id IS NULL` là chạy.
-- **Kho của Nhóm 6 có 4 mục `url = NULL`** — cần đường dẫn Drive thật.
+- **Tư liệu của lớp có 12 mục còn trống `url`** — 4 mục seed từ Đợt 1 và 8 tệp
+  của thư mục Drive `CEO_VCCI`. Nay điền được bằng nút ✎ ngay trong ứng dụng
+  (`PATCH /api/links/:id`, thêm 25/8); trước đó tạo mục với url trống là trống
+  vĩnh viễn, chỉ còn cách xoá đi tạo lại.
 - **Số điện thoại Lê Trung Đức** trong roster là `098778525`, thiếu 1 số. Giữ
   nguyên trong `roster`, không đưa vào `members`. Cần hỏi lại.
 

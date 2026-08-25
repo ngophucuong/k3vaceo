@@ -131,6 +131,13 @@ main{padding-top:18px}
 .rs{display:flex;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);align-items:center;
   text-decoration:none;color:inherit;width:100%;text-align:left}
 .rs:last-child{border-bottom:0}
+/* Nút ✎ nằm cạnh dòng tư liệu, KHÔNG nằm trong thẻ <a> — nhét button vào
+   trong <a> là HTML sai và bấm vào nút sẽ mở luôn đường dẫn. */
+.rsw{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.rsw:last-child{border-bottom:0}
+.rsw .rs{flex:1;min-width:0;border-bottom:0}
+.rsw .ico{flex:0 0 auto;display:flex;align-items:center;padding:0 14px;color:var(--ink3)}
+.rsw .ico:hover{color:var(--ink)}
 .ext{font-family:var(--num);font-size:9px;font-weight:600;letter-spacing:.06em;padding:5px 6px;
   border-radius:6px;background:var(--line);color:var(--ink2);flex:0 0 auto}
 .rs .b{flex:1;min-width:0}

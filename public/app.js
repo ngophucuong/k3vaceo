@@ -111,7 +111,9 @@ const apiDelete = p => api(p, { method: 'DELETE' });
 /* ═══════════ TRẠNG THÁI ═══════════ */
 let HOME = null;      // /api/home gần nhất
 let PLAN = null;      // /api/plan gần nhất
-let KHO_CAN_LOP = false;  // mình có đăng được tư liệu cấp lớp không
+let KHO_CAN_LOP = false;
+let KHO_LINKS = [];    // /api/links gần nhất, để bảng sửa đọc lại
+let KHO_TAG = null;    // bộ lọc đang xem, để vẽ lại đúng chỗ sau khi lưu  // mình có đăng được tư liệu cấp lớp không
 let MEMBERS = [];     // /api/members gần nhất
 
 const iAmOfficer = () => !!HOME?.officers?.some(o => o.member_id === HOME.me.id);
@@ -1726,20 +1728,70 @@ async function openOfficerEdit(role, label) {
 const KHO_FILTERS = [['all', 'Tất cả'], ['bai', 'Cho bài'], ['buoi', 'Theo buổi'], ['lop', 'Lớp K03']];
 // Một dòng tư liệu. Tách ra hàm riêng vì nay vẽ ở hai chỗ: mục của lớp và
 // mục của nhóm.
+// Ai sửa được một liên kết. Chép đúng ma trận của máy chủ (layLienKetSuaDuoc
+// trong routes/links.js) — chỉ để khỏi bày nút bấm vào là 403; máy chủ vẫn
+// kiểm lại, giao diện không bao giờ là chỗ quyết định quyền.
+function suaDuocTuLieu(r) {
+  if (r.created_by === HOME?.me?.id) return true;
+  if (r.scope === 'class') return KHO_CAN_LOP;
+  return iAmOfficer();
+}
+
 function veDongTuLieu(r) {
   const than = `<span class="ext">${esc(r.kind)}</span>
     <div class="b"><div class="t">${esc(r.title)}</div>
-    <div class="m">${r.url ? vnDate(r.created_at) : 'chưa có đường dẫn — điền khi có'}</div></div>`;
-  return r.url
+    <div class="m">${r.url ? vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
+  const dong = r.url
     ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${than}
         <span style="color:var(--ink3)">↗</span></a>`
     : `<div class="rs" style="cursor:default">${than}</div>`;
+  // Nút ✎ phải nằm NGOÀI thẻ <a>: nhét một <button> vào trong <a> là HTML sai,
+  // và bấm vào nút sẽ mở luôn đường dẫn.
+  return suaDuocTuLieu(r)
+    ? `<div class="rsw">${dong}<button class="ico" data-sualink="${r.id}" aria-label="Sửa ${esc(r.title)}">✎</button></div>`
+    : dong;
+}
+
+// Sửa một liên kết đã có — chủ yếu để DÁN ĐƯỜNG DẪN vào mục còn trống. Không
+// có màn này thì mục trống là trống vĩnh viễn, chỉ còn cách xoá đi tạo lại và
+// mất luôn ngày đăng lẫn người đăng.
+function openLinkEdit(id) {
+  const r = (KHO_LINKS || []).find(x => x.id === id);
+  if (!r) return;
+  openSheet(`
+   <h3>Sửa liên kết</h3>
+   <p class="sub">${r.url ? 'Đổi đường dẫn, tên hoặc loại.' : 'Mục này chưa có đường dẫn — dán vào đây.'}</p>
+   <label class="f">Đường dẫn</label>
+   <input id="eU" inputmode="url" spellcheck="false" placeholder="https://drive.google.com/…" value="${esc(r.url || '')}">
+   <div class="hintline">Để trống cũng được — thà trống còn hơn một đường dẫn hỏng cho cả lớp bấm vào.</div>
+   <label class="f">Gọi là gì</label>
+   <input id="eT" maxlength="200" value="${esc(r.title)}">
+   <label class="f">Loại</label>
+   <select id="eK">${['DRIVE','SHEET','DOCX','XLSX','PDF','WEB']
+     .map(k => `<option value="${k}"${k === r.kind ? ' selected' : ''}>${k}</option>`).join('')}</select>
+   <label class="f">Đóng cho</label>
+   <select id="eG">${[['bai','Cho bài'],['buoi','Theo buổi học'],['lop','Việc chung của lớp']]
+     .map(([v, l]) => `<option value="${v}"${v === r.tag ? ' selected' : ''}>${l}</option>`).join('')}</select>
+   <div class="foot" style="padding:10px 0 0">Phạm vi (${r.scope === 'class' ? 'cả lớp' : 'nhóm mình'}) không đổi được ở đây.
+     Muốn đổi thì gỡ liên kết rồi đăng lại, để nhật ký ghi rõ.</div>
+   <div id="eErr" class="errline" style="display:none"></div>
+   <div class="sa"><button class="big c" id="eThoi">Thôi</button>
+     <button class="big go" id="eLuu">Lưu</button></div>`);
+  $('#eThoi').onclick = closeSheet;
+  $('#eLuu').onclick = () => submitting($('#eLuu'), async () => {
+    await apiPatch(`/api/links/${id}`, {
+      url: $('#eU').value.trim(), title: $('#eT').value,
+      kind: $('#eK').value, tag: $('#eG').value,
+    });
+    await drawKho(KHO_TAG); await refreshHome();
+  }, 'Đã lưu');
 }
 
 async function drawKho(tag) {
   if (!$('#v-kho').dataset.loaded) $('#v-kho').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
   const kq = await apiGet(tag && tag !== 'all' ? `/api/links?tag=${encodeURIComponent(tag)}` : '/api/links');
   const links = kq.links;
+  KHO_LINKS = links; KHO_TAG = tag;
   KHO_CAN_LOP = !!kq.can_dang_lop;
   $('#v-kho').dataset.loaded = '1';
 
@@ -1773,6 +1825,9 @@ async function drawKho(tag) {
 
   document.querySelectorAll('#v-kho [data-tag]').forEach(btn => { btn.onclick = () => drawKho(btn.dataset.tag); });
   $('#addLinkBtn').onclick = openLinkAdd;
+  document.querySelectorAll('#v-kho [data-sualink]').forEach(b => {
+    b.onclick = () => openLinkEdit(Number(b.dataset.sualink));
+  });
 }
 
 function openLinkAdd() {

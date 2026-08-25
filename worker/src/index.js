@@ -11,7 +11,7 @@ import { getHome } from './routes/home.js';
 import { listMembers, getMember, patchMember, putMemberProfile,
          postNgungThamGia, postThamGiaLai, listNgung } from './routes/members.js';
 import { getOfficers, putOfficers } from './routes/officers.js';
-import { listLinks, postLink, deleteLink } from './routes/links.js';
+import { listLinks, postLink, deleteLink, patchLink } from './routes/links.js';
 import { postWizardInvites, postMemberInvite } from './routes/wizard.js';
 import { postLogout } from './routes/session.js';
 import { getPlan, patchSection, patchTopic } from './routes/plan.js';
@@ -171,6 +171,9 @@ export default {
 
       if (pathname === '/api/links' && method === 'GET') return listLinks(env, me, url.searchParams.get('tag'));
       if (pathname === '/api/links' && method === 'POST') return postLink(request, env, me);
+      if ((m = pathname.match(/^\/api\/links\/(\d+)$/)) && method === 'PATCH') {
+        return patchLink(request, env, me, Number(m[1]), ip);
+      }
       if ((m = pathname.match(/^\/api\/links\/(\d+)$/)) && method === 'DELETE') {
         return deleteLink(env, me, Number(m[1]));
       }
