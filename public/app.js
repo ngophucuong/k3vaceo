@@ -160,7 +160,24 @@ function veBangCoBanMoi() {
   if ($('#banmoi')) return;
   document.body.insertAdjacentHTML('beforeend',
     `<button class="banmoi" id="banmoi">Có bản mới — chạm để tải lại</button>`);
-  $('#banmoi').onclick = () => location.reload();
+  $('#banmoi').onclick = async () => {
+    const nut = $('#banmoi');
+    nut.textContent = 'Đang tải bản mới…';
+    // location.reload() KHÔNG đủ. Đo trên tên miền thật ngày 25/8: app.js và
+    // app.css bị trả về với max-age=14400 — bốn tiếng dùng thẳng bản đệm.
+    // (public/_headers đã đặt no-cache, nhưng có một lớp ghi đè ở cấp zone
+    // Cloudflare.) Tải lại thường thì index.html mới về mà app.js vẫn lấy từ
+    // đệm, mã không đổi, băng này hiện lại ngay — bấm mãi không hết.
+    //
+    // fetch(cache:'reload') buộc đi mạng VÀ ghi đè bản trong đệm HTTP, nên
+    // lượt tải lại ngay sau đó nhận đúng mã mới. Hỏng thì vẫn tải lại, vì
+    // cùng lắm là quay về đúng tình trạng cũ chứ không tệ hơn.
+    try {
+      await Promise.all(['/app.js', '/app.css'].map(u =>
+        fetch(u, { cache: 'reload' }).catch(() => {})));
+    } catch { /* mất mạng thì thôi */ }
+    location.reload();
+  };
 }
 async function ensureMembers() {
   if (!MEMBERS.length) MEMBERS = (await apiGet('/api/members')).members;

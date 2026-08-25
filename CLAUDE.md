@@ -235,9 +235,31 @@ bản mới" thành cái bẫy: bấm xong `index.html` mới về mà `app.js` 
 đệm nên băng hiện lại ngay.
 
 Đã đặt `Cache-Control: no-cache` cho ba tệp ấy trong `public/_headers`.
-`no-cache` không phải "đừng đệm" mà là "đệm nhưng mỗi lần dùng phải hỏi lại";
-cả ba đều có ETag nên câu hỏi ấy trả 304 rỗng. Không dùng `?v=` vì mục 8 SRS
-cấm build step. `deploy.yml` **đánh hỏng job** nếu ba tệp này lại bị đệm.
+Không dùng `?v=` vì mục 8 SRS cấm build step.
+
+**Nhưng `_headers` KHÔNG thắng được.** Sau khi đặt, tên miền trả về
+`max-age=14400` trơ trọi — mất cả `public` lẫn `must-revalidate` của bản mặc
+định, tức header của ta có được áp rồi bị một lớp khác ghi đè. Gần như chắc
+chắn là **Browser Cache TTL ở cấp zone** (Cloudflare → `cuongngo.app` →
+Caching → Configuration): 14400 giây đúng bằng một mốc dựng sẵn của họ. Sửa
+bằng bảng điều khiển, đổi sang **Respect Existing Headers** — không sửa được
+trong repo.
+
+Vì vậy nút của băng "Có bản mới" **tự nạp lại tài nguyên trước khi tải lại**:
+
+```js
+await Promise.all(['/app.js', '/app.css'].map(u =>
+  fetch(u, { cache: 'reload' }).catch(() => {})));
+location.reload();
+```
+
+`cache: 'reload'` buộc đi mạng VÀ ghi đè bản trong đệm HTTP, nên lượt tải lại
+ngay sau đó nhận đúng mã mới — chạy được kể cả khi zone vẫn đang ghi đè.
+`location.reload()` một mình thì không: index.html mới về mà app.js vẫn lấy từ
+đệm, băng hiện lại ngay, bấm mãi không hết.
+
+`deploy.yml` chỉ **cảnh báo** chứ không đánh hỏng job ở chỗ này: đánh đỏ mọi
+lượt deploy vì một nút bấm ngoài repo chỉ dạy người ta bỏ qua màu đỏ.
 
 ## Bảo lưu / rời nhóm — "ngừng tham gia"
 

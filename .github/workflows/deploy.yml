@@ -214,14 +214,18 @@ jobs:
             cc=$(printf '%s\n' "$hd" | grep -i '^cache-control:' | cut -d' ' -f2- || true)
             et=$(printf '%s\n' "$hd" | grep -ci '^etag:' || true)
             echo "  $t → cache-control: ${cc:-(không đặt)} · số dòng etag: ${et:-0}"
-            # app.js/app.css/sw.js KHÔNG có ?v= nên chỉ cần chúng được đệm
-            # quá một nhịp là deploy xong người ta vẫn chạy mã cũ. Đây là phép
-            # kiểm có răng, không phải dòng chẩn đoán cho vui.
+            # app.js/app.css/sw.js không có ?v=, nên chúng bị đệm là deploy
+            # xong người ta vẫn chạy mã cũ. CẢNH BÁO chứ không đánh hỏng job:
+            # `public/_headers` đã đặt no-cache rồi mà tên miền vẫn trả
+            # max-age=14400 — tức có một lớp ghi đè ở cấp zone (Caching →
+            # Configuration → Browser Cache TTL), sửa bằng bảng điều khiển chứ
+            # không sửa được trong repo. Đánh đỏ mọi lượt deploy vì một nút bấm
+            # ngoài tầm với chỉ dạy người ta bỏ qua màu đỏ.
             case "$t" in
               /app.js|/app.css|/sw.js)
                 case "$cc" in
                   *no-cache*|*no-store*|*max-age=0*) echo "      ✓ luôn hỏi lại máy chủ" ;;
-                  *) echo "::error::$t đang được đệm ($cc) — sửa mã xong người dùng vẫn chạy bản cũ."; exit 1 ;;
+                  *) echo "::warning::$t vẫn bị đệm ($cc) dù _headers đã đặt no-cache. Vào Cloudflare → zone cuongngo.app → Caching → Configuration → Browser Cache TTL, đổi sang 'Respect Existing Headers'. Trong lúc chờ, băng 'Có bản mới' vẫn chạy được vì giao diện tự nạp lại app.js bằng fetch(cache:'reload')." ;;
                 esac ;;
             esac
           done
