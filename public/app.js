@@ -861,9 +861,13 @@ function drawNay() {
   ${veLichHoc()}
   <div class="sect">
     <div class="eb">Cơ cấu nhóm</div>
-    <div class="card">${['truong_nhom', 'pho_nhom'].map(role => {
+    <div class="card">${[
+      ['truong_nhom', 'Trưởng nhóm'],
+      ['pho_nhom', 'Phó nhóm'],
+      // Thành viên tiêu biểu: quyền ngang phó nhóm, không phải chức danh suông.
+      ['tieu_bieu', 'Thành viên tiêu biểu'],
+    ].map(([role, label]) => {
       const o = HOME.officers.find(x => x.role === role);
-      const label = role === 'truong_nhom' ? 'Trưởng nhóm' : 'Phó nhóm';
       return `<div class="of ${o?.member_id ? '' : 'void'}">
         <span class="rl">${label}</span>
         <div style="flex:1;min-width:0">
@@ -2057,12 +2061,18 @@ function renderRound(r) {
   //   xongCaDot   — người thu đã nhận đủ của TẤT CẢ. Đánh dấu ✓ lên đầu thẻ.
   const xongCuaToi = !!r.i_am_verified;
   const xongCaDot = r.total_people > 0 && r.verified_count === r.total_people;
+  // Cả nhóm khai xong là một cái mốc thật, nhưng KHÔNG phải quỹ xong: người thu
+  // chưa soi sao kê thì chưa đồng nào được coi là tiền thật (mục 6.4 SRS). Nên
+  // đánh dấu bằng màu CAM của "đã tự khai", tuyệt đối không dùng ✓ xanh — xanh
+  // ở khắp ứng dụng này chỉ có một nghĩa: người thu đã nhận.
+  const caNhomDaKhai = !xongCaDot && r.total_people > 0 && r.declared_count === r.total_people;
   return `
   <div class="card">
     <div class="cb">
       <div style="font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">
         ${esc(r.title)}${r.scope === 'class' ? ' · cả lớp' : ''}${r.scope === 'group' && r.thuoc_quy === 'lop' ? ' · thu hộ quỹ lớp' : ''}${r.status === 'draft' ? ' · bản nháp' : ''}${r.status === 'closed' ? ' · đã đóng' : ''}${
-          xongCaDot ? ' <span class="xongchip">✓ đã thu đủ</span>' : ''}</div>
+          xongCaDot ? ' <span class="xongchip">✓ đã thu đủ</span>' : ''}${
+          caNhomDaKhai ? ' <span class="khaichip">cả nhóm đã khai</span>' : ''}</div>
       <div class="amt">${vnMoney(r.amount)}<small> đ / người</small></div>
       ${r.purpose ? `<div class="mut" style="margin-top:11px">${esc(r.purpose)}</div>` : ''}
       ${r.collector_name ? `<div class="mut" style="margin-top:5px">Người thu: <b style="color:var(--ink)">${esc(r.collector_name)}</b></div>` : ''}
@@ -2097,7 +2107,9 @@ function renderRound(r) {
           ${xongCaDot
             ? `<b style="color:var(--go)">✓ Người thu đã nhận đủ của cả <span class="num">${r.total_people}</span> người.</b> Đợt này xong.`
             : `<b class="num" style="color:var(--ink)">${r.declared_count}/${r.total_people}</b> người đã tự khai${r.verified_count ? `, người thu đã nhận <b class="num" style="color:var(--go)">${r.verified_count}</b>` : ''}.
-          Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.`}</div>
+          ${caNhomDaKhai
+            ? '<b style="color:var(--due)">Cả nhóm khai xong — còn chờ người thu đối chiếu sao kê.</b>'
+            : 'Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.'}`}</div>
         ${r.can_see_ledger ? `<button class="wide ghost" data-ledger="${r.id}" style="margin-top:12px;padding:11px;font-size:14px">Mở sổ ${r.i_am_collector ? 'của người thu' : 'theo dõi'}</button>` : ''}
         ${suaDuocDot(r) ? `<button class="wide ghost" data-suadot="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa đợt thu</button>` : ''}
       </div>`}

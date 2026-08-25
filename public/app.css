@@ -166,6 +166,11 @@ main{padding-top:18px}
 /* Nhãn "đã thu đủ" trên đầu thẻ đợt thu — cùng cặp màu với mọi dấu ✓ khác. */
 .xongchip{background:var(--go-bg);color:var(--go);border-radius:999px;
   padding:2px 8px;margin-left:6px;letter-spacing:.04em;white-space:nowrap}
+/* "Cả nhóm đã khai" — mốc thật nhưng CHƯA phải quỹ xong. Màu cam của "đã tự
+   khai", không bao giờ xanh: xanh trong ứng dụng này chỉ có một nghĩa duy
+   nhất là người thu đã soi sao kê và nhận được tiền. */
+.khaichip{background:var(--due-bg);color:var(--due);border-radius:999px;
+  padding:2px 8px;margin-left:6px;letter-spacing:.04em;white-space:nowrap}
 
 /* Báo có bản mới. Nổi trên thanh điều hướng, không che nút nào, và không tự
    tải lại — người ta có thể đang gõ dở một ô. */

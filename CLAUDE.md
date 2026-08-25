@@ -302,6 +302,12 @@ Ngô Phú Cường yêu cầu ngày 25/8: xong thì phải nói bằng hình, đ
 Lớp CSS là `.xong`. Đang dùng ở: phần bài 100%, tổng tám phần, dòng người thu
 đã nhận trong sổ thu, và dòng tổng của đợt thu khi đã nhận đủ.
 
+**Dấu ✓ xanh chỉ có MỘT nghĩa: người thu đã nhận tiền.** Không bao giờ dùng nó
+cho "cả nhóm đã tự khai" — khai xong mà người thu chưa soi sao kê thì chưa đồng
+nào là tiền thật (mục 6.4 SRS). Mốc "cả nhóm khai xong" có chip riêng
+`.khaichip` màu **cam** của `--due`, kèm câu "còn chờ người thu đối chiếu sao
+kê". Hai màu, hai nghĩa, không lẫn.
+
 Với **đợt thu**, "xong" còn phải CẤT BỚT chứ không chỉ thêm dấu. Hai mức:
 - người thu đã xác nhận tiền **của bạn** → cất hẳn mã QR, số tài khoản và nút
   chép nội dung. Để lại là mời chuyển tiền thêm lần nữa; tệ hơn, khi mạng yếu
@@ -309,6 +315,29 @@ Với **đợt thu**, "xong" còn phải CẤT BỚT chứ không chỉ thêm d�
   tài khoản" — một khối cam đọc lên y như cảnh báo trên một đợt đã xong.
 - người thu đã nhận đủ của **tất cả** → chip `.xongchip` "✓ đã thu đủ" ở đầu
   thẻ, dòng tổng đổi thành "Đợt này xong".
+
+## Vai nhóm: ba, không phải hai
+
+`truong_nhom` · `pho_nhom` · **`tieu_bieu`** ("thành viên tiêu biểu", thêm
+25/8). Vai thứ ba **quyền ngang phó nhóm** — nó đi thẳng vào `isGroupOfficer`
+nên làm được đúng mọi việc phó nhóm làm được: tạo đợt thu, mở sổ, thêm người,
+cho ngừng tham gia, sửa cơ cấu, đăng thông báo, chia phần bài.
+
+Danh sách vai nằm ở **bốn** chỗ, sửa một mà quên ba là hỏng ngầm — lần thêm
+`tieu_bieu` đã vấp đúng chỗ thứ tư:
+
+| Tệp | Việc |
+|---|---|
+| `permissions.js` `isGroupOfficer` | quyết định QUYỀN |
+| `routes/officers.js` `getOfficers` | danh sách cho màn cơ cấu |
+| `routes/officers.js` chốt chặn | không cho bỏ trống hết |
+| `routes/home.js` | **chỗ dễ quên nhất** — `/api/home` dựng danh sách riêng |
+
+Quên `home.js` thì quyền chạy đủ nhưng màn Hôm nay không hiện vai mới, và
+`iAmOfficer()` ở giao diện trả sai → nút bấm biến mất dù máy chủ vẫn cho phép.
+
+Chốt chặn "không bỏ trống hết" nay **đếm số vai còn người**, không so đôi một
+như hồi hai vai — so đôi một với ba vai sẽ cho phép bỏ trống cả ba mà vẫn lọt.
 
 ## Sổ tay hướng dẫn — ba bản, một bản thảo
 

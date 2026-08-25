@@ -78,7 +78,8 @@ export async function getHome(env, me) {
     env.DB.prepare(
       `SELECT o.role, o.note, o.effective_from, m.id AS member_id, m.full_name, m.title, m.company
        FROM officers o LEFT JOIN members m ON m.id = o.member_id
-       WHERE o.group_id = ? AND o.role IN ('truong_nhom', 'pho_nhom') AND o.superseded_at IS NULL`
+       WHERE o.group_id = ? AND o.role IN ('truong_nhom', 'pho_nhom', 'tieu_bieu')
+         AND o.superseded_at IS NULL`
     ).bind(me.group_id).all(),
     env.DB.prepare(
       `SELECT a.summary, a.verb, a.created_at, m.id AS actor_id, m.full_name AS actor_name

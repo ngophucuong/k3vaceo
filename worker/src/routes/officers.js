@@ -2,13 +2,17 @@ import { json, error, readJson } from '../lib/http.js';
 import { canManageGroup, logAudit, logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 
-const ROLE_LABEL = { truong_nhom: 'trưởng nhóm', pho_nhom: 'phó nhóm' };
+// 'tieu_bieu' — thành viên tiêu biểu, quyền ngang phó nhóm (Ngô Phú Cường
+// quyết 25/8). Không phải chức danh trang trí: nó đi thẳng vào isGroupOfficer
+// nên người giữ vai này làm được đúng mọi việc phó nhóm làm được — tạo đợt
+// thu, mở sổ, thêm người, sửa cơ cấu, đăng thông báo, chia phần bài.
+const ROLE_LABEL = { truong_nhom: 'trưởng nhóm', pho_nhom: 'phó nhóm', tieu_bieu: 'thành viên tiêu biểu' };
 
 export async function getOfficers(env, me) {
   const rows = await env.DB.prepare(
     `SELECT o.role, o.note, o.effective_from, m.id AS member_id, m.full_name, m.title, m.company
      FROM officers o LEFT JOIN members m ON m.id = o.member_id
-     WHERE o.group_id = ? AND o.role IN ('truong_nhom', 'pho_nhom') AND o.superseded_at IS NULL`
+     WHERE o.group_id = ? AND o.role IN ('truong_nhom', 'pho_nhom', 'tieu_bieu') AND o.superseded_at IS NULL`
   ).bind(me.group_id).all();
   return json({ officers: rows.results ?? [] });
 }
@@ -37,14 +41,17 @@ export async function putOfficers(request, env, me, ip) {
     `SELECT id, member_id, note FROM officers WHERE group_id = ? AND role = ? AND superseded_at IS NULL`
   ).bind(me.group_id, role).first();
 
-  // Không cho nhóm tự bỏ trống cả trưởng lẫn phó: mất hết officer là mất luôn
-  // đường sửa cơ cấu và phát link mời, chỉ còn cách sửa thẳng vào D1.
+  // Không cho nhóm tự bỏ trống HẾT người phụ trách: mất hết officer là mất luôn
+  // đường sửa cơ cấu và phát link mời, chỉ còn cách sửa thẳng vào D1. Từ khi có
+  // ba vai thì phải đếm số vai còn người, chứ so đôi một như trước sẽ cho phép
+  // bỏ trống cả ba mà vẫn lọt.
   if (memberId === null) {
-    const otherRole = role === 'truong_nhom' ? 'pho_nhom' : 'truong_nhom';
-    const other = await env.DB.prepare(
-      `SELECT member_id FROM officers WHERE group_id = ? AND role = ? AND superseded_at IS NULL`
-    ).bind(me.group_id, otherRole).first();
-    if (!other?.member_id) return error('last_officer', 409);
+    const conAi = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM officers
+        WHERE group_id = ? AND role IN ('truong_nhom', 'pho_nhom', 'tieu_bieu')
+          AND role <> ? AND member_id IS NOT NULL AND superseded_at IS NULL`
+    ).bind(me.group_id, role).first();
+    if (!conAi?.n) return error('last_officer', 409);
   }
 
   const note = cleanText(body.note, 200);

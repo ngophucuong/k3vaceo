@@ -43,7 +43,8 @@ export async function isClassCommittee(env, memberId) {
 export async function isGroupOfficer(env, memberId, groupId) {
   const row = await env.DB.prepare(
     `SELECT 1 FROM officers
-     WHERE group_id = ? AND member_id = ? AND role IN ('truong_nhom', 'pho_nhom') AND superseded_at IS NULL`
+     WHERE group_id = ? AND member_id = ?
+       AND role IN ('truong_nhom', 'pho_nhom', 'tieu_bieu') AND superseded_at IS NULL`
   ).bind(groupId, memberId).first();
   return !!row;
 }
