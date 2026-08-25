@@ -203,6 +203,16 @@ jobs:
           fi
           echo "✓ Worker Route phủ toàn bộ /api/*"
 
+          # Đệm của Pages quyết định người dùng có nhận được bản mới hay không.
+          # Không đoán: in ra để đọc. app.js và app.css KHÔNG có ?v= nên nếu
+          # chúng được đệm lâu thì sửa mã xong người ta vẫn chạy bản cũ.
+          echo "--- tiêu đề đệm trên tên miền thật ---"
+          for t in "/" "/app.js" "/app.css" "/sw.js"; do
+            cc=$(curl -sI "https://k3vaceo.cuongngo.app$t" | tr -d '\r' | grep -i '^cache-control:' | cut -d' ' -f2-)
+            et=$(curl -sI "https://k3vaceo.cuongngo.app$t" | tr -d '\r' | grep -ic '^etag:')
+            echo "  $t → cache-control: ${cc:-(không đặt)} · có etag: $([ "$et" = "1" ] && echo có || echo không)"
+          done
+
           # Sổ tay là trang tĩnh nằm cạnh ứng dụng. Ba thứ có thể hỏng lặng lẽ
           # mà deploy vẫn xanh: luật vét /* nuốt mất /sotay, CSP chặn tệp JS
           # tách rời (mục lục chết không báo gì), và ảnh thiếu.

@@ -116,9 +116,51 @@ let MEMBERS = [];     // /api/members gần nhất
 
 const iAmOfficer = () => !!HOME?.officers?.some(o => o.member_id === HOME.me.id);
 
+let BAN_LUC_MO = null;   // mã bản máy chủ chạy lúc mình mở trang
+
 async function refreshHome() {
   HOME = await apiGet('/api/home');
+  if (BAN_LUC_MO === null) BAN_LUC_MO = HOME.ban ?? null;
+  else if (HOME.ban && HOME.ban !== BAN_LUC_MO) veBangCoBanMoi();
   drawHead(); drawNay(); veChamDo();
+}
+
+// ── Tự làm mới khi quay lại ứng dụng ────────────────────────────────────────
+// Trước đây ứng dụng KHÔNG bao giờ tự làm mới: mở lên rồi để đó, hôm sau quay
+// lại vẫn thấy số liệu hôm qua cho tới khi chạm vào một nút nào đó. Trên iPhone
+// đã cài lên màn hình chính thì càng rõ, vì người ta không đóng hẳn app bao giờ.
+//
+// Không dùng setInterval: gọi máy chủ đều đặn suốt ngày cho một lớp 134 người
+// là phí, và pin điện thoại trả giá. Chỉ làm mới đúng lúc người ta quay lại
+// nhìn — thêm một chốt chặn 30 giây để chuyển qua chuyển lại không thành mưa
+// request.
+let LUC_LAM_MOI = 0;
+function batTuLamMoi() {
+  const thu = async () => {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - LUC_LAM_MOI < 30000) return;
+    LUC_LAM_MOI = Date.now();
+    try {
+      await refreshHome();
+      // Màn đang mở cũng phải mới theo, không thì số ở tab Hôm nay đã đổi mà
+      // danh sách đang xem vẫn là bản cũ.
+      const v = (location.hash || '#/nay').replace('#/', '');
+      if (v === 'bai' && $('#v-bai').dataset.loaded) await drawBai();
+      if (v === 'nhom' && $('#v-nhom').dataset.loaded) await drawNhom();
+      if (v === 'quy' && $('#v-quy').dataset.loaded) await drawQuy();
+    } catch { /* mất mạng thì thôi, lần sau quay lại thử tiếp */ }
+  };
+  document.addEventListener('visibilitychange', thu);
+  window.addEventListener('focus', thu);
+}
+
+// Máy chủ đã lên bản mới trong lúc app nằm im. Không tự tải lại: người ta có
+// thể đang gõ dở một ô. Chỉ báo và để họ bấm.
+function veBangCoBanMoi() {
+  if ($('#banmoi')) return;
+  document.body.insertAdjacentHTML('beforeend',
+    `<button class="banmoi" id="banmoi">Có bản mới — chạm để tải lại</button>`);
+  $('#banmoi').onclick = () => location.reload();
 }
 async function ensureMembers() {
   if (!MEMBERS.length) MEMBERS = (await apiGet('/api/members')).members;
@@ -2718,6 +2760,7 @@ async function boot() {
 
   try {
     HOME = await apiGet('/api/home');
+    BAN_LUC_MO = HOME.ban ?? null;
   } catch (e) {
     if (e.status === 401) return renderNoSession();
     document.body.classList.add('noapp');
@@ -2726,6 +2769,7 @@ async function boot() {
     return;
   }
   renderApp();
+  batTuLamMoi();
 }
 
 addEventListener('hashchange', route);

@@ -123,6 +123,11 @@ export async function getHome(env, me) {
   ]);
 
   return json({
+    // Mã bản đang chạy trên máy chủ. Giao diện chụp lại lúc mở trang rồi so
+    // mỗi lần quay lại app: khác nhau nghĩa là đã deploy bản mới trong lúc
+    // ứng dụng nằm im trong bộ nhớ — chuyện thường gặp với PWA trên iPhone,
+    // vì người ta không bao giờ đóng hẳn nó.
+    ban: env.COMMIT_SHA ?? null,
     lich_hoc: lichRes.results ?? [],
     thong_bao: tbRes.results ?? [],
     // Số thông báo chưa xem — giao diện chấm đỏ lên tab Hôm nay. Đây là đường
