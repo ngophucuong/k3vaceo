@@ -204,6 +204,28 @@ Vì vậy phép kiểm là **giải mã ngược**: đóng vai trình duyệt, g
 từng ký tự — cộng một phép đối chứng sai khoá phải hỏng, để chắc phép kiểm có
 răng. Xem `scripts/tao-khoa-vapid.mjs` và bộ kiểm ở thư mục scratchpad.
 
+## Làm mới: quay lại app là tự cập nhật
+
+Trước 25/8 ứng dụng **không bao giờ tự làm mới** — không `visibilitychange`,
+không `setInterval`. Mở lên rồi để đó, hôm sau quay lại vẫn thấy số liệu hôm
+qua cho tới khi chạm vào một nút. Trên iPhone đã cài lên màn hình chính thì
+càng rõ vì không ai đóng hẳn app bao giờ.
+
+Nay quay lại app (`visibilitychange` + `focus`) là gọi lại `/api/home` và vẽ
+lại đúng màn đang mở, **có chốt chặn 30 giây** để chuyển qua chuyển lại không
+thành mưa request. **Cố ý không dùng `setInterval`**: gọi máy chủ đều đặn suốt
+ngày cho 134 người là phí, và pin điện thoại trả giá.
+
+`/api/home` trả thêm `ban` = `env.COMMIT_SHA`. Giao diện chụp lại lúc mở trang
+(`BAN_LUC_MO`) rồi so mỗi lần quay lại; khác nhau là đã deploy trong lúc app
+nằm im → hiện băng `.banmoi` "Có bản mới — chạm để tải lại". **Không tự tải
+lại**: người ta có thể đang gõ dở một ô.
+
+Service worker vẫn không cache gì nên nó chưa bao giờ là thủ phạm. `app.js` và
+`app.css` **không có `?v=`**, nên nếu Pages đệm chúng lâu thì sửa mã xong người
+dùng vẫn chạy bản cũ — `deploy.yml` có sẵn phép in `cache-control` thật của
+`/`, `/app.js`, `/app.css`, `/sw.js` để đọc thay vì đoán.
+
 ## Bảo lưu / rời nhóm — "ngừng tham gia"
 
 Không xoá dòng nào và không đụng `roster`. Chỉ hạ `members.is_active` về 0, vì
@@ -244,6 +266,14 @@ Ngô Phú Cường yêu cầu ngày 25/8: xong thì phải nói bằng hình, đ
 đúng cặp màu của vòng tròn hồ sơ đã điền đủ, để "xong" ở chỗ nào cũng một màu.
 Lớp CSS là `.xong`. Đang dùng ở: phần bài 100%, tổng tám phần, dòng người thu
 đã nhận trong sổ thu, và dòng tổng của đợt thu khi đã nhận đủ.
+
+Với **đợt thu**, "xong" còn phải CẤT BỚT chứ không chỉ thêm dấu. Hai mức:
+- người thu đã xác nhận tiền **của bạn** → cất hẳn mã QR, số tài khoản và nút
+  chép nội dung. Để lại là mời chuyển tiền thêm lần nữa; tệ hơn, khi mạng yếu
+  mã không tải được thì nhánh dự phòng hiện "Chưa hiện được mã. Kiểm tra lại số
+  tài khoản" — một khối cam đọc lên y như cảnh báo trên một đợt đã xong.
+- người thu đã nhận đủ của **tất cả** → chip `.xongchip` "✓ đã thu đủ" ở đầu
+  thẻ, dòng tổng đổi thành "Đợt này xong".
 
 ## Sổ tay hướng dẫn — ba bản, một bản thảo
 
