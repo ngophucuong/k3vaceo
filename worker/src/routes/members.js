@@ -1,5 +1,5 @@
 import { json, error, readJson } from '../lib/http.js';
-import { canEditProfile, logAudit, logActivity } from '../permissions.js';
+import { canEditProfile, canManageGroup, logAudit, logActivity } from '../permissions.js';
 import { cleanText, normalizeEmail, isValidEmail } from '../lib/validate.js';
 
 // Chỉ nêu "Ban tổ chức ghi: ~~cũ~~" cho field thật sự khác — nếu chưa từng sửa
@@ -160,4 +160,109 @@ export async function putMemberProfile(request, env, me, targetId) {
   });
 
   return json({ ok: true });
+}
+
+// ══ Ngừng tham gia ══════════════════════════════════════════════════════════
+// Bảo lưu, chuyển trường, nghỉ hẳn — với ứng dụng là cùng một việc: người ấy
+// thôi xuất hiện. KHÔNG xoá dòng nào và không đụng tới `roster` (danh sách gốc
+// của Ban tổ chức giữ nguyên). Chỉ hạ cờ `is_active`, vì cờ ấy đã được kiểm
+// trong hơn ba mươi truy vấn khác nên người ấy tự rụng khỏi đăng nhập, phiên
+// đang mở, passkey, thông báo đẩy, danh sách nhóm, danh sách nhận phần bài và
+// mọi phép đếm sĩ số — mà lời khai đóng quỹ cũ vẫn còn nguyên để số dư dò
+// được ra từng dòng.
+
+async function chucDangGiu(env, memberId) {
+  return env.DB.prepare(
+    `SELECT role, group_id FROM officers
+      WHERE member_id = ? AND superseded_at IS NULL LIMIT 1`
+  ).bind(memberId).first();
+}
+
+export async function postNgungThamGia(env, me, targetId, ip) {
+  if (!(await canManageGroup(env, me, me.group_id))) return error('forbidden', 403);
+  // Tự hạ cờ mình là tự khoá mình ra ngoài; nếu lại là trưởng nhóm thì không
+  // còn ai mở cửa lại được, chỉ còn cách sửa thẳng vào D1.
+  if (targetId === me.id) return error('khong_tu_ngung', 422);
+
+  const target = await env.DB.prepare(
+    'SELECT id, full_name FROM members WHERE id = ? AND group_id = ? AND is_active = 1'
+  ).bind(targetId, me.group_id).first();
+  if (!target) return error('not_found', 404);
+
+  // Người đang giữ chức phải được thay TRƯỚC. Cho ngừng luôn thì cơ cấu vẫn
+  // đứng tên một người không bao giờ đăng nhập lại được — getOfficers cố ý
+  // không lọc is_active để giữ lịch sử, nên sẽ không có gì nhắc là phải sửa.
+  const chuc = await chucDangGiu(env, targetId);
+  if (chuc) return error(chuc.group_id === null ? 'dang_giu_chuc_lop' : 'dang_giu_chuc_nhom', 409);
+
+  // Phần bài và suất thuyết trình phải nhả ra. Một phần mang tên người đã nghỉ
+  // trông như đã có người nhận trong khi không ai làm — tệ hơn để trống, vì để
+  // trống thì giao diện hiện "chưa ai nhận" và có người bấm vào nhận.
+  const nha = await env.DB.prepare(
+    `SELECT ord, title FROM plan_sections
+      WHERE owner_member_id = ? OR present_member_id = ? ORDER BY ord`
+  ).bind(targetId, targetId).all();
+
+  await env.DB.batch([
+    env.DB.prepare("UPDATE members SET is_active = 0, updated_at = datetime('now') WHERE id = ?").bind(targetId),
+    env.DB.prepare("UPDATE plan_sections SET owner_member_id = NULL, updated_at = datetime('now') WHERE owner_member_id = ?").bind(targetId),
+    env.DB.prepare("UPDATE plan_sections SET present_member_id = NULL, present_minutes = NULL, updated_at = datetime('now') WHERE present_member_id = ?").bind(targetId),
+    // Phiên tự chết vì auth kiểm is_active ở mỗi lượt gọi, nhưng xoá hẳn cho
+    // sạch — khỏi để cookie sống lay lắt tới 90 ngày trong bảng.
+    env.DB.prepare('DELETE FROM sessions WHERE member_id = ?').bind(targetId),
+    // Lời mời chưa dùng phải chết theo, không thì link cũ vẫn mở cửa lại được.
+    env.DB.prepare("UPDATE invites SET expires_at = datetime('now', '-1 second') WHERE member_id = ? AND used_at IS NULL").bind(targetId),
+    env.DB.prepare("UPDATE push_subscriptions SET disabled_at = datetime('now') WHERE member_id = ? AND disabled_at IS NULL").bind(targetId),
+  ]);
+
+  await logAudit(env, {
+    actorId: me.id, action: 'member.ngung_tham_gia', targetType: 'member', targetId,
+    before: { is_active: 1 },
+    after: { is_active: 0, nha_phan: (nha.results ?? []).map(r => r.ord) },
+    ip,
+  });
+  await logActivity(env, {
+    cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+    verb: 'ngung_tham_gia', objectType: 'member', objectId: targetId,
+    summary: `${target.full_name} thôi tham gia nhóm`,
+  });
+
+  return json({ ok: true, ho_ten: target.full_name, nha_phan: nha.results ?? [] });
+}
+
+// Cho tham gia lại — bảo lưu xong quay về, hoặc đơn giản là bấm nhầm. Không có
+// đường này thì sửa sai phải mở D1 ra.
+export async function postThamGiaLai(env, me, targetId, ip) {
+  if (!(await canManageGroup(env, me, me.group_id))) return error('forbidden', 403);
+  const target = await env.DB.prepare(
+    'SELECT id, full_name FROM members WHERE id = ? AND group_id = ? AND is_active = 0'
+  ).bind(targetId, me.group_id).first();
+  if (!target) return error('not_found', 404);
+
+  await env.DB.prepare(
+    "UPDATE members SET is_active = 1, updated_at = datetime('now') WHERE id = ?"
+  ).bind(targetId).run();
+
+  await logAudit(env, {
+    actorId: me.id, action: 'member.tham_gia_lai', targetType: 'member', targetId,
+    before: { is_active: 0 }, after: { is_active: 1 }, ip,
+  });
+  await logActivity(env, {
+    cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+    verb: 'tham_gia_lai', objectType: 'member', objectId: targetId,
+    summary: `${target.full_name} tham gia lại nhóm`,
+  });
+  // Phần bài đã nhả ra thì không tự đòi lại — người khác có thể đã nhận rồi.
+  return json({ ok: true, ho_ten: target.full_name });
+}
+
+// Danh sách người đã ngừng, CHỈ trưởng và phó nhóm đọc được. Người thường
+// không thấy gì cả — đó là ý nghĩa của "ẩn hẳn".
+export async function listNgung(env, me) {
+  if (!(await canManageGroup(env, me, me.group_id))) return error('forbidden', 403);
+  const rows = await env.DB.prepare(
+    `SELECT id, full_name, title, company, updated_at
+       FROM members WHERE group_id = ? AND is_active = 0 ORDER BY updated_at DESC, id`
+  ).bind(me.group_id).all();
+  return json({ members: rows.results ?? [] });
 }

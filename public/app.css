@@ -156,6 +156,13 @@ main{padding-top:18px}
   transition:width .7s cubic-bezier(.22,1,.36,1)}
 .pt.zero .pbar i{background:var(--due)}
 .pct{font-family:var(--num);font-size:12px;font-weight:600;color:var(--ink3);flex:0 0 auto;padding-top:2px}
+/* Xong thì nói bằng hình chứ đừng bắt đọc con số: "100%" và "80%" trông na ná
+   nhau khi lướt, còn dấu ✓ trên nền xanh thì nhận ra ngay không cần đọc.
+   Dùng đúng cặp màu --go/--go-bg của vòng tròn hồ sơ đã điền đủ, để "xong" ở
+   chỗ nào trong ứng dụng cũng là một màu ấy. */
+.pct.xong{font-size:13px;color:var(--go);background:var(--go-bg);
+  border-radius:999px;width:22px;height:22px;display:grid;place-items:center;padding:0}
+.eb .c.xong{background:var(--go-bg);color:var(--go)}
 
 /* ─── RUBRIC ─── */
 .rub{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}

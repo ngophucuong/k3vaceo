@@ -8,7 +8,8 @@ import { getCurrentMember } from './auth.js';
 import { clientIp, allow } from './lib/ratelimit.js';
 import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
-import { listMembers, getMember, patchMember, putMemberProfile } from './routes/members.js';
+import { listMembers, getMember, patchMember, putMemberProfile,
+         postNgungThamGia, postThamGiaLai, listNgung } from './routes/members.js';
 import { getOfficers, putOfficers } from './routes/officers.js';
 import { listLinks, postLink, deleteLink } from './routes/links.js';
 import { postWizardInvites, postMemberInvite } from './routes/wizard.js';
@@ -134,6 +135,13 @@ export default {
       }
 
       if (pathname === '/api/members' && method === 'GET') return listMembers(env, me);
+      if (pathname === '/api/members/ngung' && method === 'GET') return listNgung(env, me);
+      if ((m = pathname.match(/^\/api\/members\/(\d+)\/ngung$/)) && method === 'POST') {
+        return postNgungThamGia(env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/members\/(\d+)\/tham-gia-lai$/)) && method === 'POST') {
+        return postThamGiaLai(env, me, Number(m[1]), ip);
+      }
       if ((m = pathname.match(/^\/api\/members\/(\d+)$/)) && method === 'GET') {
         return getMember(env, me, Number(m[1]));
       }

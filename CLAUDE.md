@@ -204,6 +204,47 @@ Vì vậy phép kiểm là **giải mã ngược**: đóng vai trình duyệt, g
 từng ký tự — cộng một phép đối chứng sai khoá phải hỏng, để chắc phép kiểm có
 răng. Xem `scripts/tao-khoa-vapid.mjs` và bộ kiểm ở thư mục scratchpad.
 
+## Bảo lưu / rời nhóm — "ngừng tham gia"
+
+Không xoá dòng nào và không đụng `roster`. Chỉ hạ `members.is_active` về 0, vì
+cờ ấy đã được kiểm ở hơn ba mươi truy vấn nên người ấy tự rụng khỏi đăng nhập,
+phiên đang mở, passkey, thông báo đẩy, danh sách nhóm, danh sách nhận phần bài
+và mọi phép đếm sĩ số.
+
+`POST /api/members/:id/ngung` · `POST /api/members/:id/tham-gia-lai` ·
+`GET /api/members/ngung` — cả ba chỉ trưởng và phó nhóm gọi được. Giao diện:
+nút trong hồ sơ từng người, và mục "Đã ngừng tham gia" ở cuối tab Nhóm mà
+người thường không thấy.
+
+**Bốn chỗ đã phải vá, vì hạ cờ không thôi là hỏng ngầm** — không chỗ nào tự
+báo lỗi, chỉ ra số sai:
+
+1. **Người thu vĩnh viễn không xác nhận được.** `postVerify` chặn cứng
+   `is_active = 1`, nên ai đóng tiền rồi mới nghỉ sẽ kẹt mãi ở "đã tự khai":
+   tiền có thật trong tài khoản mà không đường nào vào số dư. Nay cho xác nhận
+   nếu người ấy **đã khai đợt đó**.
+2. **Sổ thu thôi khớp với số dư.** Truy vấn số dư không đụng bảng `members`
+   nên tiền vẫn được cộng, nhưng sổ thu duyệt theo người đang hoạt động nên
+   tên biến mất — người thu thấy một khoản không dò được. Nay sổ giữ lại người
+   đã ngừng nếu họ đã khai, kèm cờ `da_ngung` để giao diện ghi nhãn.
+3. **Mẫu số hụt.** Đếm sĩ số cũng phải cộng thêm người đã ngừng mà đã khai,
+   không thì có lúc ra "9/8".
+4. **Cơ cấu giữ tên người đã đi.** `getOfficers` cố ý không lọc `is_active`
+   (giữ lịch sử), nên **chặn ở đầu vào**: đang giữ chức thì không cho ngừng,
+   trả 409 `dang_giu_chuc_nhom` / `dang_giu_chuc_lop`. Phải thay người trước.
+
+Ngoài ra: phần bài và suất thuyết trình được **nhả về "chưa ai nhận"** — một
+phần mang tên người đã nghỉ trông như đã có người làm, tệ hơn để trống. Phiên
+bị xoá, lời mời chưa dùng bị hết hạn, đăng ký thông báo đẩy bị tắt.
+
+## Dấu ✓ cho trạng thái hoàn thành
+
+Ngô Phú Cường yêu cầu ngày 25/8: xong thì phải nói bằng hình, đừng bắt đọc số
+— "100%" và "80%" trông na ná nhau khi lướt. Quy ước: nền `--go-bg` chữ `--go`,
+đúng cặp màu của vòng tròn hồ sơ đã điền đủ, để "xong" ở chỗ nào cũng một màu.
+Lớp CSS là `.xong`. Đang dùng ở: phần bài 100%, tổng tám phần, dòng người thu
+đã nhận trong sổ thu, và dòng tổng của đợt thu khi đã nhận đủ.
+
 ## Sổ tay hướng dẫn — ba bản, một bản thảo
 
 Bản thảo gốc là `so-tay.tpl.html` **ở thư mục scratchpad của phiên**, kèm 17

@@ -1169,7 +1169,7 @@ async function drawBai() {
         ${topicDone ? 'Sửa đề tài' : 'Chốt đề tài'}</button>` : ''}
   </div></div>
 
-  <div class="eb" style="margin-top:26px">Tám phần <span class="c">${overall_pct}%</span></div>
+  <div class="eb" style="margin-top:26px">Tám phần <span class="c ${overall_pct === 100 ? 'xong' : ''}">${overall_pct === 100 ? '✓ xong' : overall_pct + '%'}</span></div>
   <div class="card">${sections.map(s => {
     const sg = suggestions[String(s.ord)];
     return `<button class="pt ${s.pct === 0 ? 'zero' : ''}" data-section="${s.id}">
@@ -1184,7 +1184,7 @@ async function drawBai() {
         ${s.note ? `<div class="rq" style="margin-top:7px;margin-bottom:0">Còn thiếu: ${esc(s.note)}</div>` : ''}
         <div class="pbar"><i style="width:${s.pct}%"></i></div>
       </div>
-      <span class="pct">${s.pct}%</span></button>`;
+      <span class="pct ${s.pct === 100 ? 'xong' : ''}">${s.pct === 100 ? '✓' : s.pct + '%'}</span></button>`;
   }).join('')}</div>
 
   <div class="eb" style="margin-top:28px">Tâm đắc <span class="c">${insights.length}</span></div>
@@ -1489,12 +1489,16 @@ async function drawNhom() {
         <button class="wide ghost" style="padding:11px;font-size:14px" data-edit="${m.id}">
           ${m.id === HOME.me.id ? 'Sửa hồ sơ của tôi' : 'Sửa giúp — rồi báo lại chính chủ'}</button>
         ${officer ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" data-invite="${m.id}">Phát lại link mời cho người này</button>` : ''}
+        ${officer && m.id !== HOME.me.id
+          ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px;color:var(--due)" data-ngung="${m.id}">Ngừng tham gia nhóm</button>` : ''}
       </div>`).join('')}
   </div>
   ${officer ? `<button class="wide ghost" id="themNguoi" style="margin-top:12px">+ Thêm người vào nhóm</button>` : ''}
-  <div class="foot">Ai biết số điện thoại người còn trống thì điền hộ, chính chủ sửa lại sau.</div>`;
+  <div class="foot">Ai biết số điện thoại người còn trống thì điền hộ, chính chủ sửa lại sau.</div>
+  <div id="dsNgung"></div>`;
 
   if ($('#themNguoi')) $('#themNguoi').onclick = openThemNguoi;
+  if (officer) veNguoiDaNgung();
 
   document.querySelectorAll('#v-nhom [data-toggle]').forEach(btn => {
     btn.onclick = () => {
@@ -1505,6 +1509,9 @@ async function drawNhom() {
   });
   document.querySelectorAll('#v-nhom [data-edit]').forEach(btn => {
     btn.onclick = () => openMemberEdit(Number(btn.dataset.edit));
+  });
+  document.querySelectorAll('#v-nhom [data-ngung]').forEach(btn => {
+    btn.onclick = () => xacNhanNgung(Number(btn.dataset.ngung));
   });
   document.querySelectorAll('#v-nhom [data-invite]').forEach(btn => {
     btn.onclick = async () => {
@@ -1519,6 +1526,73 @@ async function drawNhom() {
           try { await navigator.clipboard.writeText(r.url); toast('Đã chép link'); } catch { toast('Chép tay giúp nhé'); }
         };
       } catch (e) { toast(errText(e)); }
+    };
+  });
+}
+
+// ── Ngừng tham gia ──────────────────────────────────────────────────────────
+// Bảo lưu, chuyển trường, nghỉ hẳn — cùng một việc. Hỏi lại trước khi làm và
+// nói RÕ những gì sẽ xảy ra, vì người bấm không đoán được là phần bài sẽ bị
+// nhả ra và người ấy sẽ không đăng nhập lại được nữa.
+async function xacNhanNgung(id) {
+  const m = MEMBERS.find(x => x.id === id);
+  if (!m) return;
+  openSheet(`<h3>Cho ${esc(m.full_name)} ngừng tham gia?</h3>
+    <p class="sub">Dùng khi ai đó bảo lưu, chuyển nhóm hoặc nghỉ hẳn.</p>
+    <div class="card"><div class="cb">
+      <div class="fi"><div class="k">Sẽ xảy ra</div><div class="v">
+        Tên biến mất khỏi danh sách nhóm, khỏi các đợt thu và khỏi danh sách nhận phần bài.
+        Người ấy không đăng nhập lại được nữa.</div></div>
+      <div class="fi"><div class="k">Phần bài đang giữ</div><div class="v">
+        Được nhả ra thành <b>chưa ai nhận</b> để người khác nhận tiếp.</div></div>
+      <div class="fi"><div class="k">Không mất gì</div><div class="v">
+        Hồ sơ vẫn còn, tiền đã đóng vẫn nằm trong số dư và vẫn hiện trong sổ thu.
+        Cho tham gia lại được bất cứ lúc nào.</div></div>
+    </div></div>
+    <div class="sa"><button class="big c" id="ngC">Thôi</button>
+      <button class="big go" id="ngOK">Cho ngừng tham gia</button></div>`);
+  $('#ngC').onclick = closeSheet;
+  $('#ngOK').onclick = async () => {
+    $('#ngOK').disabled = true;
+    try {
+      const r = await apiPost(`/api/members/${id}/ngung`);
+      closeSheet();
+      toast(r.nha_phan?.length
+        ? `${short(r.ho_ten)} đã ngừng · nhả ${r.nha_phan.length} phần bài`
+        : `${short(r.ho_ten)} đã ngừng tham gia`);
+      await drawNhom();
+    } catch (e) { $('#ngOK').disabled = false; toast(errText(e)); }
+  };
+}
+
+// Danh sách người đã ngừng chỉ trưởng và phó nhóm thấy — người thường không
+// thấy gì cả, đó là ý nghĩa của "ẩn hẳn". Nhưng phải có đường quay lại, không
+// thì bấm nhầm một cái là phải mở D1 ra sửa.
+async function veNguoiDaNgung() {
+  const hop = $('#dsNgung');
+  if (!hop) return;
+  let ds = [];
+  try { ds = (await apiGet('/api/members/ngung')).members ?? []; } catch { return; }
+  if (!ds.length) { hop.innerHTML = ''; return; }
+  hop.innerHTML = `
+    <div class="eb" style="margin-top:26px">Đã ngừng tham gia <span class="c">${ds.length}</span></div>
+    <div class="card"><div class="cb" style="padding:2px 14px">
+      ${ds.map(m => `<div class="fd">
+        ${avatar(m.full_name)}
+        <div class="x"><b>${esc(m.full_name)}</b>
+          <div style="font-size:11.5px;margin-top:2px" class="st-no">${esc(m.title || '')}${m.title && m.company ? ' · ' : ''}${esc(m.company || '')}</div></div>
+        <button class="tg" data-lai="${m.id}">cho quay lại</button>
+      </div>`).join('')}
+    </div></div>
+    <div class="foot">Chỉ trưởng và phó nhóm thấy mục này. Phần bài đã nhả ra thì không tự đòi lại.</div>`;
+  hop.querySelectorAll('[data-lai]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const r = await apiPost(`/api/members/${b.dataset.lai}/tham-gia-lai`);
+        toast(`${short(r.ho_ten)} đã tham gia lại`);
+        await drawNhom();
+      } catch (e) { b.disabled = false; toast(errText(e)); }
     };
   });
 }
@@ -2122,7 +2196,7 @@ async function openLedger(roundId) {
    <h3>${esc(round.title)}</h3>
    ${chiNhomMinh ? `<div class="warn" style="margin-bottom:12px">Đây là đợt thu của <b>cả lớp</b>.
      Bạn đang xem phần <b>${esc(HOME?.group?.label ?? 'nhóm mình')}</b> — ${people.length} người, không phải toàn lớp.</div>` : ''}
-   <p class="sub">${vnMoney(round.amount)} đ mỗi người · người thu đã nhận ${done}/${people.length}${chiNhomMinh ? ' trong nhóm bạn' : ''}.
+   <p class="sub">${vnMoney(round.amount)} đ mỗi người · ${done === people.length ? '✓ ' : ''}người thu đã nhận ${done}/${people.length}${chiNhomMinh ? ' trong nhóm bạn' : ''}.
      ${i_am_collector ? 'Soi sao kê xong thì bấm xác nhận từng người.' : 'Chỉ người thu mới xác nhận được đã nhận tiền.'}</p>
    <div class="warn" style="margin-bottom:14px">Không có nhắc nợ tự động. Ai chưa chuyển thì nhắn riêng.</div>
    ${khaiHoDuoc ? `<div class="foot" style="padding:0 0 12px">Ai gửi ảnh chuyển khoản qua Zalo mà chưa mở ứng dụng bao giờ
@@ -2132,8 +2206,9 @@ async function openLedger(roundId) {
      ${people.map(p => `<div class="fd">
        ${avatar(p.full_name)}
        <div class="x"><b>${esc(p.full_name)}</b>
-         <div style="font-size:11.5px;margin-top:2px" class="${p.verified ? 'st-ok' : p.declared ? 'st-mid' : 'st-no'}">${esc(p.status_label)}${
-           p.khai_ho_boi && !p.verified ? ` · do ${esc(short(p.khai_ho_boi))} khai hộ` : ''}</div></div>
+         <div style="font-size:11.5px;margin-top:2px" class="${p.verified ? 'st-ok' : p.declared ? 'st-mid' : 'st-no'}">${p.verified ? '✓ ' : ''}${esc(p.status_label)}${
+           p.khai_ho_boi && !p.verified ? ` · do ${esc(short(p.khai_ho_boi))} khai hộ` : ''}${
+           p.da_ngung ? ' · đã ngừng tham gia' : ''}</div></div>
        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
          ${p.phone ? `<a class="tg" href="tel:${esc(p.phone)}">gọi</a>` : ''}
          ${khaiHoDuoc && !p.verified

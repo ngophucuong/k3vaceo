@@ -71,9 +71,16 @@ async function shapeRound(env, round, me) {
   ]);
 
   // Tổng số người mà đợt này áp dụng — để hiện "9/14" mà không lộ tên ai.
+  // Người đã ngừng tham gia vẫn phải nằm trong mẫu số NẾU họ đã khai đợt này,
+  // không thì tử số có thể vượt mẫu số ("9/8") ngay sau khi một người khai
+  // xong rồi nghỉ.
+  const CON_TINH = `(m.is_active = 1 OR EXISTS (
+        SELECT 1 FROM fund_declarations d WHERE d.member_id = m.id AND d.round_id = ?))`;
   const totalRow = round.scope === 'class'
-    ? await env.DB.prepare('SELECT COUNT(*) AS n FROM members WHERE cohort_id = ? AND is_active = 1').bind(round.cohort_id).first()
-    : await env.DB.prepare('SELECT COUNT(*) AS n FROM members WHERE group_id = ? AND is_active = 1').bind(round.group_id).first();
+    ? await env.DB.prepare(`SELECT COUNT(*) AS n FROM members m WHERE m.cohort_id = ? AND ${CON_TINH}`)
+        .bind(round.cohort_id, round.id).first()
+    : await env.DB.prepare(`SELECT COUNT(*) AS n FROM members m WHERE m.group_id = ? AND ${CON_TINH}`)
+        .bind(round.group_id, round.id).first();
 
   const note = buildTransferNote(round.syntax_template, { fullName: me.full_name, groupNo: me.group_no });
 
@@ -404,28 +411,25 @@ export async function getLedger(env, me, roundId) {
   // Trưởng nhóm xem đợt cấp lớp thì CHỈ thấy nhóm mình — lọc ngay trong câu
   // truy vấn chứ không lọc ở giao diện (nguyên tắc N6, và mục 6 CLAUDE.md:
   // phân quyền kiểm ở máy chủ, không tin giao diện).
+  // Người đã ngừng tham gia vẫn phải hiện TRONG SỔ nếu đã khai đợt này. Bỏ họ
+  // đi thì tiền của họ vẫn nằm trong số dư (truy vấn số dư không đụng bảng
+  // members) mà không còn dòng nào cộng ra được con số ấy — người thu nhìn
+  // thấy một khoản không dò được về từng người.
+  const CHON = `SELECT m.id, m.full_name, m.phone, m.is_active,
+                       d.declared_at, d.verified_at, d.note,
+                       (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
+                  FROM members m
+                  LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?`;
+  const CON = '(m.is_active = 1 OR d.id IS NOT NULL) ORDER BY m.id';
+
   const people = round.scope === 'class'
     ? (muc === 'nhom-minh'
-        ? await env.DB.prepare(
-            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note,
-                    (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi,
-                (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
-             FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
-             WHERE m.cohort_id = ? AND m.group_id = ? AND m.is_active = 1 ORDER BY m.id`
-          ).bind(round.id, round.cohort_id, me.group_id).all()
-        : await env.DB.prepare(
-            `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note,
-                    (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi,
-                (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
-             FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
-             WHERE m.cohort_id = ? AND m.is_active = 1 ORDER BY m.id`
-          ).bind(round.id, round.cohort_id).all())
-    : await env.DB.prepare(
-        `SELECT m.id, m.full_name, m.phone, d.declared_at, d.verified_at, d.note,
-                (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
-         FROM members m LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?
-         WHERE m.group_id = ? AND m.is_active = 1 ORDER BY m.id`
-      ).bind(round.id, round.group_id).all();
+        ? await env.DB.prepare(`${CHON} WHERE m.cohort_id = ? AND m.group_id = ? AND ${CON}`)
+            .bind(round.id, round.cohort_id, me.group_id).all()
+        : await env.DB.prepare(`${CHON} WHERE m.cohort_id = ? AND ${CON}`)
+            .bind(round.id, round.cohort_id).all())
+    : await env.DB.prepare(`${CHON} WHERE m.group_id = ? AND ${CON}`)
+        .bind(round.id, round.group_id).all();
 
   return json({
     round: { id: round.id, title: round.title, amount: round.amount, status: round.status, scope: round.scope },
@@ -441,6 +445,7 @@ export async function getLedger(env, me, roundId) {
       verified: !!p.verified_at,
       note: p.note,
       khai_ho_boi: p.khai_ho_boi ?? null,
+      da_ngung: !p.is_active,
       status_label: p.verified_at ? LABEL_VERIFIED : (p.declared_at ? LABEL_DECLARED : 'chưa khai'),
     })),
   });
@@ -457,9 +462,17 @@ export async function postVerify(request, env, me, roundId, ip) {
   const memberId = Number(body.member_id);
   if (!Number.isInteger(memberId) || memberId <= 0) return error('member_invalid', 422);
 
+  // Người đã ngừng tham gia vẫn phải xác nhận được NẾU họ đã khai đợt này.
+  // Chặn cứng is_active = 1 thì ai đóng tiền xong mới nghỉ sẽ kẹt vĩnh viễn ở
+  // "đã tự khai": tiền có thật trong tài khoản người thu mà không đường nào
+  // đưa được vào số dư.
+  const CON_XAC_NHAN = `(m.is_active = 1 OR EXISTS (
+        SELECT 1 FROM fund_declarations d WHERE d.member_id = m.id AND d.round_id = ?))`;
   const inScope = round.scope === 'class'
-    ? await env.DB.prepare('SELECT id FROM members WHERE id = ? AND cohort_id = ? AND is_active = 1').bind(memberId, round.cohort_id).first()
-    : await env.DB.prepare('SELECT id FROM members WHERE id = ? AND group_id = ? AND is_active = 1').bind(memberId, round.group_id).first();
+    ? await env.DB.prepare(`SELECT m.id FROM members m WHERE m.id = ? AND m.cohort_id = ? AND ${CON_XAC_NHAN}`)
+        .bind(memberId, round.cohort_id, round.id).first()
+    : await env.DB.prepare(`SELECT m.id FROM members m WHERE m.id = ? AND m.group_id = ? AND ${CON_XAC_NHAN}`)
+        .bind(memberId, round.group_id, round.id).first();
   if (!inScope) return error('member_not_in_round', 422);
 
   // Mốc thời gian để SQLite sinh, không dùng Date của JS: hai dạng chuỗi khác
