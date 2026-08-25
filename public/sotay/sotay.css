@@ -1,0 +1,219 @@
+/* Bảng màu và chữ lấy nguyên từ public/app.css của chính ứng dụng — sổ tay
+   phải trông như cùng một nhà với thứ nó đang hướng dẫn. */
+:root{
+  --giay:#F3F3F1; --the:#FFFFFF; --the2:#FAFAF9;
+  --muc:#17191B; --muc2:#5C6266; --muc3:#93999D;
+  --net:#E3E3DF; --net2:#D2D3CE;
+  --cam:#A8500E; --cam-nen:#FAEDE0; --cam-net:#E8CBAA;
+  --luc:#146450; --luc-nen:#E4F0EB; --luc-net:#B6D6C9;
+  --bong:0 1px 2px rgba(23,25,27,.05), 0 4px 14px rgba(23,25,27,.045);
+  --so:'Space Grotesk',ui-monospace,monospace;
+  --r:14px; --r2:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --giay:#141619; --the:#1C1F23; --the2:#191C1F;
+    --muc:#ECEEEF; --muc2:#A3A9AE; --muc3:#6F767B;
+    --net:#2B2F34; --net2:#3A3F45;
+    --cam:#E4A16A; --cam-nen:#2E2016; --cam-net:#4A3421;
+    --luc:#6FC5A5; --luc-nen:#12251F; --luc-net:#234036;
+    --bong:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+  }
+}
+:root[data-theme="dark"]{
+  --giay:#141619; --the:#1C1F23; --the2:#191C1F;
+  --muc:#ECEEEF; --muc2:#A3A9AE; --muc3:#6F767B;
+  --net:#2B2F34; --net2:#3A3F45;
+  --cam:#E4A16A; --cam-nen:#2E2016; --cam-net:#4A3421;
+  --luc:#6FC5A5; --luc-nen:#12251F; --luc-net:#234036;
+  --bong:0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.28);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--giay); color:var(--muc);
+  font-family:'Be Vietnam Pro',system-ui,-apple-system,sans-serif;
+  font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%}
+a{color:var(--cam); text-decoration-thickness:1px; text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--cam); outline-offset:3px; border-radius:4px}
+
+.khung{max-width:1180px; margin:0 auto; padding:0 20px}
+.than{display:grid; grid-template-columns:minmax(0,1fr); gap:44px}
+@media (min-width:1080px){
+  .than{grid-template-columns:210px minmax(0,1fr); align-items:start; gap:56px}
+}
+
+/* ── Đầu trang ── */
+.dau{padding:56px 0 40px; border-bottom:1px solid var(--net)}
+.hieu{
+  font-family:var(--so); font-size:11.5px; font-weight:600;
+  letter-spacing:.16em; text-transform:uppercase; color:var(--muc3); margin:0 0 14px;
+}
+h1{
+  font-size:clamp(34px,6.4vw,52px); line-height:1.08; letter-spacing:-.03em;
+  font-weight:700; margin:0 0 16px; text-wrap:balance; max-width:16ch;
+}
+.dat{font-size:18px; color:var(--muc2); max-width:56ch; margin:0 0 26px}
+.diachi{
+  display:inline-flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  background:var(--the); border:1px solid var(--net); border-radius:var(--r);
+  padding:13px 18px; box-shadow:var(--bong);
+}
+.diachi b{font-family:var(--so); font-size:17px; letter-spacing:-.01em; word-break:break-all}
+.diachi span{font-size:13px; color:var(--muc3)}
+
+/* ── Mục lục ── */
+.muc{font-size:14.5px}
+@media (min-width:1080px){ .muc{position:sticky; top:32px} }
+.muc .hieu{margin-bottom:10px}
+.muc ol{list-style:none; margin:0; padding:0; display:grid; gap:2px}
+.muc a{
+  display:block; padding:6px 10px; margin-left:-10px; border-radius:8px;
+  color:var(--muc2); text-decoration:none; transition:background .12s, color .12s;
+}
+.muc a:hover{background:var(--the); color:var(--muc)}
+.muc .cham{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:8px; vertical-align:1px}
+.muc .ai .cham{background:var(--luc)}
+.muc .pt .cham{background:var(--cam)}
+.muc a.dang{background:var(--the); color:var(--muc); font-weight:600; box-shadow:var(--bong)}
+
+/* ── Thanh mục lục bám trên cùng ──
+   Mục lục cạnh bên chỉ bám được khi màn hình rộng từ 1080px. Trên điện thoại
+   nó trôi mất ngay sau màn đầu, nên đọc theo từng mục rất khó. Thanh này dựng
+   bằng JS (xem cuối tệp) để không bao giờ lệch với mục lục cạnh bên. */
+.thanh{position:sticky; top:0; z-index:50; background:var(--giay); border-bottom:1px solid var(--net)}
+@media (min-width:1080px){ .thanh{display:none} }
+.thanh-trong{max-width:1180px; margin:0 auto; padding:0 20px}
+.thanh-nut{
+  width:100%; display:flex; align-items:center; gap:11px; padding:12px 0;
+  background:none; border:0; cursor:pointer; font:inherit; color:var(--muc); text-align:left;
+}
+.thanh-nhan{
+  font-family:var(--so); font-size:10.5px; font-weight:600; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--muc3); flex:none;
+}
+.thanh-ten{font-size:14.5px; font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.thanh-mt{flex:none; color:var(--muc3); transition:transform .18s}
+@media (prefers-reduced-motion:reduce){ .thanh-mt{transition:none} }
+.thanh[data-mo="1"] .thanh-mt{transform:rotate(180deg)}
+.thanh-ds{list-style:none; max-width:1180px; margin:0 auto; padding:0 20px 12px; display:grid; gap:1px}
+/* Phải viết hẳn dòng này: display:grid ở trên đè mất [hidden]{display:none} của
+   trình duyệt, nên không có nó thì danh sách bung sẵn và không đóng lại được. */
+.thanh-ds[hidden]{display:none}
+.thanh-ds a{display:block; padding:10px 12px; border-radius:9px; color:var(--muc2); text-decoration:none; font-size:15px}
+.thanh-ds a.dang{background:var(--the); color:var(--muc); font-weight:600}
+.thanh-ds .cham{display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:9px; vertical-align:1px}
+.thanh-ds .ai .cham{background:var(--luc)}
+.thanh-ds .pt .cham{background:var(--cam)}
+/* Hai mục cuối không có chấm màu — chừa đúng chỗ chấm để chữ thẳng hàng */
+.muc li:not(.ai):not(.pt) a, .thanh-ds li:not(.ai):not(.pt) a{padding-left:calc(10px + 16px)}
+.thanh-ds li:not(.ai):not(.pt) a{padding-left:calc(12px + 16px)}
+
+/* Nhảy tới một mục thì đừng để thanh bám che mất tiêu đề */
+section[id]{scroll-margin-top:62px}
+@media (min-width:1080px){ section[id]{scroll-margin-top:24px} }
+@media (prefers-reduced-motion:no-preference){ html{scroll-behavior:smooth} }
+
+/* ── Phần ── */
+section{scroll-margin-top:24px; padding:44px 0; border-bottom:1px solid var(--net)}
+section:last-of-type{border-bottom:0}
+h2{
+  font-size:clamp(23px,3.4vw,30px); line-height:1.2; letter-spacing:-.02em;
+  font-weight:700; margin:0 0 8px; text-wrap:balance;
+}
+h3{font-size:18.5px; line-height:1.3; font-weight:600; margin:0 0 6px; letter-spacing:-.01em}
+p{margin:0 0 14px; max-width:62ch}
+.mo{color:var(--muc2)}
+.nho{font-size:14.5px}
+
+/* Nhãn quyền: xanh = ai cũng làm được, cam = chỉ người phụ trách. Đây là
+   khác biệt CÓ THẬT trong sản phẩm, không phải trang trí. */
+.the-nhan{
+  display:inline-flex; align-items:center; gap:6px; font-family:var(--so);
+  font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase;
+  padding:4px 10px; border-radius:999px; border:1px solid; white-space:nowrap;
+}
+.nhan-ai{color:var(--luc); background:var(--luc-nen); border-color:var(--luc-net)}
+.nhan-pt{color:var(--cam); background:var(--cam-nen); border-color:var(--cam-net)}
+.dau-phan{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:18px}
+
+/* ── Thẻ việc: chữ bên trái, ảnh bên phải ── */
+.viec{
+  display:grid; grid-template-columns:minmax(0,1fr); gap:20px; padding:22px; margin:0 0 18px;
+  background:var(--the); border:1px solid var(--net);
+  border-radius:var(--r); box-shadow:var(--bong);
+}
+@media (min-width:780px){
+  .viec{grid-template-columns:minmax(0,1fr) 264px; gap:28px; align-items:start; padding:26px}
+  .viec.rong{grid-template-columns:minmax(0,1fr)}
+}
+.viec > .chu > :last-child{margin-bottom:0}
+/* Ảnh chụp là màn hình SÁNG của ứng dụng; đặt thẳng lên nền tối thì chói như
+   một lỗ thủng. Viền đệm làm nó thành một vật được đặt vào trang chứ không
+   phải một mảng trắng. Không chỉnh độ sáng của chính ảnh — sổ tay phải cho
+   thấy đúng thứ người dùng sẽ thấy. */
+figure{margin:0}
+.anh{
+  display:block; width:100%; height:auto; aspect-ratio:390/844; border-radius:8px;
+  border:1px solid var(--net2); background:#FFF;
+}
+.vien-anh{
+  padding:6px; background:var(--the2); border:1px solid var(--net);
+  border-radius:var(--r2); max-width:280px;
+}
+@media (max-width:779px){ .vien-anh{max-width:250px; margin:0 auto} }
+.chu-anh{
+  font-size:12.5px; color:var(--muc3); margin:9px 0 0; line-height:1.45; max-width:none;
+}
+
+/* Bước có đánh số — chỉ dùng cho luồng đăng nhập, vì đó THẬT SỰ là một trình
+   tự: sai thứ tự thì không đi tiếp được. */
+.buoc{display:flex; align-items:baseline; gap:11px; margin:0 0 8px}
+.buoc .n{
+  font-family:var(--so); font-size:13px; font-weight:700; color:var(--cam);
+  background:var(--cam-nen); border:1px solid var(--cam-net);
+  width:26px; height:26px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center; flex:none;
+}
+
+ul.gach{margin:0 0 14px; padding-left:20px; max-width:62ch}
+ul.gach li{margin-bottom:6px}
+ul.gach li::marker{color:var(--muc3)}
+
+.luuy{
+  border-left:3px solid var(--cam); background:var(--cam-nen);
+  padding:13px 16px; border-radius:0 var(--r2) var(--r2) 0; margin:0 0 16px;
+  font-size:15px; max-width:62ch;
+}
+.luuy b{color:var(--cam)}
+:root[data-theme="dark"] .luuy b, :root:not([data-theme="light"]) .luuy b{color:var(--cam)}
+
+.khong{
+  display:grid; gap:0; background:var(--the); border:1px solid var(--net);
+  border-radius:var(--r); overflow:hidden; box-shadow:var(--bong); margin-bottom:16px;
+}
+.khong .dong{display:grid; gap:4px; padding:16px 20px; border-bottom:1px solid var(--net)}
+.khong .dong:last-child{border-bottom:0}
+.khong .tieu{font-weight:600; font-size:16px}
+.khong .vi{color:var(--muc2); font-size:14.5px; max-width:62ch}
+
+table{border-collapse:collapse; width:100%; font-size:14.5px}
+.bang-cuon{overflow-x:auto; margin:0 0 16px; border:1px solid var(--net); border-radius:var(--r); background:var(--the)}
+th,td{text-align:left; padding:11px 16px; border-bottom:1px solid var(--net); vertical-align:top}
+th{
+  font-family:var(--so); font-size:11px; font-weight:600; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--muc3); white-space:nowrap;
+}
+tr:last-child td{border-bottom:0}
+td b{font-weight:600}
+
+.chan{padding:36px 0 60px; color:var(--muc3); font-size:13.5px}
+.chan p{max-width:66ch}
+
+code{
+  font-family:var(--so); font-size:.9em; background:var(--the2);
+  border:1px solid var(--net); border-radius:5px; padding:1px 6px;
+}
+@media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
