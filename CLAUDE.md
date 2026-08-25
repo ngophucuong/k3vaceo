@@ -101,10 +101,18 @@ npx wrangler dev --port 8787 --local
 
 - Không ra được internet → `img.vietqr.io` không tải được ảnh QR bao giờ.
   Giao diện có nhánh dự phòng và test kiểm nhánh đó.
+- **Không gọi được cả vào `k3vaceo.cuongngo.app`.** Proxy trả 403 ở bước
+  CONNECT (`curl: (56) CONNECT tunnel failed`), curl báo mã `000`. Đừng tưởng
+  deploy hỏng. Muốn nhìn tên miền thật thì **thêm phép kiểm vào `deploy.yml`**
+  rồi đọc log Actions — đó là con mắt duy nhất có.
 - LibreOffice cài sẵn nhưng **hỏng**, không convert nổi cả `.txt`. Để kiểm file
   Word thì dùng bộ lược đồ OOXML chính thức:
   `PYTHONPATH=/root/.claude/skills/synced/xlsx/scripts python3 /root/.claude/skills/synced/xlsx/scripts/office/validate.py <tệp>.docx`
-  cộng với `python-docx` để đọc lại nội dung.
+  cộng với `python-docx` để đọc lại nội dung. Dựng `.docx` thì dùng gói `docx`
+  của npm — **chưa cài sẵn**, phải `npm install docx`. Muốn NHÌN nội dung tệp
+  Word đã dựng thì `mammoth` đổi sang HTML rồi chụp bằng Chromium; chính phép
+  nhìn ấy bắt được lỗi dấu sao `*nghiêng*` lồng trong `**đậm**` lọt nguyên văn
+  ra tệp, thứ phép kiểm chuỗi không thấy.
 - Playwright dùng `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` với
   `--no-sandbox`. Passkey test được bằng virtual authenticator qua CDP.
 
@@ -195,6 +203,39 @@ Ba chỗ trong Web Push sai là "gửi đi mà không ai nhận", không báo l�
 Vì vậy phép kiểm là **giải mã ngược**: đóng vai trình duyệt, giải gói ra và so
 từng ký tự — cộng một phép đối chứng sai khoá phải hỏng, để chắc phép kiểm có
 răng. Xem `scripts/tao-khoa-vapid.mjs` và bộ kiểm ở thư mục scratchpad.
+
+## Sổ tay hướng dẫn — ba bản, một bản thảo
+
+Bản thảo gốc là `so-tay.tpl.html` **ở thư mục scratchpad của phiên**, kèm 17
+ảnh trong `anh-nen/`. Từ đó dựng ra ba bản:
+
+| Bản | Ở đâu | Để làm gì |
+|---|---|---|
+| Tên miền | `public/sotay/` → `k3vaceo.cuongngo.app/sotay` | đưa cho cả lớp |
+| Tệp rời | `So-tay-k3vaceo.html` 1,2 MB, ảnh nhúng base64 | gửi Zalo, đọc không cần mạng |
+| Word | `So-tay-k3vaceo.docx` | in ra giấy |
+
+**Chỉ bản tên miền nằm trong repo.** Bản thảo và ba script dựng ở scratchpad,
+phiên mới là mất. Muốn sửa sổ tay thì sửa thẳng `public/sotay/index.html` —
+HTML thường, CSS và JS để rời, đọc được và sửa được.
+
+Ba điều đã trả giá để biết, đừng vấp lại:
+
+- `public/_headers` đặt CSP `script-src 'self'` → **script nội dòng bị chặn
+  thẳng**. Bản cho tên miền bắt buộc để CSS/JS ra tệp riêng, không thì mục lục
+  chết mà không báo gì.
+- Ảnh phải khai `width`/`height` hoặc `aspect-ratio`. Có `loading="lazy"` mà
+  không chừa sẵn chỗ thì mỗi ảnh hiện ra lại đẩy nội dung nhảy xuống — đọc
+  trên điện thoại giật liên tục.
+- `_redirects` **không cần** luật riêng cho `/sotay`: Pages tự chuyển `/sotay`
+  sang `/sotay/` bằng 308 TRƯỚC khi đọc `_redirects`, nên luật vét `/*` không
+  nuốt mất. Đo bằng `npx wrangler pages dev ../public` chứ không phải suy đoán.
+
+Số tài khoản trong ảnh mã QR **đã che bằng khối đặc** ở cả ba bản (Ngô Phú
+Cường quyết ngày 25/8, sau khi được nêu rõ trang tên miền ai có đường dẫn cũng
+mở được). Che bằng khối đặc chứ không làm mờ — ảnh mờ về lý thuyết còn dò
+ngược được. Ảnh gốc chưa che nằm ở `anh/07-*.png` trong scratchpad, không phát
+tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 
 ## Việc còn treo, cần người dùng quyết hoặc cung cấp
 
