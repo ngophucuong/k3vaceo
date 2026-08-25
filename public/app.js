@@ -1988,11 +1988,22 @@ function suaDot(id) {
 function renderRound(r) {
   const dots = Array.from({ length: r.total_people }, (_, i) =>
     `<i class="${i < r.declared_count ? 'd' : ''}"${i < r.verified_count ? ' data-v="1"' : ''}></i>`).join('');
+  // Hai mức "xong" khác nhau, và mỗi mức cất đi một thứ khác nhau:
+  //   xongCuaToi  — người thu đã xác nhận tiền CỦA BẠN. Bạn không còn việc gì,
+  //                 nên cất luôn mã QR, số tài khoản và nút chép nội dung. Để
+  //                 lại là bày ra một lời mời chuyển tiền lần nữa; tệ hơn nữa,
+  //                 khi mạng yếu mã không tải được thì nhánh dự phòng hiện câu
+  //                 "Chưa hiện được mã. Kiểm tra lại số tài khoản" — đọc lên
+  //                 y như một cảnh báo trên một đợt đã xong xuôi.
+  //   xongCaDot   — người thu đã nhận đủ của TẤT CẢ. Đánh dấu ✓ lên đầu thẻ.
+  const xongCuaToi = !!r.i_am_verified;
+  const xongCaDot = r.total_people > 0 && r.verified_count === r.total_people;
   return `
   <div class="card">
     <div class="cb">
       <div style="font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px">
-        ${esc(r.title)}${r.scope === 'class' ? ' · cả lớp' : ''}${r.scope === 'group' && r.thuoc_quy === 'lop' ? ' · thu hộ quỹ lớp' : ''}${r.status === 'draft' ? ' · bản nháp' : ''}${r.status === 'closed' ? ' · đã đóng' : ''}</div>
+        ${esc(r.title)}${r.scope === 'class' ? ' · cả lớp' : ''}${r.scope === 'group' && r.thuoc_quy === 'lop' ? ' · thu hộ quỹ lớp' : ''}${r.status === 'draft' ? ' · bản nháp' : ''}${r.status === 'closed' ? ' · đã đóng' : ''}${
+          xongCaDot ? ' <span class="xongchip">✓ đã thu đủ</span>' : ''}</div>
       <div class="amt">${vnMoney(r.amount)}<small> đ / người</small></div>
       ${r.purpose ? `<div class="mut" style="margin-top:11px">${esc(r.purpose)}</div>` : ''}
       ${r.collector_name ? `<div class="mut" style="margin-top:5px">Người thu: <b style="color:var(--ink)">${esc(r.collector_name)}</b></div>` : ''}
@@ -2008,11 +2019,11 @@ function renderRound(r) {
         <button class="wide" data-openround="${r.id}">Mở đợt thu</button>
         ${suaDuocDot(r) ? `<button class="wide ghost" data-suadot="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa đợt thu</button>` : ''}
       </div>` : `
-      <div class="qrw">
+      ${xongCuaToi ? '' : `<div class="qrw">
         <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
         <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
         <button class="copy" data-copy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
-      </div>
+      </div>`}
       <div class="cb">
         ${r.i_am_verified
           ? `<div class="wide ok" style="cursor:default">✓ Người thu đã nhận tiền của bạn</div>
@@ -2024,8 +2035,10 @@ function renderRound(r) {
                <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>`}
         <div class="dots">${dots}</div>
         <div class="foot" style="padding:8px 0 0">
-          <b class="num" style="color:var(--ink)">${r.declared_count}/${r.total_people}</b> người đã tự khai${r.verified_count ? `, người thu đã nhận <b class="num" style="color:var(--go)">${r.verified_count}</b>` : ''}.
-          Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.</div>
+          ${xongCaDot
+            ? `<b style="color:var(--go)">✓ Người thu đã nhận đủ của cả <span class="num">${r.total_people}</span> người.</b> Đợt này xong.`
+            : `<b class="num" style="color:var(--ink)">${r.declared_count}/${r.total_people}</b> người đã tự khai${r.verified_count ? `, người thu đã nhận <b class="num" style="color:var(--go)">${r.verified_count}</b>` : ''}.
+          Không hiện tên ai — chỉ người thu và trưởng nhóm xem được danh sách.`}</div>
         ${r.can_see_ledger ? `<button class="wide ghost" data-ledger="${r.id}" style="margin-top:12px;padding:11px;font-size:14px">Mở sổ ${r.i_am_collector ? 'của người thu' : 'theo dõi'}</button>` : ''}
         ${suaDuocDot(r) ? `<button class="wide ghost" data-suadot="${r.id}" style="margin-top:8px;padding:11px;font-size:14px">Sửa đợt thu</button>` : ''}
       </div>`}
