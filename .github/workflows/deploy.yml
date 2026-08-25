@@ -203,6 +203,34 @@ jobs:
           fi
           echo "✓ Worker Route phủ toàn bộ /api/*"
 
+          # Sổ tay là trang tĩnh nằm cạnh ứng dụng. Ba thứ có thể hỏng lặng lẽ
+          # mà deploy vẫn xanh: luật vét /* nuốt mất /sotay, CSP chặn tệp JS
+          # tách rời (mục lục chết không báo gì), và ảnh thiếu.
+          echo "--- sổ tay hướng dẫn tại /sotay ---"
+          st=$(curl -sL -o /tmp/sotay.html -w '%{http_code}' https://k3vaceo.cuongngo.app/sotay)
+          echo "  HTTP $st ($(wc -c < /tmp/sotay.html) byte)"
+          loi=0
+          if grep -q '<title>Sổ tay k3vaceo</title>' /tmp/sotay.html; then
+            echo "  ✓ ra đúng sổ tay"
+          else
+            echo "  ✗ /sotay không ra sổ tay"; loi=1
+          fi
+          if grep -q 'app\.js' /tmp/sotay.html; then
+            echo "  ✗ /sotay bị luật vét /* nuốt — trả về giao diện ứng dụng"; loi=1
+          else
+            echo "  ✓ không bị luật vét /* nuốt"
+          fi
+          for t in sotay.css sotay.js anh/07-quy-nut-toi-da-chuyen.jpg; do
+            m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app/sotay/$t")
+            if [ "$m" = "200" ]; then echo "  ✓ /sotay/$t"; else echo "  ✗ /sotay/$t = HTTP $m"; loi=1; fi
+          done
+          if curl -sI https://k3vaceo.cuongngo.app/sotay/ | grep -qi 'x-robots-tag: *noindex'; then
+            echo "  ✓ có X-Robots-Tag: noindex"
+          else
+            echo "  ✗ thiếu X-Robots-Tag: noindex"; loi=1
+          fi
+          [ "$loi" = "0" ] || { echo "::error::Sổ tay ở /sotay chưa chạy đúng trên tên miền."; exit 1; }
+
           KHOP="$khop" node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
             // Ghi cứng sĩ số Nhóm 6 là sai bản chất: nhóm ĐƯỢC PHÉP đông thêm.
