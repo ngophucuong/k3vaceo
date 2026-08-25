@@ -221,10 +221,23 @@ ngày cho 134 người là phí, và pin điện thoại trả giá.
 nằm im → hiện băng `.banmoi` "Có bản mới — chạm để tải lại". **Không tự tải
 lại**: người ta có thể đang gõ dở một ô.
 
-Service worker vẫn không cache gì nên nó chưa bao giờ là thủ phạm. `app.js` và
-`app.css` **không có `?v=`**, nên nếu Pages đệm chúng lâu thì sửa mã xong người
-dùng vẫn chạy bản cũ — `deploy.yml` có sẵn phép in `cache-control` thật của
-`/`, `/app.js`, `/app.css`, `/sw.js` để đọc thay vì đoán.
+Service worker vẫn không cache gì nên nó chưa bao giờ là thủ phạm. Thủ phạm
+thật là **đệm của Pages**, đo trên tên miền thật ngày 25/8:
+
+| Đường dẫn | Mặc định của Pages |
+|---|---|
+| `/` | `public, max-age=0, must-revalidate` — luôn hỏi lại ✓ |
+| `/app.js` `/app.css` `/sw.js` | `public, max-age=14400` — **bốn tiếng** |
+
+`must-revalidate` **chỉ có hiệu lực sau khi hết hạn**, không ép hỏi lại khi còn
+tươi. Nên suốt 4 tiếng sau deploy, người quay lại vẫn chạy mã cũ — và băng "Có
+bản mới" thành cái bẫy: bấm xong `index.html` mới về mà `app.js` vẫn lấy từ
+đệm nên băng hiện lại ngay.
+
+Đã đặt `Cache-Control: no-cache` cho ba tệp ấy trong `public/_headers`.
+`no-cache` không phải "đừng đệm" mà là "đệm nhưng mỗi lần dùng phải hỏi lại";
+cả ba đều có ETag nên câu hỏi ấy trả 304 rỗng. Không dùng `?v=` vì mục 8 SRS
+cấm build step. `deploy.yml` **đánh hỏng job** nếu ba tệp này lại bị đệm.
 
 ## Bảo lưu / rời nhóm — "ngừng tham gia"
 

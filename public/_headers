@@ -4,6 +4,23 @@
   Referrer-Policy: same-origin
   Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()
 
+# Đo trên tên miền thật ngày 25/8: Pages mặc định cho app.js/app.css/sw.js
+# `max-age=14400` — BỐN TIẾNG dùng thẳng bản đệm, không hỏi máy chủ lần nào.
+# (`must-revalidate` chỉ có hiệu lực SAU khi hết hạn, không ép hỏi lại khi
+# còn tươi.) Hệ quả thật: deploy xong, suốt 4 tiếng người quay lại vẫn chạy
+# mã cũ — và băng "Có bản mới, chạm để tải lại" thành cái bẫy, vì bấm xong
+# index.html mới về mà app.js vẫn lấy từ đệm nên băng hiện lại ngay.
+#
+# `no-cache` KHÔNG phải là "đừng đệm": vẫn đệm, nhưng mỗi lần dùng phải hỏi
+# lại. Ba tệp này đều có ETag nên câu hỏi ấy trả về 304 rỗng — rẻ, và đổi
+# lại là không bao giờ chạy mã cũ. Không dùng ?v= vì mục 8 SRS cấm build step.
+/app.js
+  Cache-Control: no-cache
+/app.css
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+
 # Sổ tay có tên và nơi công tác của cả nhóm — đừng để máy tìm kiếm gom về.
 /sotay/*
   X-Robots-Tag: noindex

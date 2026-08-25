@@ -214,6 +214,16 @@ jobs:
             cc=$(printf '%s\n' "$hd" | grep -i '^cache-control:' | cut -d' ' -f2- || true)
             et=$(printf '%s\n' "$hd" | grep -ci '^etag:' || true)
             echo "  $t → cache-control: ${cc:-(không đặt)} · số dòng etag: ${et:-0}"
+            # app.js/app.css/sw.js KHÔNG có ?v= nên chỉ cần chúng được đệm
+            # quá một nhịp là deploy xong người ta vẫn chạy mã cũ. Đây là phép
+            # kiểm có răng, không phải dòng chẩn đoán cho vui.
+            case "$t" in
+              /app.js|/app.css|/sw.js)
+                case "$cc" in
+                  *no-cache*|*no-store*|*max-age=0*) echo "      ✓ luôn hỏi lại máy chủ" ;;
+                  *) echo "::error::$t đang được đệm ($cc) — sửa mã xong người dùng vẫn chạy bản cũ."; exit 1 ;;
+                esac ;;
+            esac
           done
 
           # Sổ tay là trang tĩnh nằm cạnh ứng dụng. Ba thứ có thể hỏng lặng lẽ
