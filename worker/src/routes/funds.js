@@ -415,10 +415,15 @@ export async function getLedger(env, me, roundId) {
   // đi thì tiền của họ vẫn nằm trong số dư (truy vấn số dư không đụng bảng
   // members) mà không còn dòng nào cộng ra được con số ấy — người thu nhìn
   // thấy một khoản không dò được về từng người.
+  // Kèm luôn số nhóm: với đợt thu cấp lớp thì sổ có 134 dòng, thủ quỹ lớp
+  // không thể nhớ ai thuộc nhóm nào. Đợt của nhóm thì cột này thừa nên giao
+  // diện tự giấu đi.
   const CHON = `SELECT m.id, m.full_name, m.phone, m.is_active,
+                       g.no AS group_no, g.label AS group_label,
                        d.declared_at, d.verified_at, d.note,
                        (SELECT k.full_name FROM members k WHERE k.id = d.declared_by) AS khai_ho_boi
                   FROM members m
+                  LEFT JOIN groups g ON g.id = m.group_id
                   LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = ?`;
   const CON = '(m.is_active = 1 OR d.id IS NOT NULL) ORDER BY m.id';
 
@@ -446,6 +451,8 @@ export async function getLedger(env, me, roundId) {
       note: p.note,
       khai_ho_boi: p.khai_ho_boi ?? null,
       da_ngung: !p.is_active,
+      group_no: p.group_no ?? null,
+      group_label: p.group_label ?? null,
       status_label: p.verified_at ? LABEL_VERIFIED : (p.declared_at ? LABEL_DECLARED : 'chưa khai'),
     })),
   });

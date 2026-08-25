@@ -2319,32 +2319,79 @@ async function napNguoiThu(scope) {
   if (dangChon && list.some(m => String(m.id) === dangChon)) sel.value = dangChon;
 }
 
+/* ─── Sổ thu ─── */
+// Giữ dữ liệu và bộ lọc ở ngoài hàm vẽ. Hai lý do, cả hai đều đo được:
+//  - đổi bộ lọc không phải gọi lại máy chủ;
+//  - xác nhận một người xong, sổ vẽ lại mà VẪN giữ nguyên bộ lọc đang xem.
+//    Không giữ thì thủ quỹ lớp lọc "chưa khai" trong 134 người, xác nhận một
+//    người là danh sách nhảy về đầu — đến người thứ ba thì bỏ cuộc.
+let SOTHU = null;
+
+const LOC_SO_THU = [
+  ['tat-ca', 'Tất cả'],
+  ['chua-khai', 'Chưa khai'],
+  ['da-khai', 'Mới tự khai'],
+  ['da-nhan', 'Người thu đã nhận'],
+];
+// Cố ý KHÔNG có nhãn nào tên là "đã đóng": mục 6.4 SRS. Tiền chỉ có thật khi
+// người thu soi sao kê xong, nên trạng thái giữa là "mới tự khai" chứ không
+// phải "đã đóng".
+const trangThai = (p) => p.verified ? 'da-nhan' : p.declared ? 'da-khai' : 'chua-khai';
+
 async function openLedger(roundId) {
   openSheet(`<h3>Sổ thu</h3><p class="sub">Đang tải…</p>`);
   let data;
   try { data = await apiGet(`/api/funds/${roundId}/ledger`); }
   catch (e) { closeSheet(); toast(errText(e)); return; }
+  const giu = SOTHU?.roundId === roundId ? SOTHU : null;
+  SOTHU = { roundId, data, loc: giu?.loc ?? 'tat-ca', nhom: giu?.nhom ?? 'tat-ca' };
+  veSoThu();
+}
 
+function veSoThu() {
+  const { roundId, data, loc, nhom } = SOTHU;
   const { round, people, i_am_collector, pham_vi_xem } = data;
-  const done = people.filter(p => p.verified).length;
   const chiNhomMinh = pham_vi_xem === 'nhom-minh';
-  // Bày nút khai hộ cho người thu và cho trưởng/phó nhóm. Máy chủ kiểm lại
-  // đầy đủ trong khaiHoDuoc(); đây chỉ để khỏi bày nút bấm vào là 403.
   const khaiHoDuoc = i_am_collector || chiNhomMinh || !!FUNDS?.can_create_group || !!FUNDS?.can_create_class;
+
+  // Cột nhóm chỉ có nghĩa khi sổ trải trên nhiều nhóm — đợt của nhóm thì mọi
+  // dòng cùng một nhóm, hiện ra chỉ tổ chật.
+  const cacNhom = [...new Set(people.map(p => p.group_no).filter(n => n != null))].sort((a, b) => a - b);
+  const nhieuNhom = cacNhom.length > 1;
+
+  const theoNhom = nhieuNhom && nhom !== 'tat-ca'
+    ? people.filter(p => String(p.group_no) === String(nhom)) : people;
+  const dem = Object.fromEntries(LOC_SO_THU.map(([k]) => [k, 0]));
+  dem['tat-ca'] = theoNhom.length;
+  theoNhom.forEach(p => { dem[trangThai(p)]++; });
+  const hien = loc === 'tat-ca' ? theoNhom : theoNhom.filter(p => trangThai(p) === loc);
+  const daNhan = theoNhom.filter(p => p.verified).length;
+
   openSheet(`
    <h3>${esc(round.title)}</h3>
    ${chiNhomMinh ? `<div class="warn" style="margin-bottom:12px">Đây là đợt thu của <b>cả lớp</b>.
      Bạn đang xem phần <b>${esc(HOME?.group?.label ?? 'nhóm mình')}</b> — ${people.length} người, không phải toàn lớp.</div>` : ''}
-   <p class="sub">${vnMoney(round.amount)} đ mỗi người · ${done === people.length ? '✓ ' : ''}người thu đã nhận ${done}/${people.length}${chiNhomMinh ? ' trong nhóm bạn' : ''}.
+   <p class="sub">${vnMoney(round.amount)} đ mỗi người · ${daNhan === theoNhom.length && theoNhom.length ? '✓ ' : ''}người thu đã nhận ${daNhan}/${theoNhom.length}${chiNhomMinh ? ' trong nhóm bạn' : ''}.
      ${i_am_collector ? 'Soi sao kê xong thì bấm xác nhận từng người.' : 'Chỉ người thu mới xác nhận được đã nhận tiền.'}</p>
+
+   ${nhieuNhom ? `<label class="f">Xem nhóm nào</label>
+   <select id="stNhom"><option value="tat-ca">Tất cả ${cacNhom.length} nhóm — ${people.length} người</option>
+     ${cacNhom.map(n => `<option value="${n}"${String(nhom) === String(n) ? ' selected' : ''}>Nhóm ${n} — ${people.filter(p => p.group_no === n).length} người</option>`).join('')}
+   </select>` : ''}
+
+   <div class="fl cuon" style="margin:${nhieuNhom ? "12px" : "4px"} 0 14px">
+     ${LOC_SO_THU.map(([k, l]) => `<button class="fc ${loc === k ? 'on' : ''}" data-loc="${k}">${l} <span class="num">${dem[k]}</span></button>`).join('')}
+   </div>
+
    <div class="warn" style="margin-bottom:14px">Không có nhắc nợ tự động. Ai chưa chuyển thì nhắn riêng.</div>
    ${khaiHoDuoc ? `<div class="foot" style="padding:0 0 12px">Ai gửi ảnh chuyển khoản qua Zalo mà chưa mở ứng dụng bao giờ
      thì bấm <b>khai hộ</b>. Nó ghi là <b>đã tự khai</b> kèm tên bạn — vẫn chờ người thu soi sao kê rồi mới thành
      <b>người thu đã nhận</b>.</div>` : ''}
    <div class="card"><div class="cb" style="padding:2px 14px">
-     ${people.map(p => `<div class="fd">
+     ${hien.length ? hien.map(p => `<div class="fd">
        ${avatar(p.full_name)}
-       <div class="x"><b>${esc(p.full_name)}</b>
+       <div class="x"><b>${esc(p.full_name)}</b>${
+         nhieuNhom && p.group_no != null ? ` <span class="tg" style="font-size:10px;padding:1px 6px">Nhóm ${p.group_no}</span>` : ''}
          <div style="font-size:11.5px;margin-top:2px" class="${p.verified ? 'st-ok' : p.declared ? 'st-mid' : 'st-no'}">${p.verified ? '✓ ' : ''}${esc(p.status_label)}${
            p.khai_ho_boi && !p.verified ? ` · do ${esc(short(p.khai_ho_boi))} khai hộ` : ''}${
            p.da_ngung ? ' · đã ngừng tham gia' : ''}</div></div>
@@ -2356,11 +2403,17 @@ async function openLedger(roundId) {
                 : `<button class="tg" data-khaiho="${p.id}">khai hộ</button>`)
             : ''}
          ${i_am_collector ? `<button class="tg ${p.verified ? 'go' : ''}" data-verify="${p.id}" data-undo="${p.verified ? '1' : '0'}">${p.verified ? 'bỏ xác nhận' : 'đã nhận'}</button>` : ''}
-       </div></div>`).join('')}
+       </div></div>`).join('')
+     : `<div class="cb mut" style="padding:16px 2px">Không có ai trong mục này.</div>`}
    </div></div>
    <div class="sa"><button class="big c" id="ldClose">Đóng</button></div>`);
 
   $('#ldClose').onclick = closeSheet;
+  document.querySelectorAll('.sheet [data-loc]').forEach(b => {
+    b.onclick = () => { SOTHU.loc = b.dataset.loc; veSoThu(); };
+  });
+  if ($('#stNhom')) $('#stNhom').onchange = () => { SOTHU.nhom = $('#stNhom').value; veSoThu(); };
+
   const khai = async (btn, memberId, bo) => {
     btn.disabled = true;
     try { await apiPost(`/api/funds/${roundId}/declare-for`, { member_id: memberId, bo }); }

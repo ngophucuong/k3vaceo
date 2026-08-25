@@ -117,7 +117,7 @@ main{padding-top:18px}
 .fi .was{font-size:11.5px;color:var(--ink3);margin-top:2px}
 .fi .was s{opacity:.7}
 .tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
-.tg{font-size:11.5px;padding:3px 9px;border-radius:99px;background:var(--line);color:var(--ink2)}
+.tg{font-size:11.5px;padding:3px 9px;border-radius:99px;background:var(--line);color:var(--ink2);white-space:nowrap}
 .tg.go{background:var(--go-bg);color:var(--go)}
 .tg.due{background:var(--due-bg);color:var(--due)}
 
@@ -125,6 +125,11 @@ main{padding-top:18px}
 .fl{display:flex;gap:7px;overflow-x:auto;padding-bottom:14px;scrollbar-width:none;
   margin:0 -16px;padding-left:16px;padding-right:16px}
 .fl::-webkit-scrollbar{display:none}
+/* Trong bảng trượt lên thì hàng chip KHÔNG cuộn ngang được: lề âm -16px của
+   .fl bị mép bảng cắt mất, chip cuối cùng lòi ra ngoài và không ai kéo tới
+   được. Cho xuống dòng thay vì cuộn — bốn con số phải nhìn thấy cùng lúc thì
+   người thu mới biết còn bao nhiêu người chưa khai. */
+.fl.cuon{flex-wrap:wrap;overflow:visible;margin:0;padding-left:0;padding-right:0;row-gap:7px}
 .fc{font-size:12.5px;white-space:nowrap;border-radius:99px;padding:7px 14px;background:var(--surf);
   color:var(--ink2);box-shadow:var(--sh);transition:.16s}
 .fc.on{background:var(--ink);color:#fff}

@@ -316,6 +316,28 @@ Với **đợt thu**, "xong" còn phải CẤT BỚT chứ không chỉ thêm d�
 - người thu đã nhận đủ của **tất cả** → chip `.xongchip` "✓ đã thu đủ" ở đầu
   thẻ, dòng tổng đổi thành "Đợt này xong".
 
+## Sổ thu: lọc theo trạng thái, và cột nhóm cho thủ quỹ lớp
+
+Bốn chip lọc (thêm 25/8): **Tất cả · Chưa khai · Mới tự khai · Người thu đã
+nhận**, mỗi chip kèm số đếm. **Không có chip nào tên "đã đóng"** — mục 6.4 SRS.
+
+`getLedger` trả thêm `group_no` / `group_label`. Cột nhóm và ô chọn nhóm chỉ
+hiện khi sổ trải trên **nhiều hơn một nhóm**; đợt của nhóm thì mọi dòng cùng
+một nhóm nên giấu đi.
+
+Ba điều cố ý:
+
+- **Lọc ở giao diện, không gọi lại máy chủ.** Danh sách nhiều nhất 134 dòng,
+  đã tải sẵn — thêm một vòng mạng cho mỗi lần bấm chip là phí.
+- **`SOTHU` giữ bộ lọc ngoài hàm vẽ.** Xác nhận một người xong sổ vẽ lại mà
+  VẪN giữ nguyên bộ lọc. Không giữ thì thủ quỹ lọc "chưa khai" trong 134
+  người, xác nhận một người là danh sách nhảy về đầu — đến người thứ ba là bỏ
+  cuộc.
+- **Hàng chip dùng `.fl.cuon` (xuống dòng), không cuộn ngang.** Lề âm `-16px`
+  của `.fl` bị mép bảng trượt cắt mất, chip thứ tư lòi ra ngoài và không ai
+  kéo tới được. Bốn con số phải nhìn thấy cùng lúc thì mới biết còn bao nhiêu
+  người chưa khai.
+
 ## Tư liệu: sửa được, và vai cấp lớp đã có người
 
 `PATCH /api/links/:id` (thêm 25/8) sửa `url`, `title`, `kind`, `tag`. **Cố ý
