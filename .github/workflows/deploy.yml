@@ -207,10 +207,13 @@ jobs:
           # Không đoán: in ra để đọc. app.js và app.css KHÔNG có ?v= nên nếu
           # chúng được đệm lâu thì sửa mã xong người ta vẫn chạy bản cũ.
           echo "--- tiêu đề đệm trên tên miền thật ---"
+          # Bước này chạy dưới `bash -e`: grep KHÔNG khớp trả mã 1 và giết cả
+          # bước, biến một phép đo chẩn đoán thành deploy đỏ. Phải `|| true`.
           for t in "/" "/app.js" "/app.css" "/sw.js"; do
-            cc=$(curl -sI "https://k3vaceo.cuongngo.app$t" | tr -d '\r' | grep -i '^cache-control:' | cut -d' ' -f2-)
-            et=$(curl -sI "https://k3vaceo.cuongngo.app$t" | tr -d '\r' | grep -ic '^etag:')
-            echo "  $t → cache-control: ${cc:-(không đặt)} · có etag: $([ "$et" = "1" ] && echo có || echo không)"
+            hd=$(curl -sI "https://k3vaceo.cuongngo.app$t" | tr -d '\r' || true)
+            cc=$(printf '%s\n' "$hd" | grep -i '^cache-control:' | cut -d' ' -f2- || true)
+            et=$(printf '%s\n' "$hd" | grep -ci '^etag:' || true)
+            echo "  $t → cache-control: ${cc:-(không đặt)} · số dòng etag: ${et:-0}"
           done
 
           # Sổ tay là trang tĩnh nằm cạnh ứng dụng. Ba thứ có thể hỏng lặng lẽ
