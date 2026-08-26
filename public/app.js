@@ -840,12 +840,19 @@ function drawHead() {
     : `<span style="color:var(--due)">Bạn chưa nhận phần nào</span>`;
 
   if (HOME.cohort?.defense_on) {
-    // So theo ngày lịch địa phương: new Date('2026-09-26') là nửa đêm UTC nên
-    // ở múi giờ Việt Nam số ngày sẽ nhảy lúc 7 giờ sáng thay vì lúc nửa đêm.
-    const [y, mo, d] = HOME.cohort.defense_on.split('-').map(Number);
-    const target = new Date(y, mo - 1, d);
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const days = Math.round((target - today) / 86400000);
+    // Mốc "hôm nay" lấy từ MÁY CHỦ (giờ Việt Nam), không lấy từ máy người
+    // dùng: máy đặt lệch múi giờ thì con số lệch một ngày, và trang /lich công
+    // khai vốn tính bằng ngày máy chủ sẽ nói khác ứng dụng — hai nguồn sự thật
+    // cho cùng một con số. Không có hom_nay thì mới lùi về ngày của máy.
+    const g = s => { const [y, mo, d] = s.split('-').map(Number); return Date.UTC(y, mo - 1, d); };
+    let today;
+    if (HOME.hom_nay) {
+      today = g(HOME.hom_nay);
+    } else {
+      const t = new Date();
+      today = Date.UTC(t.getFullYear(), t.getMonth(), t.getDate());
+    }
+    const days = Math.round((g(HOME.cohort.defense_on) - today) / 86400000);
     $('#cdN').textContent = days > 0 ? days : 0;
   }
 }
@@ -958,6 +965,7 @@ function veLichHoc() {
         : '<div class="cb mut">Chưa có buổi nào trong lịch.</div>'}
     </div></div>
     ${sua ? `<button class="wide ghost" id="lichThem" style="margin-top:10px">+ Thêm buổi học</button>` : ''}
+    ${ds.length ? `<a class="wide ghost nutlich" href="/api/lich/k3vaceo.ics">Thêm cả khoá vào lịch điện thoại</a>` : ''}
   </div>`;
 }
 

@@ -24,3 +24,8 @@
 # Sổ tay có tên và nơi công tác của cả nhóm — đừng để máy tìm kiếm gom về.
 /sotay/*
   X-Robots-Tag: noindex
+
+# Lịch công khai: ai có đường dẫn cũng mở được (đó là điểm của nó), nhưng
+# không cần máy tìm kiếm gom tên giảng viên và lịch một lớp cụ thể về.
+/lich/*
+  X-Robots-Tag: noindex

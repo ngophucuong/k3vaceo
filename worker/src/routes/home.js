@@ -104,11 +104,19 @@ export async function getHome(env, me) {
   //
   // Mốc thời gian để SQLite so, không dùng Date của JS: chuỗi ISO có 'T' ở vị
   // trí 11 còn SQLite dùng dấu cách, so sánh chuỗi sẽ lệch (quy ước 1 CLAUDE.md).
-  const [lichRes, tbRes] = await Promise.all([
+  //
+  // "Hôm nay" ở đây LUÔN là date('now','+7 hours') — ngày theo giờ Việt Nam.
+  // datetime('now') của SQLite là UTC, mà UTC đi sau Việt Nam 7 tiếng, nên từ
+  // 17h đến nửa đêm giờ Việt Nam thì date('now') vẫn là hôm qua. Hai hệ quả
+  // thật, cả hai đều không tự báo lỗi:
+  //   · buổi học của hôm nay còn nằm trong danh sách "sắp tới" thêm 7 tiếng
+  //   · con số đếm ngược lệch một ngày so với trang /lich công khai
+  const [nayRes, lichRes, tbRes] = await Promise.all([
+    env.DB.prepare("SELECT date('now', '+7 hours') AS d").first(),
     env.DB.prepare(
       `SELECT id, ngay, tu_gio, den_gio, chu_de, giang_vien, ghi_chu
          FROM lich_hoc
-        WHERE cohort_id = ? AND huy_luc IS NULL AND ngay >= date('now')
+        WHERE cohort_id = ? AND huy_luc IS NULL AND ngay >= date('now', '+7 hours')
         ORDER BY ngay, COALESCE(tu_gio, '00:00') LIMIT 6`
     ).bind(me.cohort_id).all(),
     // Thông báo hai cấp: group_id NULL là của cả lớp, có số là của riêng nhóm
@@ -118,7 +126,7 @@ export async function getHome(env, me) {
               id > COALESCE(?, 0) AS moi
          FROM thong_bao
         WHERE cohort_id = ? AND (group_id IS NULL OR group_id = ?)
-          AND (het_han IS NULL OR het_han >= date('now'))
+          AND (het_han IS NULL OR het_han >= date('now', '+7 hours'))
         ORDER BY id DESC LIMIT 5`
     ).bind(me.thong_bao_xem_id ?? 0, me.cohort_id, me.group_id).all(),
   ]);
@@ -129,6 +137,7 @@ export async function getHome(env, me) {
     // ứng dụng nằm im trong bộ nhớ — chuyện thường gặp với PWA trên iPhone,
     // vì người ta không bao giờ đóng hẳn nó.
     ban: env.COMMIT_SHA ?? null,
+    hom_nay: nayRes?.d ?? null,
     lich_hoc: lichRes.results ?? [],
     thong_bao: tbRes.results ?? [],
     // Số thông báo chưa xem — giao diện chấm đỏ lên tab Hôm nay. Đây là đường

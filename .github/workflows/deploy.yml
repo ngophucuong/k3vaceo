@@ -258,6 +258,73 @@ jobs:
           fi
           [ "$loi" = "0" ] || { echo "::error::Sổ tay ở /sotay chưa chạy đúng trên tên miền."; exit 1; }
 
+          echo "--- lịch công khai tại /lich (KHÔNG đăng nhập) ---"
+          loi=0
+          st=$(curl -sL -o /tmp/lich.html -w '%{http_code}' https://k3vaceo.cuongngo.app/lich || true)
+          echo "  HTTP $st ($(cat /tmp/lich.html 2>/dev/null | wc -c) byte)"
+          [ "$st" = "200" ] || { echo "  ✗ /lich không mở được (mã $st)"; loi=1; }
+          if grep -q 'Lịch học — Lớp CEO K03' /tmp/lich.html; then
+            echo "  ✓ ra đúng trang lịch"
+          else
+            echo "  ✗ /lich không ra trang lịch"; loi=1
+          fi
+          if grep -q 'src="/app\.js"' /tmp/lich.html; then
+            echo "  ✗ /lich bị luật vét /* nuốt — trả về giao diện ứng dụng"; loi=1
+          else
+            echo "  ✓ không bị luật vét /* nuốt"
+          fi
+          for t in lich.css lich.js; do
+            m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app/lich/$t" || true)
+            if [ "$m" = "200" ]; then echo "  ✓ /lich/$t"; else echo "  ✗ /lich/$t = HTTP $m"; loi=1; fi
+          done
+          if curl -sI https://k3vaceo.cuongngo.app/lich/ | grep -qi 'x-robots-tag: *noindex'; then
+            echo "  ✓ có X-Robots-Tag: noindex"
+          else
+            echo "  ✗ thiếu X-Robots-Tag: noindex"; loi=1
+          fi
+
+          echo "--- /api/lich/cong-khai: mở được mà không rò gì thêm ---"
+          ck=$(curl -s -o /tmp/ck.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/lich/cong-khai || true)
+          echo "  HTTP $ck ($(cat /tmp/ck.json 2>/dev/null | wc -c) byte)"
+          [ "$ck" = "200" ] || { echo "  ✗ đường công khai không mở được"; loi=1; }
+          # N6: đường này ai cũng gọi được, nên nó TUYỆT ĐỐI không được mang theo
+          # thông báo (có loại nội bộ của nhóm), tên người, hay số tài khoản.
+          for cam in thong_bao full_name account_no phone email; do
+            if grep -q "$cam" /tmp/ck.json; then
+              echo "  ✗ RÒ: đường công khai có chứa \"$cam\""; loi=1
+            fi
+          done
+          if [ "$loi" = "0" ]; then echo "  ✓ chỉ có lịch, không rò gì thêm"; fi
+
+          echo "--- tệp lịch .ics ---"
+          ich=$(curl -s -o /tmp/l.ics -D /tmp/l.hdr -w '%{http_code}' https://k3vaceo.cuongngo.app/api/lich/k3vaceo.ics || true)
+          echo "  HTTP $ich ($(cat /tmp/l.ics 2>/dev/null | wc -c) byte)"
+          [ "$ich" = "200" ] || { echo "  ✗ tệp .ics không tải được (mã $ich)"; loi=1; exit 1; }
+          if grep -qi 'content-type: *text/calendar' /tmp/l.hdr; then
+            echo "  ✓ Content-Type: text/calendar"
+          else
+            echo "  ✗ sai Content-Type"; loi=1
+          fi
+          node --input-type=commonjs -e '
+            const fs = require("fs");
+            const raw = fs.readFileSync("/tmp/l.ics");
+            const t = raw.toString("utf8");
+            let x = 0;
+            const ok = (m, d) => { console.log((d ? "  ✓ " : "  ✗ ") + m); if (!d) x++; };
+            ok("mở BEGIN:VCALENDAR và đóng END:VCALENDAR",
+               t.startsWith("BEGIN:VCALENDAR") && t.trimEnd().endsWith("END:VCALENDAR"));
+            // Ba chỗ dưới đây sai thì ứng dụng lịch từ chối mở mà không nói vì sao
+            const nLF = (t.match(/\n/g) || []).length, nCRLF = (t.match(/\r\n/g) || []).length;
+            ok(`xuống dòng là CRLF (${nCRLF}/${nLF})`, nLF > 0 && nLF === nCRLF);
+            const dai = raw.toString("binary").split("\r\n").filter(d => Buffer.byteLength(d, "binary") > 75);
+            ok(`mọi dòng ≤ 75 octet (${dai.length} dòng quá)`, dai.length === 0);
+            ok("không có ký tự thay thế (gấp dòng không cắt giữa chữ có dấu)", !t.includes("\uFFFD"));
+            const sk = (t.match(/BEGIN:VEVENT/g) || []).length;
+            ok(`có ${sk} sự kiện`, sk > 0);
+            if (x) { console.error(`::error::Tệp .ics sai khuôn ở ${x} chỗ.`); process.exit(1); }
+          '
+          [ "$loi" = "0" ] || { echo "::error::Lịch công khai ở /lich chưa chạy đúng trên tên miền."; exit 1; }
+
           KHOP="$khop" node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
             // Ghi cứng sĩ số Nhóm 6 là sai bản chất: nhóm ĐƯỢC PHÉP đông thêm.

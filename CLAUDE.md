@@ -261,6 +261,65 @@ ngay sau đó nhận đúng mã mới — chạy được kể cả khi zone v�
 `deploy.yml` chỉ **cảnh báo** chứ không đánh hỏng job ở chỗ này: đánh đỏ mọi
 lượt deploy vì một nút bấm ngoài repo chỉ dạy người ta bỏ qua màu đỏ.
 
+## Lịch công khai `/lich` và tệp `.ics` — cửa trước cho người chưa tin
+
+Thêm 26/8. Trước đó muốn xem lịch phải qua **năm bước** ở `/vao` (tên → điện
+thoại → email → chờ thư → gõ 6 số): năm lần cho đi trước khi nhận được gì, và
+người hoài nghi bỏ cuộc ở bước hai. Nay `k3vaceo.cuongngo.app/lich` mở là thấy,
+**không đăng nhập, không hỏi gì**. Nhận trước, khai sau.
+
+| Đường | Ai gọi được | Trả gì |
+|---|---|---|
+| `/lich/` | ai cũng được | trang tĩnh trong `public/lich/` |
+| `GET /api/lich/cong-khai` | ai cũng được | CHỈ `lich_hoc` + vài trường `cohorts` |
+| `GET /api/lich/k3vaceo.ics` | ai cũng được | tệp lịch tải về máy |
+
+**Đường công khai TUYỆT ĐỐI không được kèm `thong_bao`** — thông báo có loại
+nội bộ của từng nhóm, lọt ra là vỡ N6 mà không chỗ nào báo lỗi. `deploy.yml`
+có phép kiểm quét tên các trường cấm trong phúc đáp trên tên miền thật.
+
+Không đặt giới hạn tần suất: `allow()` tốn một SELECT cộng một INSERT, đắt hơn
+chính truy vấn cần bảo vệ (13 dòng, một chỉ mục). Bao giờ bị lạm dụng thì dùng
+Cache API, đừng dùng rate limit.
+
+### Bốn chỗ sai được trong `.ics` mà không báo lỗi
+
+Ghi trong `worker/src/lib/ics.js`, đã có phép kiểm cho từng chỗ:
+
+1. **Xuống dòng phải là CRLF.** Chỉ `\n` thì vài ứng dụng lịch nuốt cả tệp.
+2. **Gấp dòng đếm theo OCTET, không theo ký tự** — giới hạn 75, mà chữ Việt có
+   dấu chiếm 2–3 byte. Và **phải lùi về ranh giới ký tự**: `TextDecoder`
+   KHÔNG ném lỗi khi cắt giữa ký tự, nó lặng lẽ thay bằng `�`. Vì vậy
+   phép kiểm "giải mã UTF-8 có được không" là **vô dụng** — phải mở gấp dòng
+   ra rồi so từng ký tự với chuỗi gốc. Dữ liệu lịch thật không ép được vào
+   nhánh này (điểm gấp tình cờ không rơi giữa ký tự nào), nên phải dựng chuỗi
+   riêng để ép — xem `kiem-gap.mjs` ở scratchpad.
+3. **UID cố định theo buổi + SEQUENCE tăng dần.** Nhờ đó tải lại tệp là buổi cũ
+   được CẬP NHẬT chứ không nhân đôi — sống còn vì lịch lớp có dời buổi.
+   `SEQUENCE` lấy `strftime('%s', updated_at)` từ D1.
+4. **Buổi đã huỷ VẪN gửi đi**, kèm `STATUS:CANCELLED`. Bỏ hẳn khỏi tệp thì nó
+   nằm lại trong lịch người ta mãi mãi và họ đến lớp vào ngày không có ai.
+
+Thêm: giờ Việt Nam là UTC+7 quanh năm nên quy về UTC rồi ghi hậu tố `Z`, không
+cần khối `VTIMEZONE`. Phải dùng `Date.UTC` để trừ 7 tiếng — 06:00 ngày 28 lùi
+thành 23:00 ngày **27**, trừ tay là quên đổi ngày. Phép kiểm đối chứng bằng
+`zoneinfo` của Python chứ không tính lại bằng chính công thức ấy.
+
+### "Hôm nay" LUÔN là `date('now', '+7 hours')`
+
+`datetime('now')` của SQLite là UTC, đi sau Việt Nam 7 tiếng, nên **từ 17h đến
+nửa đêm giờ Việt Nam thì `date('now')` vẫn là hôm qua**. Ba hệ quả đã sửa ngày
+26/8, không cái nào tự báo lỗi:
+
+- buổi học của hôm nay còn nằm trong danh sách "sắp tới" thêm 7 tiếng
+- thông báo hết hạn hôm nay còn hiện thêm 7 tiếng
+- **đếm ngược tới buổi bảo vệ lệch một ngày** giữa ứng dụng và trang `/lich`
+
+Chỗ thứ ba là thứ nguy nhất: ứng dụng lấy ngày của MÁY người dùng, trang công
+khai lấy từ máy chủ. Điện thoại đặt đúng giờ Việt Nam thì trùng, đặt lệch thì
+hai màn nói hai con số. Nay `/api/home` trả thêm `hom_nay` và giao diện dùng
+nó; ngày của máy chỉ là đường lùi khi thiếu trường ấy.
+
 ## Bảo lưu / rời nhóm — "ngừng tham gia"
 
 Không xoá dòng nào và không đụng `roster`. Chỉ hạ `members.is_active` về 0, vì

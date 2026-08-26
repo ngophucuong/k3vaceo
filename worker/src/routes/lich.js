@@ -2,6 +2,7 @@ import { json, error, readJson } from '../lib/http.js';
 import { isClassCommittee, isGroupOfficer, logAudit, logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 import { guiThongBaoDay } from './push.js';
+import { dungIcs, mocSqlite } from '../lib/ics.js';
 
 // Lịch học và thông báo của lớp. Đọc thì ai cũng đọc được — đây là thứ cả 134
 // người cần. Ghi thì chỉ Ban cán sự lớp, vì lịch sai một ngày là cả lớp đi
@@ -22,6 +23,87 @@ function gioHopLe(s) {
 
 async function phaiLaBanCanSu(env, me) {
   return isClassCommittee(env, me.id);
+}
+
+/* ══ Lịch công khai — KHÔNG cần đăng nhập ═══════════════════════════════════
+   Vì sao mở: lịch học không phải bí mật, Ban tổ chức đã gửi cho cả 134 người
+   trên Zalo rồi. Nhưng muốn xem trong ứng dụng thì phải qua năm bước đăng
+   nhập — người hoài nghi bỏ cuộc ở bước hai. Trang công khai đảo ngược phễu:
+   nhận được thứ mình cần TRƯỚC khi bị hỏi bất cứ điều gì.
+
+   N6 vẫn nguyên vẹn: chỉ trả lich_hoc và vài trường của cohorts. TUYỆT ĐỐI
+   không kèm thong_bao ở đây — thông báo có loại nội bộ của từng nhóm, lọt ra
+   đường công khai là hỏng nguyên tắc cách ly mà không chỗ nào báo lỗi.
+
+   Không đặt giới hạn tần suất: allow() tốn một SELECT cộng một INSERT, đắt hơn
+   chính truy vấn cần bảo vệ (13 dòng, một chỉ mục). Với 134 người thì tải này
+   không đáng kể. Bao giờ có dấu hiệu bị lạm dụng thì dùng Cache API, đừng
+   dùng rate limit.
+
+   Khoá cứng vào K03: đường công khai thì không được nhận tham số chọn khoá.
+   ══════════════════════════════════════════════════════════════════════════ */
+const KHOA_CONG_KHAI = 'K03';
+
+async function docLichCongKhai(env) {
+  const khoa = await env.DB.prepare(
+    'SELECT id, code, name, defense_on, sessions_total FROM cohorts WHERE code = ?'
+  ).bind(KHOA_CONG_KHAI).first();
+  if (!khoa) return null;
+
+  const lich = await env.DB.prepare(
+    `SELECT id, ngay, tu_gio, den_gio, chu_de, giang_vien, ghi_chu, huy_luc,
+            CAST(strftime('%s', COALESCE(updated_at, created_at)) AS INTEGER) AS seq
+       FROM lich_hoc WHERE cohort_id = ?
+      ORDER BY ngay, COALESCE(tu_gio, '00:00')`
+  ).bind(khoa.id).all();
+
+  return { khoa, buoi: lich.results ?? [] };
+}
+
+export async function getLichCongKhai(env) {
+  const d = await docLichCongKhai(env);
+  if (!d) return error('not_found', 404);
+  // hom_nay do SQLite sinh, không lấy từ máy khách: điện thoại đặt sai ngày
+  // thì cả trang tô nhầm buổi (quy ước 1 CLAUDE.md).
+  const nay = await env.DB.prepare("SELECT date('now', '+7 hours') AS d").first();
+  return json({
+    khoa: {
+      code: d.khoa.code, name: d.khoa.name,
+      defense_on: d.khoa.defense_on, sessions_total: d.khoa.sessions_total,
+    },
+    hom_nay: nay?.d ?? null,
+    buoi: d.buoi.map(b => ({
+      id: b.id, ngay: b.ngay, tu_gio: b.tu_gio, den_gio: b.den_gio,
+      chu_de: b.chu_de, giang_vien: b.giang_vien, ghi_chu: b.ghi_chu,
+      da_huy: b.huy_luc ? 1 : 0,
+    })),
+  }, 200, { 'Cache-Control': 'public, max-age=60' });
+}
+
+export async function getLichIcs(request, env) {
+  const d = await docLichCongKhai(env);
+  if (!d) return error('not_found', 404);
+
+  // DTSTAMP lấy lúc lịch đổi lần cuối, không lấy giờ máy — nhờ vậy tệp tải
+  // hai lần liền cho ra nội dung y hệt, và mốc ấy vẫn do SQLite sinh.
+  const moc = await env.DB.prepare(
+    `SELECT MAX(COALESCE(updated_at, created_at)) AS m FROM lich_hoc WHERE cohort_id = ?`
+  ).bind(d.khoa.id).first();
+  const dtstamp = mocSqlite(moc?.m) ?? mocSqlite(
+    (await env.DB.prepare("SELECT datetime('now') AS n").first())?.n
+  );
+
+  const host = new URL(request.url).hostname;
+  const noiDung = dungIcs(d.buoi, d.khoa, dtstamp, host);
+
+  return new Response(noiDung, {
+    headers: {
+      'Content-Type': 'text/calendar; charset=utf-8',
+      'Content-Disposition': `attachment; filename="k3vaceo-${d.khoa.code}.ics"`,
+      'Cache-Control': 'public, max-age=60',
+      'X-Content-Type-Options': 'nosniff',
+    },
+  });
 }
 
 export async function getLich(env, me) {

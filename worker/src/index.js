@@ -22,7 +22,7 @@ import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
 import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, getThongKe, postVerify,
          listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
          postDeclareFor, deleteFund } from './routes/funds.js';
-import { getLich, postBuoi, patchBuoi, deleteBuoi, postThongBao,
+import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, postThongBao,
          postThongBaoDaXem, deleteThongBao } from './routes/lich.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
@@ -74,6 +74,17 @@ export default {
         }
         return postInviteClaim(request, env, m[1]);
       }
+      // Lịch công khai: xem được mà không cần đăng nhập, và tải được về lịch
+      // điện thoại. Đây là cửa trước cho người chưa tin ứng dụng — nhận được
+      // thứ mình cần trước khi phải khai gì. Chỉ trả lich_hoc, không kèm thông
+      // báo (thông báo có loại nội bộ của nhóm — N6).
+      if (pathname === '/api/lich/cong-khai' && method === 'GET') {
+        return getLichCongKhai(env);
+      }
+      if (pathname === '/api/lich/k3vaceo.ics' && method === 'GET') {
+        return getLichIcs(request, env);
+      }
+
       // Đợt 5 — tự nhận diện rồi OTP qua email. Ba chặng: đối chiếu số điện
       // thoại (chỉ để báo sớm), khai email và nhận mã, rồi đổi mã lấy phiên.
       if (pathname === '/api/onboard/check' && method === 'POST') {

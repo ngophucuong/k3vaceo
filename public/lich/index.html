@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lịch học — Lớp CEO K03</title>
+<meta name="description" content="Lịch học lớp Giám đốc điều hành doanh nghiệp K03, VCCI × Đại học Andrews.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F3F3F1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/lich/lich.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap hd">
+    <div class="hl">
+      <span class="g">Lớp CEO K03</span>
+      <span class="s">VCCI × Đại học Andrews</span>
+    </div>
+    <div class="cd" id="dem" hidden>
+      <span class="n" id="demN"></span><span class="u">ngày đến bảo vệ</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Buổi kế tiếp: câu trả lời cho câu hỏi duy nhất người ta mở trang này để
+       hỏi. Đặt trên cùng, to nhất, không phải cuộn để thấy. -->
+  <section id="tiep" class="tiep" hidden></section>
+
+  <!-- Nút tải lịch. Nằm ngay dưới buổi kế tiếp vì đó là lúc người ta vừa nhận
+       được thứ mình cần và sẵn lòng làm thêm một việc. -->
+  <section class="taive">
+    <a class="big" id="nutIcs" href="/api/lich/k3vaceo.ics">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2v3M16 2v3M3.5 9h17M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v12A1.5 1.5 0 0 1 19 20.5H5A1.5 1.5 0 0 1 3.5 19V7A1.5 1.5 0 0 1 5 5.5Z"/></svg>
+      Thêm vào lịch điện thoại
+    </a>
+    <p class="ghi">Tải về rồi mở là các buổi vào thẳng lịch máy bạn. Lịch lớp
+      có thay đổi thì tải lại tệp này — buổi cũ được cập nhật chứ không nhân đôi.</p>
+  </section>
+
+  <h2 class="mucluc">Toàn bộ lịch</h2>
+  <section id="ds" class="ds">
+    <p class="dangtai">Đang tải lịch…</p>
+  </section>
+
+  <p class="tong" id="tong" hidden></p>
+
+  <footer>
+    <p><b>Học viên lớp K03</b> — đăng nhập để xem quỹ, phần bài và tài liệu của
+      nhóm mình.</p>
+    <p><a href="/">Mở ứng dụng</a> · <a href="/sotay/">Sổ tay hướng dẫn</a></p>
+    <p class="nho">Trang này không cần đăng nhập và không thu thập gì.</p>
+  </footer>
+</main>
+
+<script src="/lich/lich.js"></script>
+</body>
+</html>
