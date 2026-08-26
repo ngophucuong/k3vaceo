@@ -2489,8 +2489,8 @@ async function openThongKe() {
          </div>`).join('')}</div>` : ''}
      </div>`).join('')}</div>`
    : `<div class="card"><div class="cb mut">Chưa có đợt thu nào đang mở.</div></div>`}
-   ${dot.some(d => d.theo_nhom) ? '' :
-     `<div class="foot" style="padding:12px 0 0">Chỉ người thu của đợt và Ban cán sự lớp mới xem được phần chia theo nhóm.</div>`}
+   ${dot.some(d => !d.xem_ca_dot) ?
+     `<div class="foot" style="padding:12px 0 0">Chỉ người thu của đợt và Ban cán sự lớp mới xem được phần chia theo nhóm.</div>` : ''}
    <div class="sa"><button class="big c" id="tkClose">Đóng</button></div>`);
   $('#tkClose').onclick = closeSheet;
 }
