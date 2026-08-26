@@ -130,6 +130,34 @@ main{padding-top:18px}
    được. Cho xuống dòng thay vì cuộn — bốn con số phải nhìn thấy cùng lúc thì
    người thu mới biết còn bao nhiêu người chưa khai. */
 .fl.cuon{flex-wrap:wrap;overflow:visible;margin:0;padding-left:0;padding-right:0;row-gap:7px}
+
+/* ─── Biểu đồ tiến độ thu ───
+   Cột chồng ba trạng thái. Ba điều KHÔNG phải trang trí:
+   1. Vân chéo trên ô cam. Đo bằng trình kiểm màu: xanh --go và cam --due cách
+      nhau ΔE 7,7 với người mù màu đỏ-lục ở nền sáng — nằm trong dải sàn 6–8,
+      chỉ hợp lệ khi có mã hoá thứ hai. Vân chéo là mã hoá ấy; bỏ nó đi là hai
+      ô nhìn như một với một phần người đọc.
+   2. Khe 2px giữa các ô, để mắt tách được ranh giới mà không cần màu.
+   3. Số in thẳng dưới mỗi cột. Ô xám tương phản 1,47 với nền trắng, dưới 3:1
+      nên bắt buộc phải có nhãn chữ đi kèm. */
+.tk{display:grid;gap:14px}
+.tk-r{display:grid;gap:6px}
+.tk-nh{display:flex;align-items:baseline;gap:8px;font-size:13.5px;font-weight:600}
+.tk-nh .p{margin-left:auto;font-family:var(--num);font-size:12.5px;color:var(--ink3);font-weight:600}
+.tk-t{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden;background:var(--surf);
+  box-shadow:inset 0 0 0 1px var(--line)}
+.tk-t i{display:block;min-width:0}
+.tk-a{background:var(--go)}
+.tk-b{background:var(--due);
+  background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(255,255,255,.5) 3px 6px)}
+.tk-c{background:var(--line2)}
+.tk-s{font-size:11.5px;color:var(--ink2);line-height:1.5}
+.tk-s b{font-family:var(--num);color:var(--ink)}
+.tk-con{padding-left:14px;border-left:2px solid var(--line);display:grid;gap:11px;margin-top:2px}
+/* Chú giải: ô màu + CHỮ, không bao giờ chỉ có màu. */
+.tk-cg{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--ink2);margin-bottom:4px}
+.tk-cg span{display:inline-flex;align-items:center;gap:6px}
+.tk-cg i{width:11px;height:11px;border-radius:3px;display:block;flex:0 0 auto}
 .fc{font-size:12.5px;white-space:nowrap;border-radius:99px;padding:7px 14px;background:var(--surf);
   color:var(--ink2);box-shadow:var(--sh);transition:.16s}
 .fc.on{background:var(--ink);color:#fff}

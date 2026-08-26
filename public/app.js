@@ -1885,7 +1885,8 @@ async function drawQuy() {
       <div style="font-weight:600;margin-bottom:4px">Chưa có khoản thu nào</div>
       <div class="mut">Trưởng hoặc phó nhóm tạo khoản thu, ứng dụng tự sinh mã riêng cho từng người.</div>
     </div></div>`}
-  ${can_create_group || can_create_class ? `<button class="wide ghost" id="newFund" style="margin-top:12px">+ Tạo đợt thu mới</button>` : ''}
+  ${rounds.length ? `<button class="wide ghost" id="tkBtn" style="margin-top:12px">Xem tiến độ thu</button>` : ''}
+  ${can_create_group || can_create_class ? `<button class="wide ghost" id="newFund" style="margin-top:${rounds.length ? '8px' : '12px'}">+ Tạo đợt thu mới</button>` : ''}
   <div class="foot">Tiền vào thẳng tài khoản người thu. Ứng dụng không giữ tiền, không đứng giữa,
     và trạng thái ở đây là lời tự khai chứ không phải sao kê.</div>`;
 
@@ -1919,6 +1920,7 @@ async function drawQuy() {
   document.querySelectorAll('#v-quy [data-openround]').forEach(b => {
     b.onclick = () => confirmOpenRound(Number(b.dataset.openround));
   });
+  if ($('#tkBtn')) $('#tkBtn').onclick = openThongKe;
   document.querySelectorAll('#v-quy [data-suadot]').forEach(b => {
     b.onclick = () => suaDot(Number(b.dataset.suadot));
   });
@@ -2437,6 +2439,60 @@ function veSoThu() {
       } catch (e) { toast(errText(e)); b.disabled = false; }
     };
   });
+}
+
+/* ─── Thống kê tiến độ thu ─── */
+// Một cột chồng ba ô. KHÔNG gộp "đã tự khai" với "người thu đã nhận" thành một
+// con số "tỉ lệ đóng quỹ" — mục 6.4 SRS: lời khai chưa phải tiền.
+function veCot(d) {
+  const t = Math.max(d.tong, 1);
+  const pc = (n) => (n / t * 100).toFixed(2) + '%';
+  const o = [];
+  if (d.da_nhan) o.push(`<i class="tk-a" style="width:${pc(d.da_nhan)}" title="Người thu đã nhận: ${d.da_nhan}"></i>`);
+  if (d.da_khai) o.push(`<i class="tk-b" style="width:${pc(d.da_khai)}" title="Mới tự khai: ${d.da_khai}"></i>`);
+  if (d.chua_khai) o.push(`<i class="tk-c" style="width:${pc(d.chua_khai)}" title="Chưa khai: ${d.chua_khai}"></i>`);
+  // Ô xám tương phản dưới 3:1 với nền, nên số phải in ra chữ chứ không được để
+  // người đọc tự đoán từ chiều dài cột.
+  return `<div class="tk-t" role="img"
+     aria-label="${d.da_nhan} người thu đã nhận, ${d.da_khai} mới tự khai, ${d.chua_khai} chưa khai, trên ${d.tong}">${o.join('')}</div>
+   <div class="tk-s"><b>${d.da_nhan}</b> người thu đã nhận · <b>${d.da_khai}</b> mới tự khai · <b>${d.chua_khai}</b> chưa khai
+     <span style="color:var(--ink3)">· trên ${d.tong}</span></div>`;
+}
+
+async function openThongKe() {
+  openSheet(`<h3>Tiến độ thu</h3><p class="sub">Đang tải…</p>`);
+  let kq;
+  try { kq = await apiGet('/api/funds/thong-ke'); }
+  catch (e) { closeSheet(); toast(errText(e)); return; }
+  const dot = kq.dot ?? [];
+
+  openSheet(`
+   <h3>Tiến độ thu</h3>
+   <p class="sub">Hai mức tách riêng, cố ý: <b>người thu đã nhận</b> là tiền thật đã đối chiếu sao kê;
+     <b>mới tự khai</b> mới chỉ là lời người nộp.</p>
+   <div class="tk-cg">
+     <span><i style="background:var(--go)"></i> Người thu đã nhận</span>
+     <span><i class="tk-b"></i> Mới tự khai</span>
+     <span><i style="background:var(--line2)"></i> Chưa khai</span>
+   </div>
+   ${dot.length ? `<div class="tk">${dot.map(d => `
+     <div class="tk-r">
+       <div class="tk-nh">${esc(d.title)}${d.scope === 'class' ? ' <span class="tg" style="font-size:10px;padding:1px 6px">cả lớp</span>' : ''}
+         <span class="p">${d.tong ? Math.round(d.da_nhan / d.tong * 100) : 0}%</span></div>
+       ${veCot(d)}
+       <div class="tk-s" style="color:var(--ink3)">Đã vào tài khoản người thu: <b>${vnMoney(d.tien_da_nhan)}</b> / ${vnMoney(d.tien_can)} đ</div>
+       ${d.theo_nhom ? `<div class="tk-con">${d.theo_nhom.map(n => `
+         <div>
+           <div class="tk-nh" style="font-size:12.5px">${esc(n.label ?? 'Chưa có nhóm')}
+             <span class="p">${n.tong ? Math.round(n.da_nhan / n.tong * 100) : 0}%</span></div>
+           ${veCot(n)}
+         </div>`).join('')}</div>` : ''}
+     </div>`).join('')}</div>`
+   : `<div class="card"><div class="cb mut">Chưa có đợt thu nào đang mở.</div></div>`}
+   ${dot.some(d => d.theo_nhom) ? '' :
+     `<div class="foot" style="padding:12px 0 0">Chỉ người thu của đợt và Ban cán sự lớp mới xem được phần chia theo nhóm.</div>`}
+   <div class="sa"><button class="big c" id="tkClose">Đóng</button></div>`);
+  $('#tkClose').onclick = closeSheet;
 }
 
 /* ─── Sổ chi ─── */

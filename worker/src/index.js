@@ -19,7 +19,7 @@ import { postInsight, deleteInsight } from './routes/insights.js';
 import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
 import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
          postVerifyMyEmail, postVerifyMyEmailConfirm } from './routes/onboard.js';
-import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, postVerify,
+import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, getThongKe, postVerify,
          listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
          postDeclareFor, deleteFund } from './routes/funds.js';
 import { getLich, postBuoi, patchBuoi, deleteBuoi, postThongBao,
@@ -193,6 +193,7 @@ export default {
       // Sổ chi phải đứng trước /api/funds/:id — tuy 'expenses' không khớp \d+
       // nên không thật sự tranh chấp, xếp trước cho khỏi phải nghĩ lại sau này.
       if (pathname === '/api/funds/class-members' && method === 'GET') return getClassMembers(env, me);
+      if (pathname === '/api/funds/thong-ke' && method === 'GET') return getThongKe(env, me);
       if (pathname === '/api/funds/expenses' && method === 'GET') return listExpenses(env, me, url);
       if (pathname === '/api/funds/expenses' && method === 'POST') return postExpense(request, env, me, ip);
       if ((m = pathname.match(/^\/api\/funds\/expenses\/(\d+)$/)) && method === 'PATCH') {

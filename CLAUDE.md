@@ -338,6 +338,42 @@ Ba điều cố ý:
   kéo tới được. Bốn con số phải nhìn thấy cùng lúc thì mới biết còn bao nhiêu
   người chưa khai.
 
+## Biểu đồ tiến độ thu — vân chéo là bắt buộc, không phải trang trí
+
+`GET /api/funds/thong-ke` + nút "Xem tiến độ thu" ở tab Quỹ (thêm 26/8). Cột
+chồng ba đoạn cho mỗi đợt, và chia theo nhóm khi đợt trải trên nhiều nhóm.
+Trả lời đúng một câu hỏi của thủ quỹ lớp: **nhóm nào chậm nhất**. Dãy chấm ở
+thẻ đợt thu đọc được với 14 người, với 134 người thì thành một hàng chấm vô
+nghĩa.
+
+**Ba đoạn, ba nghĩa, không được gộp**: người thu đã nhận (xanh `--go`) · mới
+tự khai (cam `--due`) · chưa khai (xám). Không có con số nào tên "tỉ lệ đóng
+quỹ" và không có nhãn "đã đóng" — mục 6.4 SRS. Phần trăm in ở góc phải là tỉ
+lệ **người thu đã nhận**, tức tiền thật, không phải tổng hai đoạn đầu.
+
+**Vân chéo trên đoạn cam gánh phần đọc, gỡ đi là hỏng.** Chạy trình kiểm bảng
+màu của kỹ năng dataviz trên đúng ba màu đang dùng:
+
+- xanh `#146450` ↔ cam `#A8500E`: **ΔE 7.7 với người mù màu đỏ (protan)**.
+  Dưới 8 là dải sàn, chỉ hợp lệ khi CÓ mã hoá thứ hai. Vân chéo chính là mã
+  hoá thứ hai ấy — `repeating-linear-gradient` 45° trong `.tk-b`.
+- xám `#D2D3CE` so với nền: **tương phản 1.47**, dưới 3:1. Bắt buộc phải có
+  nhãn số đọc được bằng chữ, nên mỗi cột kèm một dòng "N người thu đã nhận ·
+  N mới tự khai · N chưa khai · trên N" chứ không bắt ai đoán độ dài đoạn.
+
+Trình kiểm ghi rõ nó chỉ xét bảng màu phân loại, mà đây là bảng màu trạng
+thái nên hai cảnh báo trên không phải lỗi — nhưng nghĩa vụ kèm theo thì vẫn
+áp dụng nguyên vẹn. Đổi màu về sau thì chạy lại trình kiểm, đừng ngắm bằng mắt.
+
+**Ai thấy gì** dùng CHUNG ma trận với sổ thu (`mucXemSo`): người thu và Ban
+cán sự lớp thấy phần chia theo nhóm của cả đợt; trưởng/phó nhóm chỉ thấy nhóm
+mình. Con số TỔNG của đợt thì ai trong đợt cũng thấy — dãy chấm ở thẻ đợt thu
+vốn đã công khai nó, giấu ở đây chỉ đẻ ra hai nguồn sự thật lệch nhau.
+
+Điều kiện chọn thành viên trong truy vấn (`is_active = 1` HOẶC đã khai đợt ấy)
+phải **trùng khít** với sổ thu và phép đếm sĩ số. Lệch một chút là biểu đồ nói
+khác cái sổ, và không chỗ nào báo lỗi.
+
 ## Tư liệu: sửa được, và vai cấp lớp đã có người
 
 `PATCH /api/links/:id` (thêm 25/8) sửa `url`, `title`, `kind`, `tag`. **Cố ý

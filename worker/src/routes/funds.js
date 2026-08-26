@@ -398,6 +398,86 @@ export async function deleteDeclare(env, me, roundId, ip) {
   return json({ ok: true });
 }
 
+// ══ Thống kê tiến độ thu ══
+// Câu hỏi thật của người thu lớp: "nhóm nào chậm nhất". Dãy chấm ở thẻ đợt thu
+// trả lời được cho 14 người, nhưng với 134 người thì nó thành một hàng chấm
+// không đọc nổi.
+//
+// KHÔNG có con số nào tên "tỉ lệ đóng quỹ": mục 6.4 SRS. Luôn tách hai mức —
+// "người thu đã nhận" là tiền thật, "mới tự khai" mới chỉ là lời nói.
+export async function getThongKe(env, me) {
+  // Đếm theo TỪNG NHÓM trong TỪNG ĐỢT bằng một truy vấn. Điều kiện thành viên
+  // phải trùng khít với sổ thu và với phép đếm sĩ số (đang hoạt động, HOẶC đã
+  // ngừng nhưng đã khai đợt đó) — lệch một chút là biểu đồ nói khác cái sổ.
+  const rows = await env.DB.prepare(
+    `SELECT r.id AS round_id, r.title, r.scope, r.amount, r.status,
+            r.collector_member_id, r.group_id AS round_group_id,
+            g.no AS group_no, g.label AS group_label,
+            COUNT(*) AS tong,
+            SUM(CASE WHEN d.verified_at IS NOT NULL THEN 1 ELSE 0 END) AS da_nhan,
+            SUM(CASE WHEN d.verified_at IS NULL AND d.declared_at IS NOT NULL THEN 1 ELSE 0 END) AS da_khai
+       FROM fund_rounds r
+       JOIN members m
+         ON m.cohort_id = r.cohort_id
+        AND (r.scope = 'class' OR m.group_id = r.group_id)
+        AND (m.is_active = 1
+             OR EXISTS (SELECT 1 FROM fund_declarations x
+                         WHERE x.member_id = m.id AND x.round_id = r.id))
+       LEFT JOIN groups g ON g.id = m.group_id
+       LEFT JOIN fund_declarations d ON d.member_id = m.id AND d.round_id = r.id
+      WHERE r.cohort_id = ? AND r.status <> 'draft'
+        AND (r.scope = 'class' OR r.group_id = ?)
+      GROUP BY r.id, g.no
+      ORDER BY r.id DESC, g.no`
+  ).bind(me.cohort_id, me.group_id).all();
+
+  // Tính một lần rồi dùng lại, thay vì gọi mucXemSo() cho từng đợt.
+  const [laTruongNhom, laBanCanSu] = await Promise.all([
+    me.group_id ? isGroupOfficer(env, me.id, me.group_id) : false,
+    isClassCommittee(env, me.id),
+  ]);
+
+  const theoDot = new Map();
+  for (const r of rows.results ?? []) {
+    if (!theoDot.has(r.round_id)) {
+      theoDot.set(r.round_id, {
+        id: r.round_id, title: r.title, scope: r.scope, amount: r.amount, status: r.status,
+        collector_member_id: r.collector_member_id, round_group_id: r.round_group_id,
+        tong: 0, da_nhan: 0, da_khai: 0, nhom: [],
+      });
+    }
+    const d = theoDot.get(r.round_id);
+    d.tong += r.tong; d.da_nhan += r.da_nhan; d.da_khai += r.da_khai;
+    d.nhom.push({
+      no: r.group_no, label: r.group_label,
+      tong: r.tong, da_nhan: r.da_nhan, da_khai: r.da_khai,
+      chua_khai: r.tong - r.da_nhan - r.da_khai,
+    });
+  }
+
+  const ra = [];
+  for (const d of theoDot.values()) {
+    // Cùng ma trận với sổ thu (mucXemSo): người thu và Ban cán sự lớp thấy cả
+    // đợt; trưởng/phó nhóm chỉ thấy phần nhóm mình. Con số TỔNG của đợt thì ai
+    // trong đợt cũng thấy — dãy chấm ở thẻ đợt thu vốn đã công khai nó rồi,
+    // giấu đi ở đây chỉ tạo ra hai nguồn sự thật.
+    const caDot = d.collector_member_id === me.id
+      || (d.scope === 'group' ? laTruongNhom : laBanCanSu);
+    const nhom = caDot ? d.nhom : d.nhom.filter(n => n.no === me.group_no);
+    ra.push({
+      id: d.id, title: d.title, scope: d.scope, amount: d.amount, status: d.status,
+      tong: d.tong, da_nhan: d.da_nhan, da_khai: d.da_khai,
+      chua_khai: d.tong - d.da_nhan - d.da_khai,
+      tien_da_nhan: d.da_nhan * d.amount,
+      tien_can: d.tong * d.amount,
+      // Chỉ gửi phần chia nhóm khi thật sự có nhiều hơn một nhóm để so.
+      theo_nhom: nhom.length > 1 ? nhom : null,
+      xem_ca_dot: caDot,
+    });
+  }
+  return json({ dot: ra });
+}
+
 // Sổ đầy đủ — chỉ người thu, trưởng/phó nhóm (đợt nhóm), Ban cán sự lớp (đợt
 // lớp). Thành viên thường chỉ thấy con số đếm trong listFunds, không thấy tên.
 // Mục 6.4 SRS: không có nhắc nợ tự động, nên ở đây chỉ trả dữ liệu để người
