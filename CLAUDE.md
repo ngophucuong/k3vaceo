@@ -18,6 +18,29 @@ Hai tài liệu gốc do người dùng cung cấp, không nằm trong repo:
 
 Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao diện.
 
+## Đang ở đâu (cập nhật 27/8)
+
+Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
+`claude/read-content-deployment-plan-dpsv8m`.
+
+**Ba việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+
+1. Trang lịch công khai `/lich` + tệp `.ics` — cửa trước cho người chưa tin.
+2. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+3. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+
+**Ba việc cần làm tiếp, xếp theo mức chặn:**
+
+1. **Điền 49 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (44
+   người chưa có số nào, 5 số sai hoặc trùng). Chưa điền thì từng ấy người
+   không tự vào được — đây là chỗ chặn số một, và nó không phải việc lập trình.
+2. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
+   cho những lần đăng nhập sau, mà nó CHƯA từng chạy trọn vẹn trên tên miền
+   thật lần nào. Hỏng thì đường vào lại chỉ còn mã email, tức chưa thật sự bỏ
+   được OTP.
+3. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
+   Existing Headers"**. Không sửa được trong repo.
+
 ## Trạng thái: Đợt 1–4 đã xong
 
 | Đợt | Nội dung | Hạn SRS |
@@ -799,8 +822,12 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   lỗi thật, trong đó 3 lỗi nghiêm trọng (mất dữ liệu, XSS, lệch thời gian).
 - **Kiểm thử thật, không chỉ đọc code**: API bằng curl trên D1 thật, luồng
   người dùng bằng Playwright trên Chromium thật, và luôn viết test hồi quy cho
-  đúng từng lỗi đã sửa. Các bộ test nằm ở thư mục scratchpad của phiên, không
-  commit vào repo — phiên mới cần viết lại nếu muốn chạy.
+  đúng từng lỗi đã sửa. **Từ 27/8 các bộ kiểm nằm ở `scripts/kiem/` trong
+  repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
+  chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
+  phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
+  trước khi chạy — có mục "bốn phép đối chứng đáng giữ nhất" và hai chỗ môi
+  trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - Commit vào nhánh `claude/read-content-deployment-plan-dpsv8m`, không tạo PR
   trừ khi được yêu cầu.
