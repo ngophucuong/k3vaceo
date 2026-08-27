@@ -295,6 +295,16 @@ jobs:
             fi
           done
           if [ "$loi" = "0" ]; then echo "  ✓ chỉ có lịch, không rò gì thêm"; fi
+          # In số tư liệu từng buổi. Sandbox không gọi được vào tên miền, nên
+          # đây là con mắt duy nhất thấy được tư liệu đã gắn vào buổi hay chưa.
+          node --input-type=commonjs -e '
+            const d = JSON.parse(require("fs").readFileSync("/tmp/ck.json", "utf8"));
+            for (const b of d.buoi || []) {
+              if (b.so_tu_lieu > 0) console.log(`    ${b.ngay}: ${b.so_tu_lieu} tài liệu — ${b.chu_de.slice(0, 44)}`);
+            }
+            const t = (d.buoi || []).reduce((s, b) => s + (b.so_tu_lieu || 0), 0);
+            console.log(`  tổng ${t} tài liệu đã gắn vào buổi (chỉ đếm tư liệu của lớp)`);
+          ' || true
 
           echo "--- tệp lịch .ics ---"
           ich=$(curl -s -o /tmp/l.ics -D /tmp/l.hdr -w '%{http_code}' https://k3vaceo.cuongngo.app/api/lich/k3vaceo.ics || true)
