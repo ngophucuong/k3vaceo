@@ -1,4 +1,5 @@
 import { json } from '../lib/http.js';
+import { layTuLieuTheoBuoi } from './lich.js';
 import { isClassCommittee } from '../permissions.js';
 
 const PROFILE_FIELDS = ['sells_what', 'sells_to', 'needs', 'offers'];
@@ -111,7 +112,7 @@ export async function getHome(env, me) {
   // thật, cả hai đều không tự báo lỗi:
   //   · buổi học của hôm nay còn nằm trong danh sách "sắp tới" thêm 7 tiếng
   //   · con số đếm ngược lệch một ngày so với trang /lich công khai
-  const [nayRes, lichRes, tbRes] = await Promise.all([
+  const [nayRes, lichRes, tbRes, tuLieuBuoi] = await Promise.all([
     env.DB.prepare("SELECT date('now', '+7 hours') AS d").first(),
     env.DB.prepare(
       `SELECT id, ngay, tu_gio, den_gio, chu_de, giang_vien, ghi_chu
@@ -129,6 +130,10 @@ export async function getHome(env, me) {
           AND (het_han IS NULL OR het_han >= date('now', '+7 hours'))
         ORDER BY id DESC LIMIT 5`
     ).bind(me.thong_bao_xem_id ?? 0, me.cohort_id, me.group_id).all(),
+    // Tư liệu gắn vào buổi. Dùng CHUNG hàm với /api/lich để hai màn không thể
+    // lọc khác nhau — cùng một liên kết mà hiện ở màn này, mất ở màn kia là
+    // lỗi không chỗ nào báo.
+    layTuLieuTheoBuoi(env, me),
   ]);
 
   return json({
@@ -138,7 +143,7 @@ export async function getHome(env, me) {
     // vì người ta không bao giờ đóng hẳn nó.
     ban: env.COMMIT_SHA ?? null,
     hom_nay: nayRes?.d ?? null,
-    lich_hoc: lichRes.results ?? [],
+    lich_hoc: (lichRes.results ?? []).map(b => ({ ...b, tu_lieu: tuLieuBuoi.get(b.id) ?? [] })),
     thong_bao: tbRes.results ?? [],
     // Số thông báo chưa xem — giao diện chấm đỏ lên tab Hôm nay. Đây là đường
     // báo tin chạy được trên MỌI máy, không cần quyền, không cần cài gì; thông

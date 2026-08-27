@@ -91,6 +91,11 @@ header{position:sticky;top:0;z-index:40;background:rgba(243,243,241,.88);
 /* Đã huỷ: gạch chữ. Chỉ đổi màu thôi thì người mù màu không nhận ra. */
 .b.dahuy .de{text-decoration:line-through;text-decoration-thickness:1.5px}
 
+.b .tl{margin-top:6px;font-size:12px;color:var(--ink2)}
+.b .tl b{font-family:var(--num);color:var(--ink)}
+.b .tl a{color:var(--go);font-weight:600;text-decoration:none}
+.b .tl a:hover{text-decoration:underline}
+
 .tong{font-size:12.5px;color:var(--ink3);text-align:center;margin:16px 2px 0;line-height:1.5}
 
 footer{margin-top:30px;padding-top:18px;border-top:1px solid var(--line);

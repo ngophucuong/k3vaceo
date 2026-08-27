@@ -452,6 +452,44 @@ buổi (có đường dẫn thật, đọc từ thanh URL trong ảnh chụp) v�
 trở lên khi chạy qua tệp, và **bản cục bộ cũng từ chối y hệt**, không chỉ D1
 thật như đã ghi ở mục trên.
 
+## Tư liệu gắn vào buổi học — một dòng, hai màn
+
+Thêm 26/8 (migration 0014). Một cột `links.buoi_id` trỏ về `lich_hoc(id)` —
+đúng khuôn mẫu đã có sẵn của `links.section_id`, không phải cách làm mới.
+
+**CỐ Ý không nhân đôi dòng và không có bảng "shortcut".** Vẫn đúng một dòng
+trong `links`; tab Lịch và tab Tư liệu đọc nó bằng hai truy vấn khác nhau. Sửa
+ở màn nào cũng là sửa chính nó, gỡ ở màn nào cũng biến mất khỏi cả hai. Hai bản
+ghi thì sớm muộn cũng lệch nhau mà không chỗ nào báo lỗi.
+
+Trước đó `tag = 'buoi'` chỉ là nhãn rời: nói "đây là tài liệu buổi học" mà
+không nói buổi NÀO. `tag` vẫn giữ cho thứ chung chung chưa gắn được vào buổi.
+
+Bốn điều đã trả giá hoặc suýt trả giá:
+
+1. **Đường công khai `/lich` CHỈ trả `so_tu_lieu`, không bao giờ tên hay URL**
+   (Ngô Phú Cường quyết 26/8). Con số nói "có thứ đáng lấy" mà không đưa gì ra
+   cho người ngoài lớp, và biến chính tài liệu thành lý do đăng nhập. Con số
+   đếm **chỉ tư liệu của lớp**: tư liệu nhóm là dữ liệu nhóm (N6), và một con
+   số đổi theo người xem thì vô nghĩa trên trang ai cũng thấy cùng một bản.
+   Danh sách trả về dựng bằng cách LIỆT KÊ TỪNG TRƯỜNG, không trải cả dòng —
+   thêm cột vào `lich_hoc` về sau sẽ không lặng lẽ lọt ra công khai.
+2. **`/api/home` và `/api/lich` dùng CHUNG `layTuLieuTheoBuoi()`.** Tách hai
+   bản là có ngày một bên lọc khác bên kia, và cùng một liên kết hiện ở màn này
+   mà mất ở màn kia.
+3. **`ORDER BY scope` (ASC, không DESC).** `'class' < 'group'` nên ASC là slide
+   Ban tổ chức đứng trên, ghi chép riêng của nhóm xuống dưới. Viết DESC một lần
+   rồi, và chỉ NHÌN ảnh chụp mới thấy — phép kiểm chuỗi không thấy.
+4. **`oChonBuoi()` luôn chèn thêm dòng cho buổi đang gắn.** `/api/home` chỉ trả
+   6 buổi SẮP TỚI, nên tư liệu gắn vào buổi đã qua sẽ không có trong danh sách:
+   mở sheet sửa ra là ô nhảy về "Không gắn buổi nào", bấm Lưu một phát là tư
+   liệu bị gỡ khỏi buổi mà không ai định làm thế.
+
+Một bài học về chính bộ kiểm: lần đầu nó báo **"không lỗi JS: sạch" trên một
+trang chưa hề nạp** (quên bật `[assets]` nên `/` trả JSON — trang không có JS
+thì tất nhiên không có lỗi JS). Mọi bộ kiểm giao diện nay mở đầu bằng một phép
+khẳng định rằng ứng dụng THẬT SỰ nạp được.
+
 ## Vai nhóm: ba, không phải hai
 
 `truong_nhom` · `pho_nhom` · **`tieu_bieu`** ("thành viên tiêu biểu", thêm

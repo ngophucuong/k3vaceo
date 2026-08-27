@@ -5,20 +5,39 @@ import { cleanText } from '../lib/validate.js';
 const KINDS = new Set(['DRIVE', 'SHEET', 'DOCX', 'PDF', 'WEB', 'XLSX']);
 const TAGS = new Set(['bai', 'buoi', 'lop']);
 
+// Buổi học mà tư liệu gắn vào. Trả { loi } nếu sai, { buoiId } nếu được.
+// Phải kiểm buổi có THẬT và cùng khoá: nhận thẳng số từ máy khách thì gắn được
+// vào một id không tồn tại, và tư liệu ấy biến mất khỏi cả hai màn — không màn
+// nào báo lỗi, chỉ là nó không bao giờ hiện ra nữa.
+async function docBuoiId(env, me, body) {
+  if (!('buoi_id' in body)) return {};
+  if (body.buoi_id === null || body.buoi_id === '') return { buoiId: null };
+  const id = Number(body.buoi_id);
+  if (!Number.isInteger(id) || id <= 0) return { loi: error('buoi_invalid', 422) };
+  const co = await env.DB.prepare(
+    'SELECT id FROM lich_hoc WHERE id = ? AND cohort_id = ?'
+  ).bind(id, me.cohort_id).first();
+  if (!co) return { loi: error('buoi_not_found', 404) };
+  return { buoiId: id };
+}
+
 export async function listLinks(env, me, tag) {
   // Tag lạ thì báo sai, không lặng lẽ trả về toàn bộ Kho — người gọi sẽ tưởng
   // mình đang xem một mục đã lọc.
   if (tag !== null && tag !== undefined && tag !== '' && tag !== 'all' && !TAGS.has(tag)) {
     return error('tag_invalid', 422);
   }
+  // Kèm ngày và chủ đề của buổi để giao diện dán được nhãn "Buổi 28/8 · Quản
+  // trị chiến lược" mà không phải gọi thêm một vòng nữa.
+  const CHON = `SELECT l.*, b.ngay AS buoi_ngay, b.chu_de AS buoi_chu_de
+                  FROM links l LEFT JOIN lich_hoc b ON b.id = l.buoi_id
+                 WHERE l.removed_at IS NULL AND (l.scope = 'class' OR l.group_id = ?)`;
   const filtered = TAGS.has(tag);
   const rows = filtered
-    ? await env.DB.prepare(
-        `SELECT * FROM links WHERE removed_at IS NULL AND tag = ? AND (scope = 'class' OR group_id = ?) ORDER BY created_at DESC`
-      ).bind(tag, me.group_id).all()
-    : await env.DB.prepare(
-        `SELECT * FROM links WHERE removed_at IS NULL AND (scope = 'class' OR group_id = ?) ORDER BY created_at DESC`
-      ).bind(me.group_id).all();
+    ? await env.DB.prepare(`${CHON} AND l.tag = ? ORDER BY l.created_at DESC`)
+        .bind(me.group_id, tag).all()
+    : await env.DB.prepare(`${CHON} ORDER BY l.created_at DESC`)
+        .bind(me.group_id).all();
   // Giao diện cần biết để bày đúng ô chọn phạm vi; máy chủ vẫn kiểm lại trong
   // postLink. Tư liệu của LỚP hiện cho cả mười nhóm, nên ai đăng được là
   // chuyện quyền hạn thật chứ không phải chi tiết trình bày.
@@ -47,11 +66,14 @@ export async function postLink(request, env, me) {
   const capLop = body.scope === 'class';
   if (capLop && !(await isClassCommittee(env, me.id))) return error('forbidden', 403);
 
+  const { loi, buoiId } = await docBuoiId(env, me, body);
+  if (loi) return loi;
+
   const row = await env.DB.prepare(
-    `INSERT INTO links (cohort_id, scope, group_id, section_id, url, title, kind, tag, created_by, created_at)
-     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, datetime('now')) RETURNING id`
+    `INSERT INTO links (cohort_id, scope, group_id, section_id, buoi_id, url, title, kind, tag, created_by, created_at)
+     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id`
   ).bind(me.cohort_id, capLop ? 'class' : 'group', capLop ? null : me.group_id,
-         url, title, kind, tag, me.id).first();
+         buoiId ?? null, url, title, kind, tag, me.id).first();
 
   await logActivity(env, {
     cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
@@ -110,6 +132,13 @@ export async function patchLink(request, env, me, linkId, ip) {
   if ('tag' in body) {
     if (!TAGS.has(body.tag)) return error('tag_invalid', 422);
     dat.tag = body.tag;
+  }
+  // Cho đổi buổi, và cho GỠ khỏi buổi (buoi_id = null). Khác với scope: đổi
+  // buổi không đụng tới ai đọc được, chỉ đổi chỗ nó hiện ra.
+  if ('buoi_id' in body) {
+    const { loi, buoiId } = await docBuoiId(env, me, body);
+    if (loi) return loi;
+    dat.buoi_id = buoiId ?? null;
   }
   // Cố ý KHÔNG cho đổi scope: chuyển một liên kết của nhóm thành của lớp là
   // đem dữ liệu nhóm ra cho 134 người xem (nguyên tắc N6). Muốn đổi thì gỡ đi

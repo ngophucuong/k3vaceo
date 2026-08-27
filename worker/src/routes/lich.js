@@ -52,7 +52,17 @@ async function docLichCongKhai(env) {
 
   const lich = await env.DB.prepare(
     `SELECT id, ngay, tu_gio, den_gio, chu_de, giang_vien, ghi_chu, huy_luc,
-            CAST(strftime('%s', COALESCE(updated_at, created_at)) AS INTEGER) AS seq
+            CAST(strftime('%s', COALESCE(updated_at, created_at)) AS INTEGER) AS seq,
+            -- CHỈ ĐẾM. Ngô Phú Cường quyết 26/8: đường dẫn tài liệu chỉ hiện
+            -- sau khi đăng nhập. Con số thì nói được "có thứ đáng lấy ở đây"
+            -- mà không đưa gì ra cho người ngoài lớp.
+            --
+            -- Chỉ đếm tư liệu của LỚP: tư liệu của nhóm là dữ liệu nhóm (N6),
+            -- và một con số đổi theo người xem thì vô nghĩa trên trang mà ai
+            -- cũng thấy cùng một bản.
+            (SELECT COUNT(*) FROM links l
+              WHERE l.buoi_id = lich_hoc.id AND l.removed_at IS NULL
+                AND l.scope = 'class' AND l.url IS NOT NULL) AS so_tu_lieu
        FROM lich_hoc WHERE cohort_id = ?
       ORDER BY ngay, COALESCE(tu_gio, '00:00')`
   ).bind(khoa.id).all();
@@ -76,6 +86,9 @@ export async function getLichCongKhai(env) {
       id: b.id, ngay: b.ngay, tu_gio: b.tu_gio, den_gio: b.den_gio,
       chu_de: b.chu_de, giang_vien: b.giang_vien, ghi_chu: b.ghi_chu,
       da_huy: b.huy_luc ? 1 : 0,
+      // Dựng danh sách trả về bằng cách LIỆT KÊ TỪNG TRƯỜNG chứ không trải cả
+      // dòng: thêm cột vào lich_hoc về sau sẽ không lặng lẽ lọt ra công khai.
+      so_tu_lieu: b.so_tu_lieu ?? 0,
     })),
   }, 200, { 'Cache-Control': 'public, max-age=60' });
 }
@@ -107,7 +120,7 @@ export async function getLichIcs(request, env) {
 }
 
 export async function getLich(env, me) {
-  const [lich, tb] = await Promise.all([
+  const [lich, tb, tuLieu] = await Promise.all([
     env.DB.prepare(
       `SELECT id, ngay, tu_gio, den_gio, chu_de, giang_vien, ghi_chu, huy_luc
          FROM lich_hoc WHERE cohort_id = ?
@@ -117,12 +130,37 @@ export async function getLich(env, me) {
       `SELECT id, noi_dung, nguon, het_han FROM thong_bao WHERE cohort_id = ?
         ORDER BY id DESC`
     ).bind(me.cohort_id).all(),
+    layTuLieuTheoBuoi(env, me),
   ]);
   return json({
-    lich_hoc: lich.results ?? [],
+    lich_hoc: (lich.results ?? []).map(b => ({ ...b, tu_lieu: tuLieu.get(b.id) ?? [] })),
     thong_bao: tb.results ?? [],
     can_sua: await phaiLaBanCanSu(env, me),
   });
+}
+
+// Tư liệu đã gắn vào buổi, gom theo buổi. MỘT truy vấn cho cả khoá rồi gom
+// trong JS — 13 buổi với vài chục liên kết thì rẻ hơn hẳn một truy vấn mỗi buổi.
+//
+// Phạm vi đọc y hệt listLinks: tư liệu của lớp thì ai cũng thấy, tư liệu của
+// nhóm thì chỉ nhóm ấy (N6). Lệch điều kiện này với Tư liệu là cùng một liên
+// kết hiện ở màn này mà mất ở màn kia.
+export async function layTuLieuTheoBuoi(env, me) {
+  const rows = await env.DB.prepare(
+    `SELECT id, buoi_id, url, title, kind, scope FROM links
+      WHERE buoi_id IS NOT NULL AND removed_at IS NULL
+        AND cohort_id = ? AND (scope = 'class' OR group_id = ?)
+      -- 'class' < 'group' theo thứ tự chữ, nên ASC là tài liệu chính của Ban tổ
+      -- chức đứng trên, ghi chép riêng của nhóm xuống dưới. DESC thì ngược lại
+      -- và trông như ghi chép của nhóm quan trọng hơn slide bài giảng.
+      ORDER BY scope, created_at`
+  ).bind(me.cohort_id, me.group_id).all();
+  const theoBuoi = new Map();
+  for (const r of rows.results ?? []) {
+    if (!theoBuoi.has(r.buoi_id)) theoBuoi.set(r.buoi_id, []);
+    theoBuoi.get(r.buoi_id).push(r);
+  }
+  return theoBuoi;
 }
 
 function docBuoi(body) {

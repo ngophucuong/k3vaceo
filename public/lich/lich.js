@@ -49,6 +49,12 @@ function veBuoi(b, homNay) {
 
   const cls = ['b', laNay ? 'naydau' : '', daQua && !laNay ? 'qua' : '', b.da_huy ? 'dahuy' : '']
     .filter(Boolean).join(' ');
+  // CHỈ số đếm, không bao giờ tên hay đường dẫn — máy chủ cũng không gửi chúng
+  // ra đường công khai. Con số nói "có thứ đáng lấy ở đây" và đăng nhập là
+  // cách lấy; đó là lý do thật để bấm tiếp, không phải một bức tường.
+  const tl = b.so_tu_lieu > 0
+    ? `<div class="tl"><b>${b.so_tu_lieu}</b> tài liệu · <a href="/">đăng nhập để mở</a></div>`
+    : '';
   const chip = b.da_huy ? '<span class="chip huy">đã huỷ</span>'
              : laNay ? '<span class="chip nay">hôm nay</span>' : '';
 
@@ -57,6 +63,7 @@ function veBuoi(b, homNay) {
     <div class="than">
       <div class="de">${esc(b.chu_de)}${chip}</div>
       ${phu ? `<div class="phu">${phu}</div>` : ''}
+      ${tl}
     </div>
   </div>`;
 }
