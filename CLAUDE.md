@@ -39,7 +39,22 @@ Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sa
   là đổi bản chất sản phẩm chứ không phải thêm tính năng. Phần "không chat" GIỮ
   NGUYÊN, và thông báo đẩy chỉ mang đúng một việc — "có tin mới, mở ứng dụng ra
   xem" — chứ không thành kênh nhắn tin thứ hai bên cạnh Zalo.
-- **N2 — Ứng dụng không giữ file.** Chỉ lưu URL. Không upload.
+- **N2 — Ứng dụng không giữ file.** Chỉ lưu URL. Không upload. → **đã cân
+  nhắc lại và GIỮ NGUYÊN ngày 26/8**, sau khi Ngô Phú Cường hỏi thẳng về upload
+  lên Cloudflare R2 và được nêu rõ cả hai vế. Đừng mở lại cuộc bàn này nếu
+  không có dữ kiện mới. Lý do quyết:
+  - Khoá kết thúc 26/9. Link Drive thì file nằm ở Drive **Ban tổ chức** và sống
+    lâu hơn ứng dụng; upload thì ứng dụng giữ một bản sao, nó tắt là mất.
+  - Slide giảng viên là tài sản của họ. Ban tổ chức chia sẻ link là quyết định
+    của chính họ, thu hồi được. Giữ một bản sao là thay họ quyết chuyện phát
+    tán — trên tên miền mang tên người dùng, cho lớp của VCCI × Andrews.
+  - R2 đòi gắn thẻ thanh toán vào tài khoản Cloudflare mới bật được, kể cả ở
+    mức miễn phí.
+
+  Lý lẽ ngược đã được nêu và vẫn không thắng: link Drive bị đặt hạn chế thì 134
+  người bấm vào đều thấy "Yêu cầu quyền truy cập", tệ hơn không có link. Cách
+  chữa là dặn Ban tổ chức mở quyền "ai có đường dẫn đều xem được", không phải
+  đem file về máy chủ của mình.
 - **N3 — Ứng dụng không giữ tiền.** Tiền vào thẳng tài khoản người thu.
 - **N4 — Tự giác là chính.** Không xác minh email, không OTP, không đối soát.
 - **N5 — Chính chủ tự sửa được thông tin của mình**, không qua ai duyệt.
