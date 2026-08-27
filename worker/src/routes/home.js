@@ -156,6 +156,9 @@ export async function getHome(env, me) {
     // (Đợt 5). Máy chủ vẫn chặn riêng ở postRegisterOptions.
     me: { id: me.id, full_name: me.full_name, group_id: me.group_id,
           email_verified: !!me.email_verified_at,
+          // Đã nhận hồ sơ thì mở được passkey, kể cả khi email chưa kiểm
+          // chứng (xem routes/passkey.js). Máy chủ vẫn chặn lại ở đó.
+          da_nhan_ho_so: !!me.claimed_at,
           // Che bớt để người đứng cạnh không đọc được, nhưng vẫn đủ để chính
           // chủ nhận ra hộp thư nào sẽ nhận mã.
           email_che: me.email ? me.email.replace(/^(..)([^@]*)/, (_, a, b) => a + '•'.repeat(Math.max(3, b.length))) : null },

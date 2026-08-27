@@ -17,7 +17,7 @@ import { postLogout } from './routes/session.js';
 import { getPlan, patchSection, patchTopic } from './routes/plan.js';
 import { postInsight, deleteInsight } from './routes/insights.js';
 import { postEmailRequest, postEmailConsume } from './routes/email-login.js';
-import { postOnboardCheck, postOnboardStart, postOtpRequest, postOtpVerify,
+import { postOnboardCheck, postOnboardVao, postOnboardStart, postOtpRequest, postOtpVerify,
          postVerifyMyEmail, postVerifyMyEmailConfirm } from './routes/onboard.js';
 import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, getLedger, getThongKe, postVerify,
          listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
@@ -89,6 +89,11 @@ export default {
       // thoại (chỉ để báo sớm), khai email và nhận mã, rồi đổi mã lấy phiên.
       if (pathname === '/api/onboard/check' && method === 'POST') {
         return postOnboardCheck(request, env);
+      }
+      // Vào thẳng, không cần mã — chỉ với hồ sơ chưa ai nhận. Đường chính từ
+      // 27/8; /api/onboard/start giữ làm đường dự phòng.
+      if (pathname === '/api/onboard/vao' && method === 'POST') {
+        return postOnboardVao(request, env);
       }
       if (pathname === '/api/onboard/start' && method === 'POST') {
         return postOnboardStart(request, env, ctx);

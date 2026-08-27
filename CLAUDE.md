@@ -674,6 +674,65 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Số điện thoại Lê Trung Đức** trong roster là `098778525`, thiếu 1 số. Giữ
   nguyên trong `roster`, không đưa vào `members`. Cần hỏi lại.
 
+## Bỏ OTP ở lần đầu — số điện thoại vào thẳng, rồi passkey
+
+Đổi 27/8 sau khi học viên phản ánh lần đầu đăng nhập quá phức tạp. Ngô Phú
+Cường quyết, sau khi được nêu rõ cái mất.
+
+| | Trước | Nay |
+|---|---|---|
+| Lần đầu | tên → số → email → **chờ thư → gõ 6 số** | tên → số → email → **vào luôn** |
+| Ngay sau đó | — | mời đặt **passkey** |
+| Vào lại | mã 6 số / passkey | mã 6 số / passkey (**không** dùng lại số) |
+
+`POST /api/onboard/vao`. Đường OTP cũ (`/api/onboard/start`, `/api/auth/otp`)
+giữ nguyên làm dự phòng.
+
+**Chốt chặn quan trọng nhất: chỉ mở được hồ sơ CHƯA AI NHẬN**
+(`claimed_at IS NULL`). Nhận xong là cửa đóng vĩnh viễn, trả 409 `da_nhan_cho`.
+
+Vì sao bắt buộc phải có chốt ấy: **số điện thoại không phải bí mật trong nội
+bộ lớp.** Danh sách lớp kèm số rất có thể đã lưu hành, trong nhóm Zalo số
+thường nhìn thấy được, và đây là lứa người trao danh thiếp. Nó chặn người
+ngoài, không chặn bạn cùng lớp. Nếu để số dùng lại mãi thì ai có danh sách
+cũng đăng nhập được vào chỗ bất kỳ ai, bất cứ lúc nào — kể cả trưởng nhóm, tức
+mở được sổ thu, tạo đợt thu, cho người khác ngừng tham gia. Khoá vào
+lần-đầu-duy-nhất thì cửa sổ ấy đóng ngay khi chính chủ vào lần đầu.
+
+Giới hạn tần suất đường này là **10 lần/IP/giờ** (`VAO_PER_HOUR`), chặt hơn hẳn
+các đường khác vì nay nó là cửa an ninh duy nhất.
+
+N4 SRS viết nguyên văn "không xác minh email, không OTP" — nên bỏ OTP là quay
+về đúng chuẩn gốc, không phải nới ra khỏi nó.
+
+### Ba thứ phải sửa kèm, thiếu một cái là luồng gãy
+
+1. **Chốt chặn passkey đã đổi**: `!me.email_verified_at` → `!me.claimed_at &&
+   !me.email_verified_at` (lỗi đổi tên thành `chua_nhan_ho_so`). Không đổi thì
+   passkey — thứ thay chỗ OTP — lại đòi đúng cái OTP vừa bỏ. `/api/home` trả
+   thêm `da_nhan_ho_so` để giao diện mở nút.
+2. **`email_verified_at` CỐ Ý để trống.** Email thật sự chưa kiểm chứng. Hệ
+   quả: gõ nhầm một chữ là mất đường vào lại khi đổi máy. Vì vậy màn "Xong rồi"
+   in lại địa chỉ vừa gõ kèm câu cảnh báo — đó là chỗ cuối cùng người ta còn
+   nhìn thấy nó.
+3. **Người chưa có số bị chặn NGAY sau khi chọn tên**, không phải sau khi gõ số
+   (44/134 người). `searchRoster` trả cờ `co_so_doi_chieu` — **cờ thôi, không
+   bao giờ trả số**, đường ấy ai gọi cũng được. Điều kiện của cờ phải trùng
+   khít `doiChieu()` trong `onboard.js`; bộ kiểm đối chiếu cờ với luật cho cả
+   134 người để hai bên không lệch.
+
+### Hai chỗ chỉ lộ ra khi chạy thật
+
+- **`register/verify` KHÔNG kiểm được ở máy cục bộ.** `wrangler dev` có mục
+  `routes` nên báo `request.url` mang hostname production, còn trình duyệt ở
+  `localhost` — `verifyRegistrationResponse` so hai thứ ấy rồi từ chối. Đổi
+  host kiểu gì cũng vướng. Trên tên miền thật hai bên trùng. Kiểm được tới đâu
+  thì khẳng định tới đó: options trả 200, trình duyệt tạo khoá thật, và bấm
+  xong thì rời màn `/vao` chứ không kẹt.
+- **Passkey vẫn CHƯA từng chạy trọn vẹn trên tên miền thật** — đây là chỗ hổng
+  có từ trước, không phải do lần đổi này. Nay nó quan trọng hơn hẳn vì passkey
+  là thứ giữ chỗ cho những lần sau.
+
 ## Đăng nhập (Đợt 5 viết lại) — không có vai "admin" riêng
 
 Sản phẩm không có tài khoản quản trị. Quyền đến từ bảng `officers`; Ngô Phú

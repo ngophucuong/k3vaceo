@@ -1,17 +1,30 @@
-// Đợt 5 — tự nhận diện rồi đăng nhập bằng OTP qua email.
+// Tự nhận diện tại /vao.
 //
-// LUỒNG (mục 4 SRS viết lại):
+// LUỒNG LẦN ĐẦU (rút gọn 27/8 — xem "Bỏ OTP ở lần đầu" trong CLAUDE.md):
 //   1. Gõ tên → chọn đúng mình trong danh sách gốc 134 người
 //   2. Nhập SỐ ĐIỆN THOẠI để chứng minh đúng là mình — số này Ban tổ chức đã
 //      có sẵn, KHÔNG gửi gì tới nó, chỉ đối chiếu
-//   3. Khai email → nhận mã 6 số qua thư
-//   4. Nhập mã → có phiên, email được đánh dấu đã kiểm chứng
-//   5. Passkey chỉ hiện ra sau bước 4
+//   3. Khai email → VÀO LUÔN, không cần mã
+//   4. Mời đặt passkey ngay — đây mới là thứ giữ chỗ cho những lần sau
 //
-// Vì sao số điện thoại đủ làm bằng chứng ở bước 2: tên thì cả lớp ai cũng
-// biết, còn số thì chỉ Ban tổ chức và người quen mới có. Với lớp 134 người
-// biết mặt nhau, cộng nhật ký công khai ở tab Nhóm, thế là đủ (nguyên tắc N4
-// — tự giác là chính). Ai chiếm chỗ người khác thì cả nhóm nhìn thấy ngay.
+// LUỒNG VÀO LẠI: passkey, hoặc mã 6 số qua email (/dangnhap). Số điện thoại
+// KHÔNG dùng lại được.
+//
+// CHỐT CHẶN QUAN TRỌNG NHẤT: đường số-điện-thoại chỉ mở được hồ sơ CHƯA AI
+// NHẬN (claimed_at IS NULL). Nhận xong là cửa đóng vĩnh viễn.
+//
+// Vì sao phải có chốt ấy: số điện thoại KHÔNG phải bí mật trong nội bộ lớp —
+// danh sách lớp kèm số rất có thể đã lưu hành, và trong nhóm Zalo thì số
+// thường nhìn thấy được. Nó chặn được người ngoài, không chặn được bạn cùng
+// lớp. Nếu để số dùng lại mãi thì ai có danh sách cũng đăng nhập được vào chỗ
+// bất kỳ ai, bất cứ lúc nào, kể cả trưởng nhóm (mở sổ thu, tạo đợt thu, cho
+// người khác ngừng tham gia). Khoá vào lần-đầu-duy-nhất thì cửa sổ ấy đóng
+// ngay khi chính chủ đăng nhập lần đầu.
+//
+// Nguyên tắc N4 SRS viết nguyên văn "không xác minh email, không OTP" — nên
+// bỏ OTP là quay về đúng chuẩn gốc, chứ không phải nới ra khỏi nó. OTP giữ
+// làm ĐƯỜNG DỰ PHÒNG: vào lại, và ai muốn kiểm chứng email để có đường khôi
+// phục khi mất máy.
 
 import { json, error, readJson } from '../lib/http.js';
 import {
@@ -24,6 +37,10 @@ import { mailerConfigured, sendMail } from '../mailer.js';
 import { clientIp, allow } from '../lib/ratelimit.js';
 
 const CHECK_PER_HOUR = 20;   // đối chiếu số điện thoại
+// Đường vào thẳng: nay số điện thoại là cửa an ninh DUY NHẤT, nên khoá chặt
+// hơn hẳn. 10 lần/IP/giờ đủ rộng cho người gõ nhầm vài lần, mà một máy dò thì
+// không đi tới đâu — số di động Việt Nam có khoảng 10^8 khả năng thật.
+const VAO_PER_HOUR = 10;
 const VERIFY_PER_HOUR = 20;  // nhập mã
 
 // Xin mã: hai lần khoá, cố ý khác nhau về chất.
@@ -63,6 +80,73 @@ export async function postOnboardCheck(request, env) {
     // khai lại — nhưng vẫn không tiết lộ email đó là gì.
     da_nhan_cho: !!member?.claimed_at,
     goi_y_email: member?.email ? che(member.email) : null,
+  });
+}
+
+/* ══ Vào thẳng: số điện thoại đúng là có phiên, không cần mã ═══════════════
+   CHỈ cho hồ sơ CHƯA AI NHẬN. Xem khối chú thích đầu tệp để biết vì sao chốt
+   ấy là thứ giữ cho đường này an toàn được. */
+export async function postOnboardVao(request, env) {
+  if (!(await allow(env, 'onboard_vao', clientIp(request), VAO_PER_HOUR))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+  const body = await readJson(request);
+
+  const ket_qua = await doiChieu(env, body);
+  if (ket_qua.loi) return error(ket_qua.loi, ket_qua.ma, ket_qua.them);
+  const { person } = ket_qua;
+  let { member } = ket_qua;
+
+  // CHỐT CHẶN. Hồ sơ đã có người nhận thì số điện thoại hết tác dụng — vào lại
+  // phải bằng passkey hoặc mã email. Kiểm ở ĐÂY chứ không tin giao diện
+  // (quy ước 6): giao diện đã rẽ nhánh sẵn từ /api/onboard/check, nhưng gọi
+  // thẳng API bỏ qua nó thì vẫn phải chặn.
+  if (member?.claimed_at) return error('da_nhan_cho', 409);
+
+  const email = normalizeEmail(body.email);
+  if (!email || !isValidEmail(email)) return error('email_invalid', 422);
+
+  // Email là lối đăng nhập lại, nên trùng email là trùng luôn lối vào.
+  const taken = await env.DB.prepare(
+    'SELECT full_name FROM members WHERE cohort_id = ? AND email = ? AND roster_id IS NOT ?'
+  ).bind(person.cohort_id, email, person.id).first();
+  if (taken) return error('email_taken', 409, { taken_by: taken.full_name });
+
+  if (!member) {
+    const group = await env.DB.prepare(
+      'SELECT id FROM groups WHERE cohort_id = ? AND label = ?'
+    ).bind(person.cohort_id, person.group_label).first();
+    if (!group) return error('group_not_found', 404);
+
+    member = await env.DB.prepare(
+      `INSERT INTO members (cohort_id, group_id, roster_id, full_name, title, company,
+                            phone, email, claimed_at, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 1, datetime('now'), datetime('now'))
+       RETURNING id, full_name`
+    ).bind(person.cohort_id, group.id, person.id, person.full_name, person.title,
+           person.company, normalizePhone(body.phone), email).first();
+  } else {
+    // COALESCE trên claimed_at là thừa ở đây (đã chặn ở trên nếu khác NULL),
+    // nhưng giữ cho hai chỗ đặt claimed_at trong tệp này viết giống hệt nhau.
+    await env.DB.prepare(
+      `UPDATE members SET email = ?, claimed_at = COALESCE(claimed_at, datetime('now')),
+              updated_at = datetime('now') WHERE id = ?`
+    ).bind(email, member.id).run();
+  }
+
+  // KHÔNG đặt email_verified_at: email thật sự chưa được kiểm chứng. Passkey
+  // vẫn mở được (xem routes/passkey.js), còn ai muốn có đường khôi phục khi
+  // mất máy thì tự bấm gửi mã trong tab Tài khoản.
+  const token = await createSession(env, member.id, request.headers.get('user-agent'));
+
+  await logActivity(env, {
+    cohortId: person.cohort_id, groupId: member.group_id ?? null, actorId: member.id,
+    verb: 'member.claim', objectType: 'member', objectId: member.id,
+    summary: 'tự nhận diện và vào ứng dụng lần đầu',
+  });
+
+  return json({ ok: true, full_name: person.full_name }, 200, {
+    'Set-Cookie': sessionCookieHeader(token, new URL(request.url).protocol === 'https:'),
   });
 }
 

@@ -57,11 +57,21 @@ async function takeChallenge(env, id, kind) {
 
 /* ══ Đăng ký passkey (phải đang đăng nhập) ══ */
 export async function postRegisterOptions(request, env, me) {
-  // Passkey chỉ mở sau khi đã chứng minh cầm hộp thư (Đợt 5). Lý do: passkey
-  // gắn chặt vào thiết bị — mất máy mà không có đường email đã kiểm chứng thì
-  // không còn lối nào vào lại. Giao diện đã ẩn nút, nhưng chặn ở máy chủ mới
-  // là chặn thật (quy ước 6: không tin giao diện).
-  if (!me.email_verified_at) return error('email_chua_kiem_chung', 403);
+  // Điều kiện: hồ sơ ĐÃ ĐƯỢC NHẬN (claimed_at), hoặc email đã kiểm chứng.
+  //
+  // Trước 27/8 chỗ này đòi cứng email_verified_at, vì hồi ấy OTP là bằng chứng
+  // duy nhất rằng đúng người. Nay lần đầu vào bằng số điện thoại cũng đặt
+  // claimed_at, và chính passkey mới là thứ thay OTP giữ chỗ cho những lần
+  // sau — đòi email kiểm chứng trước khi cho đặt passkey thì hoá ra bắt người
+  // ta làm đúng cái việc vừa bỏ đi.
+  //
+  // Passkey KHÔNG nới lỏng gì: nó gắn vào phiên hiện có, mà phiên ấy đã phải
+  // qua cửa số điện thoại rồi. Nó chỉ làm những lần vào sau chặt hơn.
+  //
+  // Đường khôi phục khi mất máy vẫn là email — nhưng email chưa kiểm chứng thì
+  // gõ nhầm một chữ là mất lối vào. Vì vậy tab Tài khoản giữ nút gửi mã xác
+  // minh, và màn đặt passkey nói rõ email dùng để làm gì.
+  if (!me.claimed_at && !me.email_verified_at) return error('chua_nhan_ho_so', 403);
 
   const existing = await env.DB.prepare(
     'SELECT credential_id FROM credentials WHERE member_id = ?'

@@ -27,7 +27,20 @@ export async function searchRoster(request, env) {
     `SELECT r.id, r.full_name, r.group_label, r.title, r.company,
             (SELECT COUNT(*) FROM members m WHERE m.roster_id = r.id) AS member_count,
             (SELECT g.label FROM members m JOIN groups g ON g.id = m.group_id
-              WHERE m.roster_id = r.id AND m.is_active = 1 LIMIT 1) AS nhom_that
+              WHERE m.roster_id = r.id AND m.is_active = 1 LIMIT 1) AS nhom_that,
+            -- Có số nào để đối chiếu không. TRẢ CỜ, KHÔNG TRẢ SỐ — đường này
+            -- ai gọi cũng được, lộ số là phát tán danh bạ cả lớp.
+            --
+            -- Điều kiện phải TRÙNG KHÍT với doiChieu() trong routes/onboard.js:
+            -- số Ban tổ chức ghi trong danh sách gốc, HOẶC số chính chủ tự đặt
+            -- (có phone_self_set_at). Lệch một chút là màn /vao bảo "chưa có
+            -- số" trong khi đối chiếu vẫn chạy được, hoặc ngược lại.
+            (CASE WHEN COALESCE(r.phone, '') <> '' THEN 1
+                  WHEN EXISTS (SELECT 1 FROM members m
+                                WHERE m.roster_id = r.id
+                                  AND COALESCE(m.phone, '') <> ''
+                                  AND m.phone_self_set_at IS NOT NULL) THEN 1
+                  ELSE 0 END) AS co_so
      FROM roster r WHERE r.cohort_id = (SELECT id FROM cohorts WHERE code = 'K03')`
   ).all();
 
@@ -44,6 +57,10 @@ export async function searchRoster(request, env) {
       group_label_goc: r.group_label,
       da_chuyen_nhom: !!(r.nhom_that && r.nhom_that !== r.group_label),
       title: r.title, company: r.company, already_member: r.member_count > 0,
+      // Giao diện dùng cờ này để chặn NGAY sau khi chọn tên, thay vì bắt người
+      // ta gõ số vào rồi mới báo hỏng — 44 người trong danh sách gốc chưa có
+      // số nào, thất bại hai lần liền là họ bỏ cuộc.
+      co_so_doi_chieu: r.co_so === 1,
     }));
   return json({ people });
 }

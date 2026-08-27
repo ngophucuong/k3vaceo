@@ -78,7 +78,8 @@ const ERR_TEXT = {
   otp_expired: 'Mã đã hết hạn hoặc đã dùng rồi — xin mã mới.',
   otp_locked: 'Nhập sai quá nhiều lần, mã này bị huỷ. Xin mã mới.',
   otp_invalid_format: 'Mã gồm đúng 6 chữ số.',
-  email_chua_kiem_chung: 'Cần xác minh email bằng mã trước khi thêm passkey.',
+  chua_nhan_ho_so: 'Cần nhận hồ sơ trước khi thêm passkey.',
+  da_nhan_cho: 'Hồ sơ này đã có người nhận. Đăng nhập bằng passkey hoặc mã gửi qua email.',
   // Đợt 6 — sổ chi
   scope_invalid: 'Không xác định được sổ quỹ nào.',
   category_invalid: 'Hạng mục chi không hợp lệ.',
@@ -422,7 +423,14 @@ function vaoBuoc1() {
       </div></div>`;
       document.querySelectorAll('#vDs [data-rid]').forEach(b => {
         b.onclick = () => {
-          VAO.person = ds.find(x => String(x.roster_id) === b.dataset.rid);
+          const p = ds.find(x => String(x.roster_id) === b.dataset.rid);
+          VAO.person = p;
+          // Chưa có số nào để đối chiếu thì nói NGAY, đừng bắt gõ số vào rồi
+          // mới báo hỏng. Máy chủ vẫn chặn lại ở doiChieu() — đây chỉ là để
+          // người ta khỏi thất bại hai lần liền.
+          if (p.co_so_doi_chieu === false) {
+            return vaoThieuSo({ full_name: p.full_name, group_label: p.group_label });
+          }
           vaoBuoc2();
         };
       });
@@ -473,16 +481,17 @@ function vaoBuoc2() {
 }
 
 function vaoThieuSo(d) {
-  vaoShell('Chưa đối chiếu được',
-    'Ban tổ chức chưa có số điện thoại của bạn trong danh sách lớp, nên chưa xác nhận được đúng người.', `
+  vaoShell('Cần xin link đăng nhập',
+    'Danh sách lớp chưa có số điện thoại của bạn, nên ứng dụng chưa tự xác nhận được đúng người.', `
     <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
       <b>${esc(d.full_name ?? '')}</b>
       <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(d.group_label ?? '')}</div>
     </div></div>
-    <div class="mut">Nhắn trưởng nhóm bổ sung số của bạn vào danh sách lớp. Xong là bạn đăng nhập được ngay, không phải làm gì thêm.</div>
-    <div class="mut" style="margin-top:10px">Hoặc xin trưởng nhóm một <b>link mời</b>. Đăng nhập bằng link rồi tự điền số của mình
-      trong tab Tài khoản — từ lần sau bạn tự đăng nhập được ở đây, không phải xin nữa.</div>
-    <button class="wide ghost" id="vLui2" style="margin-top:14px">Quay lại</button>`);
+    <div class="mut">Liên hệ <b>Ban cán sự lớp</b> hoặc <b>trưởng nhóm</b> của bạn để xin một
+      <b>link đăng nhập</b>. Bấm vào link là vào được ngay, không phải làm gì thêm.</div>
+    <div class="mut" style="margin-top:10px">Vào rồi thì tự điền số điện thoại của mình trong tab
+      Tài khoản — từ lần sau bạn tự đăng nhập ở đây được, không phải xin nữa.</div>
+    <button class="wide ghost" id="vLui2" style="margin-top:14px">Chọn lại tên</button>`);
   $('#vLui2').onclick = vaoBuoc1;
 }
 
@@ -491,33 +500,76 @@ function vaoBuoc3() {
   vaoShell(VAO.daNhanCho ? 'Chào bạn trở lại' : 'Email của bạn',
     VAO.daNhanCho
       ? `Bạn đã nhận hồ sơ này rồi${VAO.goiYEmail ? ` với email <b>${esc(VAO.goiYEmail)}</b>` : ''}. Nhập lại email đó để nhận mã đăng nhập.`
-      : 'Khai email để nhận mã đăng nhập. Đây cũng là đường đăng nhập lại khi bạn đổi máy, nên hãy dùng hộp thư bạn mở được.', `
+      : 'Còn một ô nữa là xong. Email là đường vào lại khi bạn đổi máy, nên hãy dùng hộp thư bạn mở được.', `
     <label class="f">Email</label>
     <input id="vEmail" inputmode="email" autocomplete="email" maxlength="160" placeholder="ten@congty.vn">
     <div id="vMsg3" class="hintline" style="display:none"></div>
-    <button class="wide" id="vGui">Gửi mã cho tôi</button>
+    <button class="wide" id="vGui">${VAO.daNhanCho ? 'Gửi mã cho tôi' : 'Vào ứng dụng'}</button>
     <button class="wide ghost" id="vLui3" style="margin-top:10px">Quay lại</button>`);
   $('#vLui3').onclick = vaoBuoc2;
 
   const gui = async () => {
     const email = $('#vEmail').value.trim();
     if (!email) return;
-    $('#vGui').disabled = true; $('#vGui').textContent = 'Đang gửi…';
+    $('#vGui').disabled = true; $('#vGui').textContent = VAO.daNhanCho ? 'Đang gửi…' : 'Đang vào…';
     try {
-      await apiPost('/api/onboard/start', { roster_id: p.roster_id, phone: VAO.phone, email });
-      renderNhapMa(email, `Đã gửi mã tới ${esc(email)}.`);
+      if (VAO.daNhanCho) {
+        // Hồ sơ đã có người nhận: số điện thoại hết tác dụng, phải qua mã.
+        await apiPost('/api/onboard/start', { roster_id: p.roster_id, phone: VAO.phone, email });
+        renderNhapMa(email, `Đã gửi mã tới ${esc(email)}.`);
+      } else {
+        // Lần đầu: vào thẳng, rồi mời đặt passkey ngay.
+        await apiPost('/api/onboard/vao', { roster_id: p.roster_id, phone: VAO.phone, email });
+        vaoPasskey(email);
+      }
     } catch (e) {
       $('#vMsg3').style.display = 'block';
       $('#vMsg3').style.color = 'var(--due)';
       $('#vMsg3').textContent = e?.data?.error === 'email_taken'
         ? `Email này đã thuộc về ${e.data.taken_by}. Dùng email khác, hoặc nhắn trưởng nhóm nếu bị nhầm.`
         : errText(e);
-      $('#vGui').disabled = false; $('#vGui').textContent = 'Gửi mã cho tôi';
+      $('#vGui').disabled = false;
+      $('#vGui').textContent = VAO.daNhanCho ? 'Gửi mã cho tôi' : 'Vào ứng dụng';
     }
   };
   $('#vGui').onclick = gui;
   $('#vEmail').onkeydown = e => { if (e.key === 'Enter') gui(); };
   $('#vEmail').focus();
+}
+
+// Đã có phiên. Mời đặt passkey NGAY — đây là thứ thay chỗ của mã 6 số: từ lần
+// sau vào bằng vân tay hoặc khuôn mặt, không phải mở hộp thư.
+//
+// Nói rõ email dùng để làm gì: nó CHƯA được kiểm chứng (lần đầu không cần mã),
+// nên gõ nhầm một chữ là mất đường vào lại khi đổi máy. Đây là chỗ duy nhất
+// người ta còn nhìn thấy địa chỉ vừa gõ, nên phải nói ở đây.
+function vaoPasskey(email) {
+  const co = passkeySupported();
+  vaoShell('Xong rồi', 'Bạn đã vào được ứng dụng.', `
+    <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
+      <div style="font-size:11.5px;color:var(--ink3)">Email đăng nhập lại</div>
+      <b>${esc(email)}</b>
+      <div style="font-size:12px;color:var(--ink2);margin-top:5px">Sai địa chỉ này thì đổi máy là
+        không vào lại được. Sửa được trong tab Tài khoản bất cứ lúc nào.</div>
+    </div></div>
+    ${co ? `<div class="mut" style="margin-bottom:12px">Đặt vân tay hoặc khuôn mặt cho lần sau —
+      mất năm giây, và từ đó không phải gõ gì nữa.</div>
+    <button class="wide" id="vPk">Đặt vân tay / khuôn mặt</button>
+    <button class="wide ghost" id="vBoQua" style="margin-top:10px">Để sau</button>`
+    : `<div class="mut" style="margin-bottom:12px">Máy này chưa hỗ trợ passkey. Lần sau bạn đăng
+      nhập bằng mã 6 số gửi tới email trên.</div>
+    <button class="wide" id="vBoQua">Vào ứng dụng</button>`}`);
+
+  const vao = () => { document.body.classList.remove('noapp'); location.href = '/'; };
+  $('#vBoQua').onclick = vao;
+  if (!co) return;
+  $('#vPk').onclick = async () => {
+    $('#vPk').disabled = true; $('#vPk').textContent = 'Đang đặt…';
+    // registerPasskey() tự nuốt trường hợp người dùng bấm huỷ ở hộp thoại hệ
+    // thống — huỷ thì vẫn vào ứng dụng, không kẹt lại ở màn này.
+    await registerPasskey();
+    vao();
+  };
 }
 
 /* ═══════════ WIZARD DỰNG NHÓM (/start) ═══════════
@@ -2935,11 +2987,9 @@ function veXacMinh(trangThai) {
 async function drawPasskeyBox() {
   if (!$('#pkBox')) return;
 
-  // Điều kiện của Đợt 5: chưa chứng minh cầm hộp thư thì chưa mở passkey.
-  // Passkey gắn chặt vào thiết bị — mất máy mà không có đường email đã kiểm
-  // chứng thì không còn lối nào vào lại. Máy chủ cũng chặn riêng, đây chỉ là
-  // lớp giao diện cho đỡ bấm hụt.
-  if (!HOME?.me?.email_verified) {
+  // Từ 27/8: nhận hồ sơ rồi là mở passkey được, không đòi kiểm chứng email
+  // trước. Máy chủ chặn riêng, đây chỉ là lớp giao diện cho đỡ bấm hụt.
+  if (!HOME?.me?.da_nhan_ho_so && !HOME?.me?.email_verified) {
     $('#pkBox').innerHTML = `
       <div class="eb" style="margin-bottom:8px">Passkey</div>
       <div class="mut">Xác minh email trước đã. Chúng tôi gửi một mã 6 số tới
