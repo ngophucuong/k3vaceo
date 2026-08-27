@@ -5,7 +5,7 @@
 
 import { json, error } from './lib/http.js';
 import { getCurrentMember } from './auth.js';
-import { clientIp, allow } from './lib/ratelimit.js';
+import { clientIp, conQuota, ghiNhan } from './lib/ratelimit.js';
 import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
 import { listMembers, getMember, patchMember, putMemberProfile,
@@ -38,6 +38,24 @@ import { exportPlanDocx } from './routes/export.js';
 
 const INVITE_TRIES_PER_HOUR = 20;   // mục 8 SRS
 
+// Mục 8 SRS: "20 lần thử token mời mỗi IP mỗi giờ". Con số giữ nguyên, nhưng
+// chỉ tính lần thử HỤT — bấm đúng link của chính mình không phải một "lần
+// thử". Trước 27/8 nó tính cả lượt đúng, nên trưởng nhóm phát link cho cả
+// nhóm, mọi người bấm trên cùng WiFi hội trường, và người thứ 21 nhận 429 dù
+// chưa ai đoán bậy cái gì.
+async function thuToken(env, request, chay) {
+  const ip = clientIp(request);
+  if (!(await conQuota(env, 'invite_try', ip, INVITE_TRIES_PER_HOUR))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+  const res = await chay();
+  // Tính đúng mã 410 — đó là "token không dùng được" ở cả hai route. Tính mọi
+  // mã 4xx thì người cầm link THẬT mà gõ nhầm email (422 email_invalid, 409
+  // email_taken) cũng đốt hạn mức chung với cả phòng, dù họ có đoán token đâu.
+  if (res.status === 410) await ghiNhan(env, 'invite_try', ip);
+  return res;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -63,16 +81,10 @@ export default {
       // Hai route token dưới đây là lối vào duy nhất khi chưa có phiên, nên
       // phải chặn dò token theo IP (mục 8 SRS: 20 lần thử mỗi IP mỗi giờ).
       if ((m = pathname.match(/^\/api\/invite\/([^/]+)$/)) && method === 'GET') {
-        if (!(await allow(env, 'invite_try', clientIp(request), INVITE_TRIES_PER_HOUR))) {
-          return error('rate_limited', 429, { retry_after_minutes: 60 });
-        }
-        return getInvite(env, m[1]);
+        return thuToken(env, request, () => getInvite(env, m[1]));
       }
       if ((m = pathname.match(/^\/api\/invite\/([^/]+)\/claim$/)) && method === 'POST') {
-        if (!(await allow(env, 'invite_try', clientIp(request), INVITE_TRIES_PER_HOUR))) {
-          return error('rate_limited', 429, { retry_after_minutes: 60 });
-        }
-        return postInviteClaim(request, env, m[1]);
+        return thuToken(env, request, () => postInviteClaim(request, env, m[1]));
       }
       // Lịch công khai: xem được mà không cần đăng nhập, và tải được về lịch
       // điện thoại. Đây là cửa trước cho người chưa tin ứng dụng — nhận được

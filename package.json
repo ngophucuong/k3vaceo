@@ -10,6 +10,7 @@
     "@simplewebauthn/server": "^13.3.2"
   },
   "devDependencies": {
+    "playwright-core": "^1.62.1",
     "wrangler": "^3.90.0",
     "xlsx": "^0.18.5"
   }

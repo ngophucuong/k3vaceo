@@ -55,7 +55,13 @@ ok('tiêu đề không bị xuống dòng ở khổ 390px',
    await p.locator('.hl .g').evaluate(e => e.getBoundingClientRect().height < 30));
 
 console.log('── Buổi hôm nay và buổi đã huỷ ──');
-ok('buổi hôm nay được đánh dấu', await p.locator('.b.naydau').count() === 1);
+// Đếm theo DỮ LIỆU, không đóng cứng con số. Bản đầu viết `=== 1` và đỏ đúng
+// vào 00:31 giờ Việt Nam ngày 28/8 — hôm ấy lịch có BA buổi, nên phép kiểm
+// báo hỏng trong khi trang vẽ đúng. Một phép kiểm phụ thuộc ngày thì có ngày
+// nó đỏ, mà lúc ấy không ai biết là mã hỏng hay phép kiểm hỏng.
+const soBuoiNay = d.buoi.filter(b => b.ngay === d.hom_nay).length;
+ok(`đánh dấu đủ ${soBuoiNay} buổi của hôm nay (${d.hom_nay})`,
+   await p.locator('.b.naydau').count() === soBuoiNay);
 const huy = d.buoi.filter(x => x.da_huy).length;
 ok(`${huy} buổi đã huỷ được đánh dấu`, await p.locator('.b.dahuy').count() === huy);
 if (huy) {

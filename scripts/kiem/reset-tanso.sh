@@ -1,6 +1,10 @@
 #!/bin/bash
-# Trả hai hồ sơ thử về "chưa ai nhận" để bộ kiểm chạy lại được nhiều lần.
+# Trả môi trường về mốc đầu cho kiem-tanso.mjs, và gieo sẵn 30 lời mời còn hạn.
 # Phải dừng dev server trước: chạm D1 lúc nó đang chạy là nó chết (CLAUDE.md).
+#
+# Bộ kiểm tần suất TỰ ĐỔI trạng thái (nhận hồ sơ, đốt hạn mức, tiêu lời mời)
+# nên không chạy lại được nếu không reset — điểm 3 trong scripts/kiem/README.md.
+set -e
 cd "$(dirname "$0")/../../worker"
 
 # Dừng dev server cho SẠCH. `fuser -k -n tcp 8787` KHÔNG đủ: wrangler đẻ một
@@ -19,14 +23,22 @@ dung_server() {
 }
 
 dung_server
+
+node ../scripts/kiem/gieo-moi.mjs
+
 npx wrangler d1 execute k3vaceo --local --command "
-DELETE FROM sessions; DELETE FROM rate_events; DELETE FROM credentials;
-UPDATE members SET claimed_at=NULL, email=NULL, email_verified_at=NULL
- WHERE roster_id IN (67, 68);
-" >/dev/null 2>&1
-# Bảng đối chứng cho phép kiểm "cờ có-số khớp luật máy chủ". Sinh từ D1 nên
-# phải chạy TRƯỚC khi dev server lên (chạm D1 lúc nó chạy là nó chết).
-node ../scripts/kiem/gieo-coso.mjs
+DELETE FROM rate_events;
+DELETE FROM sessions;
+DELETE FROM members WHERE roster_id BETWEEN 1 AND 60
+   AND group_id <> (SELECT id FROM groups WHERE cohort_id = 1 AND no = 6);
+UPDATE members SET claimed_at = NULL, email = NULL, email_verified_at = NULL, is_active = 1
+ WHERE roster_id BETWEEN 1 AND 60 AND full_name <> 'Ngô Phú Cường';
+INSERT INTO members (cohort_id, group_id, roster_id, full_name, phone, is_active, created_at, updated_at)
+SELECT r.cohort_id, (SELECT id FROM groups WHERE cohort_id = r.cohort_id AND label = r.group_label),
+       r.id, r.full_name, r.phone, 0, datetime('now'), datetime('now')
+  FROM roster r WHERE r.id = 57;
+" >/dev/null
+npx wrangler d1 execute k3vaceo --local --file /tmp/moi-tanso.sql >/dev/null
 
 nohup npx wrangler dev --port 8787 --local > /tmp/k3vaceo-dev.log 2>&1 &
 until curl -sf -o /dev/null http://127.0.0.1:8787/api/health 2>/dev/null; do sleep 1; done

@@ -52,7 +52,12 @@ const ERR_TEXT = {
   forbidden_assign: 'Chỉ trưởng hoặc phó nhóm mới giao được phần bài.',
   last_officer: 'Không bỏ trống được: nhóm phải còn ít nhất một trưởng hoặc phó.',
   url_must_be_https: 'Đường dẫn phải bắt đầu bằng https://',
-  rate_limited: 'Bạn xin mã hơi nhiều lần rồi. Chờ khoảng một tiếng rồi thử lại — hoặc xin trưởng nhóm một link mời để vào ngay.',
+  // Câu chung, phải đúng ở MỌI đường: xin mã, nhập mã, đối chiếu số, bấm link
+  // mời. Bản cũ viết "bạn xin mã hơi nhiều lần" nên đọc lên vô nghĩa ở đường
+  // vào thẳng bằng số điện thoại, nơi không có mã nào được gửi đi cả.
+  rate_limited: 'Thử hơi nhiều lần rồi. Chờ khoảng một tiếng rồi thử lại — hoặc xin trưởng nhóm một link đăng nhập để vào ngay.',
+  da_nhan_cho: 'Hồ sơ này đã có người nhận rồi. Đăng nhập bằng passkey hoặc mã gửi qua email.',
+  da_ngung_tham_gia: 'Hồ sơ này đang ở trạng thái ngừng tham gia. Nhắn trưởng nhóm nếu bạn muốn quay lại lớp.',
   mailer_not_configured: 'Chưa cấu hình gửi thư — nhắn trưởng nhóm để lấy link mời.',
   mail_send_failed: 'Máy chủ thư không nhận thư lúc này. Thử lại sau vài phút, hoặc nhắn trưởng nhóm để lấy link mời.',
   only_collector: 'Chỉ người thu của đợt này mới xác nhận đã nhận tiền.',
@@ -403,15 +408,28 @@ function vaoBuoc1() {
   $('#vDn').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap/email'); renderLogin(); };
 
   let hen;
+  // Lượt tìm gần nhất, chỉ giữ khi máy chủ trả về ĐỦ (dưới 12 người, tức không
+  // bị cắt bớt). Gõ thêm chữ để thu hẹp thì lọc ngay trên danh sách ấy, không
+  // hỏi lại máy chủ: 134 người mà mỗi người gõ tên mình 3-4 lượt là hơn bốn
+  // trăm lượt gọi từ cùng một WiFi hội trường. Kết quả sau khi cắt bớt thì
+  // KHÔNG giữ — thu hẹp trên một danh sách đã cụt sẽ giấu mất người.
+  let truoc = null;
+  const nhu = t => boDau(t).toLowerCase();
+
   $('#vTen').oninput = () => {
     clearTimeout(hen);
     const q = $('#vTen').value.trim();
     if (q.length < 2) { $('#vDs').innerHTML = ''; return; }
-    // Chờ người ta gõ xong hẵng hỏi máy chủ — tìm kiếm có giới hạn 60 lần/giờ.
+    // Chờ người ta gõ xong hẵng hỏi máy chủ.
     hen = setTimeout(async () => {
       let ds = [];
-      try { ds = (await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q))).people; }
-      catch (e) { $('#vDs').innerHTML = `<div class="err">${esc(errText(e))}</div>`; return; }
+      if (truoc && nhu(q).startsWith(truoc.q)) {
+        ds = truoc.ds.filter(p => nhu(p.full_name).includes(nhu(q)));
+      } else {
+        try { ds = (await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q))).people; }
+        catch (e) { truoc = null; $('#vDs').innerHTML = `<div class="err">${esc(errText(e))}</div>`; return; }
+        truoc = ds.length < 12 ? { q: nhu(q), ds } : null;
+      }
       if (!ds.length) {
         $('#vDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp. Thử gõ ngắn hơn, hoặc nhắn trưởng nhóm.</div>`;
         return;
@@ -471,7 +489,11 @@ function vaoBuoc2() {
       if (e?.data?.error === 'phone_missing_in_roster') return vaoThieuSo(e.data);
       $('#vMsg').style.display = 'block';
       $('#vMsg').style.color = 'var(--due)';
-      $('#vMsg').textContent = errText(e);
+      // Ở riêng ô này, "thử nhiều lần" nghĩa là gõ sai số nhiều lần — nói đúng
+      // như vậy thì người ta biết phải làm gì tiếp.
+      $('#vMsg').textContent = e?.data?.error === 'rate_limited'
+        ? 'Số điện thoại đã nhập sai nhiều lần. Chờ khoảng một tiếng rồi thử lại, hoặc xin trưởng nhóm một link đăng nhập để vào ngay.'
+        : errText(e);
       $('#vOk').disabled = false; $('#vOk').textContent = 'Tiếp tục';
     }
   };

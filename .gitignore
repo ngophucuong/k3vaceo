@@ -4,3 +4,11 @@ node_modules/
 
 # bí mật cục bộ, không commit
 worker/.dev.vars
+
+# Dữ liệu đối chứng của bộ kiểm — tự sinh từ D1 cục bộ, xem scripts/kiem/README.md
+scripts/kiem/coso.json
+scripts/kiem/moi-tanso.json
+
+# Ảnh chụp màn hình do bộ kiểm Playwright sinh ra ở thư mục gốc khi chạy.
+# Chỉ vét ở GỐC (dấu / đứng đầu) — ảnh của ứng dụng nằm trong public/.
+/*.png

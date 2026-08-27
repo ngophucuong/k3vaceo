@@ -21,13 +21,16 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 ## Đang ở đâu (cập nhật 27/8)
 
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
-`claude/read-content-deployment-plan-dpsv8m`.
+`claude/content-deployment-continuation-m2inni`.
 
 **Ba việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. Trang lịch công khai `/lich` + tệp `.ics` — cửa trước cho người chưa tin.
-2. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-3. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+1. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+2. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+3. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+   ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
+   thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
+   lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
 
 **Ba việc cần làm tiếp, xếp theo mức chặn:**
 
@@ -40,6 +43,11 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
    được OTP.
 3. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
    Existing Headers"**. Không sửa được trong repo.
+
+**Một việc nên làm ở buổi học đầu tiên có người dùng thật:** đứng cạnh xem
+mươi người cùng đăng nhập trên WiFi hội trường. Giới hạn tần suất đã sửa và đã
+kiểm bằng địa chỉ IP giả lập, nhưng **chưa ai chạy thử với người thật ngồi
+cùng một phòng** — mà đó chính là tình huống làm hỏng bản trước.
 
 ## Trạng thái: Đợt 1–4 đã xong
 
@@ -696,6 +704,135 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
   vĩnh viễn, chỉ còn cách xoá đi tạo lại.
 - **Số điện thoại Lê Trung Đức** trong roster là `098778525`, thiếu 1 số. Giữ
   nguyên trong `roster`, không đưa vào `members`. Cần hỏi lại.
+
+## Giới hạn tần suất: đếm lần đoán, đừng đếm người
+
+Sửa 27/8, sau khi rà lại đợt "bỏ OTP". Câu hỏi làm lộ ra lỗi: **cả lớp 134
+người ngồi chung một hội trường, cùng một WiFi, cùng mở ứng dụng lên — thì
+đường vào có còn mở không?**
+
+Câu trả lời là KHÔNG, và đo được chứ không suy đoán
+(`scripts/kiem/kiem-tanso.mjs`, chạy trên bản chưa sửa):
+
+| Cửa | Hạn mức cũ | Hỏng ở đâu |
+|---|---|---|
+| `/api/onboard/vao` | 10/IP/giờ | **người thứ 11** vào lần đầu → 429 |
+| `/api/onboard/check` | 20/IP/giờ | người thứ 21 → 429 |
+| `/api/wizard/roster/search` | 60/IP/giờ | người thứ 61 gõ tên mình → 429 |
+| `/api/passkey/login/options` | 20/IP/giờ | **lượt thứ 21** đăng nhập → 429 |
+| `/api/invite/:token` | 20/IP/giờ | dùng CHUNG thùng với passkey |
+| `/api/auth/email` | 5/IP/giờ | người thứ 6 xin link → 429 |
+
+Chỗ tệ nhất là dòng thứ năm: passkey và link mời **chung một thùng**
+`invite_try`. Bộ kiểm bắt được cảnh 40 lượt passkey ăn sạch hạn mức, rồi link
+mời **chết ngay từ lượt ĐẦU TIÊN** — trưởng nhóm phát link cho cả nhóm mà
+không ai bấm vào được.
+
+Gốc rễ không phải con số nào đặt thấp quá. Gốc rễ là **`allow()` tính cả lượt
+THÀNH CÔNG**, mà sau NAT thì "mỗi IP mỗi giờ" nghĩa là "mỗi phòng mỗi giờ".
+Nhà mạng di động Việt Nam cũng dùng NAT quy mô lớn, nên hai người lạ mặt vẫn
+có thể chung một địa chỉ.
+
+### Cách chữa: tách `allow()` làm đôi
+
+`lib/ratelimit.js` nay có ba hàm — `conQuota()` chỉ đếm, `ghiNhan()` chỉ ghi,
+`allow()` giữ nghĩa cũ cho những chỗ mà mỗi lượt gọi đều là một lần thử thật
+(xin gửi thư chẳng hạn: gửi được cũng vẫn là một lá thư đi). Nhờ vậy chỗ gọi
+tự quyết định lượt nào đáng tính:
+
+| Cửa | Nay | Tính lượt nào |
+|---|---|---|
+| số điện thoại | **8/hồ sơ/giờ** + 30/IP/giờ | chỉ khi **sai số** |
+| tìm tên | 400/IP/giờ | mọi lượt |
+| passkey login | 300/IP/giờ, thùng riêng | mọi lượt |
+| token lời mời | 20/IP/giờ (mục 8 SRS) | chỉ khi **mã 410** — token hụt |
+| nhập mã 6 số | 20/IP/giờ | chỉ khi **nhập sai** |
+| xin mã 6 số | 150/IP/giờ + 5/email/giờ | mọi lượt |
+| xin link đăng nhập | 150/IP/giờ + 5/email/giờ | mọi lượt |
+
+**Thùng theo hồ sơ mới là cửa thật.** Muốn dò số của ai thì phải nện vào đúng
+`roster_id` của người ấy, mà 8 lần một giờ thì không đi tới đâu trước 10^8 khả
+năng. Thùng theo IP chỉ để bắt máy quét rải mỏng — mỗi hồ sơ một phát nên thùng
+kia không thấy.
+
+Bốn điều cố ý, mỗi điều một lý do:
+
+1. **`/check`, `/vao` và `/start` dùng CHUNG hạn mức**, và chỗ đếm nằm trong
+   `doiChieu()` chứ không ở từng route. Ba đường soi cùng một bí mật; mỗi đường
+   một sổ riêng thì kẻ dò gọi xen kẽ là được gấp ba số lần.
+2. **Gõ hụt một chữ số KHÔNG tính là một lần đoán** (`phone_invalid`). Máy dò
+   gửi số đủ khuôn; chỉ người thật mới gõ thiếu.
+3. **Hồ sơ chưa có số trong danh sách gốc cũng không tính** — không có gì để
+   đoán thì không có gì để chặn. Điều này làm phép kiểm "quét rải" đọc ra con
+   số lạ: kẻ quét chạm được 47 hồ sơ nhưng chỉ tốn 30 lượt, vì 17 người trong
+   khoảng ấy chưa có số.
+
+   Cùng lý do, `thuToken()` chỉ tính **mã 410**, không tính mọi mã 4xx: bấm
+   đúng link của mình mà gõ nhầm email trả 422 hoặc 409, mà đó có phải đoán
+   token đâu — tính vào là bắt cả phòng chịu chung.
+4. **Mọi con số theo IP phải TRÊN sĩ số lớp.** Con số nào thấp hơn 134 cũng chỉ
+   bảo đảm được đúng một việc: khoá oan người thật. Đây là lý do nâng cả
+   `roster_search` (60 → 400) lẫn `OTP_PER_HOUR` (40 → 150).
+
+Cái mất, nói thẳng: `roster_search` nới ra là rút ngắn thời gian quét sạch danh
+sách lớp — tên, nhóm, chức vụ, đơn vị. Chấp nhận được vì đây là 134 người vốn
+đã biết nhau và phúc đáp **không bao giờ** có số điện thoại hay email. Bao giờ
+bị lạm dụng thật thì chặn bằng Cloudflare, đừng siết con số xuống dưới sĩ số.
+
+Giao diện cũng bớt gọi: gõ thêm chữ để **thu hẹp** một truy vấn đã trả về đủ
+(dưới 12 người, tức không bị cắt) thì lọc ngay trên danh sách vừa nhận. Kết quả
+đã bị cắt bớt thì KHÔNG giữ lại — thu hẹp trên một danh sách cụt sẽ giấu mất
+người.
+
+Và câu báo khoá: bản cũ viết "Bạn xin mã hơi nhiều lần rồi" ở mọi chỗ, đọc lên
+vô nghĩa trên đường vào thẳng bằng số điện thoại — nơi không có mã nào được gửi
+đi cả. Nay câu chung nói "Thử hơi nhiều lần rồi", còn riêng ô số điện thoại thì
+nói đúng chuyện: "Số điện thoại đã nhập sai nhiều lần."
+
+### Vá kèm: ngừng tham gia mà chưa kịp nhận hồ sơ
+
+Hạ `is_active` về 0 rút được phiên, passkey và thông báo đẩy — nhưng **không
+rút được `/vao`**, vì chốt chặn duy nhất ở đó là `claimed_at`, mà ai bị cho
+ngừng TRƯỚC khi kịp nhận hồ sơ thì `claimed_at` vẫn còn trống.
+
+Trước khi vá, họ vào được: máy chủ cấp cookie, đặt `claimed_at`, ghi cả một
+dòng nhật ký — rồi `getCurrentMember` lọc `is_active` nên mọi lời gọi sau đó
+rơi hết. Người dùng thấy "đã vào" xong bị đá ra, mà cửa `/vao` thì đóng vĩnh
+viễn sau lưng. Nay trả 409 `da_ngung_tham_gia`, và chốt ấy đặt **sau** phép so
+số: ai chưa biết số của người ta thì cũng không được biết người ta đã nghỉ.
+
+### Bốn cái bẫy trong chính bộ kiểm
+
+1. **Bộ kiểm "cả lớp vào được" tự nó không có răng** — gỡ sạch giới hạn tần
+   suất đi là nó xanh hết. Vì vậy nửa sau của `kiem-tanso.mjs` đo chiều ngược
+   lại, và bốn phép ấy là phần đáng giữ nhất.
+2. **Đếm lần ĐOÁN, đừng đếm vòng lặp** — xem điểm 3 ở trên.
+3. **`fuser -k -n tcp 8787` không giết nổi wrangler.** Nó đẻ một tiến trình
+   `workerd` con giữ cổng; giết mỗi cái nghe cổng thì cái kia sống sót và lần
+   khởi động sau chồng lên. Đã có lúc **chín** tiến trình cùng chạy, mỗi cái
+   một bản D1 riêng — reset ở bản này rồi đọc kết quả ở bản kia, đỏ những phép
+   đáng lẽ xanh, và mất một lúc mới nhìn ra. Hai script reset nay dùng `pkill
+   -f "wrangler dev"` cộng `pkill -f workerd` rồi chờ cổng im hẳn.
+
+4. **`pw-vao-nhanh.mjs` đọc `coso.json` — một tệp KHÔNG có trong repo.** Nó
+   nằm ở thư mục scratchpad của phiên trước, nên bộ kiểm vừa được commit vào
+   repo với lời hứa "nay không mất nữa" lại không chạy nổi ngay lượt đầu. Nay
+   `gieo-coso.mjs` sinh lại từ D1 và `reset-vao.sh` tự gọi. Bài học chung: bộ
+   kiểm commit vào repo thì mọi thứ nó ĐỌC cũng phải sinh lại được từ repo.
+
+Thêm hai chỗ môi trường, cả hai đều làm bộ kiểm trông như máy chủ sập:
+
+- **`.dev.vars` phải trỏ SMTP vào cổng ĐÓNG trên máy này** (`127.0.0.1:2525`).
+  Để nguyên `smtp.gmail.com` như tệp mẫu thì `connect()` của Workers không bao
+  giờ giải quyết, request treo tới khi workerd cắt kết nối, và bộ kiểm chết
+  giữa chừng với `UND_ERR_SOCKET: other side closed`.
+- **`wrangler dev` giữ khoá tệp SQLite từ lúc KHỞI ĐỘNG**, không phải từ
+  request đầu tiên — đo được, đã thử chờ bằng tệp tĩnh và vẫn treo. Nên
+  `pw-thongke.mjs` và `pw-tulieu-buoi.mjs`, vốn gieo dữ liệu bằng `wrangler d1
+  execute` ở đầu tệp, **phải chạy khi server đang TẮT**, rồi dựng server lên
+  kịp trước lời gọi HTTP đầu tiên. Mỗi lệnh `npx wrangler` tốn khoảng 13 giây
+  ở sandbox này nên riêng bước gieo mất hơn ba phút; treo mà không in dòng nào
+  là triệu chứng của đúng chuyện ấy, đừng nhầm với bộ kiểm hỏng.
 
 ## Bỏ OTP ở lần đầu — số điện thoại vào thẳng, rồi passkey
 

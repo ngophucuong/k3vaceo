@@ -10,7 +10,17 @@ import { cleanText, normalizeEmail, isValidEmail } from '../lib/validate.js';
 import { clientIp, allow } from '../lib/ratelimit.js';
 import { bare } from '../lib/suggest.js';
 
-const SEARCH_PER_HOUR = 60;
+// Bước ĐẦU TIÊN của mọi người, nên phải rộng hơn số người trong lớp: 134
+// người mà mỗi người gõ tên mình một lần đã là 134 lượt, quá 60 từ lâu. Giao
+// diện cũng đã bớt gọi lại (xem vaoBuoc1 trong public/app.js: gõ thêm chữ để
+// thu hẹp thì lọc ngay trên danh sách vừa nhận, không hỏi máy chủ nữa).
+//
+// Cái mất khi nới: đường này ai gọi cũng được và trả về tên, nhóm, chức vụ,
+// đơn vị — nới ra là rút ngắn thời gian quét sạch danh sách lớp. Chấp nhận
+// được vì đây là danh sách 134 người vốn đã biết nhau, và không bao giờ có số
+// điện thoại hay email trong phúc đáp. Bao giờ bị lạm dụng thật thì chặn bằng
+// Cloudflare, đừng siết con số này xuống dưới sĩ số lớp.
+const SEARCH_PER_HOUR = 400;
 
 /* ══ Bước 1: bạn là ai — tìm trong 134 người của danh sách gốc ══ */
 export async function searchRoster(request, env) {

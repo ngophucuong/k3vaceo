@@ -22,6 +22,50 @@ npx wrangler dev --port 8787 --local
 kể cả lệnh chỉ ĐỌC cũng làm dev server chết. Mọi việc chạm D1 phải làm xong
 trước khi gọi HTTP đầu tiên, hoặc kill server → chạm D1 → khởi động lại.
 
+**Đo được, đừng đoán:** `wrangler dev` giữ khoá tệp SQLite **từ lúc khởi
+động**, không phải từ request đầu tiên. Chờ server lên bằng một tệp tĩnh thay
+vì `/api/health` cũng không cứu được — đã thử, vẫn treo.
+
+Hệ quả cho `pw-thongke.mjs` và `pw-tulieu-buoi.mjs`: hai tệp này gieo dữ liệu
+bằng `wrangler d1 execute` ở đầu tệp rồi mới gọi HTTP, nên **phải chạy khi
+server đang TẮT**, và server phải lên kịp trước lời gọi HTTP đầu tiên:
+
+```bash
+pkill -f "wrangler dev"; pkill -f workerd; sleep 2
+node scripts/kiem/pw-thongke.mjs &
+# Bước gieo mất HƠN BỐN PHÚT ở sandbox này: mỗi lệnh `npx wrangler` tốn khoảng
+# 13 giây khởi động, mà tệp có mười mấy lệnh. Chờ tới khi không còn tiến trình
+# `npm exec wrangler d1` nào rồi hẵng dựng server.
+while pgrep -f "npm exec wrangler d1" >/dev/null; do sleep 5; done
+(cd worker && npx wrangler dev --port 8787 --local &)
+```
+
+Đừng canh bằng `pgrep -f "wrangler d1 execute"`: **dòng lệnh của chính cái
+vòng canh cũng chứa chuỗi ấy**, nên `pgrep` khớp vào chính nó và vòng lặp chờ
+mãi không thoát. Viết `"npm exe[c] wrangler"` — dấu ngoặc vuông làm mẫu regex
+khác hẳn chuỗi nằm trong dòng lệnh, đúng mẹo `[p]w-` quen thuộc của `ps | grep`.
+
+Và **`pkill -f workerd` phải chạy TRỌN VẸN**, nếu không còn một `workerd` mồ
+côi giữ cổng 8787: wrangler mới báo `Address already in use` rồi chết, mà
+`pgrep -f wrangler` lại chẳng thấy gì — trông như cổng trống trong khi nó
+không trống. Tìm thủ phạm thật bằng inode của socket:
+
+```bash
+python3 -c "
+import glob, os
+for l in open('/proc/net/tcp'):
+    p = l.split()
+    if len(p) > 3 and p[1].endswith(':2253') and p[3] == '0A':   # 0x2253 = 8787
+        for fd in glob.glob('/proc/[0-9]*/fd/*'):
+            try:
+                if os.readlink(fd) == f'socket:[{p[9]}]': print(fd.split('/')[2])
+            except Exception: pass"
+```
+
+Treo mà không in dòng nào, không báo lỗi gì, là triệu chứng của đúng chuyện
+khoá D1: `execFileSync` đang đợi khoá mà không bao giờ lấy được. Đừng nhầm với
+bộ kiểm hỏng.
+
 **Nhớ `git checkout worker/wrangler.toml` trước khi commit** — khối `[assets]`
 bật lên là của môi trường cục bộ, production là Pages tách riêng.
 
@@ -36,8 +80,16 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tulieu-buoi.mjs` | tư liệu gắn vào buổi, một dòng hai màn |
 | `pw-vao-nhanh.mjs` | luồng `/vao` rút gọn: số điện thoại vào thẳng + passkey |
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
+| `kiem-tanso.mjs` | giới hạn tần suất — cả lớp cùng một WiFi có vào được không |
+| `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
+| `gieo-coso.mjs` · `gieo-moi.mjs` | sinh dữ liệu đối chứng, hai reset tự gọi |
 
-## Bốn phép đối chứng đáng giữ nhất
+Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
+đúng với dữ liệu đang nằm trong D1 cục bộ. Trước 27/8 `coso.json` nằm ở thư mục
+scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
+đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
+
+## Năm phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -61,6 +113,31 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    lại công thức của `lib/ics.js`. Tự kiểm bằng chính công thức mình viết thì
    sai giống hệt nhau và test vẫn xanh.
 
+5. **`kiem-tanso.mjs` phải có phép chứng minh kẻ dò VẪN chết nhanh.** Cả bộ
+   kiểm ấy hỏi "cả lớp ngồi chung một WiFi thì vào được không", mà câu hỏi ấy
+   xanh hết chỉ bằng cách gỡ sạch giới hạn tần suất đi. Vì vậy nửa sau của nó
+   đo chiều ngược lại: dò số của một người phải chết trong 8 lần, quét rải
+   nhiều người phải chết trong 30 lần đoán, `/check` và `/vao` không được cộng
+   lượt cho nhau, dò token lời mời vẫn phải chết ở 20 lần đúng như mục 8 SRS,
+   và người cầm link THẬT mà gõ nhầm email thì không được tính là đoán token.
+   Bỏ chúng đi thì bộ kiểm này chỉ còn là cái máy bảo "nới ra là xanh".
+
+   Một cái bẫy trong chính phép đối chứng ấy: **đếm lần ĐOÁN, đừng đếm vòng
+   lặp.** Bản đầu của phép "quét rải" đếm số hồ sơ đã chạm rồi báo đỏ ở con số
+   47 — nhưng 44/134 người chưa có số nào trong danh sách gốc, gọi vào họ trả
+   `phone_missing_in_roster` chứ không phải "sai số". Hồ sơ không có gì để đoán
+   thì không tính vào sổ là ĐÚNG.
+
+## Chạy `kiem-tanso.mjs`
+
+```bash
+bash scripts/kiem/reset-tanso.sh && node scripts/kiem/kiem-tanso.mjs
+```
+
+Nó giả lập địa chỉ IP bằng header `cf-connecting-ip` — đúng thứ `clientIp()`
+đọc trên bản thật — nên một tiến trình đóng được cả vai "cả lớp chung một
+WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài liệu RFC 5737.
+
 ## Hai chỗ môi trường này không kiểm được
 
 - **`/api/passkey/register/verify`.** `wrangler dev` có mục `routes` nên báo
@@ -71,3 +148,10 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
 - **Gửi thư.** Không có máy chủ thư, nên `502 mail_send_failed` là kết quả
   ĐÚNG ở đây — nó chứng tỏ route chạy hết đường tới bước gửi. Đòi 2xx là đòi
   thứ môi trường không làm được, rồi sẽ phải nới ra, mà nới thì hết răng.
+
+  **Nhưng `.dev.vars` phải trỏ SMTP vào một cổng ĐÓNG trên máy này**, ví dụ
+  `SMTP_HOST=127.0.0.1` / `SMTP_PORT=2525`. Để nguyên `smtp.gmail.com` như tệp
+  mẫu thì trong sandbox `connect()` của Workers không bao giờ giải quyết (xem
+  mục gửi thư trong CLAUDE.md), request treo tới khi workerd cắt kết nối, và
+  bộ kiểm chết giữa chừng với `UND_ERR_SOCKET: other side closed` — trông y
+  như máy chủ sập chứ không giống lỗi cấu hình.

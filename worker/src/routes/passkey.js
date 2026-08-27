@@ -131,8 +131,21 @@ export async function postRegisterVerify(request, env, me, ip) {
 }
 
 /* ══ Đăng nhập bằng passkey (chưa đăng nhập) ══ */
+// Thùng RIÊNG và rộng. Trước 27/8 đường này dùng chung thùng 'invite_try' với
+// token lời mời, 20 lượt mỗi IP mỗi giờ, và sai ở cả hai vế:
+//
+//  • Cả lớp ngồi chung hội trường thì chung một địa chỉ IP, nên người thứ 21
+//    mở màn đăng nhập là nhận 429 — mà đây là đường vào lại HÀNG NGÀY.
+//  • Số lượt ấy ăn hết phần của link mời. Đo được: sau 40 lượt passkey thì
+//    link mời chết ngay từ lượt ĐẦU TIÊN (scripts/kiem/kiem-tanso.mjs).
+//
+// Đường này không giữ bí mật nào để đoán: nó chỉ phát ra một chuỗi ngẫu nhiên.
+// Cửa thật là chữ ký ở bước verify, mà chữ ký thì không dò được. Hạn mức ở đây
+// chỉ để một máy nào đó khỏi bơm đầy bảng webauthn_challenges.
+const PASSKEY_LOGIN_PER_HOUR = 300;
+
 export async function postLoginOptions(request, env) {
-  if (!(await allow(env, 'invite_try', clientIp(request), 20))) {
+  if (!(await allow(env, 'passkey_login', clientIp(request), PASSKEY_LOGIN_PER_HOUR))) {
     return error('rate_limited', 429, { retry_after_minutes: 60 });
   }
   // Không nhận danh sách credential theo email: làm thế là biến endpoint này

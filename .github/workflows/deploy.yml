@@ -335,6 +335,38 @@ jobs:
           '
           [ "$loi" = "0" ] || { echo "::error::Lịch công khai ở /lich chưa chạy đúng trên tên miền."; exit 1; }
 
+          echo "--- giới hạn tần suất: cả lớp chung một WiFi có vào được không ---"
+          # Sandbox không gọi được vào tên miền, nên đây là chỗ DUY NHẤT kiểm
+          # được rằng bản đang chạy thật có hạn mức mới. Hai đường dưới đây
+          # trước 27/8 khoá ở 60 và ở 20 lượt mỗi IP mỗi giờ, mà lớp có 134
+          # người ngồi chung một hội trường (xem mục "Giới hạn tần suất" trong
+          # CLAUDE.md). Máy chạy workflow có địa chỉ IP riêng nên đốt hạn mức ở
+          # đây không đụng gì tới học viên.
+          for duong in "tìm tên:/api/wizard/roster/search?q=nguyen:GET:80" \
+                       "passkey:/api/passkey/login/options:POST:25"; do
+            ten=${duong%%:*}; con=${duong#*:}
+            dan=${con%%:*}; con=${con#*:}
+            pt=${con%%:*}; lan=${con##*:}
+            khoa_o=0
+            for i in $(seq 1 "$lan"); do
+              if [ "$pt" = "POST" ]; then
+                m=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+                    -H 'content-type: application/json' -d '{}' \
+                    "https://k3vaceo.cuongngo.app$dan" || true)
+              else
+                m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app$dan" || true)
+              fi
+              if [ "$m" = "429" ]; then khoa_o=$i; break; fi
+            done
+            if [ "$khoa_o" != "0" ]; then
+              echo "  ✗ $ten: KHOÁ OAN ở lượt thứ $khoa_o trên $lan (bản cũ khoá, bản mới thì không)"
+              loi=1
+            else
+              echo "  ✓ $ten: $lan lượt liên tiếp từ một địa chỉ IP, không lượt nào bị khoá"
+            fi
+          done
+          [ "$loi" = "0" ] || { echo "::error::Giới hạn tần suất vẫn khoá oan — cả lớp ngồi chung WiFi sẽ không vào được."; exit 1; }
+
           KHOP="$khop" node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));
             // Ghi cứng sĩ số Nhóm 6 là sai bản chất: nhóm ĐƯỢC PHÉP đông thêm.

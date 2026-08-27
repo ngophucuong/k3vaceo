@@ -34,13 +34,27 @@ import { logActivity } from '../permissions.js';
 import { normalizeEmail, isValidEmail } from '../lib/validate.js';
 import { normalizePhone, isValidVnPhone, phonesMatch } from '../lib/phone.js';
 import { mailerConfigured, sendMail } from '../mailer.js';
-import { clientIp, allow } from '../lib/ratelimit.js';
+import { clientIp, allow, conQuota, ghiNhan } from '../lib/ratelimit.js';
 
-const CHECK_PER_HOUR = 20;   // đối chiếu số điện thoại
-// Đường vào thẳng: nay số điện thoại là cửa an ninh DUY NHẤT, nên khoá chặt
-// hơn hẳn. 10 lần/IP/giờ đủ rộng cho người gõ nhầm vài lần, mà một máy dò thì
-// không đi tới đâu — số di động Việt Nam có khoảng 10^8 khả năng thật.
-const VAO_PER_HOUR = 10;
+// ── Hạn mức của cửa số điện thoại ────────────────────────────────────────
+// Số điện thoại là cửa an ninh DUY NHẤT của lần đăng nhập đầu, nên phải khoá
+// chặt. Nhưng bản 27/8 khoá nhầm chỗ: 10 lượt/IP/giờ, tính cả lượt THÀNH CÔNG.
+// Cả lớp ngồi chung hội trường thì chung đúng một địa chỉ IP, nên người thứ 11
+// vào lần đầu nhận 429 — đo được, xem scripts/kiem/kiem-tanso.mjs.
+//
+// Nay đếm đúng thứ cần đếm: chỉ lượt ĐOÁN SAI SỐ mới vào sổ. Người vào đúng
+// ngay lần đầu không tiêu của ai một lượt nào.
+//
+// Hai thùng, và thùng THEO HỒ SƠ mới là cửa thật: muốn dò số của ai thì phải
+// nện vào đúng roster_id của người ấy, mà 8 lần một giờ thì không đi tới đâu
+// trước 10^8 khả năng. Thùng theo IP để chặn máy quét rải mỏng trên nhiều hồ
+// sơ — mỗi hồ sơ chỉ một phát nên thùng kia không bắt được.
+const DOAN_SAI_MOI_HO_SO = 8;
+const DOAN_SAI_MOI_IP = 30;
+
+// Ba đường /check, /vao, /start soi CÙNG một bí mật, nên phải dùng CHUNG hạn
+// mức. Tách ra thì kẻ dò gọi xen kẽ là được gấp ba số lần — vì vậy chỗ đếm
+// nằm trong doiChieu() chứ không ở từng route.
 const VERIFY_PER_HOUR = 20;  // nhập mã
 
 // Xin mã: hai lần khoá, cố ý khác nhau về chất.
@@ -48,11 +62,19 @@ const VERIFY_PER_HOUR = 20;  // nhập mã
 // Điều thật sự cần chặn là dội thư vào MỘT hộp thư, nên khoá chặt theo email —
 // 5 lần/giờ cho một địa chỉ là quá đủ cho người dùng thật.
 //
-// Khoá theo IP thì phải lỏng. Bản trước để 5 lần/giờ chung cho cả IP, và đó là
+// Khoá theo IP thì phải lỏng. Bản đầu để 5 lần/giờ chung cho cả IP, và đó là
 // lỗi thiết kế với lớp 134 người: cả một công ty ngồi sau một địa chỉ IP, năm
 // người xin mã xong là người thứ sáu bị khoá oan suốt một giờ mà không hiểu vì
-// sao. Giữ mức IP đủ cao để chỉ chặn máy quét, không chặn người.
-const OTP_PER_HOUR = 40;         // theo IP — chỉ để chặn máy quét
+// sao. Nâng lên 40 rồi, nhưng 40 VẪN dưới sĩ số lớp — mà đây là lớp học chung
+// một hội trường, nên con số nào thấp hơn 134 cũng chỉ bảo đảm được đúng một
+// việc: khoá oan người thật. Nay đặt trên sĩ số.
+//
+// Cái mất: một địa chỉ IP kích được nhiều thư hơn trong một giờ. Chấp nhận
+// được vì hai đường xin mã đều KHÔNG gửi tới địa chỉ tuỳ ý — /onboard/start
+// đòi đúng số điện thoại trước, /auth/otp chỉ gửi tới email đã có trong lớp.
+// Trần thật của cả hệ thống là 134 người × 5 lượt, do khoá theo email quyết
+// định, chứ không phải do con số này.
+const OTP_PER_HOUR = 150;        // theo IP — chỉ để chặn máy quét
 const OTP_PER_EMAIL_HOUR = 5;    // theo email — chặn dội thư, đây mới là cửa thật
 
 /* ══ Bước 2: đối chiếu số điện thoại ══════════════════════════════════════
@@ -60,11 +82,8 @@ const OTP_PER_EMAIL_HOUR = 5;    // theo email — chặn dội thư, đây mớ
    nằm ở postOnboardStart, nơi số được kiểm lại lần nữa trước khi gửi mã. Có
    như vậy thì gọi thẳng API bỏ qua bước này cũng không lọt. */
 export async function postOnboardCheck(request, env) {
-  if (!(await allow(env, 'onboard_check', clientIp(request), CHECK_PER_HOUR))) {
-    return error('rate_limited', 429, { retry_after_minutes: 60 });
-  }
   const body = await readJson(request);
-  const ket_qua = await doiChieu(env, body);
+  const ket_qua = await doiChieu(env, request, body);
   if (ket_qua.loi) return error(ket_qua.loi, ket_qua.ma, ket_qua.them);
 
   const { person, member } = ket_qua;
@@ -87,12 +106,9 @@ export async function postOnboardCheck(request, env) {
    CHỈ cho hồ sơ CHƯA AI NHẬN. Xem khối chú thích đầu tệp để biết vì sao chốt
    ấy là thứ giữ cho đường này an toàn được. */
 export async function postOnboardVao(request, env) {
-  if (!(await allow(env, 'onboard_vao', clientIp(request), VAO_PER_HOUR))) {
-    return error('rate_limited', 429, { retry_after_minutes: 60 });
-  }
   const body = await readJson(request);
 
-  const ket_qua = await doiChieu(env, body);
+  const ket_qua = await doiChieu(env, request, body);
   if (ket_qua.loi) return error(ket_qua.loi, ket_qua.ma, ket_qua.them);
   const { person } = ket_qua;
   let { member } = ket_qua;
@@ -158,7 +174,7 @@ export async function postOnboardStart(request, env, ctx) {
   const body = await readJson(request);
 
   // Kiểm lại số điện thoại ở đây mới là cửa thật.
-  const ket_qua = await doiChieu(env, body);
+  const ket_qua = await doiChieu(env, request, body);
   if (ket_qua.loi) return error(ket_qua.loi, ket_qua.ma, ket_qua.them);
   const { person } = ket_qua;
   let { member } = ket_qua;
@@ -247,7 +263,10 @@ export async function postOtpRequest(request, env, ctx) {
 
 /* ══ Nhập mã → có phiên ═══════════════════════════════════════════════════ */
 export async function postOtpVerify(request, env) {
-  if (!(await allow(env, 'otp_verify', clientIp(request), VERIFY_PER_HOUR))) {
+  // Chỉ lần nhập SAI mới vào sổ. Tính cả lượt đúng thì cả lớp cùng một WiFi
+  // sẽ khoá nhau: người thứ 21 gõ đúng mã của mình vẫn nhận 429.
+  const ip = clientIp(request);
+  if (!(await conQuota(env, 'otp_verify', ip, VERIFY_PER_HOUR))) {
     return error('rate_limited', 429, { retry_after_minutes: 60 });
   }
   const body = await readJson(request);
@@ -260,10 +279,11 @@ export async function postOtpVerify(request, env) {
     'SELECT id, full_name, group_id, cohort_id, claimed_at FROM members WHERE email = ? AND is_active = 1'
   ).bind(email).first();
   // Email lạ trả cùng một lỗi với mã sai, để không lộ email nào có thật.
-  if (!member) return error('otp_wrong', 401);
+  if (!member) { await ghiNhan(env, 'otp_verify', ip); return error('otp_wrong', 401); }
 
   const kq = await verifyOtp(env, member.id, code);
   if (!kq.ok) {
+    await ghiNhan(env, 'otp_verify', ip);
     const ma = kq.reason === 'otp_locked' ? 429 : kq.reason === 'otp_expired' ? 410 : 401;
     return error(kq.reason, ma, kq.con_lai !== undefined ? { con_lai: kq.con_lai } : undefined);
   }
@@ -320,7 +340,8 @@ export async function postVerifyMyEmail(request, env, ctx, me) {
 }
 
 export async function postVerifyMyEmailConfirm(request, env, me) {
-  if (!(await allow(env, 'otp_verify', clientIp(request), VERIFY_PER_HOUR))) {
+  const ip = clientIp(request);
+  if (!(await conQuota(env, 'otp_verify', ip, VERIFY_PER_HOUR))) {
     return error('rate_limited', 429, { retry_after_minutes: 60 });
   }
   const body = await readJson(request);
@@ -329,6 +350,7 @@ export async function postVerifyMyEmailConfirm(request, env, me) {
 
   const kq = await verifyOtp(env, me.id, code);
   if (!kq.ok) {
+    await ghiNhan(env, 'otp_verify', ip);
     const ma = kq.reason === 'otp_locked' ? 429 : kq.reason === 'otp_expired' ? 410 : 401;
     return error(kq.reason, ma, kq.con_lai !== undefined ? { con_lai: kq.con_lai } : undefined);
   }
@@ -341,9 +363,19 @@ export async function postVerifyMyEmailConfirm(request, env, me) {
 /* ══ Dùng chung ═══════════════════════════════════════════════════════════ */
 
 // Đối chiếu roster_id + số điện thoại. Trả về { person, member } hoặc { loi }.
-async function doiChieu(env, body) {
+//
+// Hạn mức nằm TRONG hàm này chứ không ở từng route: /check, /vao và /start đều
+// soi cùng một bí mật, để mỗi đường một sổ riêng thì kẻ dò gọi xen kẽ là được
+// gấp ba số lần đoán.
+async function doiChieu(env, request, body) {
   const rosterId = Number(body.roster_id);
   if (!Number.isInteger(rosterId) || rosterId <= 0) return { loi: 'roster_invalid', ma: 422 };
+
+  // Hỏi sổ trước, nhưng CHƯA ghi gì — chỉ lần đoán sai ở cuối hàm mới vào sổ.
+  const ip = clientIp(request);
+  const hetPhan = !(await conQuota(env, 'doan_so_ho_so', `r${rosterId}`, DOAN_SAI_MOI_HO_SO))
+               || !(await conQuota(env, 'doan_so_ip', ip, DOAN_SAI_MOI_IP));
+  if (hetPhan) return { loi: 'rate_limited', ma: 429, them: { retry_after_minutes: 60 } };
 
   const person = await env.DB.prepare('SELECT * FROM roster WHERE id = ?').bind(rosterId).first();
   if (!person) return { loi: 'roster_not_found', ma: 404 };
@@ -354,7 +386,7 @@ async function doiChieu(env, body) {
   // Hiện nhóm cũ ở màn xác nhận thì người ta tưởng ứng dụng ghi sai.
   const member = await env.DB.prepare(
     `SELECT m.id, m.full_name, m.email, m.claimed_at, m.phone, m.phone_self_set_at,
-            g.label AS group_label
+            m.is_active, g.label AS group_label
        FROM members m LEFT JOIN groups g ON g.id = m.group_id
       WHERE m.roster_id = ?`
   ).bind(rosterId).first();
@@ -381,9 +413,31 @@ async function doiChieu(env, body) {
                      group_label: member?.group_label || person.group_label } };
   }
 
+  // Gõ hụt một chữ số thì KHÔNG tính là một lần đoán: máy dò gửi số đủ khuôn,
+  // chỉ người thật mới gõ thiếu. Tính vào sổ ở đây là phạt đúng người vô tội.
   if (!isValidVnPhone(body.phone)) return { loi: 'phone_invalid', ma: 422 };
+
   // Cố tình KHÔNG nói lệch ở chỗ nào — nói ra là biến ô này thành công cụ dò số.
-  if (!soDoiChieu.some(so => phonesMatch(so, body.phone))) return { loi: 'phone_mismatch', ma: 401 };
+  if (!soDoiChieu.some(so => phonesMatch(so, body.phone))) {
+    // ĐÂY là lần thử duy nhất đáng ghi vào sổ. Ghi cả hai thùng: thùng theo hồ
+    // sơ chặn người nện vào một cái tên, thùng theo IP chặn máy quét rải mỏng
+    // mỗi hồ sơ một phát.
+    await ghiNhan(env, 'doan_so_ho_so', `r${rosterId}`);
+    await ghiNhan(env, 'doan_so_ip', ip);
+    return { loi: 'phone_mismatch', ma: 401 };
+  }
+
+  // Đã ngừng tham gia thì mọi đường vào phải đóng, kể cả đường này. Hạ
+  // is_active về 0 rút được phiên, passkey và thông báo đẩy — nhưng KHÔNG rút
+  // được /vao, vì chốt chặn duy nhất ở đó là claimed_at, mà ai bị cho ngừng
+  // TRƯỚC khi kịp nhận hồ sơ thì claimed_at vẫn còn trống. Trước khi vá, họ
+  // vào được: máy chủ cấp cookie, đặt claimed_at, ghi cả một dòng nhật ký —
+  // rồi getCurrentMember lọc is_active nên mọi lời gọi sau đó rơi hết. Người
+  // dùng thấy "đã vào" xong bị đá ra, mà cửa /vao thì đóng vĩnh viễn sau lưng.
+  //
+  // Đặt SAU phép so số: ai chưa biết số của người ta thì cũng không được biết
+  // người ta đã nghỉ hay chưa.
+  if (member && !member.is_active) return { loi: 'da_ngung_tham_gia', ma: 409 };
 
   return { person, member: member ?? null };
 }

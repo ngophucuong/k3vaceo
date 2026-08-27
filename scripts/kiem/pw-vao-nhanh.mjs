@@ -20,7 +20,7 @@ const CO2 = { rid: 67, ten: 'Phan Thị Thanh Nga', sdt: '0985981808' };
 const KHONG = { rid: 8, ten: 'Nguyễn Thanh Bình' };
 
 console.log('── Cờ "có số" ở bước 1 khớp khít luật của máy chủ (cả 134 người) ──');
-const that = JSON.parse(readFileSync('coso.json', 'utf8'));
+const that = JSON.parse(readFileSync(new URL("./coso.json", import.meta.url), "utf8"));
 // Quét bằng nhiều truy vấn ngắn để phủ hết danh sách
 const thay = new Map();
 for (const q of ['nguyen', 'tran', 'le', 'pham', 'hoang', 'vu', 'dang', 'bui', 'do',
