@@ -1035,25 +1035,54 @@ function veTuLieuBuoi(b) {
   ).join('')}</div>`;
 }
 
+// Một dòng buổi học. `nay` = buổi diễn ra hôm nay.
+function veDongBuoi(b, sua, nay) {
+  return `<div class="fd${nay ? ' buoinay' : ''}" style="align-items:flex-start">
+    <div class="x">
+      <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)">
+        ${esc(ngayVN(b.ngay))}${khungGio(b) ? ' · ' + esc(khungGio(b)) : ''}${b.ghi_chu ? ' · ' + esc(b.ghi_chu) : ''}</div>
+      <b>${esc(b.chu_de)}</b>
+      ${b.giang_vien ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(b.giang_vien)}</div>` : ''}
+      ${veTuLieuBuoi(b)}
+    </div>
+    ${sua ? `<button class="ico" data-buoi="${b.id}" aria-label="Sửa buổi ${esc(b.chu_de)}">✎</button>` : ''}
+  </div>`;
+}
+
 function veLichHoc() {
   const ds = HOME.lich_hoc ?? [];
   const sua = !!HOME.can_sua_lich;
   if (!ds.length && !sua) return '';
+
+  // Tab tên là "Hôm nay" mà trước 28/8 nó không hề đánh dấu hôm nay: chỉ có một
+  // danh sách sáu buổi sắp tới, buổi của chính hôm ấy lẫn vào giữa. Trớ trêu là
+  // trang công khai /lich — nơi người CHƯA đăng nhập xem — thì đánh dấu đàng
+  // hoàng. Nay tách hẳn buổi hôm nay lên đầu, thành khối riêng.
+  //
+  // Ngày lấy từ MÁY CHỦ (`HOME.hom_nay` = date('now','+7 hours')), không lấy
+  // ngày của máy người dùng: điện thoại đặt lệch múi giờ thì hai màn sẽ nói hai
+  // ngày khác nhau — đúng lỗi đã sửa hôm 26/8 cho phần đếm ngược.
+  const nay = HOME.hom_nay ?? null;
+  const cuaNay = nay ? ds.filter(b => b.ngay === nay) : [];
+  const sapToi = cuaNay.length ? ds.filter(b => b.ngay !== nay) : ds;
+
+  // Số tài liệu của riêng hôm nay — lý do thật để mở ứng dụng ra trước giờ học.
+  const soTl = cuaNay.reduce((n, b) => n + (b.tu_lieu?.length ?? 0), 0);
+
   return `
+  ${cuaNay.length ? `<div class="sect">
+    <div class="eb">Hôm nay <span class="c nay">${esc(ngayVN(nay))}</span>${
+      soTl ? ` <span class="c">${soTl} tài liệu</span>` : ''}</div>
+    <div class="card naycard"><div class="cb" style="padding:4px 16px">
+      ${cuaNay.map(b => veDongBuoi(b, sua, true)).join('')}
+    </div></div>
+  </div>` : ''}
   <div class="sect">
-    <div class="eb">Lịch học sắp tới${ds.length ? ` <span class="c">${ds.length}</span>` : ''}</div>
+    <div class="eb">${cuaNay.length ? 'Những buổi sau' : 'Lịch học sắp tới'}${
+      sapToi.length ? ` <span class="c">${sapToi.length}</span>` : ''}</div>
     <div class="card"><div class="cb" style="padding:4px 16px">
-      ${ds.length ? ds.map(b => `<div class="fd" style="align-items:flex-start">
-        <div class="x">
-          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3)">
-            ${esc(ngayVN(b.ngay))}${khungGio(b) ? ' · ' + esc(khungGio(b)) : ''}${b.ghi_chu ? ' · ' + esc(b.ghi_chu) : ''}</div>
-          <b>${esc(b.chu_de)}</b>
-          ${b.giang_vien ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(b.giang_vien)}</div>` : ''}
-          ${veTuLieuBuoi(b)}
-        </div>
-        ${sua ? `<button class="ico" data-buoi="${b.id}" aria-label="Sửa buổi ${esc(b.chu_de)}">✎</button>` : ''}
-      </div>`).join('')
-        : '<div class="cb mut">Chưa có buổi nào trong lịch.</div>'}
+      ${sapToi.length ? sapToi.map(b => veDongBuoi(b, sua, false)).join('')
+        : `<div class="cb mut">${cuaNay.length ? 'Chưa có buổi nào sau hôm nay.' : 'Chưa có buổi nào trong lịch.'}</div>`}
     </div></div>
     ${sua ? `<button class="wide ghost" id="lichThem" style="margin-top:10px">+ Thêm buổi học</button>` : ''}
     ${ds.length ? `<a class="wide ghost nutlich" href="/api/lich/k3vaceo.ics">Thêm cả khoá vào lịch điện thoại</a>` : ''}
@@ -1866,10 +1895,12 @@ function nhanBuoi(r) {
   return `<span class="nb-buoi">Buổi ${Number(d)}/${Number(m)}${de}</span>`;
 }
 
-function veDongTuLieu(r) {
+// `trongCum` = dòng này đang nằm dưới đầu mục của chính buổi ấy, nên bỏ nhãn
+// "Buổi 28/8 · …" đi: lặp lại trên từng dòng chỉ là tiếng ồn.
+function veDongTuLieu(r, trongCum) {
   const than = `<span class="ext">${esc(r.kind)}</span>
     <div class="b"><div class="t">${esc(r.title)}</div>
-    <div class="m">${nhanBuoi(r)}${r.url ? vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
+    <div class="m">${trongCum ? '' : nhanBuoi(r)}${r.url ? vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
   const dong = r.url
     ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${than}
         <span style="color:var(--ink3)">↗</span></a>`
@@ -1921,6 +1952,43 @@ function openLinkEdit(id) {
   }, 'Đã lưu');
 }
 
+// Gom tư liệu THEO BUỔI HỌC. Trước 28/8 tab này đổ ra một danh sách phẳng xếp
+// theo created_at giảm dần, nên hai tài liệu của cùng một buổi nằm cách nhau cả
+// chục dòng — Ngô Phú Cường nêu ra: thư mục của buổi 1 rơi xuống đáy bảng trong
+// khi năm tệp bên trong nó thì ở giữa. Nguyên nhân: mười một mục nạp cùng một
+// migration nên created_at bằng nhau, thứ tự trả về là thứ tự chèn ĐẢO NGƯỢC.
+//
+// Buổi xếp theo NGÀY giảm dần (buổi gần đây nhất trên cùng — người ta tìm tài
+// liệu của buổi vừa học, không phải buổi tháng trước). Trong mỗi buổi giữ
+// nguyên thứ tự máy chủ trả về.
+//
+// Mục CHƯA gắn buổi dồn xuống cuối, không trộn vào giữa: chúng chưa có chỗ
+// thuộc về, và để lẫn thì lại đúng cảnh lộn xộn vừa sửa.
+function veTuLieuTheoBuoi(ds) {
+  const cum = new Map();          // buoi_id → { ngay, chu_de, ds }
+  const roi = [];
+  for (const r of ds) {
+    if (!r.buoi_id || !r.buoi_ngay) { roi.push(r); continue; }
+    if (!cum.has(r.buoi_id)) cum.set(r.buoi_id, { ngay: r.buoi_ngay, chu_de: r.buoi_chu_de, ds: [] });
+    cum.get(r.buoi_id).ds.push(r);
+  }
+  // Chưa gắn buổi nào cả thì đừng bày đầu mục "Chưa gắn buổi học" lên — nó chỉ
+  // là tiếng ồn khi cả danh sách đều như vậy.
+  // Bọc trong hàm mũi tên: map() truyền index vào tham số thứ hai, nên gọi
+  // thẳng `map(veDongTuLieu)` thì dòng đầu (index 0) được coi là ngoài cụm còn
+  // mọi dòng sau lại bị coi là trong cụm — nhãn buổi biến mất từ dòng thứ hai.
+  if (!cum.size) return `<div class="card">${ds.map(r => veDongTuLieu(r)).join('')}</div>`;
+
+  const nhom = [...cum.values()].sort((a, b) => (a.ngay < b.ngay ? 1 : a.ngay > b.ngay ? -1 : 0));
+  return nhom.map(g => `
+    <div class="eb ebbuoi">${esc(ngayVN(g.ngay))}${g.chu_de ? ' · ' + esc(g.chu_de) : ''}
+      <span class="c">${g.ds.length}</span></div>
+    <div class="card">${g.ds.map(r => veDongTuLieu(r, true)).join('')}</div>`).join('')
+    + (roi.length ? `
+    <div class="eb ebbuoi">Chưa gắn buổi học <span class="c">${roi.length}</span></div>
+    <div class="card">${roi.map(r => veDongTuLieu(r)).join('')}</div>` : '');
+}
+
 async function drawKho(tag) {
   if (!$('#v-kho').dataset.loaded) $('#v-kho').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
   const kq = await apiGet(tag && tag !== 'all' ? `/api/links?tag=${encodeURIComponent(tag)}` : '/api/links');
@@ -1944,14 +2012,14 @@ async function drawKho(tag) {
 
   ${cuaLop.length ? `<div class="sect">
     <div class="eb">Tư liệu của lớp <span class="c">${cuaLop.length}</span></div>
-    <div class="card">${cuaLop.map(veDongTuLieu).join('')}</div>
+    ${veTuLieuTheoBuoi(cuaLop)}
     <div class="foot">Ban cán sự lớp đăng, cả mười nhóm cùng thấy.</div>
   </div>` : ''}
 
   <div class="sect">
     ${cuaLop.length ? `<div class="eb">Tư liệu của nhóm${HOME?.group?.no ? ' ' + HOME.group.no : ''}</div>` : ''}
-    <div class="card">${cuaNhom.length ? cuaNhom.map(veDongTuLieu).join('')
-      : '<div class="cb mut">Chưa có liên kết nào trong mục này.</div>'}</div>
+    ${cuaNhom.length ? veTuLieuTheoBuoi(cuaNhom)
+      : '<div class="card"><div class="cb mut">Chưa có liên kết nào trong mục này.</div></div>'}
   </div>
 
   <button class="wide ghost" style="margin-top:12px" id="addLinkBtn">+ Gắn một liên kết</button>

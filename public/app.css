@@ -203,6 +203,19 @@ main{padding-top:18px}
 .pct.xong{font-size:13px;color:var(--go);background:var(--go-bg);
   border-radius:999px;width:22px;height:22px;display:grid;place-items:center;padding:0}
 .eb .c.xong{background:var(--go-bg);color:var(--go)}
+
+/* Buổi HÔM NAY tách thành khối riêng ở đầu tab Hôm nay.
+   Viền xanh chứ không chỉ đổi nền — nền nhạt lướt qua là không thấy, đúng bài
+   học đã ghi trong public/lich/lich.css. Cùng cặp màu --go/--go-bg với mọi chỗ
+   khác nói "xong / đang là", để "hôm nay" ở màn nào cũng một màu. */
+.eb .c.nay{background:var(--go-bg);color:var(--go);text-transform:none;letter-spacing:.01em}
+.card.naycard{box-shadow:0 0 0 1.5px var(--go),var(--sh)}
+.fd.buoinay .x b{color:var(--go)}
+
+/* Đầu mục buổi học trong tab Tư liệu — cấp dưới của .eb, nên nhỏ và nhạt hơn,
+   và cần lề trên vì nó đứng sau một .card chứ không phải đầu mục lớn. */
+.eb.ebbuoi{margin-top:18px;font-size:10.5px;color:var(--ink3);text-transform:none;letter-spacing:.02em}
+.eb.ebbuoi:first-of-type{margin-top:0}
 /* Nhãn "đã thu đủ" trên đầu thẻ đợt thu — cùng cặp màu với mọi dấu ✓ khác. */
 .xongchip{background:var(--go-bg);color:var(--go);border-radius:999px;
   padding:2px 8px;margin-left:6px;letter-spacing:.04em;white-space:nowrap}
