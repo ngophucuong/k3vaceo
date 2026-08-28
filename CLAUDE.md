@@ -38,6 +38,13 @@ lên đều **không deploy** — tab Actions im lặng, không lỗi, không c�
 triệu chứng duy nhất là người dùng bảo "vào không thấy gì mới". Đã xảy ra ngày
 28/8 với bốn commit liền.
 
+`deploy.yml` nay tự trả lời câu ấy mỗi lượt: nó tải `/app.js` từ tên miền hai
+lần (bình thường và ép làm mới) rồi **so băm với tệp trong repo**. Ép làm mới
+vẫn khác thì Pages chưa xuất bản thật → đánh đỏ. Chỉ lượt tải bình thường khác
+thì là đệm → cảnh báo. Trước 28/8 không phép kiểm nào hỏi câu này: chúng chỉ
+hỏi "giao diện có trả về không" (có) và "API có chạy không" (có), nên deploy
+xanh mà người dùng chạy mã cũ lọt qua sạch.
+
 Cạnh nó là bẫy thứ hai: biến `NHANH_PAGES` trong cùng tệp **không phải nhánh
 git** — nó là nhánh production của Cloudflare Pages. Pages chỉ coi một lượt
 deploy là production khi `--branch` TRÙNG nhánh ấy; sửa nó theo nhánh git mới
@@ -226,16 +233,28 @@ Bí mật đã đặt sẵn trong repo: `CLOUDFLARE_API_TOKEN` (quyền D1:Edit)
 `CLOUDFLARE_ACCOUNT_ID`. Workflow tự kiểm tra và **đánh hỏng job** nếu kết quả
 không phải ĐÚNG HẾT.
 
-## Thông báo đẩy (Đợt 7) — cần ba bí mật thì mới chạy
+## Thông báo đẩy (Đợt 7) — khoá VAPID ĐÃ CÓ
 
-Mã đã xong và đã kiểm. Chưa gửi được vì **chưa có khoá VAPID**:
+**Cập nhật 28/8: khoá đã được đặt.** `/api/health` trên tên miền thật trả
+`push: {"bat": true, "khoa": "BMoZLBhm"}`, mà `pushCauHinh()` chỉ trả khác
+`null` khi có ĐỦ cả `VAPID_PUBLIC_KEY` lẫn `VAPID_PRIVATE_KEY`. Đo được từ log
+deploy #72, không phải suy đoán.
+
+Nói chính xác điều ấy nghĩa là gì: **khoá đã cấu hình xong, giao diện đã mở nút
+xin quyền**. Nhưng **chưa ai nhận được một thông báo đẩy thật nào trên điện
+thoại thật** — đó là loại bằng chứng duy nhất đáng tin cho việc gửi tin, đúng
+như bài học của đường gửi thư ngày 24/8 ("thư nằm trong hộp thư, không phải một
+dòng log nói rằng nó đã đi"). Nhớ rằng **iPhone chỉ nhận khi ứng dụng ĐÃ cài
+lên màn hình chính**.
+
+Khoá sinh bằng:
 
 ```bash
 node scripts/tao-khoa-vapid.mjs
 ```
 
 rồi đặt `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` vào GitHub
-Secrets — `deploy.yml` tự đồng bộ sang Worker mỗi lần deploy. Chưa có thì
+Secrets — `deploy.yml` tự đồng bộ sang Worker mỗi lần deploy. Thiếu thì
 `/api/push/khoa` trả `bat:false`, giao diện ẩn nút, mọi thứ khác chạy bình
 thường.
 
