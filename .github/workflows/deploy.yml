@@ -222,6 +222,36 @@ jobs:
           # Đệm của Pages quyết định người dùng có nhận được bản mới hay không.
           # Không đoán: in ra để đọc. app.js và app.css KHÔNG có ?v= nên nếu
           # chúng được đệm lâu thì sửa mã xong người ta vẫn chạy bản cũ.
+          # Deploy xanh mà người dùng vẫn thấy giao diện cũ — đúng chuyện xảy ra
+          # ngày 28/8. Mọi phép kiểm cũ đều đậu (giao diện có trả về, API chạy),
+          # vì không phép nào hỏi "app.js trên tên miền CÓ PHẢI bản vừa đẩy
+          # không". So bằng băm, không so bằng một chuỗi đánh dấu: chuỗi thì
+          # phải nhớ sửa mỗi lần, còn băm thì đúng cho mọi commit.
+          echo "--- app.js trên tên miền có đúng bản vừa đẩy không ---"
+          bam_local=$(sha256sum public/app.js | cut -c1-16)
+          curl -s -o /tmp/aj-thuong.js  https://k3vaceo.cuongngo.app/app.js || true
+          curl -s -o /tmp/aj-tuoi.js -H 'Cache-Control: no-cache' \
+               https://k3vaceo.cuongngo.app/app.js || true
+          bam_thuong=$(sha256sum /tmp/aj-thuong.js 2>/dev/null | cut -c1-16)
+          bam_tuoi=$(sha256sum /tmp/aj-tuoi.js 2>/dev/null | cut -c1-16)
+          echo "  trong repo      : $bam_local"
+          echo "  tải bình thường : ${bam_thuong:-(hỏng)}"
+          echo "  tải ép làm mới  : ${bam_tuoi:-(hỏng)}"
+          if [ "$bam_tuoi" != "$bam_local" ]; then
+            # Ép làm mới mà VẪN khác repo thì Pages chưa xuất bản thật. Đây là
+            # hỏng thật, không phải chuyện đệm — đánh đỏ.
+            echo "::error::Pages chưa xuất bản public/app.js của commit này. Ép làm mới vẫn ra bản khác."
+            loi=1
+          elif [ "$bam_thuong" != "$bam_local" ]; then
+            # Bản thật đã lên, nhưng lượt tải bình thường vẫn ra bản cũ: đệm.
+            # CẢNH BÁO chứ không đánh đỏ — nút bấm nằm ngoài repo (Browser Cache
+            # TTL cấp zone), mà đánh đỏ mọi lượt deploy vì một nút bấm ngoài tầm
+            # với chỉ dạy người ta bỏ qua màu đỏ.
+            echo "::warning::app.js MỚI đã lên tên miền, nhưng lượt tải bình thường vẫn nhận bản cũ — đệm cấp zone. Học viên sẽ thấy giao diện cũ tới khi hết hạn đệm. Sửa: Cloudflare → cuongngo.app → Caching → Configuration → Browser Cache TTL → Respect Existing Headers."
+          else
+            echo "  ✓ tên miền đang phục vụ đúng bản vừa đẩy"
+          fi
+
           echo "--- tiêu đề đệm trên tên miền thật ---"
           # Bước này chạy dưới `bash -e`: grep KHÔNG khớp trả mã 1 và giết cả
           # bước, biến một phép đo chẩn đoán thành deploy đỏ. Phải `|| true`.
