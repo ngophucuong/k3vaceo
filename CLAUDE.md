@@ -32,6 +32,18 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
 
+**Một cái bẫy đã trả giá, đừng vấp lại:** `deploy.yml` ghim **tên nhánh** ở
+`on.push.branches`. Đổi nhánh làm việc mà quên sửa dòng ấy thì mọi commit đẩy
+lên đều **không deploy** — tab Actions im lặng, không lỗi, không cảnh báo, và
+triệu chứng duy nhất là người dùng bảo "vào không thấy gì mới". Đã xảy ra ngày
+28/8 với bốn commit liền.
+
+Cạnh nó là bẫy thứ hai: biến `NHANH_PAGES` trong cùng tệp **không phải nhánh
+git** — nó là nhánh production của Cloudflare Pages. Pages chỉ coi một lượt
+deploy là production khi `--branch` TRÙNG nhánh ấy; sửa nó theo nhánh git mới
+thì deploy tụt xuống hạng "xem thử", workflow vẫn xanh mà tên miền vẫn chạy bản
+cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trước.
+
 **Ba việc cần làm tiếp, xếp theo mức chặn:**
 
 1. **Điền 49 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (44

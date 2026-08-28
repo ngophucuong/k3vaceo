@@ -1,10 +1,16 @@
 name: Deploy lên Cloudflare
 
-# Đẩy code lên nhánh chính là tự deploy. Bấm tay được ở tab Actions khi cần
+# Đẩy code lên nhánh làm việc là tự deploy. Bấm tay được ở tab Actions khi cần
 # deploy lại mà không có thay đổi nào.
+#
+# ĐỔI NHÁNH LÀM VIỆC THÌ PHẢI SỬA DÒNG `branches` DƯỚI ĐÂY. Ngày 28/8 nhánh
+# chuyển sang claude/content-deployment-continuation-m2inni mà dòng này còn ghi
+# nhánh cũ, nên bốn commit liền KHÔNG deploy — không lỗi, không cảnh báo, chỉ
+# là tab Actions im lặng và tên miền vẫn chạy bản cũ. Triệu chứng duy nhất là
+# người dùng bảo "vào không thấy gì mới".
 on:
   push:
-    branches: [claude/read-content-deployment-plan-dpsv8m]
+    branches: [claude/content-deployment-continuation-m2inni]
     paths-ignore: ['**.md', '.github/nap-du-lieu.trigger', '.github/phat-link-moi.trigger', '.github/kiem-tra-email.trigger']
   workflow_dispatch:
 
@@ -18,7 +24,17 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      NHANH: claude/read-content-deployment-plan-dpsv8m
+      # ĐÂY LÀ NHÁNH PRODUCTION CỦA CLOUDFLARE PAGES, KHÔNG PHẢI NHÁNH GIT.
+      # Hai thứ tình cờ cùng tên lúc dựng dự án, nhưng chúng khác nhau về bản
+      # chất: `branches:` ở trên quyết định workflow có CHẠY không, còn giá trị
+      # này quyết định bản vừa đẩy có thành PRODUCTION không.
+      #
+      # Cloudflare Pages chỉ coi một lượt deploy là production khi --branch
+      # TRÙNG với nhánh production đã cấu hình trong dự án. Đổi giá trị này
+      # theo nhánh git mới thì lượt deploy tụt xuống hạng "xem thử": workflow
+      # vẫn xanh, log vẫn báo thành công, mà k3vaceo.cuongngo.app vẫn phục vụ
+      # bản cũ. Muốn đổi thật thì phải đổi trong bảng điều khiển Pages trước.
+      NHANH_PAGES: claude/read-content-deployment-plan-dpsv8m
     steps:
       - uses: actions/checkout@v4
 
@@ -59,12 +75,12 @@ jobs:
       - name: Tạo project Pages nếu chưa có
         if: steps.check.outputs.skip != 'true'
         run: |
-          npx wrangler pages project create k3vaceo --production-branch="$NHANH" \
+          npx wrangler pages project create k3vaceo --production-branch="$NHANH_PAGES" \
             || echo "Project đã tồn tại, bỏ qua."
 
       - name: Deploy Pages (giao diện)
         if: steps.check.outputs.skip != 'true'
-        run: npx wrangler pages deploy public --project-name=k3vaceo --branch="$NHANH" --commit-dirty=true
+        run: npx wrangler pages deploy public --project-name=k3vaceo --branch="$NHANH_PAGES" --commit-dirty=true
 
       # Tải mã Worker lên là quyền cấp ACCOUNT; tạo Worker Route là quyền cấp
       # ZONE — hai thứ khác nhau, Workers Scripts:Edit không kéo theo. Thiếu
