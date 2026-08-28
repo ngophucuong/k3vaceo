@@ -37,6 +37,14 @@ INSERT INTO members (cohort_id, group_id, roster_id, full_name, phone, is_active
 SELECT r.cohort_id, (SELECT id FROM groups WHERE cohort_id = r.cohort_id AND label = r.group_label),
        r.id, r.full_name, r.phone, 0, datetime('now'), datetime('now')
   FROM roster r WHERE r.id = 57;
+-- Ca 'chưa đăng nhập nhưng ĐÃ có email': xảy ra thật khi ai đó bỏ ngang đường
+-- OTP (/api/onboard/start tạo hồ sơ với email mà chưa đặt claimed_at), hoặc khi
+-- trưởng nhóm thêm người kèm email. Không gieo thì phép kiểm 'email bị che'
+-- trong kiem-danhba.mjs xanh một cách rỗng tuếch — không có email nào để che.
+INSERT INTO members (cohort_id, group_id, roster_id, full_name, phone, email, is_active, created_at, updated_at)
+SELECT r.cohort_id, (SELECT id FROM groups WHERE cohort_id = r.cohort_id AND label = r.group_label),
+       r.id, r.full_name, r.phone, 'bo.ngang@kiemtra.vn', 1, datetime('now'), datetime('now')
+  FROM roster r WHERE r.id = 58;
 " >/dev/null
 npx wrangler d1 execute k3vaceo --local --file /tmp/moi-tanso.sql >/dev/null
 

@@ -216,6 +216,27 @@ main{padding-top:18px}
    và cần lề trên vì nó đứng sau một .card chứ không phải đầu mục lớn. */
 .eb.ebbuoi{margin-top:18px;font-size:10.5px;color:var(--ink3);text-transform:none;letter-spacing:.02em}
 .eb.ebbuoi:first-of-type{margin-top:0}
+
+/* Danh bạ lớp.
+   Nhãn Ban cán sự lớp dùng cặp màu --go giống mọi chỗ khác nói "có vai, đang
+   giữ việc". KHÔNG dùng --due: cam trong sản phẩm này luôn nghĩa là "còn phải
+   làm gì đó", mà giữ chức thì không phải việc còn nợ. N7: chuỗi hiển thị viết
+   đủ "Ban cán sự lớp", không viết tắt — nhãn lấy thẳng từ máy chủ.
+
+   Thông tin đã che in bằng phông số cho các dấu * thẳng hàng, và nhạt hơn để
+   nhìn là biết ngay đây không phải số bấm gọi được. */
+.tg.bcs{background:var(--go-bg);color:var(--go);font-size:10px;padding:1px 7px}
+.v .che{font-family:var(--num);color:var(--ink3);letter-spacing:.02em}
+#dbTim{margin-top:2px}
+
+/* Trong danh bạ lớp, dòng chức vụ/đơn vị được xuống HAI dòng thay vì cắt cụt.
+   Ở thẻ Nhóm thì cắt một dòng là đủ — mười bốn người quen mặt nhau, tên là đã
+   nhận ra. Ở thẻ Cả lớp thì không: lớp này có hàng chục người cùng làm ở
+   "Công ty Cổ phần Hữu Nghị…", nên cắt tại chỗ ấy là năm dòng liền giống hệt
+   nhau và danh bạ mất đúng cái việc nó sinh ra để làm. Đo bằng ảnh chụp, không
+   phải đoán. */
+.dblop .mrow .co{white-space:normal;overflow:visible;text-overflow:clip;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35}
 /* Nhãn "đã thu đủ" trên đầu thẻ đợt thu — cùng cặp màu với mọi dấu ✓ khác. */
 .xongchip{background:var(--go-bg);color:var(--go);border-radius:999px;
   padding:2px 8px;margin-left:6px;letter-spacing:.04em;white-space:nowrap}

@@ -821,7 +821,8 @@ const ICON = {
   // Bài: trang giấy có dòng chữ — bản kế hoạch kinh doanh tám phần.
   bai: svg(`<path d="M4.6 2.8h6.6l4.2 4.2v10.2a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8V4.6a1.8 1.8 0 0 1 1.8-1.8Z"/>
             <path d="M11 2.9V7.2h4.3M6.4 11h7.2M6.4 14.2h4.8"/>`),
-  // Nhóm: hai người.
+  // Danh bạ: hai người. (Mã trong nguồn vẫn là 'nhom' — đổi id là vỡ đường dẫn
+  // #/nhom mà cả lớp có thể đã lưu, y như 'kho' của tab Tư liệu.)
   nhom: svg(`<circle cx="8" cy="7.2" r="2.9"/>
              <path d="M2.9 16.8a5.1 5.1 0 0 1 10.2 0"/>
              <path d="M13.6 4.7a2.9 2.9 0 0 1 0 5.5M14.6 16.8a5 5 0 0 0-1.4-3.5"/>`),
@@ -856,7 +857,7 @@ function shellHtml() {
   <nav><div class="navin">
     <button class="nb" data-v="nay">${ICON.nay}Hôm nay</button>
     <button class="nb" data-v="bai">${ICON.bai}Bài</button>
-    <button class="nb" data-v="nhom">${ICON.nhom}Nhóm</button>
+    <button class="nb" data-v="nhom">${ICON.nhom}Danh bạ</button>
     <button class="nb" data-v="kho">${ICON.kho}Tư liệu</button>
     <button class="nb" data-v="quy">${ICON.quy}Quỹ</button>
   </div></nav>`;
@@ -1648,13 +1649,139 @@ function xacNhanThem(p) {
   };
 }
 
+/* ─── Danh bạ: hai thẻ, Nhóm và Cả lớp ───
+   Gộp 28/8 theo yêu cầu của Ngô Phú Cường. Thẻ "Nhóm" là tab Nhóm cũ, không
+   đổi gì. Thẻ "Cả lớp" là danh bạ 134 người.
+
+   Thẻ mặc định là NHÓM, và chip "Nhóm" đứng trước: đó là chỗ có nút bấm (sửa
+   hồ sơ, phát link mời, thêm người), còn danh bạ lớp chỉ để đọc. Đặt mặc định
+   ở thẻ mới thì mọi thao tác quen thuộc lùi sau một cú chạm.
+
+   THẺ ĐANG MỞ GIỮ NGOÀI HÀM VẼ — cùng bài học với bộ lọc của Sổ thu: sửa hồ sơ
+   một người xong màn vẽ lại, mà nếu thẻ nằm trong hàm thì nó nhảy về Nhóm và
+   người đang đọc danh bạ lớp bị đá ra. */
+let DANHBA_THE = 'nhom';
+let DANHBA_LOP = null;     // 134 người, tải một lần rồi lọc tại chỗ
+let DANHBA_TIM = '';
+
+function chipDanhBa() {
+  return `<div class="fl">
+    <button class="fc ${DANHBA_THE === 'nhom' ? 'on' : ''}" data-the="nhom">Nhóm${HOME?.group?.no ? ' ' + HOME.group.no : ''}</button>
+    <button class="fc ${DANHBA_THE === 'lop' ? 'on' : ''}" data-the="lop">Cả lớp</button>
+  </div>`;
+}
+
+function noiChip() {
+  document.querySelectorAll('#v-nhom [data-the]').forEach(b => {
+    b.onclick = () => { DANHBA_THE = b.dataset.the; drawNhom(); };
+  });
+}
+
 async function drawNhom() {
   if (!$('#v-nhom').dataset.loaded) $('#v-nhom').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
+  return DANHBA_THE === 'lop' ? veDanhBaLop() : veDanhBaNhom();
+}
+
+/* Thẻ "Cả lớp" — 134 người. CHỈ ĐỌC: không sửa được hồ sơ người nhóm khác, và
+   máy chủ cũng không cho (routes/members.js lọc theo group_id ngay trong câu
+   truy vấn, người nhóm khác nhận 404 chứ không phải 403).
+
+   Thông tin liên hệ của người CHƯA đăng nhập đã bị che Ở MÁY CHỦ, không phải ở
+   đây — xem worker/src/lib/che.js. Che ở giao diện thì mở tab Network là đọc
+   được số thật. */
+async function veDanhBaLop() {
+  if (!DANHBA_LOP) DANHBA_LOP = (await apiGet('/api/danh-ba')).nguoi;
+  $('#v-nhom').dataset.loaded = '1';
+
+  const q = nhuDanhBa(DANHBA_TIM);
+  // Lọc tại chỗ, không gọi lại máy chủ: 134 dòng đã nằm sẵn trong bộ nhớ, thêm
+  // một vòng mạng cho mỗi ký tự gõ vào là phí.
+  const ds = q ? DANHBA_LOP.filter(p =>
+        nhuDanhBa(p.full_name).includes(q) || nhuDanhBa(p.company || '').includes(q)
+     || nhuDanhBa(p.title || '').includes(q) || nhuDanhBa(p.group_label || '').includes(q))
+    : DANHBA_LOP;
+
+  const daVao = DANHBA_LOP.filter(p => p.da_dang_nhap).length;
+  const nhom = new Map();
+  for (const p of ds) {
+    const k = p.group_label || 'Chưa xếp nhóm';
+    if (!nhom.has(k)) nhom.set(k, []);
+    nhom.get(k).push(p);
+  }
+
+  $('#v-nhom').innerHTML = `
+  <div class="dblop">
+  ${chipDanhBa()}
+  <div class="foot" style="padding:0 2px 12px">
+    Cả ${DANHBA_LOP.length} người của khoá K03. Số điện thoại và email của người
+    <b style="color:var(--ink)">chưa đăng nhập</b> được che bớt — hiện đủ khi chính chủ vào ứng dụng lần đầu.
+  </div>
+  <input id="dbTim" placeholder="Tìm tên, đơn vị hoặc chức vụ" maxlength="60"
+         autocomplete="off" value="${esc(DANHBA_TIM)}">
+  <div class="eb" style="margin-top:14px">${q ? `Tìm thấy <span class="c">${ds.length}</span>`
+    : `Đã đăng nhập <span class="c">${daVao}/${DANHBA_LOP.length}</span>`}</div>
+  ${ds.length ? [...nhom].map(([ten, ps]) => `
+    <div class="eb ebbuoi">${esc(ten)} <span class="c">${ps.length}</span></div>
+    <div class="card">${ps.map(veDongDanhBa).join('')}</div>`).join('')
+    : '<div class="card"><div class="cb mut">Không thấy ai như vậy trong lớp.</div></div>'}
+  <div class="foot">Danh bạ chỉ để xem. Hồ sơ của mình thì sửa ở thẻ Nhóm.</div>
+  </div>`;
+
+  noiChip();
+  const o = $('#dbTim');
+  o.oninput = () => { DANHBA_TIM = o.value; veDanhBaLop(); };
+  // Giữ con trỏ ở cuối ô sau khi vẽ lại, không thì gõ chữ thứ hai là con trỏ
+  // nhảy về đầu và chữ xếp ngược.
+  if (DANHBA_TIM) { o.focus(); o.setSelectionRange(o.value.length, o.value.length); }
+
+  document.querySelectorAll('#v-nhom [data-db]').forEach(btn => {
+    btn.onclick = () => {
+      const panel = $('#db' + btn.dataset.db), dangMo = panel.classList.contains('on');
+      document.querySelectorAll('#v-nhom .pan').forEach(p => p.classList.remove('on'));
+      if (!dangMo) panel.classList.add('on');
+    };
+  });
+}
+
+const nhuDanhBa = t => boDau(String(t ?? '')).toLowerCase().trim();
+
+function veDongDanhBa(p) {
+  const nghe = [p.title, p.company].filter(Boolean).join(' · ');
+  // Số đã che thì KHÔNG bọc trong tel: — bấm vào là gọi nhầm một số không có
+  // thật, và nó gợi ý sai rằng số ấy dùng được.
+  const so = p.phone
+    ? (p.che ? `<span class="che">${esc(p.phone)}</span>`
+             : `<a href="tel:${esc(p.phone)}">${esc(p.phone)}</a>`)
+    : null;
+  const mail = p.email
+    ? (p.che ? `<span class="che">${esc(p.email)}</span>`
+             : `<a href="mailto:${esc(p.email)}">${esc(p.email)}</a>`)
+    : null;
+  return `
+    <button class="mrow" data-db="${p.roster_id}">
+      ${avatar(p.full_name)}
+      <div class="b"><div class="nm">${esc(p.full_name)}${
+        p.vai_lop ? `<span class="tg bcs">${esc(p.vai_lop)}</span>` : ''}${
+        p.da_dang_nhap ? '' : '<span class="tg due" style="font-size:10px;padding:1px 7px">chưa đăng nhập</span>'}</div>
+        <div class="co">${esc(nghe)}</div></div>
+    </button>
+    <div class="pan" id="db${p.roster_id}">
+      <div class="fi"><div class="k">Liên hệ</div>
+        <div class="v ${so || mail ? '' : 'blank'}">${[so, mail].filter(Boolean).join(' · ') || 'Chưa có số điện thoại và email'}</div>
+        ${p.che && (so || mail) ? `<div class="was">Che bớt vì người này chưa đăng nhập lần nào.</div>` : ''}</div>
+      <div class="fi"><div class="k">Chức vụ / đơn vị</div>
+        <div class="v ${nghe ? '' : 'blank'}">${esc(nghe) || 'Chưa có'}</div></div>
+      ${p.vai_lop ? `<div class="fi"><div class="k">Ban cán sự lớp</div><div class="v">${esc(p.vai_lop)}</div></div>` : ''}
+    </div>`;
+}
+
+async function veDanhBaNhom() {
   MEMBERS = (await apiGet('/api/members')).members;
   $('#v-nhom').dataset.loaded = '1';
   const officer = iAmOfficer();
 
   $('#v-nhom').innerHTML = `
+  ${chipDanhBa()}
   <div class="foot" style="padding:0 2px 16px">
     Hồ sơ lấy từ danh sách Ban tổ chức, có chỗ sai và có chỗ đã cũ.
     <b style="color:var(--ink)">Ai cũng tự sửa được hồ sơ của mình</b>, và sửa hộ được cho người cùng nhóm.
@@ -1690,6 +1817,7 @@ async function drawNhom() {
   <div class="foot">Ai biết số điện thoại người còn trống thì điền hộ, chính chủ sửa lại sau.</div>
   <div id="dsNgung"></div>`;
 
+  noiChip();
   if ($('#themNguoi')) $('#themNguoi').onclick = openThemNguoi;
   if (officer) veNguoiDaNgung();
 

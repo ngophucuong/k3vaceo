@@ -89,7 +89,11 @@ Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sa
 - **N3 — Ứng dụng không giữ tiền.** Tiền vào thẳng tài khoản người thu.
 - **N4 — Tự giác là chính.** Không xác minh email, không OTP, không đối soát.
 - **N5 — Chính chủ tự sửa được thông tin của mình**, không qua ai duyệt.
-- **N6 — Dữ liệu nhóm cách ly.** Nhóm 8 không đọc được gì của nhóm 6.
+- **N6 — Dữ liệu nhóm cách ly.** Nhóm 8 không đọc được gì của nhóm 6. → **đã lệch
+  có chủ ý ngày 28/8** cho DANH BẠ, Ngô Phú Cường quyết. Phân định: N6 bảo vệ
+  *việc của nhóm* — sổ thu, bài tám phần, thông báo nội bộ — chứ không phải danh
+  tính cá nhân. Danh bạ không đụng thứ nào trong số đó. Mọi đường khác GIỮ
+  NGUYÊN N6 nguyên vẹn; đừng lấy danh bạ làm tiền lệ để mở thêm.
 - **N7 — Không dùng chữ viết tắt "BCS"** ở bất kỳ chuỗi hiển thị nào. Viết đủ
   "Ban cán sự lớp", kể cả trong log và email.
 
@@ -704,6 +708,69 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
   vĩnh viễn, chỉ còn cách xoá đi tạo lại.
 - **Số điện thoại Lê Trung Đức** trong roster là `098778525`, thiếu 1 số. Giữ
   nguyên trong `roster`, không đưa vào `members`. Cần hỏi lại.
+
+## Danh bạ lớp — và vì sao số bị che
+
+Thêm 28/8. Tab "Nhóm" đổi tên thành **Danh bạ**, bên trong hai thẻ: **Nhóm**
+(nội dung cũ, không đổi) và **Cả lớp** (134 người). `GET /api/danh-ba`.
+
+Mã trong nguồn vẫn là `nhom`, y như `kho` của Tư liệu — đổi id là vỡ đường dẫn
+`#/nhom` mà cả lớp có thể đã lưu.
+
+**Thẻ mặc định là Nhóm, chip "Nhóm" đứng trước.** Đó là chỗ có nút bấm (sửa hồ
+sơ, phát link mời, thêm người, cho ngừng tham gia); danh bạ lớp chỉ để đọc. Đặt
+mặc định ở thẻ mới thì mọi thao tác quen thuộc lùi sau một cú chạm.
+
+**Thẻ đang mở giữ NGOÀI hàm vẽ** (`DANHBA_THE`) — cùng bài học với bộ lọc Sổ
+thu: sửa hồ sơ xong màn vẽ lại, thẻ nằm trong hàm thì nó nhảy về Nhóm và người
+đang đọc danh bạ bị đá ra.
+
+### Che số điện thoại: chưa đăng nhập thì che
+
+Đây là chỗ nghiêm túc nhất của cả tính năng. Số điện thoại là **bí mật duy nhất
+giữ cửa `/api/onboard/vao`**, và cửa ấy chỉ mở được hồ sơ chưa ai nhận. Bày số
+của người chưa đăng nhập ra cho cả lớp là trao chìa khoá vào hồ sơ của chính họ
+— ai cũng nhận được chỗ của họ, kể cả chỗ của một trưởng nhóm (mở sổ thu, tạo
+đợt thu, cho người khác ngừng tham gia).
+
+Luật: **chưa đăng nhập thì che, đăng nhập rồi thì hiện đủ.** Nhận hồ sơ xong là
+cửa `/vao` đóng vĩnh viễn, nên số thôi là chìa khoá.
+
+`lib/che.js`: `0979755857` → `097****857`, email dùng chung hàm `cheEmail()` đã
+có (`ng•••••••@gmail.com`). Hàm ấy trước nằm hai bản — một trong `onboard.js`,
+một viết bằng regex nội dòng trong `home.js` — nay gộp về một chỗ.
+
+**CHE Ở MÁY CHỦ, KHÔNG CHE Ở GIAO DIỆN.** Gửi số thật xuống rồi lấy CSS hay
+JavaScript che đi thì mở tab Network là đọc nguyên vẹn. Phép kiểm đáng giữ nhất
+của tính năng này là **grep số thật trong phúc đáp JSON** — số của người chưa
+đăng nhập phải KHÔNG có mặt, và số của người đã đăng nhập phải CÓ.
+
+**Con số phải nói thẳng:** che kiểu này giấu 4 chữ số, tức 10^4 khả năng. Với
+hạn mức 8 lần đoán sai mỗi hồ sơ mỗi giờ thì dò cạn mất **khoảng 52 ngày** —
+dài hơn phần còn lại của khoá học, nhưng KHÔNG phải là không thể. Muốn chặt hơn
+thì đổi `SO_CUOI` trong `lib/che.js` từ 3 xuống 2: giấu 5 chữ số thành 10^5,
+tức hơn 500 ngày, mà nhìn vẫn nhận ra đúng người.
+
+### Bốn điều cố ý khác
+
+1. **Không có bốn dòng hồ sơ** (bán gì / bán cho ai / cần gì / giúp được gì)
+   trong danh bạ lớp. Chúng là dữ liệu chia việc trong nhóm; mở ra cả lớp là
+   quyết định khác, và hôm nay gần như chưa ai điền nên mở ra chỉ thấy 134 ô
+   trống. Đây mới là thứ đáng giá thật với lớp CEO — nhưng nó bị chặn bởi việc
+   dùng thật, không bởi lập trình.
+2. **Số đã che KHÔNG bọc trong `tel:`** — bấm vào là gọi một số không có thật,
+   và nó gợi ý sai rằng số ấy dùng được.
+3. **Người đã ngừng tham gia rụng khỏi danh bạ** bằng điều kiện `is_active = 1`
+   đặt trong phép JOIN chứ không ở WHERE: để ở WHERE thì dòng `roster` của họ
+   bị loại luôn và họ biến mất cả tên.
+4. **Dòng chức vụ/đơn vị xuống hai dòng ở thẻ Cả lớp**, khác thẻ Nhóm. Lớp này
+   có hàng chục người cùng làm ở "Công ty Cổ phần Hữu Nghị…", nên cắt một dòng
+   là năm dòng liền giống hệt nhau và danh bạ mất đúng việc nó sinh ra để làm.
+   Chỉ ảnh chụp mới thấy — phép kiểm chuỗi không thấy.
+
+**Chưa làm, đã nêu và người dùng chọn cách khác:** cho chính chủ bật/tắt việc
+hiện số của mình (opt-in). Luật hiện tại đơn giản hơn — đăng nhập rồi là hiện.
+Bao giờ có người phàn nàn thì đó là chỗ sửa.
 
 ## Giới hạn tần suất: đếm lần đoán, đừng đếm người
 

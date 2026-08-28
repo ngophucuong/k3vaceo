@@ -35,6 +35,7 @@ import { normalizeEmail, isValidEmail } from '../lib/validate.js';
 import { normalizePhone, isValidVnPhone, phonesMatch } from '../lib/phone.js';
 import { mailerConfigured, sendMail } from '../mailer.js';
 import { clientIp, allow, conQuota, ghiNhan } from '../lib/ratelimit.js';
+import { cheEmail as che } from '../lib/che.js';
 
 // ── Hạn mức của cửa số điện thoại ────────────────────────────────────────
 // Số điện thoại là cửa an ninh DUY NHẤT của lần đăng nhập đầu, nên phải khoá
@@ -477,11 +478,3 @@ async function guiMa(env, ctx, member) {
   // (LoiSmtp mang theo .buoc — ba chỗ gọi dưới trả nó về trong phúc đáp.)
 }
 
-// Che email khi hiển thị lại: "ngophucuong@gmail.com" → "ng•••••••@gmail.com".
-// Đủ để người dùng nhận ra hộp thư của mình mà người lạ đứng cạnh không đọc được.
-function che(email) {
-  const [ten, mien] = String(email).split('@');
-  if (!mien) return '•••';
-  const dau = ten.slice(0, 2);
-  return `${dau}${'•'.repeat(Math.max(3, ten.length - 2))}@${mien}`;
-}

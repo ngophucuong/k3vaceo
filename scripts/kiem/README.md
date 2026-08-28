@@ -81,6 +81,7 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-vao-nhanh.mjs` | luồng `/vao` rút gọn: số điện thoại vào thẳng + passkey |
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
 | `kiem-tanso.mjs` | giới hạn tần suất — cả lớp cùng một WiFi có vào được không |
+| `kiem-danhba.mjs` | danh bạ lớp — và số thật KHÔNG lọt ra ở người chưa đăng nhập |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
 | `gieo-coso.mjs` · `gieo-moi.mjs` | sinh dữ liệu đối chứng, hai reset tự gọi |
 
@@ -89,7 +90,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Năm phép đối chứng đáng giữ nhất
+## Sáu phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -127,6 +128,17 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    47 — nhưng 44/134 người chưa có số nào trong danh sách gốc, gọi vào họ trả
    `phone_missing_in_roster` chứ không phải "sai số". Hồ sơ không có gì để đoán
    thì không tính vào sổ là ĐÚNG.
+
+6. **`kiem-danhba.mjs` phải đọc số THẬT từ D1 rồi tìm nguyên văn nó trong
+   phúc đáp JSON.** Che ở máy chủ và che ở giao diện trông y hệt nhau khi nhìn
+   màn hình — nhưng một trong hai cách vẫn gửi số thật xuống, và mở tab Network
+   là đọc được. Phép kiểm nào chỉ xem chuỗi hiển thị có dấu sao hay không thì
+   ĐẬU cả hai, mà một trong hai là trao chìa khoá vào hồ sơ người ta cho cả lớp.
+
+   Kèm hai phép chống-rỗng: phải có ít nhất một người ĐÃ đăng nhập để chứng
+   minh phúc đáp không rỗng, và phải có ít nhất một email của người chưa đăng
+   nhập — không thì "0 email đều bị che" xanh mà chẳng chứng minh gì.
+   `reset-tanso.sh` gieo sẵn ca ấy (roster 58).
 
 ## Chạy `kiem-tanso.mjs`
 

@@ -1,6 +1,7 @@
 import { json } from '../lib/http.js';
 import { layTuLieuTheoBuoi } from './lich.js';
 import { isClassCommittee } from '../permissions.js';
+import { cheEmail } from '../lib/che.js';
 
 const PROFILE_FIELDS = ['sells_what', 'sells_to', 'needs', 'offers'];
 
@@ -161,7 +162,7 @@ export async function getHome(env, me) {
           da_nhan_ho_so: !!me.claimed_at,
           // Che bớt để người đứng cạnh không đọc được, nhưng vẫn đủ để chính
           // chủ nhận ra hộp thư nào sẽ nhận mã.
-          email_che: me.email ? me.email.replace(/^(..)([^@]*)/, (_, a, b) => a + '•'.repeat(Math.max(3, b.length))) : null },
+          email_che: me.email ? cheEmail(me.email) : null },
     group,
     cohort,
     action,
