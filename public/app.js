@@ -2028,7 +2028,10 @@ function nhanBuoi(r) {
 function veDongTuLieu(r, trongCum) {
   const than = `<span class="ext">${esc(r.kind)}</span>
     <div class="b"><div class="t">${esc(r.title)}</div>
-    <div class="m">${trongCum ? '' : nhanBuoi(r)}${r.url ? vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
+    <div class="m">${trongCum ? '' : nhanBuoi(r)}${
+      // "đăng" chứ không để trơ ngày: dưới đầu mục "Thứ Bảy 15/8" mà thấy một
+      // ngày khác thì đọc như mâu thuẫn, trong khi nó là NGÀY ĐĂNG liên kết.
+      r.url ? 'đăng ' + vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
   const dong = r.url
     ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${than}
         <span style="color:var(--ink3)">↗</span></a>`
