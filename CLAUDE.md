@@ -733,15 +733,32 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
   điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn, thêm dòng `officers` với
   `group_id IS NULL` là chạy.
-- **Năm buổi đã học được thêm vào lịch**: 15/8, 21/8, 22/8 (migration 0016) rồi
-  4/9, 5/9 (migration 0017) — ngày và chủ đề do Ngô Phú Cường dán lại từ thông
-  báo Zalo của Ban tổ chức. Nhờ ba buổi đầu, 12 tư liệu của migration 0013 gắn
-  được vào đúng buổi và hết cảnh nằm rải rác ở tab Tư liệu. Chủ đề ba buổi đầu
-  ĐỌC TỪ TÊN THƯ MỤC Drive, còn buổi 4/9 và 5/9 đọc thẳng từ nguyên văn thông
-  báo; "Thái Hoà" của buổi 22/8 là suy ra từ khuôn tên — sai thì Ban cán sự lớp
-  bấm ✎ sửa được, không cần migration. Buổi 5/9 gộp hai chủ đề vào một dòng
-  bằng dấu chấm phẩy vì thông báo gốc không kèm mốc giờ để tách. Lịch còn
-  thiếu 3 buổi nữa mới đủ 13.
+- **Bảy buổi đã học được thêm vào lịch**, tính theo DÒNG `lich_hoc` (28/8 và 5/9
+  mỗi ngày chia hai-ba dòng vì nhiều chủ đề, nên "buổi" ở đây là buổi giảng chứ
+  không phải ngày lịch): 15/8, 21/8, 22/8 (migration 0016), 4/9 và 5/9 (migration
+  0017), rồi 5/9 CHỐT LẠI đè lên bản tạm (migration 0019) — cả ba đều do Ngô Phú
+  Cường dán lại từ thông báo Zalo của Ban tổ chức. `13 - 11 = 2`: lịch còn thiếu
+  đúng 2 buổi nữa.
+
+  **5/9 đổi CẢ chủ đề lẫn giảng viên, không chỉ thêm giờ** — dấu vết đáng nhớ
+  nhất trong đợt này. Bản tạm (migration 0017/0018) ghi GV Tuấn Hà, chủ đề
+  Marketing gộp một dòng vì thông báo đầu không có giờ. Bản CHỐT (migration
+  0019) là GV Hà Thu Thanh hoàn toàn khác, tách buổi sáng/chiều với hai chuyên
+  đề khác hẳn. Migration 0019 SỬA TẠI CHỖ (UPDATE) dòng cũ thay vì xoá-tạo-lại,
+  giữ nguyên `id` để tư liệu lỡ gắn vào buổi này không treo tham chiếu — và chỉ
+  đụng dòng khi `chu_de` VẪN LÀ bản tạm, để không đè lên sửa tay của Ban cán sự
+  lớp nếu có.
+
+  Nguyên tắc xuyên suốt cả ba migration: **thiếu thông tin thì để trống, đừng
+  bịa** (Ngô Phú Cường xác nhận rõ ràng). Không giờ cụ thể cho 4/9, chỉ ghi
+  "Buổi sáng"/"Buổi chiều" cho 5/9 chứ không suy ra khung giờ — bịa giờ ra thì
+  tệp `.ics` ghi sai cho lịch điện thoại của 134 người.
+
+  Chủ đề ba buổi đầu (15/8–22/8) ĐỌC TỪ TÊN THƯ MỤC Drive, còn 4/9 và 5/9 đọc
+  thẳng từ nguyên văn thông báo; "Thái Hoà" của buổi 22/8 là suy ra từ khuôn
+  tên — sai thì Ban cán sự lớp bấm ✎ sửa được, không cần migration. Nhờ ba buổi
+  đầu, 12 tư liệu của migration 0013 gắn được vào đúng buổi và hết cảnh nằm rải
+  rác ở tab Tư liệu.
 - **Tư liệu của lớp có 12 mục còn trống `url`** — 4 mục seed từ Đợt 1 và 8 tệp
   của thư mục Drive `CEO_VCCI`. Nay điền được bằng nút ✎ ngay trong ứng dụng
   (`PATCH /api/links/:id`, thêm 25/8); trước đó tạo mục với url trống là trống
