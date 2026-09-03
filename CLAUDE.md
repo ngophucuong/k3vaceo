@@ -733,12 +733,15 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
   điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn, thêm dòng `officers` với
   `group_id IS NULL` là chạy.
-- **Ba buổi đã học được thêm vào lịch** (migration 0016): 15/8 khai giảng, 21/8,
-  22/8 — ngày do Ngô Phú Cường cung cấp 28/8. Nhờ đó 12 tư liệu của migration
-  0013 gắn được vào đúng buổi và hết cảnh nằm rải rác ở tab Tư liệu. Chủ đề ba
-  buổi ĐỌC TỪ TÊN THƯ MỤC Drive chứ không từ thông báo lịch, và "Thái Hoà" của
-  buổi 22/8 là suy ra từ khuôn tên — sai thì Ban cán sự lớp bấm ✎ sửa được,
-  không cần migration. Lịch còn thiếu 5 buổi nữa mới đủ 13.
+- **Năm buổi đã học được thêm vào lịch**: 15/8, 21/8, 22/8 (migration 0016) rồi
+  4/9, 5/9 (migration 0017) — ngày và chủ đề do Ngô Phú Cường dán lại từ thông
+  báo Zalo của Ban tổ chức. Nhờ ba buổi đầu, 12 tư liệu của migration 0013 gắn
+  được vào đúng buổi và hết cảnh nằm rải rác ở tab Tư liệu. Chủ đề ba buổi đầu
+  ĐỌC TỪ TÊN THƯ MỤC Drive, còn buổi 4/9 và 5/9 đọc thẳng từ nguyên văn thông
+  báo; "Thái Hoà" của buổi 22/8 là suy ra từ khuôn tên — sai thì Ban cán sự lớp
+  bấm ✎ sửa được, không cần migration. Buổi 5/9 gộp hai chủ đề vào một dòng
+  bằng dấu chấm phẩy vì thông báo gốc không kèm mốc giờ để tách. Lịch còn
+  thiếu 3 buổi nữa mới đủ 13.
 - **Tư liệu của lớp có 12 mục còn trống `url`** — 4 mục seed từ Đợt 1 và 8 tệp
   của thư mục Drive `CEO_VCCI`. Nay điền được bằng nút ✎ ngay trong ứng dụng
   (`PATCH /api/links/:id`, thêm 25/8); trước đó tạo mục với url trống là trống
