@@ -33,7 +33,8 @@ const get = (p) => fetch(B + p, { headers: IP });
 // ── 0. Ứng dụng có thật sự chạy không, và hai phiên thử có thật ─────────
 console.log('── Máy chủ có thật sự chạy không ──');
 const health = await get('/api/health').then(r => r.json()).catch(() => ({}));
-ok(`/api/health trả roster_total = ${health.roster_total} (134)`, health.roster_total === 134);
+ok(`/api/health trả roster_total = ${health.roster_total} (≥ 134 — roster được phép đông thêm)`,
+   health.roster_total >= 134);
 
 const rCuong = await fetch(`${B}/api/danh-ba`, { headers: { cookie: ckCuong, ...IP } });
 ok(`phiên Ngô Phú Cường gọi /api/danh-ba được (${rCuong.status})`, rCuong.status === 200);

@@ -15,8 +15,9 @@
 # hai người CÙNG TÊN 'Phan Thị Thanh Nga' ở hai nhóm khác nhau.
 #
 stt,ho_ten,so_dien_thoai,ghi_chu
-# ══ 5 dòng dưới đây đang SAI, không phải thiếu — xử lý trước ══
+# ══ 6 dòng dưới đây đang SAI, không phải thiếu — xử lý trước ══
 76,Lê Trung Đức,,"Nhóm 6 — đang là ""098778525"", thiếu một chữ số"
+135,Trương Thị Ngọc Anh,,"Nhóm 4 — mới thêm migration 0023, đang là ""086689856"", thiếu một chữ số"
 65,Lưu Minh Tiến,,"Nhóm 5 — đang TRÙNG số ""0914544449"" với người khác"
 102,Lê Minh Tiến,,"Nhóm 8 — đang TRÙNG số ""0914544449"" với người khác"
 67,Phan Thị Thanh Nga,,"Nhóm 6 — đang TRÙNG số ""0985981808"" với người khác"

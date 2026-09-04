@@ -29,7 +29,7 @@ const tho = await r.text();
 const ds = JSON.parse(tho).nguoi;
 
 console.log('── Danh bạ trả về cả lớp ──');
-ok(`${ds.length} người (134)`, ds.length === 134);
+ok(`${ds.length} người (≥ 134 — roster được phép đông thêm)`, ds.length >= 134);
 ok('ai cũng có tên', ds.every(p => p.full_name));
 ok('ai cũng có nhóm', ds.every(p => p.group_label));
 

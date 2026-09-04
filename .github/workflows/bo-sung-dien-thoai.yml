@@ -61,7 +61,7 @@ jobs:
             console.log(`Còn sai khuôn:     ${r.sai_khuon}`);
             console.log(`Số bị hai người dùng chung: ${r.so_bi_trung}`);
             if (r.con_thieu === 0 && r.sai_khuon === 0 && r.so_bi_trung === 0)
-              console.log("\n✓ Cả 134 người đều có số riêng, đúng khuôn. Ai cũng tự nhận diện được.");
+              console.log("\n✓ Cả roster đều có số riêng, đúng khuôn. Ai cũng tự nhận diện được.");
             else
               console.log("\nCòn dòng chưa xong — điền tiếp vào scripts/data/bo-sung-dien-thoai.csv rồi commit lại.");
           '

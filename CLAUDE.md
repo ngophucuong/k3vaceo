@@ -25,9 +25,10 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 
 **Bốn việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9). Ngô Phú Cường (uỷ viên)
-   cần phát link mời cho người CHƯA đăng nhập ở bất kỳ nhóm nào, không chỉ
-   Nhóm 6 — `POST /api/danh-ba/:roster_id/moi`, xem mục riêng bên dưới.
+1. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9). Ngô Phú
+   Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
+   link mời cho người CHƯA đăng nhập ở bất kỳ nhóm nào, không chỉ nhóm của
+   mình — `POST /api/danh-ba/:roster_id/moi`, xem mục riêng bên dưới.
 2. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
 3. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
 4. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
@@ -56,11 +57,12 @@ cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trướ
 
 **Ba việc cần làm tiếp, xếp theo mức chặn:**
 
-1. **Điền 45 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (40
-   người chưa có số nào, 5 số sai hoặc trùng — đã điền được 4/44 người chưa có
-   số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020). Chưa điền
-   thì từng ấy người không tự vào được — đây là chỗ chặn số một, và nó không
-   phải việc lập trình.
+1. **Điền 46 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (40
+   người chưa có số nào, 6 số sai hoặc trùng — đã điền được 4/44 người chưa có
+   số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020; thêm một
+   người mới migration 0023 vào thẳng nhóm "sai" vì số trong tệp gốc thiếu một
+   chữ số). Chưa điền thì từng ấy người không tự vào được — đây là chỗ chặn số
+   một, và nó không phải việc lập trình.
 2. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
    cho những lần đăng nhập sau, mà nó CHƯA từng chạy trọn vẹn trên tên miền
    thật lần nào. Hỏng thì đường vào lại chỉ còn mã email, tức chưa thật sự bỏ
@@ -872,7 +874,7 @@ của người CHƯA đăng nhập, và chỉ khi `can_moi` (cờ trả về t�
 tính theo NGƯỜI XEM chứ không theo từng dòng) là true. Máy chủ vẫn kiểm lại
 trong `postDanhBaMoi` — giao diện chỉ để khỏi bày nút bấm vào là 403.
 
-### Lưu Minh Tiến — lớp trưởng Nhóm 8 (migration 0021)
+### Lưu Minh Tiến — lớp trưởng CẤP LỚP, và trưởng Nhóm 8 (migration 0021 + 0022)
 
 Ngô Phú Cường xác nhận trực tiếp, kèm tệp "Trưởng, phó nhóm" Ban tổ chức gửi.
 Có một cái bẫy suýt gán nhầm người: roster có **hai người tên đệm "Tiến"**,
@@ -887,9 +889,20 @@ bản ghi lịch sử; nhóm thật đặt trực tiếp vào `members.group_id`
 
 Anh ấy CHƯA từng đăng nhập — hồ sơ tạo trước (`claimed_at` để trống), tự nhận
 bằng số điện thoại ở `/vao` như bình thường, không có gì đặc quyền ở bước đó.
-Vai `truong_nhom` của Nhóm 8 gán kèm, guard theo `(group_id, role)` chứ không
-theo tên — nếu Nhóm 8 đã có ai tự nhận trưởng nhóm qua wizard thì migration
-không được đè lên người thật đã tự vận hành nhóm.
+Vai `truong_nhom` của Nhóm 8 gán kèm (migration 0021), guard theo `(group_id,
+role)` chứ không theo tên — nếu Nhóm 8 đã có ai tự nhận trưởng nhóm qua wizard
+thì migration không được đè lên người thật đã tự vận hành nhóm.
+
+**Cập nhật 4/9: anh ấy còn là lớp trưởng CẤP LỚP**, không chỉ trưởng Nhóm 8 —
+Ngô Phú Cường xác nhận rõ sau khi được hỏi lại (mục "Trưởng, phó nhóm" của tệp
+Excel dùng nhãn "Lớp trưởng" cho NHIỀU nhóm khác nhau nên ban đầu tôi hiểu lầm
+đó chỉ là tên gọi khác của "trưởng nhóm"; hỏi lại mới rõ Tiến giữ CẢ HAI).
+Migration 0022 thêm một bản ghi `officers` riêng — `group_id NULL, role
+'lop_truong'` — SONG SONG với bản ghi `truong_nhom, group_id=8` đã có, đúng
+khuôn "vai cấp lớp tách khỏi vai cấp nhóm" đã dùng cho Ngô Phú Cường. Nhờ
+`lop_truong` nằm trong `VAI_DIEU_HANH` (không phải `uy_vien` như Cường), Tiến
+có thêm quyền `isClassOfficer` — mở đợt thu và ghi sổ chi quỹ LỚP — bên cạnh
+`isClassCommittee` đã có (phát link mời xuyên nhóm, giống Cường).
 
 ### Việc còn treo: dữ liệu "Trưởng, phó nhóm" của 8 nhóm còn lại
 
@@ -906,7 +919,46 @@ không đúng.
 Sheet "DS lớp" cùng tệp (chữ ký buổi 21/8) cũng có **13 tên không khớp bất kỳ
 ai trong 134 người của roster** — có thể là học viên mới, có thể chỉ là biến
 thể tên/lỗi chính tả. Chưa xử lý, cần người dùng xác nhận từng người trước khi
-thêm vào roster.
+thêm vào roster. Trương Thị Ngọc Anh (xem mục ngay dưới) có thể là một trong
+13 tên này, nhưng chưa xác nhận được — cô ấy tới từ một dòng dữ liệu người
+dùng dán trực tiếp, không tra lại được với đúng sheet nào.
+
+### Người thứ 135: Trương Thị Ngọc Anh, Nhóm 4 (migration 0023)
+
+4/9, Ngô Phú Cường hỏi thẳng "Trương Thị Ngọc Anh Nhóm 4 có tồn tại không" —
+tra thì KHÔNG có trong 134 người của roster gốc (migration 0002), kể cả tìm
+theo họ "Trương" hay theo "Ngọc Anh" riêng lẻ. Người dùng dán lại nguyên dòng
+dữ liệu của cô ấy từ một tệp Excel khác, đủ cả dob/chức vụ/công ty/địa chỉ/số
+điện thoại — migration 0023 thêm thẳng vào `roster`, seq=135 (nối tiếp ngay
+sau 134, không dùng lại STT=15 của tệp nguồn vì đó là số thứ tự của MỘT TỆP
+KHÁC, không phải khoá của ta — `roster.seq` chỉ để hiển thị, không được code
+dùng để tra cứu, khoá thật luôn là `roster.id`).
+
+Có một điểm củng cố đáng ghi lại: công ty "Công ty CP Trường học MindX" và địa
+chỉ "71 Nguyễn Chí Thanh, phường Giảng Võ, Hà Nội" TRÙNG KHỚP với Nguyễn Trung
+Đức (seq 51, Nhóm 4) đã có sẵn trong roster từ đầu — hai đồng nghiệp cùng công
+ty, cùng lớp, cùng nhóm. Đây là bằng chứng gián tiếp tốt rằng dữ liệu người
+dùng cung cấp là thật, không phải lỗi đánh máy.
+
+**Số điện thoại thiếu 1 chữ số trong tệp nguồn** (`086689856` — 9 số, cần 10)
+— CÙNG DẠNG LỖI đã gặp với Lê Trung Đức. Ghi nguyên văn vào `roster.phone`,
+không đoán số còn thiếu; đã thêm dòng cho cô ấy vào
+`scripts/data/bo-sung-dien-thoai.csv` (nhóm "đang SAI", nay 6 dòng chứ không
+còn 5) — cô ấy sẽ không tự vào được ở `/vao` cho tới khi có số đúng.
+
+Chỉ thêm vào `roster` — KHÔNG tự tạo `members`. Người thật khớp mẫu này cần
+Ban cán sự lớp phát link mời qua tính năng xuyên nhóm mới làm (mục "Link mời
+xuyên nhóm" ở trên), hoặc cô ấy tự nhận ở `/vao` một khi có đúng số.
+
+**Bẫy suýt vấp phải, đã sửa kèm**: `roster_total` từng bị `deploy.yml` VÀ ba
+bộ kiểm (`kiem-tanso.mjs`, `kiem-danhba.mjs`, `kiem-moi.mjs`) ghi cứng thành
+`=== 134` — thêm một người là bốn chỗ đó đỏ hết, đúng kiểu lỗi `group6_members`
+đã vấp ngày 24/8. Sửa tất cả sang "không hụt đi" (`>= 134`), cùng khuôn với
+cách `group6_members` đã được sửa. `scripts/build-phan-vai-sql.mjs` cũng có
+một cận trên cứng `seq > 134` chặn gán vai — nâng lên 135 (`SEQ_TOI_DA`), kèo
+theo sẽ phải nâng tiếp nếu roster còn thêm người. `scripts/verify-d1.sql` CỐ Ý
+không sửa: nó xác nhận đúng bản nạp gốc 134 người, không phải trạng thái sống
+của roster — chỉ dùng khi nạp lại từ đầu.
 
 ### Bốn số điện thoại điền được từ tệp Ban tổ chức (migration 0020)
 

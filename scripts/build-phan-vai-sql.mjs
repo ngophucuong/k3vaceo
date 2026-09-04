@@ -59,7 +59,14 @@ for (const l of dong.slice(1)) {
   const [vai, stt, ten, ghiChu] = tachDong(l);
   if (!VAI_HOP_LE.has(vai)) { loi.push(`vai "${vai}" không hợp lệ — chỉ nhận ${[...VAI_HOP_LE].join(' | ')}`); continue; }
   const seq = Number(stt);
-  if (!Number.isInteger(seq) || seq < 1 || seq > 134) { loi.push(`stt "${stt}" của ${vai} phải là số từ 1 đến 134`); continue; }
+  // Cận trên là sĩ số roster hiện tại (migration mới nhất thêm người thì phải
+  // nâng số này theo — 134 gốc + Trương Thị Ngọc Anh migration 0023 = 135).
+  // Không phải lưới an toàn duy nhất: KHOP bên dưới còn đối tên, seq sai hẳn
+  // (âm, chữ) vẫn bị chặn ở đây trước khi chạm SQL.
+  const SEQ_TOI_DA = 135;
+  if (!Number.isInteger(seq) || seq < 1 || seq > SEQ_TOI_DA) {
+    loi.push(`stt "${stt}" của ${vai} phải là số từ 1 đến ${SEQ_TOI_DA}`); continue;
+  }
   if (!ten) { loi.push(`dòng ${vai} stt ${stt} thiếu họ tên — cần để đối chiếu`); continue; }
   nhan.push({ vai, seq, ten, ghiChu: ghiChu || null });
 }

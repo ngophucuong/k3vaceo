@@ -49,7 +49,8 @@ const KHONG_SO = 8;        // Nguyễn Thanh Bình — danh sách gốc chưa c�
 // máy chủ chưa hề chạy. Mọi khẳng định dưới đây vô nghĩa nếu chỗ này đỏ.
 console.log('── Máy chủ có thật sự chạy không ──');
 const health = await get('/api/health').then(r => r.json()).catch(() => ({}));
-ok(`/api/health trả roster_total = ${health.roster_total} (134)`, health.roster_total === 134);
+ok(`/api/health trả roster_total = ${health.roster_total} (≥ 134 — roster được phép đông thêm)`,
+   health.roster_total >= 134);
 ok('bảng rate_events đã sạch (reset-tanso.sh đã chạy)',
    (await post('/api/onboard/check', { roster_id: NGUOI[0][0], phone: NGUOI[0][1] })).status === 200);
 

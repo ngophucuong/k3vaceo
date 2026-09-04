@@ -31,7 +31,8 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # Kiểm TRƯỚC khi chạm vào D1: vai lạ, số thứ tự ngoài 1–134, hoặc một vai
+      # Kiểm TRƯỚC khi chạm vào D1: vai lạ, số thứ tự ngoài 1–135 (sĩ số roster
+      # hiện tại, xem SEQ_TOI_DA trong build-phan-vai-sql.mjs), hoặc một vai
       # gán cho hai người thì dừng ngay.
       - name: Kiểm tệp CSV
         run: node scripts/build-phan-vai-sql.mjs
