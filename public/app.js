@@ -84,7 +84,6 @@ const ERR_TEXT = {
   otp_locked: 'Nhập sai quá nhiều lần, mã này bị huỷ. Xin mã mới.',
   otp_invalid_format: 'Mã gồm đúng 6 chữ số.',
   chua_nhan_ho_so: 'Cần nhận hồ sơ trước khi thêm passkey.',
-  da_nhan_cho: 'Hồ sơ này đã có người nhận. Đăng nhập bằng passkey hoặc mã gửi qua email.',
   // Đợt 6 — sổ chi
   scope_invalid: 'Không xác định được sổ quỹ nào.',
   category_invalid: 'Hạng mục chi không hợp lệ.',
@@ -1662,6 +1661,7 @@ function xacNhanThem(p) {
    người đang đọc danh bạ lớp bị đá ra. */
 let DANHBA_THE = 'nhom';
 let DANHBA_LOP = null;     // 134 người, tải một lần rồi lọc tại chỗ
+let DANHBA_CAN_MOI = false; // Ban cán sự lớp mới thấy nút "Tạo link mời" xuyên nhóm
 let DANHBA_TIM = '';
 
 function chipDanhBa() {
@@ -1690,7 +1690,11 @@ async function drawNhom() {
    đây — xem worker/src/lib/che.js. Che ở giao diện thì mở tab Network là đọc
    được số thật. */
 async function veDanhBaLop() {
-  if (!DANHBA_LOP) DANHBA_LOP = (await apiGet('/api/danh-ba')).nguoi;
+  if (!DANHBA_LOP) {
+    const kq = await apiGet('/api/danh-ba');
+    DANHBA_LOP = kq.nguoi;
+    DANHBA_CAN_MOI = !!kq.can_moi;
+  }
   $('#v-nhom').dataset.loaded = '1';
 
   const q = nhuDanhBa(DANHBA_TIM);
@@ -1741,6 +1745,24 @@ async function veDanhBaLop() {
       if (!dangMo) panel.classList.add('on');
     };
   });
+
+  // Tạo link mời xuyên nhóm — chỉ Ban cán sự lớp thấy nút này (DANHBA_CAN_MOI),
+  // máy chủ vẫn kiểm lại. Cùng khuôn sheet với nút mời ở thẻ Nhóm.
+  document.querySelectorAll('#v-nhom [data-moi]').forEach(btn => {
+    btn.onclick = async () => {
+      try {
+        const r = await apiPost(`/api/danh-ba/${btn.dataset.moi}/moi`);
+        openSheet(`<h3>Link mời cho ${esc(r.full_name)}</h3>
+          <p class="sub">Link cũ của người này (nếu có) đã bị vô hiệu. Gửi link dưới đây qua Zalo.</p>
+          <div class="card"><div class="cb" style="word-break:break-all;font-size:13px">${esc(r.url)}</div></div>
+          <div class="sa"><button class="big c" id="ivC">Đóng</button><button class="big go" id="ivCopy">Chép link</button></div>`);
+        $('#ivC').onclick = closeSheet;
+        $('#ivCopy').onclick = async () => {
+          try { await navigator.clipboard.writeText(r.url); toast('Đã chép link'); } catch { toast('Chép tay giúp nhé'); }
+        };
+      } catch (e) { toast(errText(e)); }
+    };
+  });
 }
 
 const nhuDanhBa = t => boDau(String(t ?? '')).toLowerCase().trim();
@@ -1772,6 +1794,8 @@ function veDongDanhBa(p) {
       <div class="fi"><div class="k">Chức vụ / đơn vị</div>
         <div class="v ${nghe ? '' : 'blank'}">${esc(nghe) || 'Chưa có'}</div></div>
       ${p.vai_lop ? `<div class="fi"><div class="k">Ban cán sự lớp</div><div class="v">${esc(p.vai_lop)}</div></div>` : ''}
+      ${!p.da_dang_nhap && DANHBA_CAN_MOI
+        ? `<button class="wide ghost" style="padding:11px;font-size:14px" data-moi="${p.roster_id}">Tạo link mời</button>` : ''}
     </div>`;
 }
 

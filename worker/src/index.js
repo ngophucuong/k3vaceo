@@ -8,7 +8,7 @@ import { getCurrentMember } from './auth.js';
 import { clientIp, conQuota, ghiNhan } from './lib/ratelimit.js';
 import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
-import { getDanhBa } from './routes/danh-ba.js';
+import { getDanhBa, postDanhBaMoi } from './routes/danh-ba.js';
 import { listMembers, getMember, patchMember, putMemberProfile,
          postNgungThamGia, postThamGiaLai, listNgung } from './routes/members.js';
 import { getOfficers, putOfficers } from './routes/officers.js';
@@ -168,6 +168,12 @@ export default {
       // routes/danh-ba.js. Phải đăng nhập: phần lớn dữ liệu vốn đã công khai
       // qua /api/wizard/roster/search, nhưng thông tin liên hệ thì không.
       if (pathname === '/api/danh-ba' && method === 'GET') return getDanhBa(env, me);
+      // Tạo/phát lại link mời XUYÊN NHÓM — chỉ Ban cán sự lớp (isClassCommittee
+      // kiểm bên trong postDanhBaMoi). Nhận roster_id chứ không phải member_id:
+      // người chưa đăng nhập có thể còn chưa có dòng members nào.
+      if ((m = pathname.match(/^\/api\/danh-ba\/(\d+)\/moi$/)) && method === 'POST') {
+        return postDanhBaMoi(request, env, me, Number(m[1]));
+      }
       if (pathname === '/api/members/ngung' && method === 'GET') return listNgung(env, me);
       if ((m = pathname.match(/^\/api\/members\/(\d+)\/ngung$/)) && method === 'POST') {
         return postNgungThamGia(env, me, Number(m[1]), ip);

@@ -23,11 +23,14 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Ba việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Bốn việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-2. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-3. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+1. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9). Ngô Phú Cường (uỷ viên)
+   cần phát link mời cho người CHƯA đăng nhập ở bất kỳ nhóm nào, không chỉ
+   Nhóm 6 — `POST /api/danh-ba/:roster_id/moi`, xem mục riêng bên dưới.
+2. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+3. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+4. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -53,9 +56,11 @@ cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trướ
 
 **Ba việc cần làm tiếp, xếp theo mức chặn:**
 
-1. **Điền 49 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (44
-   người chưa có số nào, 5 số sai hoặc trùng). Chưa điền thì từng ấy người
-   không tự vào được — đây là chỗ chặn số một, và nó không phải việc lập trình.
+1. **Điền 45 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (40
+   người chưa có số nào, 5 số sai hoặc trùng — đã điền được 4/44 người chưa có
+   số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020). Chưa điền
+   thì từng ấy người không tự vào được — đây là chỗ chặn số một, và nó không
+   phải việc lập trình.
 2. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
    cho những lần đăng nhập sau, mà nó CHƯA từng chạy trọn vẹn trên tên miền
    thật lần nào. Hỏng thì đường vào lại chỉ còn mã email, tức chưa thật sự bỏ
@@ -828,6 +833,89 @@ tức hơn 500 ngày, mà nhìn vẫn nhận ra đúng người.
 **Chưa làm, đã nêu và người dùng chọn cách khác:** cho chính chủ bật/tắt việc
 hiện số của mình (opt-in). Luật hiện tại đơn giản hơn — đăng nhập rồi là hiện.
 Bao giờ có người phàn nàn thì đó là chỗ sửa.
+
+## Link mời xuyên nhóm — Ban cán sự lớp mới có
+
+Thêm 3/9. Ngô Phú Cường (uỷ viên) cần phát link mời cho người CHƯA đăng nhập ở
+BẤT KỲ nhóm nào, không chỉ Nhóm 6 của mình. Trước đó việc này khoá cứng vào
+`canManageGroup(me, me.group_id)` — chỉ trưởng/phó của CHÍNH nhóm đó mời được
+người trong nhóm đó.
+
+`POST /api/danh-ba/:roster_id/moi` — nằm ở `routes/danh-ba.js`, không phải
+`routes/wizard.js`. Nhận `roster_id` chứ không phải `member_id`: người chưa
+đăng nhập có thể còn chưa có dòng `members` nào (73/134 người, tính lúc viết
+mục này). Route tự tạo hồ sơ nếu chưa có — đúng NHÓM ghi trong danh sách gốc
+của NGƯỜI NHẬN, không phải nhóm của người phát link — rồi cấp link mời.
+
+**Cố ý KHÔNG đụng `canManageGroup`.** Hàm đó còn gác cơ cấu, phần bài, ngừng
+tham gia — mọi thứ khác vẫn đóng nguyên với người ngoài nhóm. Chỉ riêng việc
+PHÁT LINK MỜI mới mở, vì nó không đọc được việc của nhóm (không sổ thu, không
+bài, không thông báo nội bộ) — cùng lý lẽ đã dùng cho N6 ở Danh bạ, không phải
+một ngoại lệ mới cần bàn lại.
+
+**Vai đủ điều kiện là `isClassCommittee`** (lop_truong/lop_pho/thu_quy/uy_vien),
+không phải `isClassOfficer`: phát link mời không đụng tiền, nên uỷ viên — vai
+thấp nhất cấp lớp — đã đủ, đúng tinh thần nó được lập ra (mục Tư liệu, migration
+0013).
+
+Ba chốt chặn đã kiểm bằng người thật trên D1 cục bộ:
+1. Người thường (không phải Ban cán sự lớp) gọi route này nhận `forbidden` 403.
+2. Người ĐÃ nhận hồ sơ (`claimed_at` khác NULL) nhận `da_nhan_cho` 409 — đúng
+   chốt chặn của `/api/onboard/vao`, không có đường tắt nào bỏ qua nó.
+3. Gọi lại lần hai cho cùng một người CHƯA nhận ra **token khác lần trước**,
+   và link cũ trả `410 invite_invalid_or_expired` — `reissueInviteToken` tự
+   vô hiệu link cũ trước khi cấp link mới, dùng chung với đường mời trong tab
+   Nhóm, không viết lại logic.
+
+Giao diện: nút "Tạo link mời" chỉ hiện trong thẻ Cả lớp của Danh bạ, ở panel
+của người CHƯA đăng nhập, và chỉ khi `can_moi` (cờ trả về từ `/api/danh-ba`,
+tính theo NGƯỜI XEM chứ không theo từng dòng) là true. Máy chủ vẫn kiểm lại
+trong `postDanhBaMoi` — giao diện chỉ để khỏi bày nút bấm vào là 403.
+
+### Lưu Minh Tiến — lớp trưởng Nhóm 8 (migration 0021)
+
+Ngô Phú Cường xác nhận trực tiếp, kèm tệp "Trưởng, phó nhóm" Ban tổ chức gửi.
+Có một cái bẫy suýt gán nhầm người: roster có **hai người tên đệm "Tiến"**,
+cùng chức danh "Chủ tịch" — Lê Minh Tiến (Nhóm 8) và Lưu Minh Tiến (Nhóm 5) —
+CLAUDE.md đã ghi từ Đợt 5 rằng hai người này còn dùng CHUNG một số điện thoại
+sai (`0914544449`). Hỏi lại người dùng trước khi gán, đừng đoán theo tên.
+
+Và **nhóm ghi trong `roster` sai**: bản 15/8 ghi Lưu Minh Tiến ở Nhóm 5, nhưng
+cả người dùng lẫn tệp Ban tổ chức đều xác nhận thực tế là Nhóm 8 — cùng dạng
+lệch nhóm đã gặp với Nguyễn Thị Tùng Vân. `roster.group_label` GIỮ NGUYÊN làm
+bản ghi lịch sử; nhóm thật đặt trực tiếp vào `members.group_id`.
+
+Anh ấy CHƯA từng đăng nhập — hồ sơ tạo trước (`claimed_at` để trống), tự nhận
+bằng số điện thoại ở `/vao` như bình thường, không có gì đặc quyền ở bước đó.
+Vai `truong_nhom` của Nhóm 8 gán kèm, guard theo `(group_id, role)` chứ không
+theo tên — nếu Nhóm 8 đã có ai tự nhận trưởng nhóm qua wizard thì migration
+không được đè lên người thật đã tự vận hành nhóm.
+
+### Việc còn treo: dữ liệu "Trưởng, phó nhóm" của 8 nhóm còn lại
+
+Tệp Excel "Final_Danh_sách_ký_K03_15.08" Ban tổ chức gửi có sheet **"Trưởng,
+phó nhóm"** ghi "Lớp trưởng"/"Lớp phó" cho gần hết 10 nhóm — nhưng đó là
+trưởng/phó của TỪNG NHÓM (đúng tên sheet), không phải chức vụ cấp lớp; nhiều
+nhóm có 1-2 người gắn nhãn "Lớp phó" mà không ai "Lớp trưởng", nên không đủ rõ
+để tự động gán. Migration 0021 chỉ xử lý đúng ca đã được người dùng xác nhận
+trực tiếp (Lưu Minh Tiến). Còn dữ liệu trưởng/phó của Nhóm 1, 2, 3, 4, 7, 9, 10
+trong tệp ấy CHƯA áp — cần người dùng xác nhận từng người trước khi gán, vì sai
+một vai cấp nhóm là mở nhầm quyền cơ cấu/phần bài/ngừng tham gia cho người
+không đúng.
+
+Sheet "DS lớp" cùng tệp (chữ ký buổi 21/8) cũng có **13 tên không khớp bất kỳ
+ai trong 134 người của roster** — có thể là học viên mới, có thể chỉ là biến
+thể tên/lỗi chính tả. Chưa xử lý, cần người dùng xác nhận từng người trước khi
+thêm vào roster.
+
+### Bốn số điện thoại điền được từ tệp Ban tổ chức (migration 0020)
+
+Đối chiếu 44 người thiếu số trong roster với cả hai sheet của tệp trên (theo
+TÊN, vì không có cột roster_id nào để khớp thẳng) — chỉ 4 người khớp được:
+Trần Huy Tùng, Tạ Duy Hưng, Nguyễn Quang Huy, Lâm Ngọc Thảo. Bốn dòng ấy đã bị
+xoá khỏi `scripts/data/bo-sung-dien-thoai.csv` vì đã xong, tránh double-work.
+40 người còn lại trong CSV thì tệp Ban tổ chức này không có số của họ — vẫn
+phải hỏi trực tiếp.
 
 ## Giới hạn tần suất: đếm lần đoán, đừng đếm người
 

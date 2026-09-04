@@ -82,7 +82,9 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
 | `kiem-tanso.mjs` | giới hạn tần suất — cả lớp cùng một WiFi có vào được không |
 | `kiem-danhba.mjs` | danh bạ lớp — và số thật KHÔNG lọt ra ở người chưa đăng nhập |
+| `kiem-moi.mjs` | link mời xuyên nhóm cho Ban cán sự lớp (`POST /api/danh-ba/:id/moi`) |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
+| `reset-moi.sh` | dựng hai phiên + hai hồ sơ thử cho `kiem-moi.mjs` |
 | `gieo-coso.mjs` · `gieo-moi.mjs` | sinh dữ liệu đối chứng, hai reset tự gọi |
 
 Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
