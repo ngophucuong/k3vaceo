@@ -46,6 +46,7 @@ const passkeySupported = () => !!(window.PublicKeyCredential && navigator.creden
 
 const ERR_TEXT = {
   email_taken: 'Email này người khác trong lớp đã dùng.',
+  website_must_be_https: 'Website phải bắt đầu bằng https:// — dán cả đường dẫn đầy đủ.',
   email_invalid: 'Email chưa đúng định dạng.',
   email_required: 'Cần điền email.',
   forbidden: 'Bạn không có quyền làm việc này.',
@@ -151,6 +152,7 @@ function batTuLamMoi() {
       if (v === 'bai' && $('#v-bai').dataset.loaded) await drawBai();
       if (v === 'nhom' && $('#v-nhom').dataset.loaded) await drawNhom();
       if (v === 'quy' && $('#v-quy').dataset.loaded) await drawQuy();
+      if (v === 'gt' && $('#v-gt').dataset.loaded) await drawGiaoThuong();
     } catch { /* mất mạng thì thôi, lần sau quay lại thử tiếp */ }
   };
   document.addEventListener('visibilitychange', thu);
@@ -778,7 +780,7 @@ function renderNoSession() {
 }
 
 /* ═══════════ KHUNG ỨNG DỤNG ═══════════ */
-const VIEWS = ['nay', 'bai', 'nhom', 'kho', 'quy'];
+const VIEWS = ['nay', 'bai', 'nhom', 'kho', 'quy', 'gt'];
 
 /* Icon thanh điều hướng. Bản trước vẽ bằng CSS — mỗi tab là một khối bo góc
    khác nhau, nên năm tab trông gần như y hệt và không gợi ra thứ gì. Nay vẽ
@@ -811,6 +813,10 @@ const ICON = {
   quy: svg(`<rect x="2.4" y="5.2" width="15.2" height="9.6" rx="2"/>
             <circle cx="10" cy="10" r="2.4"/>
             <path d="M5.4 8.2v3.6M14.6 8.2v3.6"/>`),
+  // Giao thương: hai mũi tên trao đổi ngược chiều — hàng đi một đường, tiền
+  // và đơn hàng về một đường. Đọc được ở 20×20 mà không cần chú giải.
+  gt: svg(`<path d="M2.8 7.2h11.6M11.4 4.2l3 3-3 3"/>
+           <path d="M17.2 12.8H5.6M8.6 9.8l-3 3 3 3"/>`),
 };
 
 function shellHtml() {
@@ -830,6 +836,7 @@ function shellHtml() {
     <section class="view" id="v-nhom"></section>
     <section class="view" id="v-kho"></section>
     <section class="view" id="v-quy"></section>
+    <section class="view" id="v-gt"></section>
   </main>
   <nav><div class="navin">
     <button class="nb" data-v="nay">${ICON.nay}Hôm nay</button>
@@ -837,6 +844,7 @@ function shellHtml() {
     <button class="nb" data-v="nhom">${ICON.nhom}Nhóm</button>
     <button class="nb" data-v="kho">${ICON.kho}Tư liệu</button>
     <button class="nb" data-v="quy">${ICON.quy}Quỹ</button>
+    <button class="nb" data-v="gt">${ICON.gt}Kết nối</button>
   </div></nav>`;
 }
 
@@ -851,6 +859,7 @@ function route() {
   if (v === 'nhom') drawNhom();
   if (v === 'kho') drawKho('all');
   if (v === 'quy') drawQuy();
+  if (v === 'gt') drawGiaoThuong();
   if (v === 'nay') danhDauDaXem();
 }
 
@@ -3027,6 +3036,246 @@ async function drawPasskeyBox() {
       catch (e) { toast(errText(e)); }
     };
   });
+}
+
+/* ═══════════ GIAO THƯƠNG ═══════════
+   Danh mục "bán gì, bán cho ai" của CẢ LỚP — không lọc theo nhóm. Đây là chỗ
+   duy nhất trong ứng dụng cố ý bỏ N6; lý lẽ đầy đủ ở migrations/0016.
+
+   Hai mức lộ, và giao diện phải nói rõ sự khác nhau ở đúng chỗ người ta bấm:
+     · mặc định — 134 người trong lớp xem được
+     · công khai — ra internet, Google tìm thấy được (chính chủ tự bật)         */
+
+let GT = null;                       // /api/giao-thuong gần nhất
+let GT_LOC = { nganh: 'tat-ca', tim: '' };
+
+const gtTenNganh = () => new Map((GT?.nganh_list ?? []).map(n => [n.ma, n.ten]));
+
+// Cùng luật với máy chủ. Chuỗi này đi vào href, mà 'javascript:' thì esc()
+// không cứu được — nó không có ký tự HTML nào để thoát.
+const gtWebAnToan = u => /^https:\/\/[^\s/]+\./i.test(String(u ?? '')) ? u : null;
+
+function gtThe(p, ten) {
+  const noi = [p.title, p.company].filter(Boolean).map(esc).join(' · ');
+  const web = gtWebAnToan(p.website);
+  const lh = [];
+  if (p.phone) lh.push(`<a href="tel:${esc(String(p.phone).replace(/[^\d+]/g, ''))}">Gọi</a>`);
+  if (p.email) lh.push(`<a href="mailto:${esc(p.email)}">Email</a>`);
+  if (web) lh.push(`<a href="${esc(web)}" target="_blank" rel="nofollow noopener">Website</a>`);
+
+  return `<div class="gtc" data-the="${p.id}">
+    <div class="gth">
+      ${avatar(p.full_name)}
+      <div style="min-width:0;flex:1">
+        <div class="nm">${esc(p.full_name)}${p.cong_khai ? '<span class="tg" style="font-size:10px;padding:1px 7px;margin-left:6px">công khai</span>' : ''}</div>
+        ${noi ? `<div class="co">${noi}</div>` : ''}
+      </div>
+      ${p.group_no ? `<span class="gtn num">N${p.group_no}</span>` : ''}
+    </div>
+    ${p.nganh?.length ? `<div class="gtng">${p.nganh.map(m =>
+      `<span class="tg">${esc(ten.get(m) ?? m)}</span>`).join('')}</div>` : ''}
+    ${p.sells_what ? `<div class="gtb"><span class="k">Bán gì</span>${esc(p.sells_what)}</div>` : ''}
+    ${p.sells_to ? `<div class="gtp"><span class="k">Bán cho ai</span>${esc(p.sells_to)}</div>` : ''}
+    ${p.offers ? `<div class="gtp"><span class="k">Giúp được gì</span>${esc(p.offers)}</div>` : ''}
+    ${p.mo_ta ? `<div class="gtm">${esc(p.mo_ta)}</div>` : ''}
+    ${p.needs ? `<div class="gtcan"><span class="k">Đang cần</span>${esc(p.needs)}</div>` : ''}
+    ${lh.length ? `<div class="gtlh">${lh.join('')}</div>` : ''}
+  </div>`;
+}
+
+async function drawGiaoThuong() {
+  if (!$('#v-gt').dataset.loaded) $('#v-gt').innerHTML = `<div class="foot" style="padding:0 2px">Đang tải…</div>`;
+  GT = await apiGet('/api/giao-thuong');
+  $('#v-gt').dataset.loaded = '1';
+  veGiaoThuong();
+}
+
+/* Tách khỏi drawGiaoThuong để bấm chip và gõ tìm KHÔNG gọi lại máy chủ —
+   danh mục nhiều nhất 134 dòng và đã tải sẵn. Cùng nếp với sổ thu, và cùng
+   lý do: giữ bộ lọc nguyên vẹn qua mỗi lần vẽ lại. */
+function veGiaoThuong() {
+  const ten = gtTenNganh();
+  const nguoi = GT.nguoi ?? [];
+  const toi = GT.toi;
+  const coGianHang = toi && [toi.sells_what, toi.offers, toi.needs, toi.mo_ta]
+    .some(x => (x ?? '').trim() !== '');
+
+  const dem = new Map();
+  for (const p of nguoi) for (const m of p.nganh ?? []) dem.set(m, (dem.get(m) ?? 0) + 1);
+  const chips = [['tat-ca', 'Tất cả', nguoi.length]].concat(
+    (GT.nganh_list ?? []).filter(n => dem.has(n.ma)).map(n => [n.ma, n.ten, dem.get(n.ma)]));
+
+  const q = boDau(GT_LOC.tim).trim();
+  const hien = nguoi.filter(p => {
+    if (GT_LOC.nganh !== 'tat-ca' && !(p.nganh ?? []).includes(GT_LOC.nganh)) return false;
+    if (!q) return true;
+    const kho = boDau([p.full_name, p.title, p.company, p.sells_what, p.sells_to,
+      p.needs, p.offers, p.mo_ta, ...(p.nganh ?? []).map(m => ten.get(m))]
+      .filter(Boolean).join(' '));
+    return q.split(/\s+/).every(t => kho.includes(t));
+  });
+
+  // Gợi ý do máy chủ tính (lý do ở worker/src/lib/ghep.js). Mỗi dòng phải nói
+  // ĐƯỢC vì sao nó ở đây: gợi ý không giải thích được thì không ai bấm.
+  const goiY = (GT.goi_y ?? []).map(g => {
+    const p = nguoi.find(x => x.id === g.member_id);
+    if (!p) return '';
+    return `<button class="gtg" data-xem="${p.id}">
+      ${avatar(p.full_name)}
+      <div style="min-width:0;flex:1;text-align:left">
+        <div class="nm">${esc(p.full_name)}</div>
+        <div class="vs">${esc(g.vi_sao)}${g.trung?.length ? ` · cùng nhắc tới “${esc(g.trung[0])}”` : ''}</div>
+      </div>
+    </button>`;
+  }).join('');
+
+  $('#v-gt').innerHTML = `
+  <div class="foot" style="padding:0 2px 12px">
+    Cả lớp cùng xem được mục này, không giới hạn trong nhóm — bài tập thì theo nhóm,
+    làm ăn thì không.
+  </div>
+
+  <div class="card gtme">
+    <div class="gtmeh">
+      <div>
+        <div class="eb" style="margin:0">Gian hàng của bạn</div>
+        <div class="foot" style="padding:2px 0 0">${coGianHang
+          ? (toi.cong_khai
+            ? 'Đang công khai — cả người ngoài lớp cũng xem được.'
+            : 'Đang hiện trong lớp. Chưa công khai ra ngoài.')
+          : 'Chưa điền gì. Cả lớp chưa biết bạn bán gì.'}</div>
+      </div>
+      <button class="pill" id="gtSua">${coGianHang ? 'Sửa' : 'Điền'}</button>
+    </div>
+  </div>
+
+  ${goiY ? `<div class="sect">
+    <div class="eb">Có thể hợp với bạn <span class="c">${GT.goi_y.length}</span></div>
+    <div class="gtgs">${goiY}</div>
+    <div class="foot">Ghép theo chữ bạn và họ cùng viết ra, không phải ai trả tiền để đứng trước.</div>
+  </div>` : ''}
+
+  <div class="sect">
+    <div class="eb">Danh mục cả lớp <span class="c">${nguoi.length}</span></div>
+    <input id="gtTim" class="gttim" type="search" placeholder="Tìm theo tên, đơn vị, mặt hàng…"
+           value="${esc(GT_LOC.tim)}" autocomplete="off" spellcheck="false">
+    <div class="fl cuon">${chips.map(([ma, t, n]) =>
+      `<button class="fc ${GT_LOC.nganh === ma ? 'on' : ''}" data-ng="${esc(ma)}">${esc(t)} <span class="num">${n}</span></button>`).join('')}</div>
+    ${hien.length ? hien.map(p => gtThe(p, ten)).join('')
+      : `<div class="card"><div class="cb mut">Không có ai khớp. Thử bớt chữ, hoặc chọn lại “Tất cả”.</div></div>`}
+  </div>
+
+  ${GT.chua_mo ? `<div class="foot" style="padding:4px 2px 0">
+    Còn ${GT.chua_mo} người trong lớp chưa điền gian hàng.</div>` : ''}
+  <div class="foot"></div>`;
+
+  $('#gtSua').onclick = openGianHang;
+  document.querySelectorAll('#v-gt [data-ng]').forEach(b => {
+    b.onclick = () => { GT_LOC.nganh = b.dataset.ng; veGiaoThuong(); };
+  });
+  document.querySelectorAll('#v-gt [data-xem]').forEach(b => {
+    b.onclick = () => {
+      // Gợi ý dẫn thẳng tới thẻ người ấy trong danh mục: bỏ lọc, xoá ô tìm,
+      // vẽ lại rồi cuộn tới. Mở một sheet riêng thì lại phải dựng bản sao thứ
+      // hai của cùng cái thẻ, và hai bản sao thì sớm muộn lệch nhau.
+      GT_LOC = { nganh: 'tat-ca', tim: '' };
+      veGiaoThuong();
+      const el = document.querySelector(`#v-gt [data-the="${b.dataset.xem}"]`);
+      if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+  });
+
+  // Ô tìm gắn oninput chứ không vẽ lại cả tab mỗi phím: vẽ lại làm mất tiêu
+  // điểm, con trỏ nhảy về đầu ô và bàn phím điện thoại đóng lại.
+  const o = $('#gtTim');
+  o.oninput = () => {
+    GT_LOC.tim = o.value;
+    const vt = o.selectionStart;
+    veGiaoThuong();
+    const moi = $('#gtTim');
+    moi.focus();
+    moi.setSelectionRange(vt, vt);
+  };
+}
+
+async function openGianHang() {
+  // ĐỌC LẠI TỪ MÁY CHỦ trước khi mở form — đừng tin bản trong bộ nhớ. Bốn ô
+  // đầu dùng CHUNG với hồ sơ ở tab Nhóm, nên kịch bản này có thật: sửa "bán
+  // gì" ở tab Nhóm, quay sang đây bấm Sửa, bấm Lưu — và bản vừa sửa bị ghi
+  // đè bằng bản cũ còn nằm trong GT. Đúng lỗi mất dữ liệu đã xảy ra ở Đợt 1
+  // với form sửa hồ sơ (xem quy ước 3 trong CLAUDE.md).
+  try { GT = await apiGet('/api/giao-thuong'); }
+  catch (e) { toast(errText(e)); return; }
+  const t = GT?.toi ?? {};
+  const ten = gtTenNganh();
+  const dangChon = new Set(t.nganh ?? []);
+
+  openSheet(`<h3>Gian hàng của bạn</h3>
+   <p class="sub">Bốn dòng đầu cũng là hồ sơ ở tab Nhóm — sửa ở đây là sửa chính nó.</p>
+
+   <label class="f">Bán gì</label><input id="gA" maxlength="80" value="${esc(t.sells_what)}" placeholder="Vận tải container Bắc – Nam">
+   <label class="f">Bán cho ai</label><input id="gB" maxlength="80" value="${esc(t.sells_to)}" placeholder="Nhà máy, công ty xuất nhập khẩu">
+   <label class="f">Đang cần</label><input id="gC" maxlength="80" value="${esc(t.needs)}" placeholder="Phần mềm quản lý kho">
+   <label class="f">Giúp được gì</label><input id="gD" maxlength="80" value="${esc(t.offers)}" placeholder="Kho bãi tại Hải Phòng">
+
+   <label class="f">Ngành (chọn tối đa 3)</label>
+   <div class="fl cuon" id="gNg">${(GT?.nganh_list ?? []).map(n =>
+     `<button type="button" class="fc ${dangChon.has(n.ma) ? 'on' : ''}" data-ma="${esc(n.ma)}">${esc(n.ten)}</button>`).join('')}</div>
+
+   <label class="f">Giới thiệu thêm</label>
+   <textarea id="gE" maxlength="300" rows="3" placeholder="Một hai câu cho người chưa quen bạn.">${esc(t.mo_ta)}</textarea>
+   <label class="f">Website</label><input id="gF" maxlength="300" value="${esc(t.website)}" placeholder="https://…">
+   <div class="errline" id="gErr" style="display:none"></div>
+
+   <div class="gtck">
+     <label class="gtsw"><input type="checkbox" id="gCK" ${t.cong_khai ? 'checked' : ''}>
+       <span><b>Công khai ra ngoài lớp</b>
+       <i>Hiện tại ${GT?.nguoi?.length ?? 0} người trong lớp xem được gian hàng của bạn.
+       Bật thêm mức này thì nó nằm ở trang k3vaceo.cuongngo.app/giao-thuong —
+       ai cũng mở được, và Google tìm thấy được.</i></span></label>
+
+     <label class="gtsw" id="gLHWrap"><input type="checkbox" id="gLH" ${t.hien_lien_he ? 'checked' : ''}>
+       <span><b>Kèm số điện thoại và email</b>
+       <i>Trên trang công khai sẽ hiện ${esc(t.phone || '(chưa có số)')}${t.email ? ' và ' + esc(t.email) : ''}.
+       Không bật thì người lạ đọc được bạn bán gì nhưng phải tự tìm cách liên hệ.</i></span></label>
+   </div>
+   <div class="foot" style="padding:8px 0 0">Gỡ lúc nào cũng được — tắt công tắc là trang ngoài không còn bạn.
+     Nhưng thứ Google đã lấy về thì phải chờ họ quét lại.</div>
+
+   <div class="sa"><button class="big c" id="gHuy">Thôi</button>
+     <button class="big go" id="gLuu">Lưu</button></div>`);
+
+  // Ô "kèm liên hệ" chỉ có nghĩa khi đã bật công khai — trong lớp thì liên hệ
+  // vốn đã hiện. Làm mờ chứ không giấu: giấu đi thì người ta không biết là có
+  // lựa chọn ấy, rồi bật công khai xong lại tưởng số mình mặc nhiên ra theo.
+  const dongBo = () => { $('#gLHWrap').classList.toggle('mo', !$('#gCK').checked); };
+  $('#gCK').onchange = dongBo;
+  dongBo();
+
+  document.querySelectorAll('.sheet [data-ma]').forEach(b => {
+    b.onclick = () => {
+      const ma = b.dataset.ma;
+      if (dangChon.has(ma)) dangChon.delete(ma);
+      else if (dangChon.size >= 3) { toast('Nhiều nhất 3 ngành'); return; }
+      else dangChon.add(ma);
+      b.classList.toggle('on', dangChon.has(ma));
+    };
+  });
+
+  $('#gHuy').onclick = closeSheet;
+  $('#gLuu').onclick = () => submitting($('#gLuu'), async () => {
+    await apiPut('/api/me/giao-thuong', {
+      sells_what: $('#gA').value, sells_to: $('#gB').value,
+      needs: $('#gC').value, offers: $('#gD').value,
+      nganh: [...dangChon], mo_ta: $('#gE').value, website: $('#gF').value,
+      cong_khai: $('#gCK').checked, hien_lien_he: $('#gLH').checked,
+    });
+    await drawGiaoThuong();
+    // Hồ sơ ở tab Nhóm dùng chung bốn ô đầu — không vẽ lại thì vòng tròn 0–4
+    // ở đó vẫn là số cũ cho tới lần mở sau.
+    if ($('#v-nhom').dataset.loaded) await drawNhom();
+    await refreshHome();
+  }, 'Đã lưu gian hàng');
 }
 
 /* ═══════════ KHỞI ĐỘNG ═══════════ */

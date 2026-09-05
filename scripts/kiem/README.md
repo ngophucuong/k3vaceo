@@ -36,8 +36,11 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tulieu-buoi.mjs` | tư liệu gắn vào buổi, một dòng hai màn |
 | `pw-vao-nhanh.mjs` | luồng `/vao` rút gọn: số điện thoại vào thẳng + passkey |
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
+| `kiem-ghep.mjs` | thuật toán ghép giao thương + danh mục ngành — **chạy thẳng, không cần máy chủ** |
+| `pw-giao-thuong.mjs` | tab Kết nối, trang `/giao-thuong`, hai mức lộ |
+| `gieo-giao-thuong.sh` | gieo bốn gian hàng ở bốn nhóm cho `pw-giao-thuong.mjs` |
 
-## Bốn phép đối chứng đáng giữ nhất
+## Sáu phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -60,6 +63,25 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
 4. **`kiem-ics.py` tính lại múi giờ bằng `zoneinfo` của Python**, không dùng
    lại công thức của `lib/ics.js`. Tự kiểm bằng chính công thức mình viết thì
    sai giống hệt nhau và test vẫn xanh.
+
+5. **`kiem-ghep.mjs` dựng lại bốn cách làm NGÂY THƠ rồi cho thấy chúng sai** ở
+   đúng ca mà phép kiểm phía trên đang khẳng định — bỏ dấu thiếu bước `đ→d`,
+   so từ đơn thay vì bigram, cắt từ phổ biến mà thiếu chốt "dưới 20 hồ sơ",
+   và ngưỡng điểm hạ xuống 1. Không có chúng thì cả bộ vẫn đậu kể cả khi
+   thuật toán ghép bị thay bằng một phép so chuỗi tầm thường.
+
+6. **Phép hồi quy "form đọc lại từ máy chủ" trong `pw-giao-thuong.mjs` đã
+   được đối chứng bằng tay**: gỡ dòng `GT = await apiGet(...)` trong
+   `openGianHang` ra thì nó đỏ, lắp lại thì xanh. Đây là lỗi mất dữ liệu
+   loại nguy nhất — bốn ô "bán gì / bán cho ai / cần gì / giúp được gì" dùng
+   CHUNG giữa tab Nhóm và tab Kết nối, nên mở form từ bộ nhớ đệm rồi bấm Lưu
+   là ghi đè bản mới bằng bản cũ, y hệt lỗi Đợt 1.
+
+**Chỗ dễ rò nhất của cả sản phẩm, kiểm ở `pw-giao-thuong.mjs`:** trang
+`/giao-thuong` là đường DUY NHẤT đưa dữ liệu người dùng ra internet. Hai phép
+kiểm phải giữ nguyên răng — người CHƯA bật `cong_khai` phải vắng mặt hoàn
+toàn, và số điện thoại của người TẮT `hien_lien_he` không được có trong HTML.
+Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ không ai muốn đưa.
 
 ## Hai chỗ môi trường này không kiểm được
 

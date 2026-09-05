@@ -24,6 +24,7 @@ import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, 
          postDeclareFor, deleteFund } from './routes/funds.js';
 import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, postThongBao,
          postThongBaoDaXem, deleteThongBao } from './routes/lich.js';
+import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
 import {
@@ -83,6 +84,13 @@ export default {
       }
       if (pathname === '/api/lich/k3vaceo.ics' && method === 'GET') {
         return getLichIcs(request, env);
+      }
+      // Danh mục giao thương công khai — đường DUY NHẤT đưa dữ liệu người
+      // dùng ra internet, và chỉ đưa của ai đã tự bật. Xem đầu file
+      // routes/giao-thuong.js: ba chốt phải đứng cùng lúc, không chốt nào tự
+      // báo lỗi khi hỏng.
+      if (pathname === '/api/giao-thuong/cong-khai' && method === 'GET') {
+        return getGiaoThuongCongKhai(env);
       }
 
       // Đợt 5 — tự nhận diện rồi OTP qua email. Ba chặng: đối chiếu số điện
@@ -170,6 +178,12 @@ export default {
       if ((m = pathname.match(/^\/api\/members\/(\d+)\/invite$/)) && method === 'POST') {
         return postMemberInvite(request, env, me, Number(m[1]));
       }
+
+      // Giao thương: CỐ Ý không lọc theo nhóm (lệch N6 có chủ ý, Ngô Phú Cường
+      // quyết 5/9 — lý lẽ ở migrations/0016_giao_thuong.sql). Đường sửa thì
+      // chỉ chính chủ, không có bản sửa hộ.
+      if (pathname === '/api/giao-thuong' && method === 'GET') return getGiaoThuong(env, me);
+      if (pathname === '/api/me/giao-thuong' && method === 'PUT') return putGianHang(request, env, me, ip);
 
       if (pathname === '/api/officers' && method === 'GET') return getOfficers(env, me);
       if (pathname === '/api/officers' && method === 'PUT') return putOfficers(request, env, me, ip);
