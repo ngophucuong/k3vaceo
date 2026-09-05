@@ -94,13 +94,17 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `reset-tulieu-text.sh` | dựng phiên Ngô Phú Cường cho `kiem-tulieu-text.mjs` / `pw-tulieu-text.mjs` |
 | `reset-tulieu-bai.sh` | như trên, cộng seed một `plan_sections` của NHÓM KHÁC cho phép kiểm N6 |
 | `gieo-coso.mjs` · `gieo-moi.mjs` | sinh dữ liệu đối chứng, hai reset tự gọi |
+| `kiem-ghep.mjs` | thuật toán ghép giao thương + danh mục ngành — **chạy thẳng, không cần máy chủ** |
+| `pw-giao-thuong.mjs` | tab Giao thương, trang `/giao-thuong`, hai mức lộ |
+| `gieo-giao-thuong.sh` | gieo bốn gian hàng ở bốn nhóm cho `pw-giao-thuong.mjs` |
+| `pw-nav.mjs` | thanh nav sáu tab ở sáu khổ màn hình — xem cảnh báo dưới đây |
 
 Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
 đúng với dữ liệu đang nằm trong D1 cục bộ. Trước 27/8 `coso.json` nằm ở thư mục
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Mười phép đối chứng đáng giữ nhất
+## Mười ba phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -203,6 +207,38 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
     style: Chromium trên máy chủ không có "tai thỏ" nên `env(safe-area-inset-*)`
     luôn bằng 0, computed style không phân biệt được "đã chừa chỗ" với "quên
     chừa" — đúng cái lỗi cần bắt.
+
+11. **`kiem-ghep.mjs` dựng lại bốn cách làm NGÂY THƠ rồi cho thấy chúng sai** ở
+   đúng ca mà phép kiểm phía trên đang khẳng định — bỏ dấu thiếu bước `đ→d`,
+   so từ đơn thay vì bigram, cắt từ phổ biến mà thiếu chốt "dưới 20 hồ sơ",
+   và ngưỡng điểm hạ xuống 1. Không có chúng thì cả bộ vẫn đậu kể cả khi
+   thuật toán ghép bị thay bằng một phép so chuỗi tầm thường.
+
+
+12. **Phép hồi quy "form đọc lại từ máy chủ" trong `pw-giao-thuong.mjs` đã
+   được đối chứng bằng tay**: gỡ dòng `GT = await apiGet(...)` trong
+   `openGianHang` ra thì nó đỏ, lắp lại thì xanh. Đây là lỗi mất dữ liệu
+   loại nguy nhất — bốn ô "bán gì / bán cho ai / cần gì / giúp được gì" dùng
+   CHUNG giữa tab Nhóm và tab Giao thương, nên mở form từ bộ nhớ đệm rồi bấm Lưu
+   là ghi đè bản mới bằng bản cũ, y hệt lỗi Đợt 1.
+
+
+13. **`pw-nav.mjs` đo BỀ RỘNG CHỮ, không đo chiều cao nút.** Bản đầu đo chiều
+   cao — đoán rằng nhãn dài sẽ xuống dòng và đội nút cao lên — và nó báo xanh
+   ở mọi khổ từ 300px tới 430px, kể cả những khổ nhãn đang tràn thật. Vì
+   `white-space:nowrap` khiến chữ TRÀN chứ không xuống dòng, còn `min-width:0`
+   khiến phần tràn không đẩy thanh nav rộng ra: cả phép đo chiều cao lẫn phép
+   đo `scrollWidth` của thanh nav đều mù. Phải so `lb.scrollWidth` với
+   `nb.clientWidth`. Đây là phép kiểm **đậu giả** mới nhất bị bắt, 5/9.
+
+**Chỗ dễ rò nhất của cả sản phẩm, kiểm ở `pw-giao-thuong.mjs`:** trang
+`/giao-thuong` là đường DUY NHẤT đưa dữ liệu người dùng ra internet. Hai phép
+kiểm phải giữ nguyên răng — người CHƯA bật `cong_khai` phải vắng mặt hoàn
+toàn, và số điện thoại của người TẮT `hien_lien_he` không được có trong HTML.
+Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ không ai muốn đưa.
+
+
+
 
 ## Chạy `kiem-tanso.mjs`
 

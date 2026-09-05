@@ -23,35 +23,39 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Bảy việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Tám việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+1. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
+   Danh mục "bán gì, bán cho ai" của cả lớp, kèm ghép nối theo nhu cầu và
+   một trang ai cũng mở được (Google index được). Chỗ DUY NHẤT dữ liệu người
+   dùng ra khỏi tên miền, và chỉ của ai tự bật — xem mục riêng bên dưới.
+2. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
    Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
    1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
    tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
    bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
    trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
    người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
-2. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+3. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-3. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+4. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-4. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+5. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
    Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
    người đã đăng nhập (mục #1 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
    xem mục riêng bên dưới.
-5. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-6. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-7. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+6. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+7. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+8. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -142,10 +146,18 @@ Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sa
 - **N4 — Tự giác là chính.** Không xác minh email, không OTP, không đối soát.
 - **N5 — Chính chủ tự sửa được thông tin của mình**, không qua ai duyệt.
 - **N6 — Dữ liệu nhóm cách ly.** Nhóm 8 không đọc được gì của nhóm 6. → **đã lệch
-  có chủ ý ngày 28/8** cho DANH BẠ, Ngô Phú Cường quyết. Phân định: N6 bảo vệ
-  *việc của nhóm* — sổ thu, bài tám phần, thông báo nội bộ — chứ không phải danh
-  tính cá nhân. Danh bạ không đụng thứ nào trong số đó. Mọi đường khác GIỮ
-  NGUYÊN N6 nguyên vẹn; đừng lấy danh bạ làm tiền lệ để mở thêm.
+  có chủ ý HAI LẦN**, cùng một phân định, Ngô Phú Cường quyết cả hai:
+  - **28/8, cho DANH BẠ.** N6 bảo vệ *việc của nhóm* — sổ thu, bài tám phần,
+    thông báo nội bộ — chứ không phải danh tính cá nhân. Danh bạ không đụng thứ
+    nào trong số đó.
+  - **5/9, cho GIAO THƯƠNG.** *"Cơ hội giao thương công khai là thứ giá trị tồn
+    tại sau khoá học. Nên bạn có thể bỏ qua các quy định trước (việc ghép nhóm
+    chỉ để làm bài tập)."* Cùng lý lẽ, nối dài thêm một bước: bài tập hết hạn
+    26/9, quan hệ làm ăn thì không. Và thêm một mức nữa mà danh bạ không có —
+    ra khỏi tên miền, ai cũng đọc được — nên mức ấy phải chính chủ tự bật.
+
+  Mọi đường khác GIỮ NGUYÊN N6 nguyên vẹn; đừng lấy hai chỗ này làm tiền lệ để
+  mở thêm. Quỹ, bài 8 phần, thông báo nhóm, sổ thu, tư liệu nhóm — không đụng.
 - **N7 — Không dùng chữ viết tắt "BCS"** ở bất kỳ chuỗi hiển thị nào. Viết đủ
   "Ban cán sự lớp", kể cả trong log và email.
 
@@ -864,6 +876,139 @@ Quên `home.js` thì quyền chạy đủ nhưng màn Hôm nay không hiện vai
 
 Chốt chặn "không bỏ trống hết" nay **đếm số vai còn người**, không so đôi một
 như hồi hai vai — so đôi một với ba vai sẽ cho phép bỏ trống cả ba mà vẫn lọt.
+
+## Giao thương — chỗ duy nhất N6 được bỏ, và vì sao
+
+Thêm 5/9 (migration 0016). Tab **Giao thương** trong ứng dụng, cộng trang công khai
+`k3vaceo.cuongngo.app/giao-thuong`. Ngô Phú Cường quyết bỏ N6 cho riêng phạm vi
+này: *"việc ghép nhóm chỉ để làm bài tập"* — mà bài tập hết hạn 26/9.
+
+**Hạt giống đã nằm sẵn trong DB từ Đợt 1, không phải làm mới từ đầu.** Bảng
+`member_profile` (migration 0001) đã có đúng bốn ô `sells_what` · `sells_to` ·
+`needs` · `offers`, và vòng tròn 0–4 ở tab Nhóm chính là đếm chúng. Thứ thiếu
+suốt bốn đợt chỉ là một màn tổng hợp: `listMembers` khoá cứng
+`WHERE group_id = ?`, nên "bán gì" của 120 người ngoài nhóm là vô hình, và
+ngay trong nhóm cũng phải bấm mở từng người mới thấy.
+
+### Hai mức lộ, đừng bao giờ gộp làm một
+
+| `cong_khai` | Ai xem được | Cần gì để bật |
+|---|---|---|
+| `0` (mặc định) | 134 người đã đăng nhập | không cần gì — đây là chỗ N6 được bỏ |
+| `1` | cả internet, Google index được | **chính chủ tự bật**, không ai bật hộ |
+
+Cột `hien_lien_he` là công tắc thứ hai, tách riêng: nhiều người muốn giới
+thiệu việc mình làm nhưng chưa muốn số điện thoại nằm trên trang ai cũng tải
+về được. Gộp hai thứ làm một thì phần lớn chọn "thôi không bật".
+
+**Vì sao mức thứ hai vẫn phải xin phép, dù đã được bảo là bỏ quy định:** không
+phải để giữ N6 — mà vì (1) không lùi được, gỡ khỏi D1 không gỡ được khỏi bộ
+nhớ đệm của Google; (2) lý do sản phẩm mạnh hơn lý do nguyên tắc: 30 gian hàng
+do chính chủ bật, số đúng, người đang chờ điện thoại reo — đáng giá hơn hẳn
+134 gian hàng dựng từ dữ liệu cũ của Ban tổ chức mà chủ nhân không biết mình
+đang ở đó. Người lạ gọi trúng số sai một lần là không quay lại trang nữa.
+
+`/giao-thuong/` **CỐ Ý KHÔNG có `X-Robots-Tag: noindex`**, khác `/lich/` và
+`/sotay/`. Đừng "sửa cho nhất quán" — cả lý do trang tồn tại là để người lạ
+TÌM THẤY được. Điều kiện an toàn nằm ở chỗ khác và phải giữ: mặc định TẮT, và
+ngay cạnh công tắc có đúng câu "Google tìm thấy được".
+
+### Ghép nối: cơ học, không phải mô hình ngôn ngữ
+
+`worker/src/lib/ghep.js`. Ba chiều, ba câu giải thích khác nhau — gợi ý không
+nói được vì sao thì không ai bấm:
+
+- `ho_can` — họ đang cần thứ bạn bán (chiều duy nhất bán được hàng ngay, nên
+  xếp đầu khi bằng điểm)
+- `toi_can` — họ có thứ bạn đang cần
+- `dung_khach` — `sells_to` của bạn khớp với đơn vị/chức vụ của họ
+
+Bốn điều đã trả giá hoặc suýt trả giá:
+
+1. **So BIGRAM, không so từ đơn.** Tiếng Việt gần như mọi từ có nghĩa đều hai
+   âm tiết; so từ đơn thì "tải app" khớp "vận tải" và gợi ý thành vô dụng.
+   Có phép đối chứng riêng cho chỗ này trong `kiem-ghep.mjs`.
+2. **Cắt từ khoá xuất hiện ở > 20% hồ sơ** (ý tưởng IDF). Nếu 60/134 người
+   cùng viết "dịch vụ" thì cụm ấy khớp tất cả mọi người, giá trị bằng không.
+   Tự đếm chứ không viết sẵn danh sách cụm chung: danh sách viết tay luôn
+   thiếu đúng những cụm mà lớp NÀY hay dùng.
+3. **Hai chốt an toàn cho phép cắt ấy**, thiếu một cái là hỏng ngầm khi dữ
+   liệu còn thưa: dưới 20 hồ sơ thì không cắt gì (20% của 5 là 1, tức cắt
+   sạch), và ngưỡng không bao giờ thấp hơn 5 hồ sơ.
+4. **KHÔNG cộng điểm cho người cùng ngành.** Trực giác bảo cùng ngành thì liên
+   quan, nhưng trong giao thương cùng ngành phần lớn là ĐỐI THỦ: người bán vật
+   liệu cần gặp nhà thầu, không cần gặp người bán vật liệu khác. Ngành để đó
+   cho người dùng tự lọc.
+
+**Tính ở máy chủ, cố ý làm ngược nếp "lọc ở giao diện" của sổ thu** — không có
+build step nên `worker/src/lib/` không dùng lại được trong `public/app.js`,
+mà chép thuật toán sang tệp thứ hai thì hai bản lệch nhau trong im lặng. Cái
+giá bằng không: gợi ý không đổi khi bấm chip, nên tính một lần là đủ. Việc lọc
+và tìm vẫn ở giao diện.
+
+### Bốn chỗ đã phải sửa, không chỗ nào tự báo lỗi
+
+1. **Form gian hàng phải ĐỌC LẠI từ máy chủ trước khi mở** (`openGianHang`
+   gọi `/api/giao-thuong` chứ không dựng từ biến `GT`). Bốn ô đầu dùng CHUNG
+   với hồ sơ ở tab Nhóm: sửa ở tab Nhóm rồi quay sang đây bấm Sửa, bấm Lưu là
+   ghi đè bản mới bằng bản cũ. Đúng lỗi mất dữ liệu của Đợt 1, quy ước 3.
+   `pw-giao-thuong.mjs` có phép hồi quy, và phép ấy **đã được đối chứng** —
+   gỡ bản sửa ra thì nó đỏ.
+2. **Chip "công khai" KHÔNG dùng lớp `.xong`.** Cặp màu `--go-bg`/`--go` có
+   đúng một nghĩa trong sản phẩm này: người thu đã nhận tiền. Dùng cho việc
+   khác là phá quy ước màu.
+3. **`website` chỉ nhận `https://`**, kiểm ở CẢ máy chủ lẫn giao diện. Chuỗi
+   này đi thẳng vào `href`, mà `javascript:` thì `esc()` không cứu được — nó
+   không chứa ký tự HTML nào để thoát.
+4. **Tiêu đề trang công khai không dùng `var(--num)`.** Space Grotesk thiếu
+   glyph tiếng Việt nên "Giao thương" rơi về monospace dự phòng, đứng lệch hẳn
+   với cả trang. Trang `/lich` không lộ ra vì tiêu đề của nó gần như không có
+   dấu. **Chỉ nhìn ảnh chụp mới thấy** — phép kiểm chuỗi không thấy.
+
+### Thanh nav sáu tab: tab đang mở giữ chữ, năm tab kia còn icon
+
+Ngô Phú Cường quyết 5/9: giữ nguyên chữ "Giao thương", **chật thì bỏ chữ chứ
+không đổi tên tab cho vừa**. Số đo được (`scripts/kiem/pw-nav.mjs`):
+
+| khổ máy | nút rộng | "Giao thương" cần | |
+|---|---|---|---|
+| 320px | 49px | 75px | ✗ |
+| 390px | 61px | 75px | ✗ iPhone 12–15 |
+| 430px | 69px | 75px | ✗ kể cả Pro Max |
+| 520px | 82px | 75px | ✓ máy tính bảng trở lên |
+
+520px cũng chính là `--wrap`, bề rộng lớn nhất thanh nav từng đạt — trên nữa
+không rộng thêm. Nên nhãn đầy đủ **không vừa trên bất kỳ điện thoại nào**.
+
+Nhưng rụng chữ cả sáu tab thì lộ ra chuyện khác: **icon "Bài" và icon "Tư
+liệu" đều là hình trang giấy**, bỏ chữ đi là hai tab ấy gần như không phân
+biệt được. Vì vậy dưới 520px chỉ **tab đang mở** giữ chữ (`flex:1.8` để có chỗ),
+năm tab kia còn icon. Bấm sang tab nào là chữ hiện ra ngay tại đó.
+
+**Cạm bẫy của chính phép đo này — đã vấp một lần.** Bản đầu đo CHIỀU CAO nút,
+đoán rằng nhãn dài sẽ xuống dòng và đội nút cao lên. Nó báo xanh ở mọi khổ từ
+300px tới 430px, kể cả những khổ đang tràn thật. Lý do: `.lb` có
+`white-space:nowrap` nên chữ **tràn ra ngoài chứ không xuống dòng**, nút không
+cao lên; và `.nb` có `min-width:0` nên phần tràn cũng không đẩy `.navin` rộng
+ra, tức `scrollWidth > clientWidth` của thanh nav cũng im lặng. **Hai phép kiểm
+hiển nhiên nhất đều mù.** Phải so `lb.scrollWidth` với `nb.clientWidth`.
+
+Mọi nút có `aria-label`: khi rụng chữ thì nút chỉ còn một hình, không có
+aria-label là trình đọc màn hình đọc ra một nút trống.
+
+Con số trên vẫn lệch với máy thật — sandbox không ra được internet nên Google
+Fonts không tải, phép đo chạy trên font dự phòng của hệ thống. Font dự phòng
+rộng hơn Be Vietnam Pro, nên đây là phép đo **bi quan**: máy thật chỉ có thể
+rộng rãi hơn, không chật hơn.
+
+### Hai điều chưa kiểm chứng được
+
+- **Chưa ai bật công khai trên dữ liệu thật.** Mọi phép kiểm chạy trên bốn hồ
+  sơ gieo sẵn ở máy cục bộ, không phải trên 134 người thật.
+- **Mật độ là rủi ro sản phẩm, không phải rủi ro kỹ thuật.** Còn 21 ngày tới
+  26/9 và 44 người vẫn chưa có số điện thoại để tự đăng nhập. Danh mục thưa
+  thì trông như chợ chiều, tệ hơn không có. Trạng thái rỗng của trang công
+  khai vì vậy được viết như một lời mời chứ không phải một thông báo lỗi.
 
 ## Sổ tay hướng dẫn — ba bản, một bản thảo
 

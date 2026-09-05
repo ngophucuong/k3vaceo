@@ -1,0 +1,129 @@
+/* Danh mục giao thương công khai. Dùng đúng bảng màu, font và bán kính bo của
+   ứng dụng — người bấm từ đây sang ứng dụng không được thấy mình đi sang một
+   sản phẩm khác. Trùng lặp với lich.css là CỐ Ý: không có build step (mục 8
+   SRS) nên không gộp được, và gộp thành một tệp dùng chung thì sửa trang này
+   sẽ lặng lẽ đổi trang kia. */
+:root{
+  --bg:#F3F3F1; --surf:#FFFFFF;
+  --ink:#17191B; --ink2:#5C6266; --ink3:#93999D; --line:#E3E3DF; --line2:#D2D3CE;
+  --go:#146450; --go-bg:#E4F0EB; --go-line:#B6D6C9;
+  --due:#A8500E; --due-bg:#FAEDE0; --due-line:#E8CBAA;
+  --r:14px; --r2:10px; --wrap:520px;
+  --sh:0 1px 2px rgba(23,25,27,.05), 0 4px 14px rgba(23,25,27,.045);
+  --num:'Space Grotesk',ui-monospace,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:'Be Vietnam Pro',system-ui,sans-serif;font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding-bottom:40px}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 16px}
+:focus-visible{outline:2px solid var(--go);outline-offset:2px}
+::selection{background:var(--go-bg)}
+
+header{position:sticky;top:0;z-index:40;background:rgba(243,243,241,.88);
+  backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid var(--line)}
+.hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px 11px}
+/* Xếp theo CỘT, khác /lich. Trang lịch giấu phụ đề ở khổ hẹp được vì người
+   mở nó đã biết mình đang xem lịch lớp nào. Ở đây thì ngược lại: người mở là
+   NGƯỜI LẠ, và "Giao thương" một mình không nói được của ai. Ẩn ở dưới 430px
+   nghĩa là gần như mọi điện thoại đều không thấy — tức giấu đúng người cần
+   đọc nhất. Header trang này không có gì bên phải nên xếp cột không mất gì. */
+.hl{display:flex;flex-direction:column;gap:1px;min-width:0}
+/* KHÔNG dùng var(--num) ở đây, khác với /lich. Space Grotesk không có glyph
+   tiếng Việt đủ dấu, nên "Giao thương" rơi về monospace dự phòng và đứng
+   lệch hẳn với phần còn lại của trang. Trang lịch không lộ ra vì tiêu đề của
+   nó là "Lớp CEO K03" — gần như không có dấu. */
+.hl .g{font-weight:700;font-size:18px;letter-spacing:-.02em;white-space:nowrap}
+.hl .s{font-size:11.5px;color:var(--ink3);line-height:1.35}
+
+.mo{font-size:13.5px;color:var(--ink2);line-height:1.6;margin:16px 2px 14px}
+.mo b{color:var(--ink);font-weight:600}
+
+/* ─── Tìm và lọc ─── */
+.tim{width:100%;padding:12px 14px;border:1px solid var(--line2);border-radius:var(--r2);
+  background:var(--surf);color:var(--ink);font:inherit;font-size:15px;
+  box-shadow:var(--sh);-webkit-appearance:none}
+.tim::placeholder{color:var(--ink3)}
+.tim:focus{outline:none;border-color:var(--go);box-shadow:0 0 0 1px var(--go)}
+
+/* Chip XUỐNG DÒNG chứ không cuộn ngang. Cuộn ngang thì chip cuối nằm ngoài mép
+   và không ai kéo tới — đã trả giá đúng lỗi này ở hàng chip sổ thu. Người đọc
+   phải thấy được HẾT các ngành đang có cùng một lúc, nếu không thì họ tưởng
+   danh mục chỉ có mấy ngành đầu. */
+.fl.cuon{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 16px}
+.fc{border:1px solid var(--line2);background:var(--surf);color:var(--ink2);
+  padding:7px 12px;border-radius:99px;font:inherit;font-size:13px;font-weight:500;
+  cursor:pointer;white-space:nowrap}
+.fc.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.fc .num{font-family:var(--num);font-size:12px;opacity:.75;margin-left:3px}
+
+/* ─── Thẻ gian hàng ─── */
+.ds{display:flex;flex-direction:column;gap:10px}
+.dangtai{color:var(--ink3);font-size:14px;margin:0;padding:8px 2px}
+
+.g{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);padding:16px}
+.g .dau{display:flex;gap:12px;align-items:flex-start}
+.av{flex:0 0 auto;width:40px;height:40px;border-radius:50%;color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:600;letter-spacing:.01em}
+.g .ten{font-weight:600;font-size:16px;line-height:1.3}
+.g .noi{font-size:13px;color:var(--ink2);margin-top:2px;line-height:1.4}
+.g .nganh{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.tg{font-size:11px;font-weight:600;letter-spacing:.02em;padding:3px 8px;border-radius:99px;
+  background:var(--go-bg);color:var(--go);border:1px solid var(--go-line)}
+
+/* "Bán gì" là dòng người ta tới đây để đọc — cho nó cỡ chữ của một câu trả
+   lời, không phải cỡ của một nhãn phụ. */
+.g .ban{font-size:15px;line-height:1.45;margin-top:12px}
+.g .k{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink3);display:block;margin-bottom:2px}
+.g .phu{font-size:13.5px;color:var(--ink2);line-height:1.5;margin-top:9px}
+.g .tas{font-size:13.5px;line-height:1.55;margin-top:10px;color:var(--ink2)}
+
+/* "Đang cần" tô cam: với người đọc thì đây là chỗ họ BÁN được hàng, tức dòng
+   có giá trị nhất trên thẻ. Cam là màu đã dùng cho "đang chờ, còn việc phải
+   làm" ở khắp ứng dụng, nên nó đọc đúng nghĩa mà không cần chú giải. */
+.can{margin-top:11px;padding:9px 11px;border-radius:var(--r2);
+  background:var(--due-bg);border:1px solid var(--due-line);font-size:13.5px;line-height:1.45}
+.can .k{color:var(--due)}
+
+.lh{display:flex;flex-wrap:wrap;gap:8px;margin-top:13px}
+.lh a{display:inline-flex;align-items:center;gap:6px;text-decoration:none;
+  border:1px solid var(--line2);border-radius:var(--r2);padding:8px 12px;
+  font-size:13.5px;font-weight:600;color:var(--ink);background:var(--bg)}
+.lh a:active{filter:brightness(.96)}
+.lh a.chinh{background:var(--go);border-color:var(--go);color:#fff}
+.lh svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round}
+
+/* ─── Trạng thái rỗng ─── */
+/* Ngày đầu chưa ai bật thì trang này TRỐNG, và sẽ trống một thời gian. Trạng
+   thái ấy phải đọc như một lời mời, không như một trang hỏng — nếu không thì
+   người ghé lần đầu sẽ không quay lại lần hai. */
+.trong{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);padding:26px 20px;text-align:center}
+.trong .t{font-size:16px;font-weight:600;margin:0 0 8px}
+.trong .d{font-size:13.5px;color:var(--ink2);line-height:1.6;margin:0}
+
+.tong{font-size:12.5px;color:var(--ink3);text-align:center;margin:18px 2px 0;line-height:1.5}
+
+/* ─── Chân trang ─── */
+footer{margin-top:30px;padding-top:20px;border-top:1px solid var(--line);
+  font-size:13px;color:var(--ink2)}
+.moi{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--sh);padding:18px;margin-bottom:18px}
+.moi .t{font-size:16px;font-weight:600;margin:0 0 6px;color:var(--ink)}
+.moi .d{font-size:13.5px;color:var(--ink2);line-height:1.55;margin:0 0 14px}
+.big{display:flex;align-items:center;justify-content:center;gap:9px;
+  width:100%;padding:14px 18px;border-radius:var(--r2);
+  background:var(--go);color:#fff;font-weight:600;font-size:15.5px;
+  text-decoration:none;transition:transform .16s,filter .16s}
+.big:active{transform:scale(.985);filter:brightness(.94)}
+footer p{margin:0 0 7px}
+footer a{color:var(--go);font-weight:600;text-decoration:none}
+footer a:hover{text-decoration:underline}
+footer .nho{font-size:12px;color:var(--ink3);line-height:1.55;margin:0 0 12px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
