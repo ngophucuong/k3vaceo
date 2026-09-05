@@ -14,6 +14,62 @@ const avatar = (name, cl = '') => `<span class="av ${cl}" style="background:hsl(
 const short = n => String(n ?? '').trim().split(/\s+/).slice(-2).join(' ');
 const vnDate = s => { const d = new Date(String(s).replace(' ', 'T') + 'Z'); return isNaN(d) ? '' : d.toLocaleDateString('vi-VN'); };
 
+/* Markdown TỐI GIẢN, AN TOÀN — cho ô "Nội dung Text" của Tư liệu
+   (routes/links.js, cột content_md). Nguyên tắc: ESC() TRƯỚC, PARSE SAU —
+   toàn bộ văn bản gốc bị vô hiệu hoá thành thực thể HTML (một mã <script> gõ
+   vào ghi chú thành &lt;script&gt;, trơ lì) TRƯỚC KHI bất kỳ quy tắc markdown
+   nào chạy, nên các quy tắc dưới đây chỉ cần lo đúng cú pháp chứ không cần lo
+   thoát ký tự nữa — làm ngược lại (parse rồi mới esc phần còn lại) mới là chỗ
+   dễ hở, vì dễ quên một nhánh.
+   Ngoại lệ duy nhất chèn lại một thuộc tính (href) là link [chữ](url): bắt
+   buộc url khớp đúng "https://…", đúng luật đang dùng cho mọi URL khác trong
+   ứng dụng — không có nhánh nào cho javascript: hay data:, nên cú pháp link
+   với url khác https đơn giản là không được nhận diện, giữ nguyên chữ thô.
+   CỐ Ý không hỗ trợ ảnh/bảng/```code```/tiêu đề lồng danh sách: phạm vi chỉ
+   cần đủ cho một ghi chú bài giảng, không phải một trình soạn Markdown đầy đủ. */
+function mdSafe(raw) {
+  const dong = esc(raw).split('\n');
+  const khoi = [];
+  let ds = null; // { the: 'ul'|'ol', hang: [] } — danh sách đang mở, gộp các dòng liền nhau
+
+  const dongInline = s => s
+    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/\*(.+?)\*/g, '<i>$1</i>')
+    .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+  const dongDs = () => { if (ds) { khoi.push(`<${ds.the}>${ds.hang.join('')}</${ds.the}>`); ds = null; } };
+  let doan = [];
+  const dongDoan = () => { if (doan.length) { khoi.push(`<p>${doan.map(dongInline).join('<br>')}</p>`); doan = []; } };
+
+  for (const goc of dong) {
+    const d = goc.trim();
+    let m;
+    if (d === '') { dongDoan(); dongDs(); continue; }
+    if ((m = d.match(/^(#{1,3})\s+(.+)$/))) {
+      dongDoan(); dongDs();
+      const cap = m[1].length + 3; // #→h4 ##→h5 ###→h6, đủ nhỏ để không phá bố cục sheet
+      khoi.push(`<h${cap}>${dongInline(m[2])}</h${cap}>`);
+      continue;
+    }
+    if ((m = d.match(/^[-*]\s+(.+)$/))) {
+      dongDoan();
+      if (!ds || ds.the !== 'ul') { dongDs(); ds = { the: 'ul', hang: [] }; }
+      ds.hang.push(`<li>${dongInline(m[1])}</li>`);
+      continue;
+    }
+    if ((m = d.match(/^\d+[.)]\s+(.+)$/))) {
+      dongDoan();
+      if (!ds || ds.the !== 'ol') { dongDs(); ds = { the: 'ol', hang: [] }; }
+      ds.hang.push(`<li>${dongInline(m[1])}</li>`);
+      continue;
+    }
+    dongDs();
+    doan.push(d);
+  }
+  dongDoan(); dongDs();
+  return khoi.join('') || '<p class="mut">(chưa có nội dung)</p>';
+}
+
 function toast(t) {
   const e = $('#toast'); e.textContent = t; e.classList.add('on');
   clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('on'), 2400);
@@ -119,6 +175,12 @@ let PLAN = null;      // /api/plan gần nhất
 let KHO_CAN_LOP = false;
 let KHO_LINKS = [];    // /api/links gần nhất, để bảng sửa đọc lại
 let KHO_TAG = null;    // bộ lọc đang xem, để vẽ lại đúng chỗ sau khi lưu  // mình có đăng được tư liệu cấp lớp không
+// Tra được một dòng tư liệu bằng id dù nó vừa hiện ra ở tab Tư liệu hay ở
+// khối "Hôm nay" (veTuLieuBuoi) — hai nơi cùng đọc một dòng links nhưng KHÔNG
+// cùng danh sách trong bộ nhớ (KHO_LINKS chỉ có sau khi mở tab Tư liệu), nên
+// openLinkText cần một chỗ tra chung thay vì chỉ tìm trong KHO_LINKS.
+const TULIEU_CACHE = new Map();
+const ghiNhoTuLieu = ds => { for (const r of ds || []) if (r && r.id != null) TULIEU_CACHE.set(r.id, r); };
 let MEMBERS = [];     // /api/members gần nhất
 
 const iAmOfficer = () => !!HOME?.officers?.some(o => o.member_id === HOME.me.id);
@@ -992,6 +1054,9 @@ function drawNay() {
   document.querySelectorAll('#v-nay [data-xoatb]').forEach(b => {
     b.onclick = () => xoaThongBao(Number(b.dataset.xoatb));
   });
+  document.querySelectorAll('#v-nay [data-xemtext]').forEach(b => {
+    b.onclick = () => openLinkText(Number(b.dataset.xemtext));
+  });
   if (iAmOfficer()) drawJoinRequests();
 }
 
@@ -1028,7 +1093,11 @@ function khungGio(b) {
 function veTuLieuBuoi(b) {
   const ds = b.tu_lieu ?? [];
   if (!ds.length) return '';
-  return `<div class="tlb">${ds.map(r => r.url
+  ghiNhoTuLieu(ds); // để bấm vào một ghi chú Text ngay từ đây tra được nội dung
+  return `<div class="tlb">${ds.map(r => r.kind === 'TEXT'
+    ? `<span class="xem" data-xemtext="${r.id}" style="cursor:pointer">
+         <span class="k">Ghi chú</span>${esc(r.title)}<span class="mt">›</span></span>`
+    : r.url
     ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">
          <span class="k">${esc(r.kind)}</span>${esc(r.title)}<span class="mt">↗</span></a>`
     : `<span class="trong"><span class="k">${esc(r.kind)}</span>${esc(r.title)} — chưa có đường dẫn</span>`
@@ -2047,16 +2116,35 @@ function nhanBuoi(r) {
   return `<span class="nb-buoi">Buổi ${Number(d)}/${Number(m)}${de}</span>`;
 }
 
+// Sheet xem một ghi chú Text (kind='TEXT') đã render Markdown — an toàn nhờ
+// mdSafe() esc() trước rồi mới nhận diện cú pháp (xem chú thích ở hàm đó).
+// Tra qua TULIEU_CACHE thay vì KHO_LINKS: mở từ khối "Hôm nay" (veTuLieuBuoi)
+// thì tab Tư liệu có thể chưa từng tải, KHO_LINKS lúc đó vẫn rỗng.
+function openLinkText(id) {
+  const r = TULIEU_CACHE.get(id);
+  if (!r) return;
+  openSheet(`
+   <h3>${esc(r.title)}</h3>
+   <p class="sub">${nhanBuoi(r) || 'Ghi chú tự viết — không phải slide hay tài liệu của Ban tổ chức.'}</p>
+   <div class="mdview">${mdSafe(r.content_md || '')}</div>
+   <div class="sa" style="margin-top:18px"><button class="big go" id="mvC">Đóng</button></div>`);
+  $('#mvC').onclick = closeSheet;
+}
+
 // `trongCum` = dòng này đang nằm dưới đầu mục của chính buổi ấy, nên bỏ nhãn
 // "Buổi 28/8 · …" đi: lặp lại trên từng dòng chỉ là tiếng ồn.
 function veDongTuLieu(r, trongCum) {
-  const than = `<span class="ext">${esc(r.kind)}</span>
+  const laText = r.kind === 'TEXT';
+  const than = `<span class="ext">${esc(laText ? 'Ghi chú' : r.kind)}</span>
     <div class="b"><div class="t">${esc(r.title)}</div>
     <div class="m">${trongCum ? '' : nhanBuoi(r)}${
       // "đăng" chứ không để trơ ngày: dưới đầu mục "Thứ Bảy 15/8" mà thấy một
       // ngày khác thì đọc như mâu thuẫn, trong khi nó là NGÀY ĐĂNG liên kết.
-      r.url ? 'đăng ' + vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
-  const dong = r.url
+      laText || r.url ? 'đăng ' + vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
+  const dong = laText
+    ? `<div class="rs" data-xemtext="${r.id}" style="cursor:pointer">${than}
+        <span style="color:var(--ink3)">›</span></div>`
+    : r.url
     ? `<a class="rs" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${than}
         <span style="color:var(--ink3)">↗</span></a>`
     : `<div class="rs" style="cursor:default">${than}</div>`;
@@ -2073,17 +2161,25 @@ function veDongTuLieu(r, trongCum) {
 function openLinkEdit(id) {
   const r = (KHO_LINKS || []).find(x => x.id === id);
   if (!r) return;
+  const laText = r.kind === 'TEXT';
   openSheet(`
-   <h3>Sửa liên kết</h3>
-   <p class="sub">${r.url ? 'Đổi đường dẫn, tên hoặc loại.' : 'Mục này chưa có đường dẫn — dán vào đây.'}</p>
+   <h3>Sửa ${laText ? 'ghi chú' : 'liên kết'}</h3>
+   <p class="sub">${laText ? 'Sửa lại nội dung Markdown.'
+     : r.url ? 'Đổi đường dẫn, tên hoặc loại.' : 'Mục này chưa có đường dẫn — dán vào đây.'}</p>
+   ${laText ? `
+   <label class="f">Nội dung (Markdown)</label>
+   <textarea id="eC" maxlength="8000" rows="8">${esc(r.content_md || '')}</textarea>
+   <div class="hintline">Hỗ trợ # tiêu đề, **đậm**, *nghiêng*, danh sách -, link [chữ](https://…).</div>
+   ` : `
    <label class="f">Đường dẫn</label>
    <input id="eU" inputmode="url" spellcheck="false" placeholder="https://drive.google.com/…" value="${esc(r.url || '')}">
    <div class="hintline">Để trống cũng được — thà trống còn hơn một đường dẫn hỏng cho cả lớp bấm vào.</div>
-   <label class="f">Gọi là gì</label>
-   <input id="eT" maxlength="200" value="${esc(r.title)}">
    <label class="f">Loại</label>
    <select id="eK">${['DRIVE','SHEET','DOCX','XLSX','PDF','WEB']
      .map(k => `<option value="${k}"${k === r.kind ? ' selected' : ''}>${k}</option>`).join('')}</select>
+   `}
+   <label class="f">Gọi là gì</label>
+   <input id="eT" maxlength="200" value="${esc(r.title)}">
    <label class="f">Đóng cho</label>
    <select id="eG">${[['bai','Cho bài'],['buoi','Theo buổi học'],['lop','Việc chung của lớp']]
      .map(([v, l]) => `<option value="${v}"${v === r.tag ? ' selected' : ''}>${l}</option>`).join('')}</select>
@@ -2098,11 +2194,12 @@ function openLinkEdit(id) {
      <button class="big go" id="eLuu">Lưu</button></div>`);
   $('#eThoi').onclick = closeSheet;
   $('#eLuu').onclick = () => submitting($('#eLuu'), async () => {
-    await apiPatch(`/api/links/${id}`, {
-      url: $('#eU').value.trim(), title: $('#eT').value,
-      kind: $('#eK').value, tag: $('#eG').value,
-      buoi_id: $('#eB').value === '' ? null : Number($('#eB').value),
-    });
+    await apiPatch(`/api/links/${id}`, laText
+      ? { content_md: $('#eC').value, title: $('#eT').value, tag: $('#eG').value,
+          buoi_id: $('#eB').value === '' ? null : Number($('#eB').value) }
+      : { url: $('#eU').value.trim(), title: $('#eT').value,
+          kind: $('#eK').value, tag: $('#eG').value,
+          buoi_id: $('#eB').value === '' ? null : Number($('#eB').value) });
     await drawKho(KHO_TAG); await refreshHome();
   }, 'Đã lưu');
 }
@@ -2150,6 +2247,7 @@ async function drawKho(tag) {
   const links = kq.links;
   KHO_LINKS = links; KHO_TAG = tag;
   KHO_CAN_LOP = !!kq.can_dang_lop;
+  ghiNhoTuLieu(links); // để openLinkText tra được cả khi mở từ chính tab này
   $('#v-kho').dataset.loaded = '1';
 
   // Tư liệu của LỚP để riêng và để TRÊN. Trộn chung thì không ai phân biệt
@@ -2160,8 +2258,9 @@ async function drawKho(tag) {
 
   $('#v-kho').innerHTML = `
   <div class="foot" style="padding:0 2px 14px">
-    Tư liệu chỉ giữ đường dẫn. File vẫn nằm ở Drive của người làm ra nó — ứng dụng không chứa,
-    không sao lưu, không đứng tên.
+    Đường dẫn thì file vẫn nằm ở Drive của người làm ra nó — ứng dụng không chứa, không sao lưu,
+    không đứng tên. Ghi chú Text là nội dung tự viết trong lớp, không phải slide hay tài liệu của
+    Ban tổ chức.
   </div>
   <div class="fl">${KHO_FILTERS.map(([k, l]) => `<button class="fc ${tag === k ? 'on' : ''}" data-tag="${k}">${l}</button>`).join('')}</div>
 
@@ -2185,20 +2284,40 @@ async function drawKho(tag) {
   document.querySelectorAll('#v-kho [data-sualink]').forEach(b => {
     b.onclick = () => openLinkEdit(Number(b.dataset.sualink));
   });
+  document.querySelectorAll('#v-kho [data-xemtext]').forEach(b => {
+    b.onclick = () => openLinkText(Number(b.dataset.xemtext));
+  });
 }
 
+// Hai cách gắn Tư liệu: dán ĐƯỜNG DẪN (mặc định, như trước nay), hoặc viết
+// hẳn NỘI DUNG TEXT — ghi chú Markdown do chính người trong lớp gõ, không
+// phải slide/file của Ban tổ chức (xem migration 0025). Cùng một sheet, một
+// nút bấm chuyển qua lại — không tách hai màn cho khỏi phải lặp lại các ô
+// dùng chung (Gọi là gì / Dùng cho / Thuộc buổi nào / Ai thấy được).
 function openLinkAdd() {
   openSheet(`
-   <h3>Gắn liên kết</h3>
-   <p class="sub">Chỉ dán đường dẫn https — file để nguyên chỗ cũ.</p>
-   <label class="f">Đường dẫn</label><input id="lU" placeholder="https://…" inputmode="url" maxlength="2000">
+   <h3>Gắn Tư liệu</h3>
+   <div class="fl" style="margin-bottom:2px">
+     <button type="button" class="fc on" id="modeUrl">Đường dẫn</button>
+     <button type="button" class="fc" id="modeText">Nội dung Text</button>
+   </div>
+   <div id="modeUrlBox">
+     <p class="sub">Chỉ dán đường dẫn https — file để nguyên chỗ cũ.</p>
+     <label class="f">Đường dẫn</label><input id="lU" placeholder="https://…" inputmode="url" maxlength="2000">
+     <label class="f">Loại</label><select id="lK"><option>DRIVE</option><option>SHEET</option><option>DOCX</option><option>PDF</option><option>WEB</option></select>
+   </div>
+   <div id="modeTextBox" style="display:none">
+     <p class="sub">Ghi chú do bạn tự viết — ứng dụng lưu nguyên văn, không phải một đường dẫn.</p>
+     <label class="f">Nội dung (Markdown)</label>
+     <textarea id="lC" maxlength="8000" rows="8" placeholder="# Tiêu đề&#10;&#10;Gõ ghi chú ở đây."></textarea>
+     <div class="hintline">Tối đa 8.000 ký tự. Hỗ trợ # tiêu đề, **đậm**, *nghiêng*, danh sách -, link [chữ](https://…).</div>
+   </div>
    <label class="f">Gọi là gì</label><input id="lN" maxlength="200" placeholder="Báo cáo thị trường FMCG 2025">
-   <label class="f">Loại</label><select id="lK"><option>DRIVE</option><option>SHEET</option><option>DOCX</option><option>PDF</option><option>WEB</option></select>
    <label class="f">Dùng cho</label><select id="lT"><option value="bai">Cho bài</option><option value="buoi">Theo buổi</option><option value="lop">Lớp K03</option></select>
    <label class="f">Thuộc buổi học nào</label>
    <select id="lB">${oChonBuoi(null)}</select>
-   <div class="hintline">Chọn buổi thì liên kết hiện thêm dưới buổi ấy ở tab Hôm nay.
-     Vẫn là một liên kết duy nhất, sửa ở đâu cũng đổi cả hai chỗ.</div>
+   <div class="hintline">Chọn buổi thì tư liệu hiện thêm dưới buổi ấy ở tab Hôm nay.
+     Vẫn là một dòng duy nhất, sửa ở đâu cũng đổi cả hai chỗ.</div>
    ${KHO_CAN_LOP ? `<label class="f">Ai thấy được</label>
    <select id="lS"><option value="group">Chỉ nhóm mình</option><option value="class">Cả lớp — cả mười nhóm</option></select>
    <div class="hintline" id="lSHint"></div>` : ''}
@@ -2206,6 +2325,18 @@ function openLinkAdd() {
    <div class="sa"><button class="big c" id="lCancel">Thôi</button>
      <button class="big go" id="lSave">Gắn vào</button></div>`);
   $('#lCancel').onclick = closeSheet;
+
+  const dangText = () => $('#modeText').classList.contains('on');
+  const doiChe = m => {
+    $('#modeUrl').classList.toggle('on', m === 'url');
+    $('#modeText').classList.toggle('on', m === 'text');
+    $('#modeUrlBox').style.display = m === 'url' ? '' : 'none';
+    $('#modeTextBox').style.display = m === 'text' ? '' : 'none';
+    $('#lErr').style.display = 'none';
+  };
+  $('#modeUrl').onclick = () => doiChe('url');
+  $('#modeText').onclick = () => doiChe('text');
+
   if ($('#lS')) {
     const veHint = () => {
       $('#lSHint').innerHTML = $('#lS').value === 'class'
@@ -2215,18 +2346,27 @@ function openLinkAdd() {
     $('#lS').onchange = veHint; veHint();
   }
   $('#lSave').onclick = async () => {
-    if (!/^https:\/\//i.test($('#lU').value.trim())) {
+    const laText = dangText();
+    if (laText) {
+      if (!$('#lC').value.trim()) {
+        $('#lErr').textContent = 'Cần gõ ít nhất một chữ.';
+        $('#lErr').style.display = 'block'; return;
+      }
+    } else if (!/^https:\/\//i.test($('#lU').value.trim())) {
       $('#lErr').textContent = 'Cần đường dẫn bắt đầu bằng https://';
       $('#lErr').style.display = 'block'; return;
     }
     await submitting($('#lSave'), async () => {
-      await apiPost('/api/links', {
-        url: $('#lU').value.trim(), title: $('#lN').value, kind: $('#lK').value, tag: $('#lT').value,
+      const chung = {
+        title: $('#lN').value, tag: $('#lT').value,
         scope: $('#lS') ? $('#lS').value : 'group',
         buoi_id: $('#lB').value === '' ? null : Number($('#lB').value),
-      });
+      };
+      await apiPost('/api/links', laText
+        ? { ...chung, content_md: $('#lC').value, kind: 'TEXT' }
+        : { ...chung, url: $('#lU').value.trim(), kind: $('#lK').value });
       await drawKho('all'); await refreshHome();
-    }, 'Đã gắn vào Tư liệu');
+    }, laText ? 'Đã lưu ghi chú' : 'Đã gắn vào Tư liệu');
   };
 }
 

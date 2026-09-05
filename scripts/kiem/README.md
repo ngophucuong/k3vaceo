@@ -83,8 +83,11 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tanso.mjs` | giới hạn tần suất — cả lớp cùng một WiFi có vào được không |
 | `kiem-danhba.mjs` | danh bạ lớp — và số thật KHÔNG lọt ra ở người chưa đăng nhập |
 | `kiem-moi.mjs` | link mời xuyên nhóm cho Ban cán sự lớp (`POST /api/danh-ba/:id/moi`) |
+| `kiem-tulieu-text.mjs` | Tư liệu dạng Text: bắt buộc content_md, đếm công khai, layTuLieuTheoBuoi |
+| `pw-tulieu-text.mjs` | **an toàn XSS của `mdSafe()`** — bốn ca độc + bốn ca thuận + giao diện |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
 | `reset-moi.sh` | dựng hai phiên + hai hồ sơ thử cho `kiem-moi.mjs` |
+| `reset-tulieu-text.sh` | dựng phiên Ngô Phú Cường cho `kiem-tulieu-text.mjs` / `pw-tulieu-text.mjs` |
 | `gieo-coso.mjs` · `gieo-moi.mjs` | sinh dữ liệu đối chứng, hai reset tự gọi |
 
 Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
@@ -92,7 +95,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Sáu phép đối chứng đáng giữ nhất
+## Bảy phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -141,6 +144,16 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    minh phúc đáp không rỗng, và phải có ít nhất một email của người chưa đăng
    nhập — không thì "0 email đều bị che" xanh mà chẳng chứng minh gì.
    `reset-tanso.sh` gieo sẵn ca ấy (roster 58).
+
+7. **`pw-tulieu-text.mjs` phải chứng minh mã độc bị VÔ HIỆU HOÁ, không phải bị
+   ÂM THẦM XOÁ MẤT.** Một hàm chỉ biết `.replace(/<[^>]*>/g,'')` cũng "an
+   toàn" theo nghĩa không cho `<script>` chạy — nhưng nó xoá luôn nội dung hợp
+   lệ có dấu `< >`, và phép kiểm nào chỉ xem "còn `<script>` không" thì ĐẬU cả
+   hai cách. Mỗi ca độc (4 ca: `<script>`, `onerror` qua `<img>`, link
+   `javascript:`, chèn thuộc tính qua chữ trong `[chữ](url)`) phải kiểm CẢ
+   HAI vế: không cho một biến đánh dấu chạy được, VÀ chuỗi độc vẫn còn nguyên
+   trong `.textContent`. Kèm bốn ca THUẬN (`#`, `**`, `-`, link https hợp lệ)
+   để chắc các quy tắc chặn XSS không vô tình chặn luôn markdown đúng.
 
 ## Chạy `kiem-tanso.mjs`
 

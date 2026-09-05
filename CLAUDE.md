@@ -23,15 +23,20 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Bốn việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Năm việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9). Ngô Phú
+1. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+   dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
+   với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
+   `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
+   ngược thứ tự.
+2. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9). Ngô Phú
    Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho người CHƯA đăng nhập ở bất kỳ nhóm nào, không chỉ nhóm của
    mình — `POST /api/danh-ba/:roster_id/moi`, xem mục riêng bên dưới.
-2. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-3. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-4. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+3. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+4. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+5. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -112,6 +117,12 @@ Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sa
   người bấm vào đều thấy "Yêu cầu quyền truy cập", tệ hơn không có link. Cách
   chữa là dặn Ban tổ chức mở quyền "ai có đường dẫn đều xem được", không phải
   đem file về máy chủ của mình.
+
+  **Cập nhật 5/9: "Nội dung Text" (mục riêng bên dưới) KHÔNG phải mở lại cuộc
+  bàn này.** Lý do N2 tồn tại là không tự ý phát tán TÀI SẢN CỦA NGƯỜI KHÁC
+  (slide giảng viên). Ghi chú Markdown người trong lớp tự gõ không phải bản
+  sao của ai — N2 vẫn nguyên vẹn cho việc không upload file/không giữ bản sao
+  slide-PDF-ảnh, mục "Đường dẫn" không đổi gì.
 - **N3 — Ứng dụng không giữ tiền.** Tiền vào thẳng tài khoản người thu.
 - **N4 — Tự giác là chính.** Không xác minh email, không OTP, không đối soát.
 - **N5 — Chính chủ tự sửa được thông tin của mình**, không qua ai duyệt.
@@ -577,6 +588,83 @@ Một bài học về chính bộ kiểm: lần đầu nó báo **"không lỗi 
 trang chưa hề nạp** (quên bật `[assets]` nên `/` trả JSON — trang không có JS
 thì tất nhiên không có lỗi JS). Mọi bộ kiểm giao diện nay mở đầu bằng một phép
 khẳng định rằng ứng dụng THẬT SỰ nạp được.
+
+## Tư liệu dạng "Nội dung Text" — lệch có chủ ý thứ hai với N2
+
+Thêm 5/9 (migration 0025). Ngô Phú Cường hỏi có đưa được nội dung dạng text
+(render Markdown) trực tiếp vào ứng dụng không, sau khi phải rút gọn bản tóm
+tắt bài giảng LEAN buổi 4/9 thành một dòng ghi_chu ngắn vì lúc đó chưa có chỗ
+nào chứa được cả bài. Trả lời: được, và đã làm — nút "Gắn Tư liệu" nay có hai
+chế độ, **Đường dẫn** (như trước nay) và **Nội dung Text** (mới), chọn bằng
+một cặp nút bấm ngay đầu sheet.
+
+**Vì sao đây KHÔNG mâu thuẫn với N2** ("ứng dụng không giữ file, chỉ lưu URL,
+không upload", đã cân nhắc và giữ nguyên hai lần, 24/8 và 26/8): lý do N2 được
+lập ra là **không tự ý phát tán tài sản của người khác** — slide giảng viên,
+tài liệu Ban tổ chức chia sẻ có điều kiện. Ghi chú Text ở đây là văn bản
+**người trong lớp tự gõ** (tóm tắt bài giảng, ghi chép riêng), không phải bản
+sao của ai. N2 vẫn đứng nguyên cho đúng việc nó bảo vệ: không upload file,
+không giữ bản sao slide/PDF/ảnh — mục "Đường dẫn" không đổi gì cả.
+
+### Cột và luồng dữ liệu
+
+Một cột `links.content_md` (TEXT, để trống ở mọi dòng cũ). `kind='TEXT'` phân
+biệt với năm loại URL cũ (DRIVE|SHEET|DOCX|PDF|WEB|XLSX): khi đó `url` để
+NULL, `content_md` có giá trị — và ngược lại cho mọi loại còn lại, `postLink`/
+`patchLink` giữ hai nhánh loại trừ nhau. Giới hạn **8.000 ký tự**, kiểm ở tầng
+ứng dụng (`NOI_DUNG_MAX` trong `routes/links.js`) vì SQLite TEXT không khai
+báo độ dài trong DDL — `cleanText()` cắt bớt phần dư, không báo lỗi.
+
+**Hai chỗ đã có từ trước PHẢI sửa kèm, không thì tính năng "chạy" nhưng một
+màn vẫn sai — cả hai đều không tự báo lỗi:**
+
+1. `docLichCongKhai()` trong `routes/lich.js` đếm `so_tu_lieu` bằng
+   `url IS NOT NULL`. Một ghi chú Text của lớp gắn vào buổi thì `url` là NULL,
+   nên con số công khai báo "chưa có gì" trong khi rõ ràng có — sửa thành
+   `url IS NOT NULL OR content_md IS NOT NULL`.
+2. `layTuLieuTheoBuoi()` (dùng CHUNG cho `/api/home` và `/api/lich`, đúng
+   khuôn "một dòng, hai màn" ở mục trên) liệt kê từng trường trong SELECT chứ
+   không `SELECT *` — quên thêm `content_md` vào danh sách ấy thì Hôm nay hiện
+   đúng tên ghi chú nhưng bấm vào không có gì để hiện.
+
+### mdSafe() — ESC TRƯỚC, PARSE SAU
+
+Hàm render Markdown nằm trong `public/app.js` (không thêm thư viện, đúng mục
+8 SRS — cùng tinh thần tự viết ZIP+OOXML cho xuất Word). Nguyên tắc AN TOÀN
+duy nhất cần nhớ: **`esc()` toàn bộ văn bản gốc TRƯỚC, rồi mới nhận diện cú
+pháp markdown trên phần đã esc**. Một `<script>` gõ vào ghi chú thành
+`&lt;script&gt;` — trơ lì — trước khi bất kỳ quy tắc `#`/`**`/`-`/`[]()` nào
+chạy, nên các quy tắc ấy chỉ cần lo đúng cú pháp, không cần lo thoát ký tự nữa.
+Làm ngược lại (parse rồi esc phần còn lại) mới là chỗ dễ hở, vì dễ quên một
+nhánh — đây là bài học đã ghi cho `esc()` ở quy ước kỹ thuật mục 2, áp dụng
+lại nguyên vẹn cho một hàm mới.
+
+Ngoại lệ DUY NHẤT chèn lại một thuộc tính HTML (href) là cú pháp link
+`[chữ](url)`: bắt buộc url khớp đúng `https://…`, đúng luật đang dùng cho mọi
+URL khác trong ứng dụng. `javascript:`/`data:` đơn giản là không khớp cú pháp
+link, giữ nguyên chữ thô — không có nhánh nào xử lý riêng, nên không có gì để
+quên xử lý.
+
+CỐ Ý KHÔNG hỗ trợ ảnh, bảng, `` ```code``` ``, tiêu đề lồng trong danh sách:
+phạm vi chỉ cần đủ cho một ghi chú bài giảng. Ảnh đặc biệt bị bỏ có chủ ý —
+`![alt](url)` sẽ mở lại đúng câu hỏi "ứng dụng có nên nhúng ảnh từ nguồn ngoài
+không", một quyết định khác chưa ai hỏi.
+
+**Bộ kiểm `pw-tulieu-text.mjs`** là bộ kiểm đáng giá nhất của tính năng này —
+tương đương vai trò của `kiem-danhba.mjs` cho việc che số điện thoại. Phải
+chạy bằng trình duyệt thật vì `mdSafe()` sống trong `app.js`, không cách nào
+gọi từ Node thuần. Bốn ca độc (thẻ `<script>`, `onerror` qua `<img>`, link
+`javascript:`, chèn thuộc tính qua chữ trong `[chữ](url)`) đều phải: (a) không
+cho một biến đánh dấu chạy được, và (b) chuỗi độc vẫn còn nguyên trong
+`.textContent` — chứng minh nó bị VÔ HIỆU HOÁ chứ không phải bị ÂM THẦM XOÁ
+MẤT, vì một hàm chỉ biết `.replace(/<[^>]*>/g,'')` cũng "an toàn" theo nghĩa
+không chạy mã, nhưng xoá luôn nội dung hợp lệ có dấu `< >` — `mdSafe()` không
+được phép làm vậy. Kèm bốn ca THUẬN (`#`, `**`, `-`, link https hợp lệ) để
+chắc các quy tắc chặn XSS không vô tình chặn luôn markdown đúng.
+
+`kiem-tulieu-text.mjs` (không cần trình duyệt) kiểm phần máy chủ: tạo TEXT
+không cần url nhưng bắt buộc content_md, hai chỗ sửa kèm ở trên, và giới hạn
+8.000 ký tự.
 
 ## Vai nhóm: ba, không phải hai
 

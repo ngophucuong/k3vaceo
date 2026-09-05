@@ -60,9 +60,14 @@ async function docLichCongKhai(env) {
             -- Chỉ đếm tư liệu của LỚP: tư liệu của nhóm là dữ liệu nhóm (N6),
             -- và một con số đổi theo người xem thì vô nghĩa trên trang mà ai
             -- cũng thấy cùng một bản.
+            --
+            -- Đếm cả url lẫn content_md (ghi chú Text, migration 0025): trước
+            -- kia chỉ đếm url, nên một ghi chú Text của lớp sẽ không được tính
+            -- — con số nói "chưa có gì" trong khi rõ ràng có.
             (SELECT COUNT(*) FROM links l
               WHERE l.buoi_id = lich_hoc.id AND l.removed_at IS NULL
-                AND l.scope = 'class' AND l.url IS NOT NULL) AS so_tu_lieu
+                AND l.scope = 'class'
+                AND (l.url IS NOT NULL OR l.content_md IS NOT NULL)) AS so_tu_lieu
        FROM lich_hoc WHERE cohort_id = ?
       ORDER BY ngay, COALESCE(tu_gio, '00:00')`
   ).bind(khoa.id).all();
@@ -147,7 +152,7 @@ export async function getLich(env, me) {
 // kết hiện ở màn này mà mất ở màn kia.
 export async function layTuLieuTheoBuoi(env, me) {
   const rows = await env.DB.prepare(
-    `SELECT id, buoi_id, url, title, kind, scope FROM links
+    `SELECT id, buoi_id, url, title, kind, scope, content_md FROM links
       WHERE buoi_id IS NOT NULL AND removed_at IS NULL
         AND cohort_id = ? AND (scope = 'class' OR group_id = ?)
       -- 'class' < 'group' theo thứ tự chữ, nên ASC là tài liệu chính của Ban tổ

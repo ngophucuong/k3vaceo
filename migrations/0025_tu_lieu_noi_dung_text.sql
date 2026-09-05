@@ -1,0 +1,19 @@
+-- Tư liệu dạng "Nội dung Text" — bên cạnh việc dán đường dẫn Google Drive.
+--
+-- Ngô Phú Cường hỏi có đưa được nội dung dạng text (render Markdown) trực
+-- tiếp vào ứng dụng không, rồi yêu cầu thêm hẳn một lựa chọn khi tạo Tư liệu.
+-- Đây LÀ một ngoại lệ có chủ ý với N2 ("chỉ lưu URL, không giữ nội dung"),
+-- nhưng KHÔNG mâu thuẫn với lý do N2 được lập ra: N2 nói về FILE/slide của
+-- BAN TỔ CHỨC — thứ không phải của ứng dụng mà quyết thay họ chuyện phát tán.
+-- Ghi chú Markdown ở đây là văn bản NGƯỜI TRONG LỚP TỰ VIẾT (tóm tắt bài
+-- giảng, ghi chép riêng) — không phải bản sao tài sản của ai khác. N2 vẫn
+-- đứng nguyên cho việc KHÔNG upload file, KHÔNG giữ bản sao slide/PDF.
+--
+-- Một cột TEXT là đủ, giữ đúng khuôn 'links.buoi_id' (migration 0014): không
+-- tạo bảng riêng, không nhân đôi dòng. kind='TEXT' phân biệt với các loại
+-- URL cũ (DRIVE|SHEET|DOCX|PDF|WEB|XLSX); khi đó url để NULL, content_md có
+-- giá trị — và ngược lại cho mọi loại còn lại.
+--
+-- Giới hạn 8.000 ký tự kiểm ở tầng ứng dụng (routes/links.js), không phải ở
+-- đây: SQLite TEXT không có giới hạn độ dài để khai báo trong DDL.
+ALTER TABLE links ADD COLUMN content_md TEXT;

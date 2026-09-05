@@ -2,8 +2,11 @@ import { json, error, readJson } from '../lib/http.js';
 import { isGroupOfficer, isClassCommittee, logActivity, logAudit } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 
-const KINDS = new Set(['DRIVE', 'SHEET', 'DOCX', 'PDF', 'WEB', 'XLSX']);
+const KINDS = new Set(['DRIVE', 'SHEET', 'DOCX', 'PDF', 'WEB', 'XLSX', 'TEXT']);
 const TAGS = new Set(['bai', 'buoi', 'lop']);
+// Ghi chú Markdown tự viết — xem giải thích đầy đủ trong migration 0025.
+// Giới hạn ở TẦNG ỨNG DỤNG vì cột content_md không khai báo độ dài trong DDL.
+const NOI_DUNG_MAX = 8000;
 
 // Buổi học mà tư liệu gắn vào. Trả { loi } nếu sai, { buoiId } nếu được.
 // Phải kiểm buổi có THẬT và cùng khoá: nhận thẳng số từ máy khách thì gắn được
@@ -49,14 +52,23 @@ export async function listLinks(env, me, tag) {
 
 export async function postLink(request, env, me) {
   const body = await readJson(request);
-  const url = cleanText(body.url, 2000);
-  if (!url) return error('url_required', 422);
-  if (!/^https:\/\/[^\s/]+\./i.test(url)) return error('url_must_be_https', 422);
   if (body.kind !== undefined && !KINDS.has(body.kind)) return error('kind_invalid', 422);
+  const kind = KINDS.has(body.kind) ? body.kind : 'WEB';
+
+  // Hai đường loại trừ nhau: TEXT thì bắt buộc có nội dung, không cần url;
+  // mọi loại khác thì bắt buộc có url https, không đụng content_md.
+  let url = null, contentMd = null;
+  if (kind === 'TEXT') {
+    contentMd = cleanText(body.content_md, NOI_DUNG_MAX);
+    if (!contentMd) return error('content_required', 422);
+  } else {
+    url = cleanText(body.url, 2000);
+    if (!url) return error('url_required', 422);
+    if (!/^https:\/\/[^\s/]+\./i.test(url)) return error('url_must_be_https', 422);
+  }
   if (body.tag !== undefined && !TAGS.has(body.tag)) return error('tag_invalid', 422);
 
-  const title = cleanText(body.title, 200) ?? url;
-  const kind = KINDS.has(body.kind) ? body.kind : 'WEB';
+  const title = cleanText(body.title, 200) ?? (kind === 'TEXT' ? 'Ghi chú' : url);
   const tag = TAGS.has(body.tag) ? body.tag : 'bai';
 
   // Tư liệu của LỚP hiện cho cả mười nhóm — chỉ Ban cán sự lớp đăng được.
@@ -70,15 +82,17 @@ export async function postLink(request, env, me) {
   if (loi) return loi;
 
   const row = await env.DB.prepare(
-    `INSERT INTO links (cohort_id, scope, group_id, section_id, buoi_id, url, title, kind, tag, created_by, created_at)
-     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id`
+    `INSERT INTO links (cohort_id, scope, group_id, section_id, buoi_id, url, title, kind, tag, content_md, created_by, created_at)
+     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id`
   ).bind(me.cohort_id, capLop ? 'class' : 'group', capLop ? null : me.group_id,
-         buoiId ?? null, url, title, kind, tag, me.id).first();
+         buoiId ?? null, url, title, kind, tag, contentMd, me.id).first();
 
   await logActivity(env, {
     cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
     verb: 'links.add', objectType: 'link', objectId: row.id,
-    summary: capLop ? 'gắn một tư liệu chung của lớp' : 'gắn một liên kết vào Tư liệu',
+    summary: capLop
+      ? (kind === 'TEXT' ? 'viết một ghi chú chung của lớp' : 'gắn một tư liệu chung của lớp')
+      : (kind === 'TEXT' ? 'viết một ghi chú vào Tư liệu' : 'gắn một liên kết vào Tư liệu'),
   });
 
   return json({ ok: true, id: row.id });
@@ -129,6 +143,12 @@ export async function patchLink(request, env, me, linkId, ip) {
     if (!KINDS.has(body.kind)) return error('kind_invalid', 422);
     dat.kind = body.kind;
   }
+  // Cho phép xoá trắng nội dung trở lại — cùng lý do đã cho phép xoá trắng
+  // url: thà một ghi chú trống còn hơn giữ nguyên bản cũ mà người sửa tưởng
+  // đã đổi.
+  if ('content_md' in body) {
+    dat.content_md = cleanText(body.content_md, NOI_DUNG_MAX);
+  }
   if ('tag' in body) {
     if (!TAGS.has(body.tag)) return error('tag_invalid', 422);
     dat.tag = body.tag;
@@ -161,6 +181,13 @@ export async function patchLink(request, env, me, linkId, ip) {
       cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
       verb: 'links.edit', objectType: 'link', objectId: linkId,
       summary: `dán đường dẫn cho "${dat.title ?? link.title}"`,
+    });
+  }
+  if ('content_md' in dat && dat.content_md && dat.content_md !== link.content_md) {
+    await logActivity(env, {
+      cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+      verb: 'links.edit', objectType: 'link', objectId: linkId,
+      summary: `sửa ghi chú "${dat.title ?? link.title}"`,
     });
   }
   return json({ ok: true });
