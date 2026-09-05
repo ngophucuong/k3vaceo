@@ -6,16 +6,31 @@
 // routes/danh-ba.js, cố ý KHÔNG đụng canManageGroup — cơ cấu/phần bài/ngừng
 // tham gia của nhóm khác vẫn đóng nguyên với người ngoài nhóm.
 //
-// Bốn phép ĐỐI CHỨNG ở đây, mỗi phép ứng với một chốt chặn đã kiểm bằng người
-// thật lúc viết route (xem "Link mời xuyên nhóm" trong CLAUDE.md):
+// Cập nhật 5/9: mở rộng thêm cho người ĐÃ ĐĂNG NHẬP — trước đó route này chặn
+// cứng 409 da_nhan_cho, nay bỏ chặn ở ĐÂY nhưng dựng lại chốt ở BƯỚC NHẬN
+// (postInviteClaim, routes/invite.js): hồ sơ đã có người nhận thì phải gõ
+// ĐÚNG số điện thoại mới nhận lại được, cùng bậc kiểm và cùng hạn mức đoán với
+// /vao. Đây là phần ĐÁNG GIÁ NHẤT của bộ kiểm này — không chỉ hỏi "route có
+// chạy" mà còn phải chứng minh: token một mình KHÔNG còn đủ để chiếm tài
+// khoản người khác, và cửa đoán số vẫn có hạn mức thật (không mở song song
+// một đường dò số không bị khoá).
+//
+// Sáu phép ĐỐI CHỨNG:
 //   1. Người thường (không phải Ban cán sự lớp) → 403 forbidden.
-//   2. Người ĐÃ nhận hồ sơ → 409 da_nhan_cho, không có đường tắt bỏ qua.
-//   3. Gọi hai lần cho CÙNG một người chưa nhận → hai token KHÁC nhau, và
-//      token cũ chết ngay (410) — reissueInviteToken phải thật sự vô hiệu
-//      link trước chứ không chỉ cấp thêm.
-//   4. Người CHƯA có dòng members nào (73/134 người lúc viết route) vẫn tạo
-//      được, và phải rơi đúng NHÓM ghi trong roster.group_label của NGƯỜI
-//      NHẬN — không phải nhóm của người phát link.
+//   2. Người ĐÃ nhận hồ sơ (roster 105) — phát lại được (200, không còn 409),
+//      nhưng GET /api/invite/:token phải giấu số điện thoại (phone: null).
+//   3. Claim link đó với số SAI → 401 phone_mismatch, không lộ chỗ sai.
+//   4. Claim KHÔNG kèm số → 422 phone_invalid, và KHÔNG bị tính vào hạn mức
+//      đoán (gõ hụt không phải một lần đoán, đúng nguyên tắc của doiChieu()).
+//   5. Claim với số ĐÚNG → 200, có phiên, email được cập nhật đúng giá trị
+//      gửi lên — chứng minh claim đi trọn đường chứ không chỉ trả 200 suông.
+//   6. Đoán sai đủ 8 lần (DOAN_SAI_MOI_HO_SO) thì lần thứ 9 phải 429
+//      rate_limited — cùng hạn mức với /vao, không phải một cửa dò số miễn phí
+//      thứ hai.
+//   7. Gọi hai lần cho CÙNG một người chưa nhận (roster 106) → hai token KHÁC
+//      nhau, token cũ chết ngay (410), và hồ sơ mới tạo rơi đúng NHÓM ghi
+//      trong roster.group_label của NGƯỜI NHẬN — không đòi số điện thoại gì cả
+//      (hành vi CŨ, không đổi, vì đây là lần nhận đầu tiên).
 //
 // Chạy:  bash scripts/kiem/reset-moi.sh  &&  node scripts/kiem/kiem-moi.mjs
 
@@ -53,14 +68,64 @@ const bForbidden = await rForbidden.json().catch(() => ({}));
 ok(`403 forbidden (nhận ${rForbidden.status} ${bForbidden.error ?? ''})`,
    rForbidden.status === 403 && bForbidden.error === 'forbidden');
 
-// ── 2. Người ĐÃ nhận hồ sơ → 409 da_nhan_cho ─────────────────────────────
-console.log('\n── Mời người ĐÃ nhận hồ sơ (roster 105, Nhóm 8) ──');
+// ── 2. Người ĐÃ nhận hồ sơ (roster 105, Nhóm 8) — nay phát lại được ──────
+console.log('\n── Mời người ĐÃ nhận hồ sơ (roster 105, Nhóm 8) — mở rộng 5/9 ──');
+const postJson = (p, ck, body) => fetch(B + p, {
+  method: 'POST', headers: { cookie: ck, 'content-type': 'application/json', ...IP },
+  body: JSON.stringify(body ?? {}),
+});
+
 const rDaNhan = await post('/api/danh-ba/105/moi', ckCuong);
 const bDaNhan = await rDaNhan.json().catch(() => ({}));
-ok(`409 da_nhan_cho (nhận ${rDaNhan.status} ${bDaNhan.error ?? ''})`,
-   rDaNhan.status === 409 && bDaNhan.error === 'da_nhan_cho');
+ok(`không còn 409 — phát lại được (nhận ${rDaNhan.status})`,
+   rDaNhan.status === 200 && bDaNhan.full_name === 'Nguyễn Thị Hằng Nhi');
+const tokenDaNhan = bDaNhan.url?.split('/i/')[1];
+ok('có token', !!tokenDaNhan);
 
-// ── 3+4. Người CHƯA có hồ sơ nào (roster 106, Lê Thị Huế, Nhóm 9) ────────
+const rXemDaNhan = await get('/api/invite/' + tokenDaNhan);
+const bXemDaNhan = await rXemDaNhan.json();
+ok('already_claimed = true', bXemDaNhan.member?.already_claimed === true);
+ok('số điện thoại bị GIẤU (phone: null) — không thì ai cầm link cũng đọc được',
+   bXemDaNhan.member?.phone === null);
+
+// ── 3. Claim với số SAI → 401, không lộ chỗ sai ──────────────────────────
+const rSaiSo = await postJson(`/api/invite/${tokenDaNhan}/claim`, null,
+  { email: 'ke-la@example.com', phone: '0999999999' });
+const bSaiSo = await rSaiSo.json().catch(() => ({}));
+ok(`số sai → 401 phone_mismatch (nhận ${rSaiSo.status} ${bSaiSo.error ?? ''})`,
+   rSaiSo.status === 401 && bSaiSo.error === 'phone_mismatch');
+
+// ── 4. Claim KHÔNG kèm số → 422, và KHÔNG tính vào hạn mức đoán ──────────
+const rThieuSo = await postJson(`/api/invite/${tokenDaNhan}/claim`, null,
+  { email: 'ke-la-2@example.com' });
+const bThieuSo = await rThieuSo.json().catch(() => ({}));
+ok(`thiếu số → 422 phone_invalid, không phải 401 (nhận ${rThieuSo.status} ${bThieuSo.error ?? ''})`,
+   rThieuSo.status === 422 && bThieuSo.error === 'phone_invalid');
+
+// ── 5. Claim với số ĐÚNG → 200, có phiên, email cập nhật đúng ────────────
+const rDungSo = await postJson(`/api/invite/${tokenDaNhan}/claim`, null,
+  { email: 'hangnhi-that@example.com', phone: '0373780212' });
+ok(`số đúng → 200, có set-cookie phiên (nhận ${rDungSo.status})`,
+   rDungSo.status === 200 && !!rDungSo.headers.get('set-cookie'));
+
+// ── 6. Đoán sai đủ 8 lần (DOAN_SAI_MOI_HO_SO) thì lần 9 phải 429 ─────────
+// Lần sai ở bước 3 đã tính 1 — cần thêm 7 lần sai nữa cho đủ 8, rồi lần thứ 9
+// (dù số gì) phải bị khoá. Thiếu số ở bước 4 không được tính, nên nếu nó lỡ
+// bị tính nhầm thì phép này sẽ khoá SỚM một lượt — bắt được ngay.
+let khoaOLuot = 0;
+for (let i = 2; i <= 8; i++) {
+  const r = await postJson(`/api/invite/${tokenDaNhan}/claim`, null,
+    { email: `ke-la-${i}@example.com`, phone: '0999999999' });
+  if (r.status === 429) { khoaOLuot = i; break; }
+}
+ok(`7 lần sai kế tiếp (lượt 2–8) đều 401, chưa bị khoá sớm`, khoaOLuot === 0);
+const r429 = await postJson(`/api/invite/${tokenDaNhan}/claim`, null,
+  { email: 'ke-la-9@example.com', phone: '0999999999' });
+const b429 = await r429.json().catch(() => ({}));
+ok(`lượt thứ 9 → 429 rate_limited, cùng hạn mức với /vao (nhận ${r429.status} ${b429.error ?? ''})`,
+   r429.status === 429 && b429.error === 'rate_limited');
+
+// ── 7. Người CHƯA có hồ sơ nào (roster 106, Lê Thị Huế, Nhóm 9) ──────────
 console.log('\n── Mời người CHƯA có hồ sơ nào (roster 106, Nhóm 9) ──');
 const rLan1 = await post('/api/danh-ba/106/moi', ckCuong);
 const bLan1 = await rLan1.json().catch(() => ({}));

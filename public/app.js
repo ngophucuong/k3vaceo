@@ -301,26 +301,36 @@ async function renderClaim(token) {
     return;
   }
   const { member, group } = data;
+  // Hồ sơ ĐÃ CÓ NGƯỜI NHẬN: máy chủ không trả số điện thoại về đây nữa (xem
+  // getInvite, routes/invite.js) — ô này đổi vai trò từ "sửa cho đúng" sang
+  // "gõ lại để chứng minh là mình", nên KHÔNG được điền sẵn giá trị nào, kẻo
+  // ai cầm link cũng bấm Lưu là qua luôn mà chẳng cần biết số thật.
+  const laNhanLai = member.already_claimed;
   $('#claimcard').innerHTML = `
     <div class="lb">${esc(group.label)} · Khoá K03</div>
-    <h1>${member.already_claimed ? 'Sửa lại hồ sơ của bạn' : `Chào ${esc(short(member.full_name))}`}</h1>
-    <p class="sub">${member.already_claimed
-      ? 'Bạn đã xác nhận hồ sơ trước đó — sửa lại nếu có gì đổi rồi bấm lưu.'
+    <h1>${laNhanLai ? 'Sửa lại hồ sơ của bạn' : `Chào ${esc(short(member.full_name))}`}</h1>
+    <p class="sub">${laNhanLai
+      ? 'Hồ sơ này đã có người nhận. Gõ đúng SỐ ĐIỆN THOẠI đã đăng ký để xác nhận đúng là bạn, rồi sửa các ô khác nếu cần.'
       : 'Thông tin lấy từ danh sách Ban tổ chức, có chỗ đã cũ hoặc sai. Sửa lại cho đúng rồi xác nhận.'}</p>
     <label class="f">Họ tên</label><input value="${esc(member.full_name)}" disabled>
     <label class="f">Email <span style="color:var(--due)">*</span></label>
     <input id="cEmail" value="${esc(member.email)}" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
     <div class="hintline">Dùng để tự đăng nhập lại nếu mất link này.</div>
-    <label class="f">Điện thoại</label><input id="cPhone" value="${esc(member.phone)}" placeholder="09xx xxx xxx" inputmode="tel" maxlength="30">
+    <label class="f">Điện thoại${laNhanLai ? ' <span style="color:var(--due)">*</span>' : ''}</label>
+    <input id="cPhone" value="${esc(member.phone)}" placeholder="${laNhanLai ? 'Số đã đăng ký với Ban tổ chức' : '09xx xxx xxx'}" inputmode="tel" maxlength="30">
+    ${laNhanLai ? `<div class="hintline">Bắt buộc — dùng để xác nhận đúng là bạn, không phải số muốn đổi sang.</div>` : ''}
     <label class="f">Chức vụ</label><input id="cTitle" value="${esc(member.title)}" maxlength="120">
     <label class="f">Đơn vị</label><input id="cCompany" value="${esc(member.company)}" maxlength="160">
     <div id="cErr" class="errline" style="display:none"></div>
-    <button class="wide" id="cSubmit">${member.already_claimed ? 'Lưu' : 'Xác nhận hồ sơ'}</button>`;
+    <button class="wide" id="cSubmit">${laNhanLai ? 'Lưu' : 'Xác nhận hồ sơ'}</button>`;
 
   const showErr = msg => { $('#cErr').textContent = msg; $('#cErr').style.display = 'block'; };
   $('#cSubmit').onclick = async () => {
     const email = $('#cEmail').value.trim();
     if (!email) { showErr('Cần điền email để dùng lần sau.'); return; }
+    if (laNhanLai && !$('#cPhone').value.trim()) {
+      showErr('Cần gõ đúng số điện thoại đã đăng ký để xác nhận đúng là bạn.'); return;
+    }
     const label = $('#cSubmit').textContent;
     $('#cSubmit').disabled = true; $('#cSubmit').textContent = 'Đang lưu…';
     try {
@@ -330,7 +340,9 @@ async function renderClaim(token) {
       history.replaceState({}, '', '/');
       boot();
     } catch (e) {
-      showErr(errText(e));
+      showErr(laNhanLai && e?.data?.error === 'phone_mismatch'
+        ? 'Số điện thoại chưa đúng. Gõ đúng số đã đăng ký với Ban tổ chức, không phải số muốn đổi sang.'
+        : errText(e));
       $('#cSubmit').disabled = false; $('#cSubmit').textContent = label;
     }
   };
@@ -1825,12 +1837,20 @@ async function veDanhBaLop() {
 
   // Tạo link mời xuyên nhóm — chỉ Ban cán sự lớp thấy nút này (DANHBA_CAN_MOI),
   // máy chủ vẫn kiểm lại. Cùng khuôn sheet với nút mời ở thẻ Nhóm.
+  //
+  // Từ 5/9 nút này còn dùng được cho người ĐÃ đăng nhập (data-moi-vao) — máy
+  // chủ đòi người bấm vào link phải gõ đúng số điện thoại mới nhận lại được
+  // (routes/invite.js), nên câu ở đây phải nói rõ để người phát link biết mà
+  // dặn trước, không thì họ tưởng cứ bấm link là vào được ngay.
   document.querySelectorAll('#v-nhom [data-moi]').forEach(btn => {
     btn.onclick = async () => {
       try {
         const r = await apiPost(`/api/danh-ba/${btn.dataset.moi}/moi`);
-        openSheet(`<h3>Link mời cho ${esc(r.full_name)}</h3>
-          <p class="sub">Link cũ của người này (nếu có) đã bị vô hiệu. Gửi link dưới đây qua Zalo.</p>
+        const daVao = btn.dataset.moiVao === '1';
+        openSheet(`<h3>Link ${daVao ? 'đăng nhập' : 'mời'} cho ${esc(r.full_name)}</h3>
+          <p class="sub">Link cũ của người này (nếu có) đã bị vô hiệu.${daVao
+            ? ' Hồ sơ này đã có người nhận — người bấm vào link phải gõ ĐÚNG số điện thoại đã đăng ký mới vào lại được.'
+            : ''} Gửi link dưới đây qua Zalo.</p>
           <div class="card"><div class="cb" style="word-break:break-all;font-size:13px">${esc(r.url)}</div></div>
           <div class="sa"><button class="big c" id="ivC">Đóng</button><button class="big go" id="ivCopy">Chép link</button></div>`);
         $('#ivC').onclick = closeSheet;
@@ -1871,8 +1891,9 @@ function veDongDanhBa(p) {
       <div class="fi"><div class="k">Chức vụ / đơn vị</div>
         <div class="v ${nghe ? '' : 'blank'}">${esc(nghe) || 'Chưa có'}</div></div>
       ${p.vai_lop ? `<div class="fi"><div class="k">Ban cán sự lớp</div><div class="v">${esc(p.vai_lop)}</div></div>` : ''}
-      ${!p.da_dang_nhap && DANHBA_CAN_MOI
-        ? `<button class="wide ghost" style="padding:11px;font-size:14px" data-moi="${p.roster_id}">Tạo link mời</button>` : ''}
+      ${DANHBA_CAN_MOI
+        ? `<button class="wide ghost" style="padding:11px;font-size:14px" data-moi="${p.roster_id}" data-moi-vao="${p.da_dang_nhap ? 1 : 0}">${
+            p.da_dang_nhap ? 'Phát lại link đăng nhập' : 'Tạo link mời'}</button>` : ''}
     </div>`;
 }
 
@@ -1909,7 +1930,7 @@ async function veDanhBaNhom() {
         <div class="fi"><div class="k">Giúp được gì</div><div class="v ${m.profile.offers ? '' : 'blank'}">${esc(m.profile.offers) || 'Chưa điền'}</div></div>
         <button class="wide ghost" style="padding:11px;font-size:14px" data-edit="${m.id}">
           ${m.id === HOME.me.id ? 'Sửa hồ sơ của tôi' : 'Sửa giúp — rồi báo lại chính chủ'}</button>
-        ${officer ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" data-invite="${m.id}">Phát lại link mời cho người này</button>` : ''}
+        ${officer ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" data-invite="${m.id}" data-invite-vao="${m.claimed ? 1 : 0}">Phát lại link mời cho người này</button>` : ''}
         ${officer && m.id !== HOME.me.id
           ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px;color:var(--due)" data-ngung="${m.id}">Ngừng tham gia nhóm</button>` : ''}
       </div>`).join('')}
@@ -1939,8 +1960,11 @@ async function veDanhBaNhom() {
     btn.onclick = async () => {
       try {
         const r = await apiPost(`/api/members/${btn.dataset.invite}/invite`);
-        openSheet(`<h3>Link mời cho ${esc(r.full_name)}</h3>
-          <p class="sub">Link cũ của người này đã bị vô hiệu. Gửi link dưới đây qua Zalo.</p>
+        const daVao = btn.dataset.inviteVao === '1';
+        openSheet(`<h3>Link ${daVao ? 'đăng nhập' : 'mời'} cho ${esc(r.full_name)}</h3>
+          <p class="sub">Link cũ của người này đã bị vô hiệu.${daVao
+            ? ' Hồ sơ này đã có người nhận — người bấm vào link phải gõ ĐÚNG số điện thoại đã đăng ký mới vào lại được.'
+            : ''} Gửi link dưới đây qua Zalo.</p>
           <div class="card"><div class="cb" style="word-break:break-all;font-size:13px">${esc(r.url)}</div></div>
           <div class="sa"><button class="big c" id="ivC">Đóng</button><button class="big go" id="ivCopy">Chép link</button></div>`);
         $('#ivC').onclick = closeSheet;

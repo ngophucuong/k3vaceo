@@ -42,6 +42,12 @@ export async function postWizardInvites(request, env, me) {
 // dữ liệu Safari, đổi điện thoại). Đợt 1 chưa có đăng nhập bằng email nên link
 // mời là lối vào duy nhất; không có đường phát lại thì họ mất hẳn quyền vào.
 // Mọi lời mời cũ còn hạn của người đó bị đóng lại để chỉ còn một link sống.
+//
+// An toàn cho người ĐÃ NHẬN nhờ chốt chặn ở bước NHẬN (xacNhanLaiSo,
+// routes/invite.js, thêm 5/9) — hồ sơ đã có người nhận thì phải gõ ĐÚNG số
+// điện thoại mới nhận lại được. Trước bản sửa đó, route này để hở: ai cầm
+// được link phát lại là đăng nhập thẳng vào tài khoản người khác, không cần
+// biết số điện thoại hay passkey gì cả — chỉ cần gõ một email tự chọn bất kỳ.
 export async function postMemberInvite(request, env, me, targetId) {
   if (!(await canManageGroup(env, me, me.group_id))) return error('forbidden', 403);
 

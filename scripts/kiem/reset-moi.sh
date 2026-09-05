@@ -2,8 +2,9 @@
 # Dựng dữ liệu cho kiem-moi.mjs (link mời xuyên nhóm, POST /api/danh-ba/:id/moi):
 #   - roster 106 (Lê Thị Huế, Nhóm 9) CHƯA có hồ sơ nào — kiểm route tự tạo
 #     đúng nhóm ghi trong danh sách gốc, và gọi lại lần hai ra token khác.
-#   - roster 105 (Nguyễn Thị Hằng Nhi, Nhóm 8) ĐÃ nhận hồ sơ — kiểm chốt chặn
-#     da_nhan_cho.
+#   - roster 105 (Nguyễn Thị Hằng Nhi, Nhóm 8) ĐÃ nhận hồ sơ — kiểm việc phát
+#     lại link mời cho người đã đăng nhập (mở rộng 5/9) và chốt chặn xác nhận
+#     lại số điện thoại ở bước nhận (routes/invite.js).
 #   - hai phiên cố định: Ngô Phú Cường (uỷ viên Ban cán sự lớp, migration 0013)
 #     và Nguyễn Thị Thu Hương (thành viên thường Nhóm 6, không giữ vai gì) —
 #     để so 200 với 403.
@@ -36,6 +37,13 @@ DELETE FROM sessions WHERE member_id IN (
 );
 DELETE FROM invites WHERE member_id IN (SELECT id FROM members WHERE roster_id IN (105, 106));
 DELETE FROM members WHERE roster_id IN (105, 106);
+
+-- Dọn sổ tần suất của đúng hai thùng kiem-moi.mjs sẽ đốt (đoán số điện thoại
+-- khi phát lại link cho roster 105) — không dọn thì chạy lại trong cùng một
+-- giờ là cộng dồn từ lượt trước, phép đếm-chính-xác-số-lần sẽ khoá SỚM một
+-- lượt mà không phải do mã sai, chỉ vì sổ chưa sạch.
+DELETE FROM rate_events WHERE bucket = 'doan_so_ho_so' AND ip = 'r105';
+DELETE FROM rate_events WHERE bucket = 'doan_so_ip' AND ip = '203.0.113.90';
 
 -- Ca 409: roster 105 (Nguyễn Thị Hằng Nhi, Nhóm 8) ĐÃ nhận hồ sơ.
 INSERT INTO members (cohort_id, group_id, roster_id, full_name, title, company, phone,

@@ -50,8 +50,13 @@ import { cheEmail as che } from '../lib/che.js';
 // nện vào đúng roster_id của người ấy, mà 8 lần một giờ thì không đi tới đâu
 // trước 10^8 khả năng. Thùng theo IP để chặn máy quét rải mỏng trên nhiều hồ
 // sơ — mỗi hồ sơ chỉ một phát nên thùng kia không bắt được.
-const DOAN_SAI_MOI_HO_SO = 8;
-const DOAN_SAI_MOI_IP = 30;
+//
+// Export hai hằng số này vì routes/invite.js dùng lại CHUNG hai thùng khi xác
+// nhận lại số cho một hồ sơ ĐÃ CÓ NGƯỜI NHẬN (phát lại link mời) — cùng một
+// bí mật đang bị soi thì phải cùng một hạn mức, không thì đi đường kia là
+// được thêm một lượt đoán miễn phí.
+export const DOAN_SAI_MOI_HO_SO = 8;
+export const DOAN_SAI_MOI_IP = 30;
 
 // Ba đường /check, /vao, /start soi CÙNG một bí mật, nên phải dùng CHUNG hạn
 // mức. Tách ra thì kẻ dò gọi xen kẽ là được gấp ba số lần — vì vậy chỗ đếm
@@ -363,6 +368,23 @@ export async function postVerifyMyEmailConfirm(request, env, me) {
 
 /* ══ Dùng chung ═══════════════════════════════════════════════════════════ */
 
+// Số nào được coi là "đúng" của một hồ sơ, từ đúng hai nguồn:
+//   1. Số Ban tổ chức ghi trong danh sách gốc (roster.phone).
+//   2. Số mà CHÍNH CHỦ đã tự sửa trong hồ sơ (members.phone có dấu
+//      phone_self_set_at) — dành cho ai bị ghi sai số hoặc chưa có số nào:
+//      vào bằng link mời, sửa đúng số của mình, từ lần sau tự vào được.
+// Cố ý không nhận số do người cùng nhóm sửa hộ: nhận thì A sửa số của B
+// thành số mình rồi đăng nhập ở /dangnhap nhận là B, đổi luôn email đăng nhập của B.
+//
+// Export vì routes/invite.js dùng lại CHUNG câu hỏi này khi phát lại link mời
+// cho một hồ sơ ĐÃ CÓ NGƯỜI NHẬN — cùng một câu hỏi "đúng là người này
+// không", viết hai bản dễ lệch nhau lúc sửa một bên mà quên bên kia.
+export function soHopLeTuHoSo(person, member) {
+  const ds = [person?.phone];
+  if (member?.phone && member.phone_self_set_at) ds.push(member.phone);
+  return ds.filter(Boolean);
+}
+
 // Đối chiếu roster_id + số điện thoại. Trả về { person, member } hoặc { loi }.
 //
 // Hạn mức nằm TRONG hàm này chứ không ở từng route: /check, /vao và /start đều
@@ -392,16 +414,7 @@ async function doiChieu(env, request, body) {
       WHERE m.roster_id = ?`
   ).bind(rosterId).first();
 
-  // Hai số được coi là hợp lệ để đối chiếu:
-  //   1. Số Ban tổ chức ghi trong danh sách gốc (roster.phone).
-  //   2. Số mà CHÍNH CHỦ đã tự sửa trong hồ sơ (members.phone có dấu
-  //      phone_self_set_at) — dành cho ai bị ghi sai số hoặc chưa có số nào:
-  //      vào bằng link mời, sửa đúng số của mình, từ lần sau tự vào được.
-  // Cố ý không nhận số do người cùng nhóm sửa hộ: nhận thì A sửa số của B
-  // thành số mình rồi đăng nhập ở /dangnhap nhận là B, đổi luôn email đăng nhập của B.
-  const soHopLe = [person.phone];
-  if (member?.phone && member.phone_self_set_at) soHopLe.push(member.phone);
-  const soDoiChieu = soHopLe.filter(Boolean);
+  const soDoiChieu = soHopLeTuHoSo(person, member);
 
   // Không có số nào để soi (44/134 người trong danh sách gốc). Nói rõ để họ
   // biết đường xin link mời, chứ báo "sai số" thì họ gõ lại cả buổi.

@@ -2,23 +2,63 @@ import { json, error, readJson } from '../lib/http.js';
 import { resolveInviteToken, createSession, sessionCookieHeader } from '../auth.js';
 import { logActivity } from '../permissions.js';
 import { cleanText, normalizeEmail, isValidEmail } from '../lib/validate.js';
+import { isValidVnPhone, phonesMatch } from '../lib/phone.js';
+import { clientIp, conQuota, ghiNhan } from '../lib/ratelimit.js';
+import { soHopLeTuHoSo, DOAN_SAI_MOI_HO_SO, DOAN_SAI_MOI_IP } from './onboard.js';
 
 export async function getInvite(env, token) {
   const member = await resolveInviteToken(env, token);
   if (!member) return error('invite_invalid_or_expired', 410);
   const group = await env.DB.prepare('SELECT no, label FROM groups WHERE id = ?').bind(member.group_id).first();
+  const daNhan = !!member.claimed_at;
   return json({
     member: {
       id: member.id,
       full_name: member.full_name,
       title: member.title,
       company: member.company,
-      phone: member.phone,
+      // Hồ sơ ĐÃ CÓ NGƯỜI NHẬN thì KHÔNG trả số điện thoại ra đây — đây chính
+      // là thứ người bấm vào link phải TỰ GÕ ĐÚNG để chứng minh là mình (xem
+      // postInviteClaim bên dưới). Trả sẵn số ra thì ai cầm link cũng đọc
+      // được rồi gõ y nguyên, chốt chặn coi như không có.
+      phone: daNhan ? null : member.phone,
       email: member.email,
-      already_claimed: !!member.claimed_at,
+      already_claimed: daNhan,
     },
     group,
   });
+}
+
+/* Hồ sơ ĐÃ CÓ NGƯỜI NHẬN mà vẫn phát lại được link (Ngô Phú Cường yêu cầu 5/9
+   mở rộng "phát lại link mời" ra cả người đã đăng nhập, cả lớp — xem
+   routes/danh-ba.js) thì TOKEN một mình không còn đủ làm bằng chứng: ai cầm
+   được link — kể cả Ban cán sự lớp bấm nhầm người, kể cả link lỡ lộ ra ngoài
+   — sẽ đăng nhập thẳng vào tài khoản người khác nếu không có chốt này, vì
+   bước nhận trước đây chỉ cần một email tự chọn, không đòi gì thêm.
+   Đòi lại đúng SỐ ĐIỆN THOẠI, CÙNG bậc kiểm và CÙNG hạn mức (doan_so_ho_so /
+   doan_so_ip) với lần đăng nhập đầu ở /vao — không mở thêm một cửa dò số
+   song song không bị khoá. */
+async function xacNhanLaiSo(env, request, member, body) {
+  const ip = clientIp(request);
+  const hetPhan = !(await conQuota(env, 'doan_so_ho_so', `r${member.roster_id}`, DOAN_SAI_MOI_HO_SO))
+               || !(await conQuota(env, 'doan_so_ip', ip, DOAN_SAI_MOI_IP));
+  if (hetPhan) return error('rate_limited', 429, { retry_after_minutes: 60 });
+
+  // Gõ hụt một chữ số thì KHÔNG tính là một lần đoán — giống hệt doiChieu().
+  if (!isValidVnPhone(body.phone)) return error('phone_invalid', 422);
+
+  const person = member.roster_id
+    ? await env.DB.prepare('SELECT phone FROM roster WHERE id = ?').bind(member.roster_id).first()
+    : null;
+  const soDoiChieu = soHopLeTuHoSo(person, member);
+  // Không có số nào để soi (hồ sơ không có roster_id, hoặc roster không có
+  // số) thì KHÔNG có cách nào xác nhận — chặn hẳn, an toàn hơn cho qua.
+  if (!soDoiChieu.length || !soDoiChieu.some(so => phonesMatch(so, body.phone))) {
+    await ghiNhan(env, 'doan_so_ho_so', `r${member.roster_id}`);
+    await ghiNhan(env, 'doan_so_ip', ip);
+    return error('phone_mismatch', 401);
+  }
+  return null;
 }
 
 export async function postInviteClaim(request, env, token) {
@@ -26,6 +66,15 @@ export async function postInviteClaim(request, env, token) {
   if (!member) return error('invite_invalid_or_expired', 410);
 
   const body = await readJson(request);
+  const wasClaimed = !!member.claimed_at;
+
+  // Xác nhận lại danh tính TRƯỚC khi làm bất cứ việc gì khác (kể cả soi email
+  // đã dùng chưa) — đúng thứ tự "xác thực trước, xử lý sau".
+  if (wasClaimed) {
+    const loi = await xacNhanLaiSo(env, request, member, body);
+    if (loi) return loi;
+  }
+
   const email = normalizeEmail(body.email);
   if (!email) return error('email_required', 422);
   if (!isValidEmail(email)) return error('email_invalid', 422);
@@ -42,7 +91,6 @@ export async function postInviteClaim(request, env, token) {
   const title = 'title' in body ? (cleanText(body.title, 120) ?? member.title) : member.title;
   const company = 'company' in body ? (cleanText(body.company, 160) ?? member.company) : member.company;
   const phone = 'phone' in body ? (cleanText(body.phone, 30) ?? member.phone) : member.phone;
-  const wasClaimed = !!member.claimed_at;
 
   try {
     await env.DB.prepare(

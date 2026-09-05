@@ -102,7 +102,14 @@ export async function getDanhBa(env, me) {
    Vai đủ điều kiện là isClassCommittee (lop_truong/lop_pho/thu_quy/uy_vien),
    không phải isClassOfficer: phát link mời không đụng tiền, nên uỷ viên —
    vai thấp nhất cấp lớp — đã đủ, đúng tinh thần nó được lập ra (mục "Tư liệu:
-   sửa được" trong CLAUDE.md, migration 0013). */
+   sửa được" trong CLAUDE.md, migration 0013).
+
+   Cập nhật 5/9: mở rộng thêm cho cả người ĐÃ ĐĂNG NHẬP, không chỉ người chưa
+   đăng nhập như bản đầu 3/9. Ngô Phú Cường yêu cầu, đúng khuôn "quyền cấp lớp
+   = quyền cấp nhóm đã có nhưng trải ra cả lớp" — postMemberInvite
+   (routes/wizard.js) đã luôn cho trưởng/phó nhóm làm việc này với NHÓM MÌNH
+   từ Đợt 1. An toàn nhờ chốt chặn mới ở bước NHẬN (xacNhanLaiSo, routes/
+   invite.js) — xem chú thích ngay dưới hàm này. */
 export async function postDanhBaMoi(request, env, me, rosterId) {
   if (!(await isClassCommittee(env, me.id))) return error('forbidden', 403);
 
@@ -115,11 +122,18 @@ export async function postDanhBaMoi(request, env, me, rosterId) {
     'SELECT id, full_name, claimed_at FROM members WHERE roster_id = ? AND is_active = 1'
   ).bind(rosterId).first();
 
-  // Đã nhận hồ sơ rồi thì link mời hết tác dụng — đúng chốt chặn của
-  // /api/onboard/vao (số điện thoại không dùng lại được sau khi nhận). Người
-  // này vào lại bằng passkey hoặc mã email, không phải link mời.
-  if (member?.claimed_at) return error('da_nhan_cho', 409);
-
+  // KHÔNG còn chặn hồ sơ ĐÃ NHẬN ở đây nữa — Ngô Phú Cường yêu cầu 5/9 mở
+  // rộng "phát lại link mời" ra cho cả người đã đăng nhập, đúng quyền
+  // postMemberInvite (routes/wizard.js) đã có sẵn cho trưởng/phó nhóm với
+  // NHÓM MÌNH, nay áp dụng cho CẢ LỚP với Ban cán sự lớp.
+  //
+  // An toàn vì chốt chặn thật giờ nằm ở BƯỚC NHẬN (xacNhanLaiSo trong
+  // routes/invite.js): hồ sơ đã có người nhận thì phải gõ ĐÚNG số điện thoại
+  // mới nhận lại được, y hệt bậc kiểm của lần đăng nhập đầu ở /vao — token
+  // một mình không còn là bằng chứng đủ. Trước bản sửa đó, route này (và
+  // postMemberInvite) từng để hở: ai cầm được link phát lại là đăng nhập
+  // thẳng vào tài khoản người khác, không cần biết số điện thoại hay passkey
+  // gì cả — chỉ cần gõ một email tự chọn bất kỳ.
   if (!member) {
     // Chưa có hồ sơ ở BẤT KỲ nhóm nào — tạo mới, đúng nhóm ghi trong danh
     // sách gốc. Không dùng nhóm của NGƯỜI PHÁT LINK: đây là hồ sơ của người

@@ -23,27 +23,35 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Sáu việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Bảy việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+1. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+   Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
+   1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
+   tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
+   bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
+   trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
+   người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
+2. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-2. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+3. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-3. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9). Ngô Phú
-   Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
-   link mời cho người CHƯA đăng nhập ở bất kỳ nhóm nào, không chỉ nhóm của
-   mình — `POST /api/danh-ba/:roster_id/moi`, xem mục riêng bên dưới.
-4. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-5. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-6. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+4. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+   Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
+   link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
+   người đã đăng nhập (mục #1 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
+   xem mục riêng bên dưới.
+5. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+6. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+7. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -1054,17 +1062,85 @@ thấp nhất cấp lớp — đã đủ, đúng tinh thần nó được lập 
 
 Ba chốt chặn đã kiểm bằng người thật trên D1 cục bộ:
 1. Người thường (không phải Ban cán sự lớp) gọi route này nhận `forbidden` 403.
-2. Người ĐÃ nhận hồ sơ (`claimed_at` khác NULL) nhận `da_nhan_cho` 409 — đúng
-   chốt chặn của `/api/onboard/vao`, không có đường tắt nào bỏ qua nó.
+2. ~~Người ĐÃ nhận hồ sơ (`claimed_at` khác NULL) nhận `da_nhan_cho` 409~~ — đã
+   **bỏ chặn này ngày 5/9**, xem mục riêng "Phát lại link mời cho người ĐÃ
+   ĐĂNG NHẬP" ngay dưới đây. Chốt chặn thật giờ chuyển sang bước NHẬN.
 3. Gọi lại lần hai cho cùng một người CHƯA nhận ra **token khác lần trước**,
    và link cũ trả `410 invite_invalid_or_expired` — `reissueInviteToken` tự
    vô hiệu link cũ trước khi cấp link mới, dùng chung với đường mời trong tab
    Nhóm, không viết lại logic.
 
-Giao diện: nút "Tạo link mời" chỉ hiện trong thẻ Cả lớp của Danh bạ, ở panel
-của người CHƯA đăng nhập, và chỉ khi `can_moi` (cờ trả về từ `/api/danh-ba`,
-tính theo NGƯỜI XEM chứ không theo từng dòng) là true. Máy chủ vẫn kiểm lại
-trong `postDanhBaMoi` — giao diện chỉ để khỏi bày nút bấm vào là 403.
+Giao diện: nút "Tạo link mời" chỉ hiện trong thẻ Cả lớp của Danh bạ, và chỉ
+khi `can_moi` (cờ trả về từ `/api/danh-ba`, tính theo NGƯỜI XEM chứ không
+theo từng dòng) là true. Máy chủ vẫn kiểm lại trong `postDanhBaMoi` — giao
+diện chỉ để khỏi bày nút bấm vào là 403. **Từ 5/9 nút này hiện cho MỌI
+người**, không chỉ người chưa đăng nhập — đổi nhãn thành "Phát lại link đăng
+nhập" khi người đó đã đăng nhập rồi, xem mục dưới đây.
+
+### Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật (5/9)
+
+Ngô Phú Cường nói "tôi cũng có quyền phát lại link mời cho cả lớp, kể cả học
+viên đã đăng nhập", rồi làm rõ: quyền anh ĐANG có "trong nhóm" (nút "Phát lại
+link mời cho người này" ở tab Nhóm, `POST /api/members/:id/invite`,
+`routes/wizard.js` — có từ Đợt 1, chưa từng chặn `claimed_at`) — anh muốn Cường
+và lớp trưởng có quyền y hệt đó cho CẢ LỚP, không chỉ nhóm mình.
+
+Tra tới tận nơi link đó dẫn tới thì lộ ra: `postInviteClaim` (bước NHẬN,
+`routes/invite.js`) **không kiểm gì cả** khi hồ sơ đã có người nhận — chỉ cần
+gõ một email tự chọn bất kỳ là được cấp phiên đăng nhập ngay lập tức, **kèm
+ghi đè luôn email thật của người đó**. Nói cách khác: route ở `wizard.js` đã
+âm thầm cho phép **chiếm tài khoản người khác** từ Đợt 1 tới giờ — ai cầm được
+link phát lại (kể cả phát nhầm người, kể cả link lỡ lộ ra ngoài) đều đăng nhập
+thẳng vào tài khoản đó, không cần biết số điện thoại, không cần passkey. Route
+này an toàn ở Đợt 1 vì khi đó chưa có đường vào lại nào khác (chưa có OTP,
+chưa có passkey) nên "phát lại = cấp lại chìa khoá" là hợp lý; từ Đợt 2/5 đã
+có `/dangnhap` (mã 6 số qua email) và passkey nên cái lỗ ấy không còn cần
+thiết nữa, chỉ còn là rủi ro treo lại — và mở rộng y nguyên nó ra cả lớp sẽ
+tăng phạm vi từ "14 người Nhóm 6 mình biết mặt" lên "138 người toàn lớp".
+
+**Không mở rộng y nguyên. Vá lỗ hổng trước, rồi mới mở rộng ra cả lớp** — đúng
+kết quả Ngô Phú Cường muốn (cấp lại được link đăng nhập cho bất kỳ ai, cả lớp)
+nhưng không kèm rủi ro chiếm tài khoản:
+
+- **`xacNhanLaiSo()`** (`routes/invite.js`, hàm mới) — khi `member.claimed_at`
+  đã có giá trị, `postInviteClaim` đòi thêm **đúng số điện thoại** trước khi
+  cho ghi đè bất cứ gì, cùng bậc kiểm và **CÙNG hạn mức đoán** (`doan_so_ho_so`
+  / `doan_so_ip`, export từ `onboard.js`) với lần đăng nhập đầu ở `/vao` — có
+  chủ đích: không mở thêm một cửa dò số song song không bị khoá. Xác thực
+  chạy TRƯỚC mọi việc khác (kể cả soi email đã dùng chưa).
+- **`soHopLeTuHoSo(person, member)`** (`onboard.js`, tách ra từ `doiChieu()`)
+  — "số nào được coi là đúng của một hồ sơ" giờ dùng CHUNG giữa `/vao` và bước
+  nhận lại link mời, để sửa một bên mà quên bên kia là chuyện không xảy ra
+  được nữa (đã từng là nguy cơ khi hai nơi có hai bản sao riêng).
+- **`getInvite()`** (`routes/invite.js`) **giấu số điện thoại** khi
+  `already_claimed` — trả `phone: null` thay vì số thật. Đây là chỗ DỄ QUÊN
+  NHẤT: nếu vẫn trả số thật ra để "cho tiện sửa" thì ai mở link cũng đọc được
+  số ngay trên màn hình rồi gõ y nguyên — chốt chặn vừa dựng coi như không
+  tồn tại. `pw-nhanlai.mjs` có phép đối chứng riêng cho đúng chỗ này: ô Điện
+  thoại ở màn nhận link phải RỖNG, không được điền sẵn.
+- **`postDanhBaMoi`** (`routes/danh-ba.js`) bỏ hẳn chốt `da_nhan_cho` 409 —
+  giờ phát lại được cho MỌI người, cả lớp, cả đã đăng nhập lẫn chưa. An toàn
+  vì chốt thật đã chuyển sang bước nhận ở trên.
+- **`postMemberInvite`** (`routes/wizard.js`, route CŨ của Đợt 1) tự động
+  được vá theo, vì cả hai route đều đi qua chung `postInviteClaim` — không
+  cần sửa route này, chỉ cập nhật lại chú thích cho đúng sự thật mới.
+
+Giao diện (`public/app.js`): nút đổi nhãn "Tạo link mời" ↔ "Phát lại link đăng
+nhập" theo `da_dang_nhap`, ở cả hai chỗ (tab Nhóm và Danh bạ → Cả lớp). Sheet
+sau khi phát link nói rõ "người bấm vào link phải gõ ĐÚNG số điện thoại đã
+đăng ký" khi tái cấp cho người đã đăng nhập, để Ban cán sự lớp biết đường dặn
+trước. Màn nhận link (`renderClaim`) đổi phụ đề, KHÔNG điền sẵn ô điện thoại
+khi `already_claimed`, và bắt buộc gõ trước khi cho bấm Lưu (chặn ngay trên
+giao diện, khỏi tốn một lượt gọi máy chủ cho lỗi hiển nhiên).
+
+`kiem-moi.mjs` viết lại hoàn toàn phần "người đã nhận hồ sơ": không còn kiểm
+"409 bị chặn" mà kiểm CẢ HAI chiều — số sai bị chặn (401), số thiếu KHÔNG bị
+tính vào hạn mức đoán (422, khác nhánh — đúng nguyên tắc "gõ hụt không phải
+một lần đoán"), và đoán đủ 8 lần thì lần 9 phải 429 đúng hạn mức của `/vao`.
+`reset-moi.sh` phải dọn thêm hai thùng `rate_events` (`doan_so_ho_so`/`r105`,
+`doan_so_ip`/`203.0.113.90`) — thiếu bước này thì chạy lại bộ kiểm trong cùng
+một giờ sẽ khoá SỚM một lượt vì cộng dồn từ lượt chạy trước, không phải do mã
+sai (đã vấp và sửa ngay khi viết bộ kiểm này).
 
 ### Lưu Minh Tiến — lớp trưởng CẤP LỚP, và trưởng Nhóm 8 (migration 0021 + 0022)
 

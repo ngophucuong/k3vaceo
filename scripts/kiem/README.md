@@ -82,7 +82,8 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
 | `kiem-tanso.mjs` | giới hạn tần suất — cả lớp cùng một WiFi có vào được không |
 | `kiem-danhba.mjs` | danh bạ lớp — và số thật KHÔNG lọt ra ở người chưa đăng nhập |
-| `kiem-moi.mjs` | link mời xuyên nhóm cho Ban cán sự lớp (`POST /api/danh-ba/:id/moi`) |
+| `kiem-moi.mjs` | link mời xuyên nhóm cho Ban cán sự lớp (`POST /api/danh-ba/:id/moi`), **kể cả người đã đăng nhập** — đối chứng xác nhận lại số điện thoại và hạn mức đoán |
+| `pw-nhanlai.mjs` | giao diện của phát lại link cho người đã đăng nhập — ô điện thoại phải RỖNG, không lộ số thật |
 | `kiem-tulieu-text.mjs` | Tư liệu dạng Text: bắt buộc content_md, đếm công khai, layTuLieuTheoBuoi |
 | `pw-tulieu-text.mjs` | **an toàn XSS của `mdSafe()`** — bốn ca độc + bốn ca thuận + giao diện |
 | `kiem-tulieu-bai.mjs` | tư liệu gắn vào PHẦN BÀI (links.section_id): plan.js/links.js, **N6** qua nhóm khác |
@@ -98,7 +99,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Bảy phép đối chứng đáng giữ nhất
+## Tám phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -157,6 +158,20 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    HAI vế: không cho một biến đánh dấu chạy được, VÀ chuỗi độc vẫn còn nguyên
    trong `.textContent`. Kèm bốn ca THUẬN (`#`, `**`, `-`, link https hợp lệ)
    để chắc các quy tắc chặn XSS không vô tình chặn luôn markdown đúng.
+
+8. **`kiem-moi.mjs` phải chứng minh CẢ chiều đúng lẫn chiều sai của phát lại
+   link mời cho người đã đăng nhập (mở rộng 5/9).** Tính năng này sửa một lỗ
+   hổng thật: trước bản sửa, `postInviteClaim` không đòi gì ngoài một email tự
+   chọn, nên ai cầm được link phát lại — kể cả link phát nhầm người, kể cả
+   link lỡ lộ — là đăng nhập thẳng vào tài khoản người khác. Phép kiểm "phát
+   lại được, không còn 409" một mình sẽ ĐẬU cả bản có lỗ hổng lẫn bản đã vá,
+   vì cả hai đều trả 200. Phải kiểm thêm: số sai bị chặn (401), số thiếu
+   không bị TÍNH vào hạn mức đoán (422, khác nhánh), và đoán đủ 8 lần thì lần
+   9 phải 429 — CÙNG hạn mức với `/vao`, không phải một cửa dò số miễn phí
+   thứ hai. `pw-nhanlai.mjs` kiểm thêm phía giao diện: ô "Điện thoại" ở màn
+   nhận link phải RỖNG khi đăng nhập lại — nếu giao diện lỡ điền sẵn số thật
+   vào đó thì chốt chặn ở máy chủ coi như không tồn tại, vì bất kỳ ai mở link
+   cũng đọc được số ngay trên màn hình rồi gõ y nguyên.
 
 ## Chạy `kiem-tanso.mjs`
 
