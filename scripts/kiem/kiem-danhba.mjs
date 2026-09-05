@@ -6,6 +6,12 @@
 // kiểm chỉ xem chuỗi hiển thị có dấu sao hay không thì ĐẬU cả hai cách — mà một
 // trong hai cách là trao chìa khoá vào hồ sơ của người ta cho cả lớp.
 //
+// Cập nhật 5/9: bốn dòng hồ sơ (bán gì/bán cho ai/cần gì/giúp được gì) mở ra
+// cả lớp — kiểm CẢ HAI chiều ở cuối tệp: người chưa đăng nhập phải null (đối
+// chứng âm), và điền thật cho người vừa đăng nhập rồi đọc lại đúng giá trị
+// (đối chứng dương) — chỉ kiểm chiều âm thì một bộ kiểm "gán null cho tất cả,
+// kể cả người có dữ liệu thật" vẫn đậu.
+//
 // Chạy:  bash scripts/kiem/reset-tanso.sh  &&  node scripts/kiem/kiem-danhba.mjs
 // (reset-tanso.sh dọn sổ tần suất và trả hồ sơ 1–60 về "chưa ai nhận")
 
@@ -82,9 +88,50 @@ ok(`có ${vai.length} người mang vai cấp lớp`, vai.length > 0);
 ok('nhãn viết đủ chữ, không dùng "BCS" (N7)',
    vai.every(p => !/\bBCS\b/.test(p.vai_lop)));
 
+console.log('\n── Bốn dòng hồ sơ (bán gì/bán cho ai/cần gì/giúp được gì), mở ra cả lớp 5/9 ──');
+// ĐỐI CHỨNG ÂM: người CHƯA đăng nhập — bốn dòng phải là null, không phải chỉ
+// "không thấy chữ trong response" (cách kiểm cũ, đã bỏ) — kiểm null RÕ RÀNG
+// từng dòng thì lỡ một người có DỮ LIỆU THẬT ở member_profile (hiếm nhưng
+// không phải không thể — sửa hộ trước khi họ tự đăng nhập) mới chắc chắn bắt
+// được, thay vì trông cậy vào việc chữ đó tình cờ không xuất hiện ở đâu khác.
+const chuaVao = ds.filter(p => !p.da_dang_nhap);
+ok(`${chuaVao.length} người chưa đăng nhập đều có bốn dòng = null`,
+   chuaVao.every(p => p.sells_what === null && p.sells_to === null
+                    && p.needs === null && p.offers === null));
+
+// ĐỐI CHỨNG DƯƠNG: điền thật cho chính người vừa đăng nhập (roster 4), rồi
+// đọc lại — phải thấy đúng giá trị vừa điền, không phải chỉ "không sai".
+const meRow = ds.find(p => p.roster_id === NGUOI[0]);
+ok('tìm thấy đúng hồ sơ vừa đăng nhập trong danh bạ', !!meRow?.member_id);
+if (meRow?.member_id) {
+  const GIA_TRI = { sells_what: 'KIEMDANHBA_ban', sells_to: 'KIEMDANHBA_muc_tieu', needs: 'KIEMDANHBA_can', offers: 'KIEMDANHBA_giup' };
+  // wrangler dev cục bộ thỉnh thoảng làm rớt MỘT request ngay sau một loạt
+  // gọi liên tiếp (đo được: curl gọi y hệt luôn thành công, chỉ fetch() của
+  // Node bắn liền tay mới dính — trùng lúc log in ra một loạt kết nối
+  // telemetry của wrangler bị egress proxy chặn). Không phải lỗi của route
+  // — thử lại một lần cho chắc trước khi báo đỏ oan.
+  let rGhi;
+  try { rGhi = await fetch(`${B}/api/members/${meRow.member_id}/profile`, {
+    method: 'PUT', headers: { cookie: `s=${ck}`, 'content-type': 'application/json', ...IP },
+    body: JSON.stringify(GIA_TRI),
+  }); } catch {
+    await new Promise(r => setTimeout(r, 400));
+    rGhi = await fetch(`${B}/api/members/${meRow.member_id}/profile`, {
+      method: 'PUT', headers: { cookie: `s=${ck}`, 'content-type': 'application/json', ...IP },
+      body: JSON.stringify(GIA_TRI),
+    });
+  }
+  ok(`tự điền hồ sơ của mình được (${rGhi.status})`, rGhi.status === 200);
+
+  const dsSau = await fetch(`${B}/api/danh-ba`, { headers: { cookie: `s=${ck}`, ...IP } }).then(r => r.json()).then(d => d.nguoi);
+  const meSau = dsSau.find(p => p.roster_id === NGUOI[0]);
+  ok('sau khi điền, danh bạ Cả lớp hiện ĐÚNG bốn giá trị vừa gõ',
+     meSau && meSau.sells_what === GIA_TRI.sells_what && meSau.sells_to === GIA_TRI.sells_to
+     && meSau.needs === GIA_TRI.needs && meSau.offers === GIA_TRI.offers);
+}
+
 console.log('\n── Không rò thứ không thuộc danh bạ ──');
-// Bốn dòng hồ sơ là dữ liệu chia việc TRONG NHÓM — cố ý không có ở đây.
-for (const cam of ['sells_what', 'sells_to', 'needs', 'offers', 'token_hash', 'claimed_at']) {
+for (const cam of ['token_hash', 'claimed_at']) {
   ok(`không có trường "${cam}"`, !tho.includes(cam));
 }
 

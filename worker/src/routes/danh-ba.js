@@ -11,12 +11,14 @@
 //
 // Phần lớn dữ liệu ở đây VỐN ĐÃ công khai: /api/wizard/roster/search trả tên,
 // nhóm, chức vụ và đơn vị cho bất kỳ ai chưa đăng nhập — đó là cách màn
-// /dangnhap tìm tên. Cái mới duy nhất là THÔNG TIN LIÊN HỆ, và nó bị che theo
-// luật ở lib/che.js.
+// /dangnhap tìm tên. Thông tin liên hệ thì bị che theo luật ở lib/che.js.
 //
-// KHÔNG có bốn dòng hồ sơ (bán gì / bán cho ai / cần gì / giúp được gì) ở đây.
-// Chúng là dữ liệu để chia việc trong nhóm; mở ra cả lớp là một quyết định
-// khác, và hôm nay gần như chưa ai điền nên mở ra cũng chỉ thấy 134 ô trống.
+// CẬP NHẬT 5/9: có thêm bốn dòng hồ sơ (bán gì / bán cho ai / cần gì / giúp
+// được gì) — Ngô Phú Cường yêu cầu mở ra cả lớp, đúng thứ CLAUDE.md từng gọi
+// là "thứ giá trị nhất" của một lớp CEO. Không phải chuyện N6 (đây là dữ liệu
+// CÁ NHÂN về nhu cầu kinh doanh, không phải việc của nhóm), mà CHỈ hiện cho
+// người ĐÃ ĐĂNG NHẬP — người chưa đăng nhập chưa có gì để điền, hiện ra chỉ
+// thấy một khối "chưa điền" cho gần một trăm người là tiếng ồn thuần tuý.
 
 import { json, error } from '../lib/http.js';
 import { cheSoDienThoai, cheEmail } from '../lib/che.js';
@@ -40,6 +42,7 @@ export async function getDanhBa(env, me) {
             r.group_label AS roster_group,
             m.id AS member_id, m.title, m.company, m.phone, m.email, m.claimed_at,
             g.label AS group_label, g.no AS group_no,
+            mp.sells_what, mp.sells_to, mp.needs, mp.offers,
             (SELECT o.role FROM officers o
               WHERE o.member_id = m.id AND o.group_id IS NULL
                 AND o.superseded_at IS NULL
@@ -51,6 +54,7 @@ export async function getDanhBa(env, me) {
        -- như chưa đăng nhập — mà thế là đúng: họ không còn là người của lớp.
        LEFT JOIN members m ON m.roster_id = r.id AND m.is_active = 1
        LEFT JOIN groups g ON g.id = m.group_id
+       LEFT JOIN member_profile mp ON mp.member_id = m.id
       WHERE r.cohort_id = ?
       ORDER BY COALESCE(g.no, CAST(REPLACE(r.group_label, 'Nhóm ', '') AS INTEGER)), r.id`
   ).bind(me.cohort_id).all();
@@ -82,6 +86,19 @@ export async function getDanhBa(env, me) {
         phone: daVao ? so : cheSoDienThoai(so),
         email: daVao ? (r.email ?? null) : (r.email ? cheEmail(r.email) : null),
         che: !daVao,
+        // Bốn dòng "mạng lưới" (bán gì/bán cho ai/cần gì/giúp được gì) — mở
+        // ra cả lớp từ 5/9, Ngô Phú Cường yêu cầu. CHỈ cho người ĐÃ ĐĂNG NHẬP:
+        // không phải vì N6 (đây là dữ liệu CÁ NHÂN, không phải việc của nhóm —
+        // không đụng sổ thu/bài/thông báo nội bộ, đúng phân định đã dùng cho
+        // cả danh bạ), mà vì người chưa đăng nhập không có gì để hiện (chưa ai
+        // điền được khi chưa vào ứng dụng lần nào) — hiện ra chỉ thấy một khối
+        // "chưa điền" cho gần một trăm người, đúng cảnh CLAUDE.md từng nói
+        // "mở ra chỉ thấy 134 ô trống". Gán null ở SERVER, không lọc ở giao
+        // diện — quy ước 6.
+        sells_what: daVao ? (r.sells_what ?? null) : null,
+        sells_to: daVao ? (r.sells_to ?? null) : null,
+        needs: daVao ? (r.needs ?? null) : null,
+        offers: daVao ? (r.offers ?? null) : null,
       };
     }),
   });

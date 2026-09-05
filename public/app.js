@@ -1891,6 +1891,11 @@ function veDongDanhBa(p) {
       <div class="fi"><div class="k">Chức vụ / đơn vị</div>
         <div class="v ${nghe ? '' : 'blank'}">${esc(nghe) || 'Chưa có'}</div></div>
       ${p.vai_lop ? `<div class="fi"><div class="k">Ban cán sự lớp</div><div class="v">${esc(p.vai_lop)}</div></div>` : ''}
+      ${p.da_dang_nhap ? `
+      <div class="fi"><div class="k">Bán gì</div><div class="v ${p.sells_what ? '' : 'blank'}">${esc(p.sells_what) || 'Chưa điền'}</div></div>
+      <div class="fi"><div class="k">Bán cho ai</div><div class="v ${p.sells_to ? '' : 'blank'}">${esc(p.sells_to) || 'Chưa điền'}</div></div>
+      <div class="fi"><div class="k">Cần gì ở nhóm</div><div class="v ${p.needs ? '' : 'blank'}">${esc(p.needs) || 'Chưa điền'}</div></div>
+      <div class="fi"><div class="k">Giúp được gì</div><div class="v ${p.offers ? '' : 'blank'}">${esc(p.offers) || 'Chưa điền'}</div></div>` : ''}
       ${DANHBA_CAN_MOI
         ? `<button class="wide ghost" style="padding:11px;font-size:14px" data-moi="${p.roster_id}" data-moi-vao="${p.da_dang_nhap ? 1 : 0}">${
             p.da_dang_nhap ? 'Phát lại link đăng nhập' : 'Tạo link mời'}</button>` : ''}

@@ -1017,11 +1017,10 @@ tức hơn 500 ngày, mà nhìn vẫn nhận ra đúng người.
 
 ### Bốn điều cố ý khác
 
-1. **Không có bốn dòng hồ sơ** (bán gì / bán cho ai / cần gì / giúp được gì)
-   trong danh bạ lớp. Chúng là dữ liệu chia việc trong nhóm; mở ra cả lớp là
-   quyết định khác, và hôm nay gần như chưa ai điền nên mở ra chỉ thấy 134 ô
-   trống. Đây mới là thứ đáng giá thật với lớp CEO — nhưng nó bị chặn bởi việc
-   dùng thật, không bởi lập trình.
+1. ~~Không có bốn dòng hồ sơ (bán gì / bán cho ai / cần gì / giúp được gì)
+   trong danh bạ lớp~~ — **đã mở ra cả lớp ngày 5/9**, xem mục riêng ngay dưới
+   đây. Giữ hai dòng gạch này làm dấu vết: đây từng là quyết định cố ý, không
+   phải một chỗ quên.
 2. **Số đã che KHÔNG bọc trong `tel:`** — bấm vào là gọi một số không có thật,
    và nó gợi ý sai rằng số ấy dùng được.
 3. **Người đã ngừng tham gia rụng khỏi danh bạ** bằng điều kiện `is_active = 1`
@@ -1035,6 +1034,32 @@ tức hơn 500 ngày, mà nhìn vẫn nhận ra đúng người.
 **Chưa làm, đã nêu và người dùng chọn cách khác:** cho chính chủ bật/tắt việc
 hiện số của mình (opt-in). Luật hiện tại đơn giản hơn — đăng nhập rồi là hiện.
 Bao giờ có người phàn nàn thì đó là chỗ sửa.
+
+### Bốn dòng hồ sơ (bán gì / bán cho ai / cần gì / giúp được gì) mở ra cả lớp (5/9)
+
+Ngô Phú Cường yêu cầu: "Mọi người trong lớp xem được thông tin cần mua, bán,…
+của những người đã đăng nhập trong lớp." Đúng thứ mục trên từng gọi là "thứ
+đáng giá thật với lớp CEO" — 134 chủ doanh nghiệp, và mạng lưới mới là cái còn
+lại sau khi khoá kết thúc 26/9.
+
+**Không phải chuyện N6.** Bốn dòng này là dữ liệu CÁ NHÂN về nhu cầu kinh
+doanh của TỪNG NGƯỜI — không phải việc của nhóm (không sổ thu, không bài,
+không thông báo nội bộ) — nên mở ra cả lớp đúng phân định đã dùng cho toàn bộ
+Danh bạ từ 28/8, không phải một ngoại lệ mới cần bàn lại.
+
+**Chỉ hiện cho người ĐÃ ĐĂNG NHẬP** — đúng nguyên văn yêu cầu, và cũng là lý do
+mục trên từng chặn tính năng này lại: người chưa đăng nhập chưa có cách nào
+điền được bốn ô này, hiện ra chỉ thấy một khối "chưa điền" cho gần một trăm
+người, đúng cảnh CLAUDE.md từng cảnh báo. `getDanhBa()` (`routes/danh-ba.js`)
+`LEFT JOIN member_profile` rồi gán `null` ở SERVER cho người chưa đăng nhập —
+đúng quy ước 6 (không tin giao diện), và trùng khuôn `phone`/`email` đã che
+theo `da_dang_nhap` ngay bên trên nó trong cùng hàm.
+
+Giao diện (`veDongDanhBa`, `public/app.js`) hiện bốn dòng này trong panel mở
+rộng của thẻ Cả lớp, **CÙNG nhãn** đã dùng ở thẻ Nhóm ("Bán gì", "Bán cho ai",
+"Cần gì ở nhóm", "Giúp được gì") — cùng một cột dữ liệu (`member_profile`),
+không viết hai bộ câu chữ cho cùng một thứ. Chỉ vẽ khối này khi
+`p.da_dang_nhap`, khớp đúng điều kiện máy chủ đã gán `null`.
 
 ## Link mời xuyên nhóm — Ban cán sự lớp mới có
 
