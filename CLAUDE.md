@@ -1210,19 +1210,14 @@ một vai cấp nhóm là mở nhầm quyền cơ cấu/phần bài/ngừng tham
 không đúng.
 
 Sheet "DS lớp" cùng tệp (chữ ký buổi 21/8) ban đầu có 13 tên không khớp ai
-trong roster — **đã rà từ 5/9** (migration 0028, rồi 0029): Nguyễn Thị Hoa và
-Võ Thị Trang được thêm hẳn, "Đậu Huy Đại" hoá ra là tên bị cụt của một người
-đã có sẵn (sửa thành "Đậu Huy Đại Việt"), và Nguyễn Tuấn Hùng (Nhóm 3) được
-thêm theo yêu cầu trực tiếp của Ngô Phú Cường — xem mục "Người thứ 139" ngay
-dưới. **Còn CHƯA xử lý**: "Vương Quốc Chung" (Nhóm 1, rất giống "Khương Quốc
-Chung" seq 75 nhưng người đó lại xuất hiện đầy đủ, riêng biệt ở Nhóm 5 trong
-cùng tệp — nhiều khả năng là hai người khác nhau, không phải lỗi chép) và sáu
-tên khác: Nguyễn Việt Anh (Nhóm 1), Nguyễn Thu Thảo (Nhóm 2, có số
-`0989588534` trong tệp), Nguyễn Tùng Lâm (Nhóm 5), Nguyễn Tuấn Đạt (Nhóm 7, có
-số `0961547806`), Lưu Thị Bích Ngọc (Nhóm 9, số ghi `904580955` — thiếu số 0
-đầu, chưa rõ có phải lỗi Excel làm rụng số 0 hay không), Đặng Hùng (Nhóm 10, số
-ghi `03845375x8` — có ký tự "x" lẫn vào, rõ ràng lỗi nhập liệu của Ban tổ
-chức). Cần người dùng xác nhận từng người trước khi thêm vào roster.
+trong roster. **Đã rà xong toàn bộ, chia làm ba đợt**: migration 0028 (Nguyễn
+Thị Hoa, Võ Thị Trang thêm hẳn; "Đậu Huy Đại" hoá ra là tên bị cụt, sửa thành
+"Đậu Huy Đại Việt"), migration 0029 (Nguyễn Tuấn Hùng, Nhóm 3), và migration
+0030 (5/9, cùng ngày — Ngô Phú Cường xác nhận thêm cả bảy người còn lại qua
+AskUserQuestion, kể cả "Vương Quốc Chung": tuy rất giống "Khương Quốc Chung"
+seq 75 nhưng người đó lại xuất hiện đầy đủ, riêng biệt ở Nhóm 5 trong cùng
+tệp — xác nhận là hai người khác nhau, không phải lỗi chép — xem mục "Bảy
+người còn lại" ngay dưới).
 
 ### Người thứ 135: Trương Thị Ngọc Anh, Nhóm 4 (migration 0023)
 
@@ -1281,13 +1276,42 @@ Minh Tiến phát link cho anh ấy qua Danh bạ → Cả lớp là vào đư�
 phải chờ ai điền số.
 
 Đây chính là lý do phù hợp để nói với Ngô Phú Cường: **toàn bộ danh sách trong
-`bo-sung-dien-thoai.csv` (44 người chưa có số + 6 người số đang sai/trùng +
-Nguyễn Tuấn Hùng vừa thêm = 51 dòng) đều có thể vào được NGAY bằng đường phát
-link mời này**, không cần đợi điền số điện thoại nữa — điền số chỉ còn cần
-thiết cho việc HỌ tự đăng nhập LẠI ở những lần sau nếu link mời bị mất hoặc hết
-hạn (magic-link email vẫn dùng được, nhưng phát lại link mời là đường nhanh
-nhất). Số điện thoại vẫn nên điền dần vì `/vao` là đường vào không cần Ban cán
-sự lớp đứng ra mỗi lần, nhưng nó không còn là chỗ chặn duy nhất.
+`bo-sung-dien-thoai.csv` đều có thể vào được NGAY bằng đường phát link mời
+này**, không cần đợi điền số điện thoại nữa — điền số chỉ còn cần thiết cho
+việc HỌ tự đăng nhập LẠI ở những lần sau nếu link mời bị mất hoặc hết hạn
+(magic-link email vẫn dùng được, nhưng phát lại link mời là đường nhanh nhất).
+Số điện thoại vẫn nên điền dần vì `/vao` là đường vào không cần Ban cán sự lớp
+đứng ra mỗi lần, nhưng nó không còn là chỗ chặn duy nhất.
+
+### Bảy người còn lại của đợt rà soát 21/8 (migration 0030)
+
+5/9, cùng ngày với migration 0029 — hỏi lại Ngô Phú Cường qua AskUserQuestion
+về đúng bảy tên "chưa đủ căn cứ" liệt kê ở mục trên, anh xác nhận thêm cả bảy.
+seq nối tiếp 140-146, ngay sau 139 (Nguyễn Tuấn Hùng).
+
+**"Vương Quốc Chung" là NGƯỜI KHÁC "Khương Quốc Chung"** (seq 75, Nhóm 6),
+không phải lỗi chép tên — Ngô Phú Cường chọn đúng phương án này, khớp với
+bằng chứng trong tệp (Khương Quốc Chung xuất hiện đầy đủ, riêng biệt ở một
+dòng khác của cùng sheet).
+
+**Hai người (Nguyễn Thu Thảo — Nhóm 2, Nguyễn Tuấn Đạt — Nhóm 7) đã có SẴN số
+điện thoại hợp lệ trong tệp** (`0989588534`, `0961547806`) — ghi thẳng vào
+`roster.phone`, KHÔNG đưa vào `bo-sung-dien-thoai.csv`: hai người này tự vào
+được ở `/vao` ngay lập tức, không cần ai phát link mời hộ.
+
+**Năm người còn lại thêm vào `bo-sung-dien-thoai.csv`**: Vương Quốc Chung,
+Nguyễn Việt Anh (Nhóm 1), Nguyễn Tùng Lâm (Nhóm 5) — tệp không ghi số nào —
+vào nhóm "chưa có số" (nay 44 dòng, không phải 40 như trước, vì cộng thêm
+Nguyễn Tuấn Hùng của migration 0029 và ba người này). Lưu Thị Bích Ngọc
+(Nhóm 9, số ghi `904580955` — thiếu số 0 đầu) và Đặng Hùng (Nhóm 10, số ghi
+`03845375x8` — lẫn ký tự "x") — ghi NGUYÊN VĂN số sai vào `roster.phone`,
+không đoán số thật, đúng nguyên tắc đã dùng cho Lê Trung Đức và Trương Thị
+Ngọc Anh; vào nhóm "đang SAI" (nay 8 dòng). Tổng CSV nay 52 dòng.
+
+**Migration dùng BẢY câu `INSERT` riêng, không gộp bằng `UNION ALL`** — đúng
+bẫy D1 đã ghi ở mục "Cạm bẫy của D1 thật": từ 6 nhánh `UNION ALL` trở lên bị
+từ chối khi chạy qua tệp migration. Migration 0028 làm đúng vậy với ba việc;
+0030 tiếp tục đúng khuôn với bảy người.
 
 ### Bốn số điện thoại điền được từ tệp Ban tổ chức (migration 0020)
 

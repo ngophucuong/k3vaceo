@@ -15,18 +15,22 @@
 # hai người CÙNG TÊN 'Phan Thị Thanh Nga' ở hai nhóm khác nhau.
 #
 stt,ho_ten,so_dien_thoai,ghi_chu
-# ══ 6 dòng dưới đây đang SAI, không phải thiếu — xử lý trước ══
+# ══ 8 dòng dưới đây đang SAI, không phải thiếu — xử lý trước ══
 76,Lê Trung Đức,,"Nhóm 6 — đang là ""098778525"", thiếu một chữ số"
 135,Trương Thị Ngọc Anh,,"Nhóm 4 — mới thêm migration 0023, đang là ""086689856"", thiếu một chữ số"
 65,Lưu Minh Tiến,,"Nhóm 5 — đang TRÙNG số ""0914544449"" với người khác"
 102,Lê Minh Tiến,,"Nhóm 8 — đang TRÙNG số ""0914544449"" với người khác"
 67,Phan Thị Thanh Nga,,"Nhóm 6 — đang TRÙNG số ""0985981808"" với người khác"
 111,Phan Thị Thanh Nga,,"Nhóm 9 — đang TRÙNG số ""0985981808"" với người khác"
+145,Lưu Thị Bích Ngọc,,"Nhóm 9 — mới thêm migration 0030, tệp DS lớp ghi ""904580955"" — thiếu số 0 đầu"
+146,Đặng Hùng,,"Nhóm 10 — mới thêm migration 0030, tệp DS lớp ghi ""03845375x8"" — có ký tự lạ"
 # ══ 44 người chưa có số nào ══
 8,Nguyễn Thanh Bình,,Nhóm 1
 9,Lê Thị Thu Trang,,Nhóm 1
 10,Đinh Thị Giang,,Nhóm 1
 12,Nguyễn Khắc Dũng,,Nhóm 1
+140,Vương Quốc Chung,,"Nhóm 1 — mới thêm migration 0030, tệp DS lớp không ghi số"
+141,Nguyễn Việt Anh,,"Nhóm 1 — mới thêm migration 0030, tệp DS lớp không ghi số"
 22,Trần Duy Hưng,,Nhóm 2
 23,Phương Thanh Vũ,,Nhóm 2
 24,Đỗ Văn Lương,,Nhóm 2
@@ -40,6 +44,7 @@ stt,ho_ten,so_dien_thoai,ghi_chu
 52,Đào Văn Duy,,Nhóm 5
 61,Đậu Thị Lý,,Nhóm 5
 62,Cao Văn Hách,,Nhóm 5
+143,Nguyễn Tùng Lâm,,"Nhóm 5 — mới thêm migration 0030, tệp DS lớp không ghi số"
 66,Nguyễn Thị Thu Hương,,Nhóm 6
 72,Bùi Thị Huyền Trang,,Nhóm 6
 73,Trần Hoàng Hà,,Nhóm 6
