@@ -37,6 +37,74 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Phần này KHÔNG hỏi về một người, mà hỏi về CẢ LỚP — thêm 5/9 khi Ngô Phú
+      # Cường báo "nhiều học viên không nhận được email OTP". Soi từng địa chỉ
+      # một thì không bao giờ trả lời được câu "nhiều" là bao nhiêu, và tệ hơn:
+      # người kêu to nhất chưa chắc là người đại diện cho lỗi thật.
+      #
+      # PHÉP ĐO QUYẾT ĐỊNH là TỈ LỆ MÃ ĐÃ DÙNG. `otp_codes` có dòng chỉ chứng
+      # minh Worker đã GỌI gửi thư (createOtp ghi dòng TRƯỚC khi gọi sendMail —
+      # xem guiMa() trong routes/onboard.js), không chứng minh thư tới nơi.
+      # Nhưng `used_at` khác NULL thì chắc chắn: người đó đã ĐỌC ĐƯỢC mã trong
+      # hộp thư và gõ lại đúng. Không có đường nào khác để biết mã ấy.
+      #   · tỉ lệ dùng cao  → thư tới bình thường, lỗi nằm ở vài người lẻ
+      #   · tỉ lệ dùng thấp → thư KHÔNG tới tay, hỏng ở đường gửi hoặc vào spam
+      - name: Soi cả lớp — thư có tới tay không
+        run: |
+          echo "════ 24 giờ qua: xin mã bao nhiêu lần, dùng được bao nhiêu ════"
+          $WRANGLER --command \
+            "SELECT COUNT(*) AS ma_da_sinh,
+                    COUNT(DISTINCT member_id) AS so_nguoi_xin,
+                    SUM(CASE WHEN used_at IS NOT NULL THEN 1 ELSE 0 END) AS da_dung_duoc,
+                    SUM(CASE WHEN used_at IS NULL THEN 1 ELSE 0 END) AS khong_dung_duoc
+               FROM otp_codes WHERE created_at > datetime('now','-24 hours')" 2>&1 | tail -12
+
+          echo
+          echo "════ Chia theo giờ (giờ Việt Nam) ════"
+          $WRANGLER --command \
+            "SELECT strftime('%d/%m %Hh', created_at, '+7 hours') AS gio_vn,
+                    COUNT(*) AS xin_ma,
+                    SUM(CASE WHEN used_at IS NOT NULL THEN 1 ELSE 0 END) AS dung_duoc
+               FROM otp_codes WHERE created_at > datetime('now','-24 hours')
+              GROUP BY gio_vn ORDER BY gio_vn DESC LIMIT 24" 2>&1 | tail -32
+
+          echo
+          echo "════ AI ĐANG KẸT: xin mã mà chưa lần nào vào được ════"
+          echo "Đây là danh sách cần gọi điện hoặc phát link mời cho họ."
+          $WRANGLER --command \
+            "SELECT m.full_name AS ho_ten, g.label AS nhom, m.email,
+                    COUNT(*) AS so_lan_xin, MAX(o.created_at) AS lan_gan_nhat
+               FROM otp_codes o JOIN members m ON m.id = o.member_id
+               LEFT JOIN groups g ON g.id = m.group_id
+              WHERE o.created_at > datetime('now','-24 hours')
+              GROUP BY m.id
+             HAVING SUM(CASE WHEN o.used_at IS NOT NULL THEN 1 ELSE 0 END) = 0
+              ORDER BY so_lan_xin DESC, lan_gan_nhat DESC LIMIT 30" 2>&1 | tail -45
+
+          echo
+          echo "════ Tên miền email — bắt lỗi gõ nhầm khi tự khai ════"
+          echo "email_verified_at CỐ Ý để trống (mục 'Bỏ OTP ở lần đầu' trong"
+          echo "CLAUDE.md), nên gõ nhầm một chữ là thư bay vào hư không mà"
+          echo "không ai báo. gmial/gmai/gmail.con là nghi phạm quen mặt."
+          $WRANGLER --command \
+            "SELECT LOWER(substr(email, instr(email,'@')+1)) AS mien,
+                    COUNT(*) AS so_nguoi
+               FROM members WHERE COALESCE(email,'') <> ''
+              GROUP BY mien ORDER BY so_nguoi DESC LIMIT 25" 2>&1 | tail -35
+
+          echo
+          echo "════ Trần tần suất của CẢ LỚP trong 1 giờ qua ════"
+          echo "otp_email trần 5 mỗi địa chỉ. otp_request trần 150 mỗi IP."
+          echo "Cả lớp ngồi chung WiFi hội trường thì đếm theo IP là đếm cả phòng."
+          $WRANGLER --command \
+            "SELECT bucket AS o_khoa, ip AS khoa_theo, COUNT(*) AS so_lan,
+                    MAX(created_at) AS gan_nhat
+               FROM rate_events
+              WHERE created_at > datetime('now','-1 hour')
+                AND bucket IN ('otp_email','otp_request')
+              GROUP BY bucket, ip HAVING so_lan >= 4
+              ORDER BY so_lan DESC LIMIT 20" 2>&1 | tail -30
+
       - name: Đọc
         run: |
           em=$(printf '%s' "$EMAIL" | sed "s/'/''/g")
