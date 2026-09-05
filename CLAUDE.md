@@ -23,20 +23,27 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Năm việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Sáu việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+1. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+   bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
+   với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
+   nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
+   "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
+   khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
+   như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
+2. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-2. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9). Ngô Phú
+3. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9). Ngô Phú
    Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho người CHƯA đăng nhập ở bất kỳ nhóm nào, không chỉ nhóm của
    mình — `POST /api/danh-ba/:roster_id/moi`, xem mục riêng bên dưới.
-3. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-4. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-5. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+4. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+5. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+6. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -695,6 +702,73 @@ dán tay trên điện thoại sau khi vá xong.
 `pw-tulieu-text.mjs` có thêm một phép đối chứng cho đúng bẫy này: ô chọn buổi
 trong sheet "Gắn Tư liệu" phải liệt kê được một buổi ĐÃ QUA (4/9), không chỉ
 buổi trong 6 ngày sắp tới.
+
+## Tư liệu gắn vào PHẦN BÀI — mắt xích còn thiếu của bộ ba Hôm nay/Bài/Tư liệu
+
+Thêm 5/9. Ngô Phú Cường hỏi thẳng: "Lịch, buổi học phải liên thông tư liệu với
+nhau từ menu 'Hôm nay', 'Bài' và 'Tư liệu' phải không?" Tra ra Hôm nay↔Tư liệu
+(qua `buoi_id`, mục trên) đã nối đủ, nhưng Bài↔Tư liệu thì KHÔNG: cột
+`links.section_id` có từ migration 0001 — cũ hơn cả tính năng buổi học — nhưng
+chưa từng được dùng. `postLink` ghi cứng `NULL`, `patchLink` không nhận
+trường này, `getPlan()` không JOIN nó, và huy hiệu tư liệu ở tab Bài không tồn
+tại. Cột nằm sẵn trong DDL từ đầu không có nghĩa là tính năng đã xong — đây là
+bài học ngược lại của mọi "lệch có chủ ý" đã ghi trong tệp này.
+
+**Vì sao KHÔNG thể copy nguyên khuôn buổi học sang đây:** `lich_hoc` dùng
+CHUNG cho cả khoá — một `id` nghĩa là cùng một buổi với tất cả mọi người. Còn
+`plan_sections` (phần bài) thì mỗi nhóm giữ một bộ TÁM DÒNG RIÊNG (qua
+`plan_id → plans.group_id`): "Phần 1" của Nhóm 6 và "Phần 1" của Nhóm 7 là hai
+dòng khác nhau trong D1. Vì vậy chốt chặn N6 ở đây không chỉ kiểm "phần này có
+thật" mà còn phải kiểm "phần này thuộc ĐÚNG NHÓM của người gọi" —
+`docSectionId()` (`routes/links.js`) làm việc đó bằng một JOIN
+`plan_sections ps JOIN plans p ON p.id = ps.plan_id WHERE ps.id = ? AND
+p.group_id = ?`. Thiếu điều kiện `p.group_id` thì Nhóm 6 gắn thẳng được tư
+liệu vào Phần 1 của Nhóm 7 — vỡ N6 ngay ở khâu ghi, không đợi tới khâu đọc.
+
+Một hệ quả tự nhiên của ranh giới nhóm này: **không có khái niệm "tư liệu cấp
+lớp gắn vào một phần bài cụ thể".** `section_id` luôn trỏ về đúng một dòng của
+MỘT nhóm, nên dù người đăng chọn phạm vi "Cả lớp", tư liệu ấy vẫn chỉ hiện
+trong tab Bài của CHÍNH nhóm người đăng (vì `getPlan()` chỉ JOIN theo
+`plan.id` của người xem) — các nhóm khác chỉ thấy nó ở tab Tư liệu chung, dưới
+nhãn "Phần N · <tên phần>" (tên phần là nhãn mẫu dùng chung cho cả 10 nhóm,
+không phải nội dung riêng của nhóm nào). Không chặn tổ hợp này: nó không lộ gì
+nhạy cảm (tiêu đề phần là nhãn mẫu, nội dung là thứ người đăng đã chủ động chọn
+công khai), và việc chặn thêm là một lớp phức tạp không ai cần tới.
+
+Bốn chỗ đã sửa để khớp đúng khuôn "một dòng, hai/ba màn":
+
+1. **`docSectionId()`** (`routes/links.js`, cạnh `docBuoiId()` đã có) — validate
+   và chuẩn hoá `section_id` từ thân request, dùng chung cho cả `postLink` và
+   `patchLink`, đúng khuôn `docBuoiId()`.
+2. **`getPlan()`** (`routes/plan.js`) thêm một truy vấn `JOIN plan_sections ON
+   ps.id = l.section_id WHERE ps.plan_id = ?` rồi gắn `tu_lieu` vào từng phần
+   trả về — same pattern với `layTuLieuTheoBuoi()` nhưng không dùng chung hàm
+   vì `getPlan` đã lọc theo `me.group_id` từ đầu, không cần lọc lại.
+3. **`listLinks()`** (`routes/links.js`) thêm `LEFT JOIN plan_sections` vào
+   `CHON`, trả kèm `section_ord`/`section_title` — dùng cho nhãn ở tab Tư liệu.
+4. **Giao diện** (`public/app.js`): `veTuLieuBuoi()` → `veTuLieuGan()` và
+   `nhanBuoi()` → `nhanGan()`, tổng quát hoá để dùng chung cho cả buổi lẫn
+   phần (hai hàm này vốn đã chỉ đọc `.tu_lieu`/`.buoi_id`+`.section_id`, không
+   cần viết hàm riêng). `oChonPhan()` là bản sinh đôi của `oChonBuoi()`, cùng
+   giữ thói quen "chèn thêm dòng cho phần đang gắn nếu nó rơi khỏi danh sách
+   vừa tải" để sheet sửa không bao giờ tự nhảy về "Không gắn phần nào" khi Lưu.
+   Tab Bài (`drawBai`) hiện huy hiệu "📎 N tư liệu" trên mỗi phần có gắn; sheet
+   sửa một phần (`openSectionEdit`) có nút "+ Gắn tư liệu cho phần này", gọi
+   `openLinkAdd(sectionId)` — tham số mới `preSection` khiến sheet mở lên đã
+   tự chọn sẵn tag='bai' và đúng phần đang xem, khỏi bắt chọn lại. Tab Tư liệu
+   (`veTuLieuTheoBuoi`) thêm cụm riêng "Theo phần bài" — không dồn vào "Chưa
+   gắn buổi học" vì các dòng ấy CÓ gắn, chỉ là gắn vào phần chứ không phải
+   buổi, và nhãn "chưa gắn" cho một dòng đã gắn là sai.
+
+`kiem-tulieu-bai.mjs` (API) và `pw-tulieu-bai.mjs` (giao diện, kể cả bấm nút
+"+ Gắn tư liệu cho phần này" từ trong sheet phần bài) là hai bộ kiểm giữ đúng
+chốt N6 và khuôn "một dòng, nhiều màn" này. `reset-tulieu-bai.sh` seed thêm
+một `plan_sections` của MỘT NHÓM KHÁC (Nhóm 7) — thứ D1 cục bộ mới nạp không
+có sẵn (chỉ Nhóm 6 được seed từ migration 0003, các nhóm khác chỉ có phần bài
+sau khi chạy wizard) — vì phép kiểm N6 quan trọng nhất của tính năng này cần
+một `section_id` THẬT của nhóm khác để chứng minh bị chặn, không phải một id
+bịa ra (id bịa chỉ chứng minh nhánh "not found", không chứng minh nhánh
+"đúng nhóm").
 
 ## Vai nhóm: ba, không phải hai
 

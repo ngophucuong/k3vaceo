@@ -24,16 +24,38 @@ async function docBuoiId(env, me, body) {
   return { buoiId: id };
 }
 
+// Phần bài mà tư liệu gắn vào. Trả { loi } nếu sai, { sectionId } nếu được.
+// KHÁC buổi học ở một điểm quan trọng: lich_hoc dùng CHUNG cho cả khoá, còn
+// mỗi nhóm giữ một bộ tám phần RIÊNG (plan_sections qua plan_id → group_id
+// của chính nhóm). Vì vậy chốt chặn ở đây không chỉ kiểm "có thật" mà còn
+// phải kiểm "thuộc đúng nhóm của người gọi" — thiếu điều kiện p.group_id thì
+// Nhóm 6 gắn được tư liệu thẳng vào Phần 1 của Nhóm 7, vỡ N6.
+async function docSectionId(env, me, body) {
+  if (!('section_id' in body)) return {};
+  if (body.section_id === null || body.section_id === '') return { sectionId: null };
+  const id = Number(body.section_id);
+  if (!Number.isInteger(id) || id <= 0) return { loi: error('section_invalid', 422) };
+  const co = await env.DB.prepare(
+    `SELECT ps.id FROM plan_sections ps JOIN plans p ON p.id = ps.plan_id
+      WHERE ps.id = ? AND p.group_id = ?`
+  ).bind(id, me.group_id).first();
+  if (!co) return { loi: error('section_not_found', 404) };
+  return { sectionId: id };
+}
+
 export async function listLinks(env, me, tag) {
   // Tag lạ thì báo sai, không lặng lẽ trả về toàn bộ Kho — người gọi sẽ tưởng
   // mình đang xem một mục đã lọc.
   if (tag !== null && tag !== undefined && tag !== '' && tag !== 'all' && !TAGS.has(tag)) {
     return error('tag_invalid', 422);
   }
-  // Kèm ngày và chủ đề của buổi để giao diện dán được nhãn "Buổi 28/8 · Quản
-  // trị chiến lược" mà không phải gọi thêm một vòng nữa.
-  const CHON = `SELECT l.*, b.ngay AS buoi_ngay, b.chu_de AS buoi_chu_de
+  // Kèm ngày/chủ đề buổi và số/tên phần bài để giao diện dán được nhãn
+  // "Buổi 28/8 · Quản trị chiến lược" hay "Phần 3 · Khách hàng mục tiêu" mà
+  // không phải gọi thêm một vòng nữa.
+  const CHON = `SELECT l.*, b.ngay AS buoi_ngay, b.chu_de AS buoi_chu_de,
+                       ps.ord AS section_ord, ps.title AS section_title
                   FROM links l LEFT JOIN lich_hoc b ON b.id = l.buoi_id
+                               LEFT JOIN plan_sections ps ON ps.id = l.section_id
                  WHERE l.removed_at IS NULL AND (l.scope = 'class' OR l.group_id = ?)`;
   const filtered = TAGS.has(tag);
   const rows = filtered
@@ -78,14 +100,16 @@ export async function postLink(request, env, me) {
   const capLop = body.scope === 'class';
   if (capLop && !(await isClassCommittee(env, me.id))) return error('forbidden', 403);
 
-  const { loi, buoiId } = await docBuoiId(env, me, body);
-  if (loi) return loi;
+  const { loi: loiBuoi, buoiId } = await docBuoiId(env, me, body);
+  if (loiBuoi) return loiBuoi;
+  const { loi: loiSection, sectionId } = await docSectionId(env, me, body);
+  if (loiSection) return loiSection;
 
   const row = await env.DB.prepare(
     `INSERT INTO links (cohort_id, scope, group_id, section_id, buoi_id, url, title, kind, tag, content_md, created_by, created_at)
-     VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')) RETURNING id`
   ).bind(me.cohort_id, capLop ? 'class' : 'group', capLop ? null : me.group_id,
-         buoiId ?? null, url, title, kind, tag, contentMd, me.id).first();
+         sectionId ?? null, buoiId ?? null, url, title, kind, tag, contentMd, me.id).first();
 
   await logActivity(env, {
     cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
@@ -159,6 +183,13 @@ export async function patchLink(request, env, me, linkId, ip) {
     const { loi, buoiId } = await docBuoiId(env, me, body);
     if (loi) return loi;
     dat.buoi_id = buoiId ?? null;
+  }
+  // Cùng cơ chế cho phần bài — docSectionId() tự kiểm phần đó thuộc ĐÚNG NHÓM
+  // của người sửa, không chỉ "có thật".
+  if ('section_id' in body) {
+    const { loi, sectionId } = await docSectionId(env, me, body);
+    if (loi) return loi;
+    dat.section_id = sectionId ?? null;
   }
   // Cố ý KHÔNG cho đổi scope: chuyển một liên kết của nhóm thành của lớp là
   // đem dữ liệu nhóm ra cho 134 người xem (nguyên tắc N6). Muốn đổi thì gỡ đi

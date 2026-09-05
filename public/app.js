@@ -175,8 +175,8 @@ let PLAN = null;      // /api/plan gần nhất
 let KHO_CAN_LOP = false;
 let KHO_LINKS = [];    // /api/links gần nhất, để bảng sửa đọc lại
 let KHO_TAG = null;    // bộ lọc đang xem, để vẽ lại đúng chỗ sau khi lưu  // mình có đăng được tư liệu cấp lớp không
-// Tra được một dòng tư liệu bằng id dù nó vừa hiện ra ở tab Tư liệu hay ở
-// khối "Hôm nay" (veTuLieuBuoi) — hai nơi cùng đọc một dòng links nhưng KHÔNG
+// Tra được một dòng tư liệu bằng id dù nó vừa hiện ra ở tab Tư liệu, ở khối
+// "Hôm nay" hay ở tab Bài (đều dùng chung veTuLieuGan()) — các nơi này KHÔNG
 // cùng danh sách trong bộ nhớ (KHO_LINKS chỉ có sau khi mở tab Tư liệu), nên
 // openLinkText cần một chỗ tra chung thay vì chỉ tìm trong KHO_LINKS.
 const TULIEU_CACHE = new Map();
@@ -1084,14 +1084,15 @@ function khungGio(b) {
   return b.ghi_chu ? '' : 'cả buổi';
 }
 
-// Tư liệu đã gắn vào buổi, hiện ngay dưới buổi ấy. Đây là nửa kia của lối tắt:
-// CÙNG một dòng trong bảng links mà tab Tư liệu đang liệt kê — không phải bản
-// sao. Gỡ ở Tư liệu là mất luôn ở đây, vì chỉ có một dòng.
+// Tư liệu đã gắn vào một buổi HOẶC một phần bài, hiện ngay dưới chỗ nó thuộc
+// về. Hàm dùng CHUNG cho cả hai (đối tượng `x` chỉ cần có mảng `tu_lieu`) —
+// đúng lối tắt "một dòng, hai màn": CÙNG một dòng trong bảng links mà tab Tư
+// liệu đang liệt kê, không phải bản sao. Gỡ ở Tư liệu là mất luôn ở đây.
 //
 // Mục chưa dán đường dẫn thì vẫn hiện, dạng chữ xám không bấm được: giấu đi
 // thì không ai biết là còn thiếu, mà cho bấm vào chỗ chết thì tệ hơn nữa.
-function veTuLieuBuoi(b) {
-  const ds = b.tu_lieu ?? [];
+function veTuLieuGan(x) {
+  const ds = x.tu_lieu ?? [];
   if (!ds.length) return '';
   ghiNhoTuLieu(ds); // để bấm vào một ghi chú Text ngay từ đây tra được nội dung
   return `<div class="tlb">${ds.map(r => r.kind === 'TEXT'
@@ -1112,7 +1113,7 @@ function veDongBuoi(b, sua, nay) {
         ${esc(ngayVN(b.ngay))}${khungGio(b) ? ' · ' + esc(khungGio(b)) : ''}${b.ghi_chu ? ' · ' + esc(b.ghi_chu) : ''}</div>
       <b>${esc(b.chu_de)}</b>
       ${b.giang_vien ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(b.giang_vien)}</div>` : ''}
-      ${veTuLieuBuoi(b)}
+      ${veTuLieuGan(b)}
     </div>
     ${sua ? `<button class="ico" data-buoi="${b.id}" aria-label="Sửa buổi ${esc(b.chu_de)}">✎</button>` : ''}
   </div>`;
@@ -1444,6 +1445,7 @@ async function drawBai() {
           : sg ? `<span class="hint">✦ hợp với ${esc(short(sg.full_name))}</span>`
                : `<span class="tg due">chưa ai nhận</span>`}
         ${s.note ? `<div class="rq" style="margin-top:7px;margin-bottom:0">Còn thiếu: ${esc(s.note)}</div>` : ''}
+        ${s.tu_lieu?.length ? `<span class="tg" style="margin-top:6px">📎 ${s.tu_lieu.length} tư liệu</span>` : ''}
         <div class="pbar"><i style="width:${s.pct}%"></i></div>
       </div>
       <span class="pct ${s.pct === 100 ? 'xong' : ''}">${s.pct === 100 ? '✓' : s.pct + '%'}</span></button>`;
@@ -1559,6 +1561,8 @@ async function openSectionEdit(sectionId) {
   openSheet(`
    <h3>${s.ord === 0 ? '' : 'Phần ' + s.ord + ' · '}${esc(s.title)}</h3>
    <p class="sub">${esc(s.requirement)}</p>
+   ${veTuLieuGan(s)}
+   <button class="wide ghost" id="sAddLink" style="padding:11px;font-size:14px;margin-bottom:14px">+ Gắn tư liệu cho phần này</button>
    ${sg && canAssign ? `<div class="card" style="margin-bottom:14px"><div class="cb" style="display:flex;align-items:center;gap:11px">
      ${avatar(sg.full_name)}<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--go);font-weight:600">Gợi ý theo chức vụ</div>
      <div style="font-size:14px;font-weight:600">${esc(sg.full_name)}</div>
@@ -1581,6 +1585,10 @@ async function openSectionEdit(sectionId) {
      ${canAssign || iOwn ? `<button class="big go" id="sSave">Lưu</button>` : ''}</div>`);
 
   $('#sCancel').onclick = closeSheet;
+  $('#sAddLink').onclick = () => openLinkAdd(sectionId);
+  document.querySelectorAll('#sheet [data-xemtext]').forEach(b => {
+    b.onclick = () => openLinkText(Number(b.dataset.xemtext));
+  });
   if ($('#pickSg')) $('#pickSg').onclick = () => { $('#sOwner').value = String(sg.id); };
   if ($('#sSave')) $('#sSave').onclick = () => submitting($('#sSave'), async () => {
     const payload = { pct: Number($('#sPct').value || 0), note: $('#sNote').value };
@@ -2116,26 +2124,58 @@ function oChonBuoi(dangChon, ds) {
     + ban.map(b => `<option value="${b.id}"${b.id === dangChon ? ' selected' : ''}>${esc(nhan(b))}</option>`).join('');
 }
 
-// Nhãn "Buổi 28/8 · Quản trị chiến lược" cho tư liệu đã gắn vào một buổi. Đây
-// là nửa còn lại của lối tắt: cùng MỘT dòng dữ liệu, màn Lịch hiện nó dưới
-// buổi, màn Tư liệu hiện nó trong danh sách kèm nhãn cho biết nó thuộc buổi nào.
-function nhanBuoi(r) {
-  if (!r.buoi_id || !r.buoi_ngay) return '';
-  const [, m, d] = r.buoi_ngay.split('-');
-  const de = r.buoi_chu_de ? ` · ${esc(r.buoi_chu_de)}` : '';
-  return `<span class="nb-buoi">Buổi ${Number(d)}/${Number(m)}${de}</span>`;
+// Tám phần bài của CHÍNH NHÓM MÌNH — khác buổi học ở chỗ mỗi nhóm giữ một bộ
+// phần riêng (plan_sections theo group), nên không có khái niệm "đầy đủ cho
+// cả khoá" ở đây, chỉ cần "đầy đủ cho nhóm mình" là đủ. /api/plan không lọc
+// theo thời gian nên không có bẫy "buổi đã qua" như layLichDayDu().
+async function layPhanBai() {
+  try { return (await apiGet('/api/plan')).sections ?? []; }
+  catch { return PLAN?.sections ?? []; }
+}
+
+// Ô chọn phần bài. `ds` là danh sách từ layPhanBai(). Giữ đúng khuôn
+// oChonBuoi(): chèn thêm dòng cho phần đang gắn nếu vì lý do gì đó nó không
+// còn trong `ds` (nhóm đổi khung bài giữa chừng — hiếm nhưng không phải không
+// thể), tránh cảnh mở sheet sửa ra là ô nhảy về "Không gắn phần nào".
+function oChonPhan(dangChon, ds) {
+  const ban = (ds ?? []).slice();
+  if (dangChon && !ban.some(s => s.id === dangChon)) {
+    const r = (KHO_LINKS || []).find(x => x.section_id === dangChon);
+    ban.unshift({ id: dangChon, ord: null, title: r?.title ?? 'phần đã đổi' });
+  }
+  const nhan = s => s.ord === 0 || s.ord === null ? (s.title ?? '') : `Phần ${s.ord} — ${s.title ?? ''}`;
+  return `<option value="">Không gắn phần nào</option>`
+    + ban.map(s => `<option value="${s.id}"${s.id === dangChon ? ' selected' : ''}>${esc(nhan(s))}</option>`).join('');
+}
+
+// Nhãn "Buổi 28/8 · Quản trị chiến lược" hoặc "Phần 3 · Khách hàng mục tiêu"
+// cho tư liệu đã gắn vào một buổi HOẶC một phần bài. Đây là nửa còn lại của
+// lối tắt: cùng MỘT dòng dữ liệu, màn Hôm nay/Bài hiện nó dưới buổi/phần, màn
+// Tư liệu hiện nó trong danh sách kèm nhãn cho biết nó thuộc về đâu.
+function nhanGan(r) {
+  if (r.buoi_id && r.buoi_ngay) {
+    const [, m, d] = r.buoi_ngay.split('-');
+    const de = r.buoi_chu_de ? ` · ${esc(r.buoi_chu_de)}` : '';
+    return `<span class="nb-buoi">Buổi ${Number(d)}/${Number(m)}${de}</span>`;
+  }
+  if (r.section_id && r.section_title) {
+    const so = r.section_ord ? `Phần ${r.section_ord}` : 'Phần';
+    return `<span class="nb-buoi">${so} · ${esc(r.section_title)}</span>`;
+  }
+  return '';
 }
 
 // Sheet xem một ghi chú Text (kind='TEXT') đã render Markdown — an toàn nhờ
 // mdSafe() esc() trước rồi mới nhận diện cú pháp (xem chú thích ở hàm đó).
-// Tra qua TULIEU_CACHE thay vì KHO_LINKS: mở từ khối "Hôm nay" (veTuLieuBuoi)
-// thì tab Tư liệu có thể chưa từng tải, KHO_LINKS lúc đó vẫn rỗng.
+// Tra qua TULIEU_CACHE thay vì KHO_LINKS: mở từ khối "Hôm nay" hay tab Bài
+// (đều dùng veTuLieuGan()) thì tab Tư liệu có thể chưa từng tải, KHO_LINKS
+// lúc đó vẫn rỗng.
 function openLinkText(id) {
   const r = TULIEU_CACHE.get(id);
   if (!r) return;
   openSheet(`
    <h3>${esc(r.title)}</h3>
-   <p class="sub">${nhanBuoi(r) || 'Ghi chú tự viết — không phải slide hay tài liệu của Ban tổ chức.'}</p>
+   <p class="sub">${nhanGan(r) || 'Ghi chú tự viết — không phải slide hay tài liệu của Ban tổ chức.'}</p>
    <div class="mdview">${mdSafe(r.content_md || '')}</div>
    <div class="sa" style="margin-top:18px"><button class="big go" id="mvC">Đóng</button></div>`);
   $('#mvC').onclick = closeSheet;
@@ -2147,7 +2187,7 @@ function veDongTuLieu(r, trongCum) {
   const laText = r.kind === 'TEXT';
   const than = `<span class="ext">${esc(laText ? 'Ghi chú' : r.kind)}</span>
     <div class="b"><div class="t">${esc(r.title)}</div>
-    <div class="m">${trongCum ? '' : nhanBuoi(r)}${
+    <div class="m">${trongCum ? '' : nhanGan(r)}${
       // "đăng" chứ không để trơ ngày: dưới đầu mục "Thứ Bảy 15/8" mà thấy một
       // ngày khác thì đọc như mâu thuẫn, trong khi nó là NGÀY ĐĂNG liên kết.
       laText || r.url ? 'đăng ' + vnDate(r.created_at) : 'chưa có đường dẫn — bấm ✎ để dán vào'}</div></div>`;
@@ -2172,7 +2212,7 @@ async function openLinkEdit(id) {
   const r = (KHO_LINKS || []).find(x => x.id === id);
   if (!r) return;
   const laText = r.kind === 'TEXT';
-  const dsBuoi = await layLichDayDu();
+  const [dsBuoi, dsPhan] = await Promise.all([layLichDayDu(), layPhanBai()]);
   openSheet(`
    <h3>Sửa ${laText ? 'ghi chú' : 'liên kết'}</h3>
    <p class="sub">${laText ? 'Sửa lại nội dung Markdown.'
@@ -2194,24 +2234,41 @@ async function openLinkEdit(id) {
    <label class="f">Đóng cho</label>
    <select id="eG">${[['bai','Cho bài'],['buoi','Theo buổi học'],['lop','Việc chung của lớp']]
      .map(([v, l]) => `<option value="${v}"${v === r.tag ? ' selected' : ''}>${l}</option>`).join('')}</select>
-   <label class="f">Thuộc buổi học nào</label>
-   <select id="eB">${oChonBuoi(r.buoi_id, dsBuoi)}</select>
-   <div class="hintline">Gắn vào buổi thì nó hiện thêm dưới buổi ấy ở tab Hôm nay —
-     vẫn là một liên kết, không phải bản sao.</div>
+   <div id="eBuoiBox" style="display:${r.tag === 'buoi' ? '' : 'none'}">
+     <label class="f">Thuộc buổi học nào</label>
+     <select id="eB">${oChonBuoi(r.buoi_id, dsBuoi)}</select>
+     <div class="hintline">Gắn vào buổi thì nó hiện thêm dưới buổi ấy ở tab Hôm nay —
+       vẫn là một liên kết, không phải bản sao.</div>
+   </div>
+   <div id="ePhanBox" style="display:${r.tag === 'bai' ? '' : 'none'}">
+     <label class="f">Thuộc phần bài nào</label>
+     <select id="eP">${oChonPhan(r.section_id, dsPhan)}</select>
+     <div class="hintline">Gắn vào phần thì nó hiện thêm dưới phần ấy ở tab Bài —
+       vẫn là một liên kết, không phải bản sao.</div>
+   </div>
    <div class="foot" style="padding:10px 0 0">Phạm vi (${r.scope === 'class' ? 'cả lớp' : 'nhóm mình'}) không đổi được ở đây.
      Muốn đổi thì gỡ liên kết rồi đăng lại, để nhật ký ghi rõ.</div>
    <div id="eErr" class="errline" style="display:none"></div>
    <div class="sa"><button class="big c" id="eThoi">Thôi</button>
      <button class="big go" id="eLuu">Lưu</button></div>`);
   $('#eThoi').onclick = closeSheet;
+  $('#eG').onchange = () => {
+    $('#eBuoiBox').style.display = $('#eG').value === 'buoi' ? '' : 'none';
+    $('#ePhanBox').style.display = $('#eG').value === 'bai' ? '' : 'none';
+  };
   $('#eLuu').onclick = () => submitting($('#eLuu'), async () => {
+    // Cả hai ô chọn luôn có mặt trong DOM (chỉ ẩn/hiện theo tag), nên đọc giá
+    // trị của cả hai bất kể ô nào đang hiện — đúng cách buổi học đã làm từ
+    // trước (ô buổi luôn được gửi kèm bất kể tag nào đang chọn).
+    const chung = {
+      title: $('#eT').value, tag: $('#eG').value,
+      buoi_id: $('#eB').value === '' ? null : Number($('#eB').value),
+      section_id: $('#eP').value === '' ? null : Number($('#eP').value),
+    };
     await apiPatch(`/api/links/${id}`, laText
-      ? { content_md: $('#eC').value, title: $('#eT').value, tag: $('#eG').value,
-          buoi_id: $('#eB').value === '' ? null : Number($('#eB').value) }
-      : { url: $('#eU').value.trim(), title: $('#eT').value,
-          kind: $('#eK').value, tag: $('#eG').value,
-          buoi_id: $('#eB').value === '' ? null : Number($('#eB').value) });
-    await drawKho(KHO_TAG); await refreshHome();
+      ? { ...chung, content_md: $('#eC').value }
+      : { ...chung, url: $('#eU').value.trim(), kind: $('#eK').value });
+    await drawKho(KHO_TAG); await refreshHome(); if (PLAN) await drawBai();
   }, 'Đã lưu');
 }
 
@@ -2227,26 +2284,41 @@ async function openLinkEdit(id) {
 //
 // Mục CHƯA gắn buổi dồn xuống cuối, không trộn vào giữa: chúng chưa có chỗ
 // thuộc về, và để lẫn thì lại đúng cảnh lộn xộn vừa sửa.
+//
+// Mục gắn PHẦN BÀI dồn vào một cụm riêng "Theo phần bài" thay vì rơi chung
+// vào "Chưa gắn buổi học" — chúng CÓ gắn, chỉ là gắn vào phần chứ không phải
+// buổi, và nhãn "chưa gắn" cho một dòng đã gắn là sai. Không tách nhỏ theo
+// từng phần (khác với buổi tách theo từng ngày): tám phần một nhóm không đủ
+// nhiều để đáng làm vậy, và tab Bài đã có chỗ xem theo đúng từng phần rồi.
 function veTuLieuTheoBuoi(ds) {
   const cum = new Map();          // buoi_id → { ngay, chu_de, ds }
+  const theoPhan = [];
   const roi = [];
   for (const r of ds) {
-    if (!r.buoi_id || !r.buoi_ngay) { roi.push(r); continue; }
-    if (!cum.has(r.buoi_id)) cum.set(r.buoi_id, { ngay: r.buoi_ngay, chu_de: r.buoi_chu_de, ds: [] });
-    cum.get(r.buoi_id).ds.push(r);
+    if (r.buoi_id && r.buoi_ngay) {
+      if (!cum.has(r.buoi_id)) cum.set(r.buoi_id, { ngay: r.buoi_ngay, chu_de: r.buoi_chu_de, ds: [] });
+      cum.get(r.buoi_id).ds.push(r);
+    } else if (r.section_id && r.section_title) {
+      theoPhan.push(r);
+    } else {
+      roi.push(r);
+    }
   }
-  // Chưa gắn buổi nào cả thì đừng bày đầu mục "Chưa gắn buổi học" lên — nó chỉ
-  // là tiếng ồn khi cả danh sách đều như vậy.
+  // Chưa gắn gì cả thì đừng bày đầu mục nào lên — tiếng ồn khi cả danh sách
+  // đều như vậy.
   // Bọc trong hàm mũi tên: map() truyền index vào tham số thứ hai, nên gọi
   // thẳng `map(veDongTuLieu)` thì dòng đầu (index 0) được coi là ngoài cụm còn
   // mọi dòng sau lại bị coi là trong cụm — nhãn buổi biến mất từ dòng thứ hai.
-  if (!cum.size) return `<div class="card">${ds.map(r => veDongTuLieu(r)).join('')}</div>`;
+  if (!cum.size && !theoPhan.length) return `<div class="card">${ds.map(r => veDongTuLieu(r)).join('')}</div>`;
 
   const nhom = [...cum.values()].sort((a, b) => (a.ngay < b.ngay ? 1 : a.ngay > b.ngay ? -1 : 0));
   return nhom.map(g => `
     <div class="eb ebbuoi">${esc(ngayVN(g.ngay))}${g.chu_de ? ' · ' + esc(g.chu_de) : ''}
       <span class="c">${g.ds.length}</span></div>
     <div class="card">${g.ds.map(r => veDongTuLieu(r, true)).join('')}</div>`).join('')
+    + (theoPhan.length ? `
+    <div class="eb ebbuoi">Theo phần bài <span class="c">${theoPhan.length}</span></div>
+    <div class="card">${theoPhan.map(r => veDongTuLieu(r)).join('')}</div>` : '')
     + (roi.length ? `
     <div class="eb ebbuoi">Chưa gắn buổi học <span class="c">${roi.length}</span></div>
     <div class="card">${roi.map(r => veDongTuLieu(r)).join('')}</div>` : '');
@@ -2304,9 +2376,13 @@ async function drawKho(tag) {
 // hẳn NỘI DUNG TEXT — ghi chú Markdown do chính người trong lớp gõ, không
 // phải slide/file của Ban tổ chức (xem migration 0025). Cùng một sheet, một
 // nút bấm chuyển qua lại — không tách hai màn cho khỏi phải lặp lại các ô
-// dùng chung (Gọi là gì / Dùng cho / Thuộc buổi nào / Ai thấy được).
-async function openLinkAdd() {
-  const dsBuoi = await layLichDayDu();
+// dùng chung (Gọi là gì / Ai thấy được).
+//
+// Ô "Thuộc buổi/phần nào" đổi theo tag đang chọn (buổi ↔ phần bài) — mở từ
+// tab Bài (xem openSectionEdit) thì `preSection` truyền sẵn phần đang xem,
+// tự đặt tag='bai' và chọn đúng phần ấy luôn, khỏi bắt chọn lại.
+async function openLinkAdd(preSection) {
+  const [dsBuoi, dsPhan] = await Promise.all([layLichDayDu(), layPhanBai()]);
   openSheet(`
    <h3>Gắn Tư liệu</h3>
    <div class="fl" style="margin-bottom:2px">
@@ -2326,10 +2402,18 @@ async function openLinkAdd() {
    </div>
    <label class="f">Gọi là gì</label><input id="lN" maxlength="200" placeholder="Báo cáo thị trường FMCG 2025">
    <label class="f">Dùng cho</label><select id="lT"><option value="bai">Cho bài</option><option value="buoi">Theo buổi</option><option value="lop">Lớp K03</option></select>
-   <label class="f">Thuộc buổi học nào</label>
-   <select id="lB">${oChonBuoi(null, dsBuoi)}</select>
-   <div class="hintline">Chọn buổi thì tư liệu hiện thêm dưới buổi ấy ở tab Hôm nay.
-     Vẫn là một dòng duy nhất, sửa ở đâu cũng đổi cả hai chỗ.</div>
+   <div id="lBuoiBox" style="display:none">
+     <label class="f">Thuộc buổi học nào</label>
+     <select id="lB">${oChonBuoi(null, dsBuoi)}</select>
+     <div class="hintline">Chọn buổi thì tư liệu hiện thêm dưới buổi ấy ở tab Hôm nay.
+       Vẫn là một dòng duy nhất, sửa ở đâu cũng đổi cả hai chỗ.</div>
+   </div>
+   <div id="lPhanBox">
+     <label class="f">Thuộc phần bài nào</label>
+     <select id="lP">${oChonPhan(preSection ?? null, dsPhan)}</select>
+     <div class="hintline">Chọn phần thì tư liệu hiện thêm dưới phần ấy ở tab Bài.
+       Vẫn là một dòng duy nhất, sửa ở đâu cũng đổi cả hai chỗ.</div>
+   </div>
    ${KHO_CAN_LOP ? `<label class="f">Ai thấy được</label>
    <select id="lS"><option value="group">Chỉ nhóm mình</option><option value="class">Cả lớp — cả mười nhóm</option></select>
    <div class="hintline" id="lSHint"></div>` : ''}
@@ -2337,6 +2421,12 @@ async function openLinkAdd() {
    <div class="sa"><button class="big c" id="lCancel">Thôi</button>
      <button class="big go" id="lSave">Gắn vào</button></div>`);
   $('#lCancel').onclick = closeSheet;
+
+  $('#lT').onchange = () => {
+    $('#lBuoiBox').style.display = $('#lT').value === 'buoi' ? '' : 'none';
+    $('#lPhanBox').style.display = $('#lT').value === 'bai' ? '' : 'none';
+  };
+  $('#lT').onchange();
 
   const dangText = () => $('#modeText').classList.contains('on');
   const doiChe = m => {
@@ -2373,11 +2463,12 @@ async function openLinkAdd() {
         title: $('#lN').value, tag: $('#lT').value,
         scope: $('#lS') ? $('#lS').value : 'group',
         buoi_id: $('#lB').value === '' ? null : Number($('#lB').value),
+        section_id: $('#lP').value === '' ? null : Number($('#lP').value),
       };
       await apiPost('/api/links', laText
         ? { ...chung, content_md: $('#lC').value, kind: 'TEXT' }
         : { ...chung, url: $('#lU').value.trim(), kind: $('#lK').value });
-      await drawKho('all'); await refreshHome();
+      await drawKho('all'); await refreshHome(); if (PLAN) await drawBai();
     }, laText ? 'Đã lưu ghi chú' : 'Đã gắn vào Tư liệu');
   };
 }

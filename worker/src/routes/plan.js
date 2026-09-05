@@ -13,7 +13,7 @@ export async function getPlan(env, me) {
   const plan = await loadPlan(env, me.group_id);
   if (!plan) return error('plan_not_found', 404);
 
-  const [sectionsRes, membersRes, insightsRes] = await Promise.all([
+  const [sectionsRes, membersRes, insightsRes, tuLieuRes] = await Promise.all([
     env.DB.prepare(
       `SELECT ps.id, ps.ord, ps.title, ps.requirement, ps.pct, ps.note, ps.owner_member_id,
               ps.present_member_id, ps.present_minutes,
@@ -34,6 +34,15 @@ export async function getPlan(env, me) {
        LEFT JOIN members m ON m.id = i.created_by
        WHERE i.group_id = ? ORDER BY i.created_at DESC`
     ).bind(me.group_id).all(),
+    // Tư liệu gắn vào từng phần — đúng khuôn "một dòng, hai màn" đã dùng cho
+    // buổi học (layTuLieuTheoBuoi trong routes/lich.js): cùng một dòng trong
+    // `links`, tab Bài và tab Tư liệu đọc nó bằng hai truy vấn khác nhau.
+    env.DB.prepare(
+      `SELECT l.id, l.section_id, l.url, l.title, l.kind, l.content_md FROM links l
+        JOIN plan_sections ps ON ps.id = l.section_id
+       WHERE ps.plan_id = ? AND l.removed_at IS NULL
+       ORDER BY l.created_at`
+    ).bind(plan.id).all(),
   ]);
 
   const sections = sectionsRes.results ?? [];
@@ -45,9 +54,16 @@ export async function getPlan(env, me) {
   const totalMinutes = sections.reduce((n, s) => n + (s.present_minutes || 0), 0);
   const speakers = new Set(sections.map(s => s.present_member_id).filter(Boolean));
 
+  const tuLieuTheoPhan = new Map();
+  for (const r of tuLieuRes.results ?? []) {
+    if (!tuLieuTheoPhan.has(r.section_id)) tuLieuTheoPhan.set(r.section_id, []);
+    tuLieuTheoPhan.get(r.section_id).push(r);
+  }
+  const sectionsVoiTuLieu = sections.map(s => ({ ...s, tu_lieu: tuLieuTheoPhan.get(s.id) ?? [] }));
+
   return json({
     plan: { topic_product: plan.topic_product, topic_customers: plan.topic_customers },
-    sections,
+    sections: sectionsVoiTuLieu,
     members,
     suggestions: suggestOwners(members, sections),
     insights: insightsRes.results ?? [],
