@@ -60,10 +60,11 @@ for (const l of dong.slice(1)) {
   if (!VAI_HOP_LE.has(vai)) { loi.push(`vai "${vai}" không hợp lệ — chỉ nhận ${[...VAI_HOP_LE].join(' | ')}`); continue; }
   const seq = Number(stt);
   // Cận trên là sĩ số roster hiện tại (migration mới nhất thêm người thì phải
-  // nâng số này theo — 134 gốc + Trương Thị Ngọc Anh migration 0023 = 135).
-  // Không phải lưới an toàn duy nhất: KHOP bên dưới còn đối tên, seq sai hẳn
-  // (âm, chữ) vẫn bị chặn ở đây trước khi chạm SQL.
-  const SEQ_TOI_DA = 135;
+  // nâng số này theo — 134 gốc + Trương Thị Ngọc Anh migration 0023 = 135 +
+  // Vũ Thị Ngân migration 0027 = 136). Không phải lưới an toàn duy nhất: KHOP
+  // bên dưới còn đối tên, seq sai hẳn (âm, chữ) vẫn bị chặn ở đây trước khi
+  // chạm SQL.
+  const SEQ_TOI_DA = 136;
   if (!Number.isInteger(seq) || seq < 1 || seq > SEQ_TOI_DA) {
     loi.push(`stt "${stt}" của ${vai} phải là số từ 1 đến ${SEQ_TOI_DA}`); continue;
   }

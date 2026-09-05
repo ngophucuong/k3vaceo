@@ -27,5 +27,5 @@
 # không xoá, để còn lần theo lịch sử.
 vai_tro,stt,ho_ten,ghi_chu
 lop_truong,65,Lưu Minh Tiến,Lớp trưởng lớp CEO K03
-thu_quy,84,Vũ Thị Ngân Hà,"Thủ quỹ lớp. Thông báo của lớp ghi tên ngắn ""Vũ Thị Ngân"" và ghi Nhóm 1; danh sách Ban tổ chức chỉ có Vũ Thị Ngân Hà ở Nhóm 7. Nếu là hai người khác nhau thì sửa lại stt ở dòng này."
+thu_quy,136,Vũ Thị Ngân,"Thủ quỹ lớp. Ngô Phú Cường xác nhận 5/9: người khác hẳn Vũ Thị Ngân Hà (stt 84, Nhóm 7) — thêm roster mới ở stt 136, Nhóm 1 (migration 0027)."
 uy_vien,71,Ngô Phú Cường,"Thành viên Ban cán sự lớp, phụ trách theo dõi và báo cáo Nhóm 6"
