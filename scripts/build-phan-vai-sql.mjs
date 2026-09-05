@@ -61,10 +61,10 @@ for (const l of dong.slice(1)) {
   const seq = Number(stt);
   // Cận trên là sĩ số roster hiện tại (migration mới nhất thêm người thì phải
   // nâng số này theo — 134 gốc + Trương Thị Ngọc Anh migration 0023 = 135 +
-  // Vũ Thị Ngân migration 0027 = 136). Không phải lưới an toàn duy nhất: KHOP
-  // bên dưới còn đối tên, seq sai hẳn (âm, chữ) vẫn bị chặn ở đây trước khi
-  // chạm SQL.
-  const SEQ_TOI_DA = 136;
+  // Vũ Thị Ngân migration 0027 = 136 + Nguyễn Thị Hoa, Võ Thị Trang migration
+  // 0028 = 138). Không phải lưới an toàn duy nhất: KHOP bên dưới còn đối tên,
+  // seq sai hẳn (âm, chữ) vẫn bị chặn ở đây trước khi chạm SQL.
+  const SEQ_TOI_DA = 138;
   if (!Number.isInteger(seq) || seq < 1 || seq > SEQ_TOI_DA) {
     loi.push(`stt "${stt}" của ${vai} phải là số từ 1 đến ${SEQ_TOI_DA}`); continue;
   }
