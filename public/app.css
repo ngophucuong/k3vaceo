@@ -14,6 +14,30 @@ body{background:var(--bg);color:var(--ink);font-family:'Be Vietnam Pro',system-u
   font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
   padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 body.noapp{padding-bottom:0}
+
+/* ─── CẢM GIÁC ỨNG DỤNG, KHÔNG PHẢI TRANG WEB ───────────────────────────────
+   Bốn thứ dưới đây là bốn dấu hiệu "đây là trình duyệt" mà người dùng nhận ra
+   ngay cả khi không gọi tên được. Sửa 5/9 sau khi Ngô Phú Cường chụp màn hình
+   đầu trang chồng lên đồng hồ hệ thống.
+
+   1. CHẠM HAI LẦN KHÔNG PHÓNG NỮA. `touch-action:manipulation` bỏ cử chỉ
+      chạm-hai-lần-để-phóng, và bỏ luôn 300ms trình duyệt phải CHỜ xem có cú
+      chạm thứ hai không — nút bấm nhạy hẳn lên, đây là thứ cảm nhận được rõ
+      nhất. Chạy trên CẢ iOS, khác `user-scalable=no` chỉ chạy trên Android.
+   2. KHÔNG KÉO CĂNG MÉP MÀN HÌNH. `overscroll-behavior-y:none` bỏ cú nảy cao
+      su ở đầu/cuối trang và bỏ "kéo xuống để tải lại" của Chrome Android —
+      thứ mà kéo nhầm một cái là mất nguyên trạng thái màn đang mở.
+   3. CHẠM GIỮ KHÔNG BÔI ĐEN CHỮ. Bôi đen nhãn nút rồi hiện bảng "Sao chép /
+      Tra cứu" là dấu hiệu trang web rõ nhất. CHỈ tắt ở phần khung sườn
+      (đầu trang, thanh dưới, nút) — nội dung như số điện thoại, email, ghi
+      chú tư liệu PHẢI copy được, nên tuyệt đối không đặt lên `body`.
+   4. KHÔNG TRƯỢT NGANG. Một phần tử lỡ rộng quá là cả trang lắc ngang được,
+      cảm giác long lẻo. */
+html{touch-action:manipulation;overscroll-behavior-y:none}
+body{overscroll-behavior-y:none;overflow-x:hidden}
+header,nav,button,label.f,.eb,.raillb,.grab,.seg{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.av,.nb .g{-webkit-user-drag:none;user-drag:none}
 .wrap{max-width:var(--wrap);margin:0 auto;padding:0 16px}
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
 .num{font-family:var(--num);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
@@ -21,8 +45,18 @@ button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;paddin
 ::selection{background:var(--go-bg)}
 
 /* ─── ĐẦU TRANG ─── */
+/* `padding-top:env(safe-area-inset-top)` là thứ CHỪA CHỖ cho đồng hồ, cột sóng
+   và pin của hệ điều hành. Thiếu đúng một dòng này thì khi cài lên màn hình
+   chính, đầu trang vẽ đè lên thanh trạng thái — Ngô Phú Cường chụp được ngày
+   5/9: "Nhóm 6" nằm chồng lên "16:57", "21 ngày đến bảo vệ" chồng lên cột sóng.
+   Lề DƯỚI đã chừa từ đầu (thanh điều hướng, sheet, toast đều có
+   safe-area-inset-bottom) — chỉ riêng lề TRÊN bị bỏ quên.
+   Đặt trên `header` chứ không phải `body`: header dán dính (sticky) nên phần
+   đệm này phải đi theo nó, để lúc cuộn thì nội dung trôi qua BÊN DƯỚI vùng mờ
+   chứ không lòi lên trên thanh trạng thái. */
 header{position:sticky;top:0;z-index:40;background:rgba(243,243,241,.88);
-  backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid var(--line)}
+  backdrop-filter:saturate(1.6) blur(14px);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top)}
 .hd{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 0 11px}
 .hl{display:flex;align-items:baseline;gap:9px;min-width:0}
 .hl .g{font-family:var(--num);font-weight:700;font-size:17px;letter-spacing:-.02em}
@@ -344,8 +378,16 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(243,243,24
   align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
 .veil.on{display:flex;animation:fade .2s ease}
 @keyframes fade{from{opacity:0}to{opacity:1}}
+/* `dvh` chứ không phải `vh`: trên di động `vh` tính theo màn hình lúc thanh
+   địa chỉ ĐANG ẨN, nên sheet cao 90vh thực tế tràn khỏi màn khi thanh hiện ra
+   — nút Lưu ở đáy bị đẩy ra ngoài, không bấm được. `vh` giữ làm đường lui cho
+   trình duyệt cũ (khai trước, cái sau đè lên nếu hiểu được).
+   `overscroll-behavior:contain` để cuộn hết sheet thì DỪNG, không kéo lây
+   trang nền phía sau trôi theo — trang nền trôi trong khi sheet đứng yên là
+   dấu hiệu "web" rõ nhất còn sót lại. */
 .sheet{background:var(--bg);width:100%;max-width:var(--wrap);border-radius:20px 20px 0 0;
-  padding:8px 16px calc(22px + env(safe-area-inset-bottom));max-height:90vh;overflow-y:auto;
+  padding:8px 16px calc(22px + env(safe-area-inset-bottom));max-height:90vh;max-height:90dvh;
+  overflow-y:auto;overscroll-behavior:contain;
   animation:up .34s cubic-bezier(.22,1,.36,1)}
 @keyframes up{from{transform:translateY(28px)}to{transform:none}}
 .grab{width:38px;height:4px;border-radius:99px;background:var(--line2);margin:0 auto 15px}
@@ -353,8 +395,13 @@ nav{position:fixed;left:0;right:0;bottom:0;z-index:50;background:rgba(243,243,24
 .sheet .sub{font-size:13.5px;color:var(--ink2);margin:0 0 18px;line-height:1.5}
 label.f{display:block;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
   color:var(--ink3);margin:0 0 6px}
+/* CỠ CHỮ Ô NHẬP PHẢI ≥ 16px — đây là con số CỦA iOS, không phải thẩm mỹ. Ô nhỏ
+   hơn 16px thì Safari tự phóng to cả trang lúc chạm vào ô, rồi KHÔNG tự thu
+   lại: gõ xong một ô là mọi thứ to đùng, phải chụm hai ngón thu về tay. Đây
+   chính là kiểu "phóng nhầm" khó chịu nhất, và là lý do 15px cũ phải đổi.
+   Bịt được ở đây thì khoá zoom hay không cũng không còn quan trọng mấy. */
 input,textarea,select{width:100%;background:var(--surf);border:0;box-shadow:inset 0 0 0 1px var(--line2);
-  border-radius:10px;padding:12px 13px;font-family:'Be Vietnam Pro',sans-serif;font-size:15px;
+  border-radius:10px;padding:12px 13px;font-family:'Be Vietnam Pro',sans-serif;font-size:16px;
   color:var(--ink);margin-bottom:14px;transition:box-shadow .16s}
 textarea{resize:vertical;min-height:74px;line-height:1.5}
 input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px var(--ink)}
@@ -378,7 +425,10 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
 #toast.on{opacity:1;transform:translate(-50%,0)}
 
 /* ─── MÀN NHẬN LINK MỜI / CHƯA ĐĂNG NHẬP ─── */
-.claimwrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+/* Màn nhận link mời / đăng nhập chạy với body.noapp (không có header, không có
+   thanh dưới) nên phải TỰ chừa cả hai lề an toàn — không có ai chừa hộ. */
+.claimwrap{min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+  padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
 .claimcard{max-width:400px;width:100%;background:var(--surf);border-radius:20px;box-shadow:var(--sh2);
   padding:24px 22px}
 .claimcard .lb{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink3);margin-bottom:8px}

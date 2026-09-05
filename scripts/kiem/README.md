@@ -88,6 +88,7 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tulieu-text.mjs` | **an toàn XSS của `mdSafe()`** — bốn ca độc + bốn ca thuận + giao diện |
 | `kiem-tulieu-bai.mjs` | tư liệu gắn vào PHẦN BÀI (links.section_id): plan.js/links.js, **N6** qua nhóm khác |
 | `pw-tulieu-bai.mjs` | giao diện: sheet phần bài ↔ Gắn Tư liệu ↔ tab Tư liệu, "một dòng, ba màn" |
+| `pw-mobile.mjs` | cảm giác ứng dụng: chừa chỗ thanh trạng thái, khoá zoom, ô nhập 16px — và **số điện thoại vẫn copy được** |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
 | `reset-moi.sh` | dựng hai phiên + ba hồ sơ thử cho `kiem-moi.mjs`/`pw-nhanlai.mjs`, gồm một hồ sơ giả không có số điện thoại |
 | `reset-tulieu-text.sh` | dựng phiên Ngô Phú Cường cho `kiem-tulieu-text.mjs` / `pw-tulieu-text.mjs` |
@@ -99,7 +100,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Chín phép đối chứng đáng giữ nhất
+## Mười phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -186,6 +187,22 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    Số") rồi chứng minh: `has_phone_on_file: false`, và claim với số bậy hay
    không kèm số nào đều phải 200 — không phải "không còn 401" (đã có thể chỉ
    vì đọc nhầm hồ sơ), mà đúng luồng đi hết tới cấp phiên.
+
+10. **`pw-mobile.mjs` phải chứng minh chữ NỘI DUNG vẫn copy được, không chỉ
+    chứng minh khung sườn đã tắt bôi đen (5/9).** Đợt "cảm giác ứng dụng" tắt
+    `user-select` cho đầu trang, thanh dưới và nút. Cách viết gọn nhất là đặt
+    thẳng lên `body` — và màn hình sẽ trông **y hệt**, không lỗi JS, mọi phép
+    kiểm khác vẫn xanh, chỉ mất đúng một thứ: chép số điện thoại trong Danh bạ,
+    tức đúng việc danh bạ sinh ra để làm. Vì vậy phép đối chứng NGƯỢC (tìm
+    `a[href^="tel:"]` rồi đọc `user-select` của nó) mới là phép đáng giữ, không
+    phải phép thuận. Chọn người mẫu phải là người ĐÃ ĐĂNG NHẬP: số của người
+    chưa đăng nhập bị che ở máy chủ và số đã che cố ý không bọc trong `tel:`,
+    nên lấy nhầm người là phép kiểm đỏ vì lý do chẳng liên quan (đã vấp ngay
+    lượt chạy đầu, dùng Đinh Khánh Toàn — người chưa đăng nhập ở D1 cục bộ).
+    Phần safe-area thì đọc THẲNG luật trong stylesheet chứ không đọc computed
+    style: Chromium trên máy chủ không có "tai thỏ" nên `env(safe-area-inset-*)`
+    luôn bằng 0, computed style không phân biệt được "đã chừa chỗ" với "quên
+    chừa" — đúng cái lỗi cần bắt.
 
 ## Chạy `kiem-tanso.mjs`
 

@@ -318,6 +318,70 @@ Vì vậy phép kiểm là **giải mã ngược**: đóng vai trình duyệt, g
 từng ký tự — cộng một phép đối chứng sai khoá phải hỏng, để chắc phép kiểm có
 răng. Xem `scripts/tao-khoa-vapid.mjs` và bộ kiểm ở thư mục scratchpad.
 
+## Cảm giác ứng dụng: khoá zoom và chừa chỗ cho thanh trạng thái
+
+Sửa 5/9 sau khi Ngô Phú Cường chụp màn hình ứng dụng đã cài lên màn hình chính:
+chữ **"Nhóm 6" nằm chồng lên đồng hồ "16:57"**, dòng "21 ngày đến bảo vệ" chồng
+lên cột sóng và pin. Không phép kiểm nào bắt được — không lỗi JS, deploy xanh,
+API đúng hết; chỉ thiếu đúng **một dòng CSS**.
+
+**Gốc rễ là hai thẻ meta đánh nhau.** `apple-mobile-web-app-status-bar-style`
+đang đặt `black-translucent`, nghĩa là "cho nội dung chui xuống DƯỚI thanh
+trạng thái, và đổi chữ giờ/pin sang màu trắng". Cả hai vế đều sai với một ứng
+dụng nền SÁNG: nội dung đè lên đồng hồ, mà chữ trắng trên nền sáng thì không
+đọc được. Nay là `default`. Cùng lý do, `theme-color` đổi từ `#14161A` (tối)
+sang `#F3F3F1` — trùng nền đầu trang, để trên Android thanh trạng thái không
+còn là một vệt đen cắt ngang.
+
+**Lề DƯỚI đã chừa từ đầu, chỉ lề TRÊN bị bỏ quên.** `env(safe-area-inset-bottom)`
+có mặt ở bốn chỗ (thanh điều hướng, sheet, toast, băng "có bản mới") từ lâu,
+nên không ai nghĩ tới việc lề trên chưa bao giờ được chừa. Nay
+`header{padding-top:env(safe-area-inset-top)}` — đặt trên `header` chứ không
+phải `body`, vì header dán dính (sticky): phần đệm phải đi theo nó thì lúc cuộn
+nội dung mới trôi qua BÊN DƯỚI vùng mờ thay vì lòi lên trên thanh trạng thái.
+
+### Khoá zoom: bịt phóng NHẦM quan trọng hơn cấm phóng CHỦ Ý
+
+Ba lớp, xếp theo mức thật sự có tác dụng:
+
+1. **Cỡ chữ ô nhập ≥ 16px** — con số của Apple, không phải thẩm mỹ. Ô nhỏ hơn
+   16px thì Safari **tự phóng to cả trang** lúc chạm vào ô rồi KHÔNG tự thu
+   lại. Đây là kiểu phóng nhầm khó chịu nhất và đường duy nhất bịt được nó là
+   đổi cỡ chữ (15px → 16px). Chạy trên mọi máy.
+2. **`touch-action:manipulation`** — bỏ cử chỉ chạm-hai-lần-để-phóng, và bỏ
+   luôn 300ms trình duyệt phải chờ xem có cú chạm thứ hai không. Nút bấm nhạy
+   hẳn lên; đây là thứ cảm nhận rõ nhất mà không ai gọi tên được. Chạy trên cả
+   iOS lẫn Android.
+3. **`user-scalable=no, maximum-scale=1`** — chỉ Android nghe. **iOS CỐ TÌNH bỏ
+   qua** từ iOS 10 vì lý do trợ năng, không thẻ nào ép được. Trên iPhone chụm
+   hai ngón vẫn phóng được — đó là hành vi đúng của hệ điều hành, đừng đi tìm
+   cách lách. Muốn bỏ khoá hẳn thì xoá hai tham số này trong `index.html`, một
+   dòng.
+
+**Cố ý KHÔNG chặn cử chỉ chụm hai ngón bằng JavaScript** (`gesturestart`
+preventDefault). Lớp này ứng dụng không cần: nó không thêm gì cho "cảm giác
+ứng dụng" mà lấy mất cái van an toàn cuối cùng của người đọc chữ nhỏ — lớp có
+134+ chủ doanh nghiệp tuổi 35–55, và giao diện còn nhiều chữ 10.5–13.5px.
+**`/lich` và `/sotay` cũng CỐ Ý không khoá zoom**: đó là trang để ĐỌC, có ảnh
+và bảng, phóng to là nhu cầu thật.
+
+### Ba thứ còn lại làm nó thôi giống trang web
+
+- **`overscroll-behavior-y:none`** — bỏ cú nảy cao su ở đầu/cuối trang, và bỏ
+  "kéo xuống để tải lại" của Chrome Android. Kéo nhầm một cái là mất nguyên
+  trạng thái màn đang mở, nên đây không chỉ là thẩm mỹ.
+- **`user-select:none` CHỈ cho khung sườn** (đầu trang, thanh dưới, nút, nhãn).
+  Chạm giữ mà bôi đen nhãn nút rồi hiện bảng "Sao chép / Tra cứu" là dấu hiệu
+  trang web rõ nhất. **Tuyệt đối không đặt lên `body`**: số điện thoại và email
+  trong Danh bạ phải copy được — đó đúng là việc danh bạ sinh ra để làm. Đây là
+  phép đối chứng chính của `pw-mobile.mjs`, vì đặt nhầm lên `body` thì màn hình
+  trông y hệt mà tính năng mất.
+- **`dvh` thay `vh`** cho sheet (90dvh) và màn nhận link (100dvh), giữ `vh` khai
+  trước làm đường lui. `vh` tính theo màn hình lúc thanh địa chỉ ĐANG ẨN, nên
+  sheet 90vh tràn khỏi màn khi thanh hiện ra và nút Lưu ở đáy bị đẩy ra ngoài.
+  Thêm `overscroll-behavior:contain` cho sheet để cuộn hết thì dừng, không kéo
+  lây trang nền trôi theo.
+
 ## Làm mới: quay lại app là tự cập nhật
 
 Trước 25/8 ứng dụng **không bao giờ tự làm mới** — không `visibilitychange`,

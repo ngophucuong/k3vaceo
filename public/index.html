@@ -2,14 +2,27 @@
 <html lang="vi">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- KHOÁ ZOOM: đây là ứng dụng để chạm, không phải trang để đọc. `user-scalable=no`
+     chặn phóng to trên Android; iOS CỐ TÌNH bỏ qua nó (chính sách trợ năng của
+     Apple, không sửa được bằng bất kỳ thẻ nào) nên trên iPhone chụm hai ngón
+     vẫn phóng được — chấp nhận. Thứ thật sự làm người ta khó chịu không phải
+     phóng CHỦ Ý mà là phóng NHẦM, và hai đường ấy đã bịt được ở mọi máy:
+     `touch-action:manipulation` (chạm hai lần) và cỡ chữ ô nhập 16px (iOS tự
+     phóng khi ô nhỏ hơn 16px) — xem app.css.
+     /lich và /sotay CỐ Ý không khoá: đó là trang để ĐỌC, có ảnh và bảng, người
+     lớn tuổi cần phóng to. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>k3vaceo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#14161A">
+<!-- Màu thanh trạng thái phải TRÙNG nền đầu trang (--bg #F3F3F1), không phải màu
+     tối. Đặt tối trong khi ứng dụng nền sáng thì trên Android thanh trạng thái
+     là một vệt đen cắt ngang phía trên đầu trang sáng — nhìn như vỡ giao diện
+     chứ không như một ứng dụng. -->
+<meta name="theme-color" content="#F3F3F1">
 <!-- iOS bỏ qua manifest cho phần biểu tượng và chế độ toàn màn hình; ba thẻ
      dưới đây là đường duy nhất. Thiếu chúng thì "Thêm vào màn hình chính"
      trên iPhone ra một ô trắng có ảnh chụp màn hình, và mở lên vẫn có thanh
@@ -17,7 +30,12 @@
      thông báo đẩy. -->
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- `default` chứ KHÔNG phải `black-translucent`. Ứng dụng nền SÁNG, mà
+     `black-translucent` làm hai việc cùng lúc, cả hai đều hỏng ở đây: đẩy nội
+     dung chui xuống DƯỚI thanh trạng thái (đúng lỗi Ngô Phú Cường chụp được
+     ngày 5/9: chữ "Nhóm 6" chồng lên đồng hồ), và đổi chữ giờ/pin sang MÀU
+     TRẮNG — trắng trên nền sáng là không đọc được gì. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="k3vaceo">
 </head>
 <body>
