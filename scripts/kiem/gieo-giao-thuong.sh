@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Gieo dữ liệu thử cho tab Kết nối và trang /giao-thuong.
+# Gieo dữ liệu thử cho tab Giao thương và trang /giao-thuong.
 #
 #     bash scripts/kiem/gieo-giao-thuong.sh
 #

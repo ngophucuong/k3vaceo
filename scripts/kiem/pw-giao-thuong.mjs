@@ -1,4 +1,4 @@
-// Kiểm tab Kết nối trong ứng dụng và trang công khai /giao-thuong.
+// Kiểm tab Giao thương trong ứng dụng và trang công khai /giao-thuong.
 //
 //     bash scripts/kiem/gieo-giao-thuong.sh     # TRƯỚC khi chạy dev server
 //     cd worker && npx wrangler dev --port 8787 --local
@@ -91,8 +91,8 @@ console.log('── Trang /giao-thuong/ : người lạ, không đăng nhập �
   await c.close();
 }
 
-/* ══ 2. TAB KẾT NỐI trong ứng dụng ════════════════════════════════════════ */
-console.log('── Tab Kết nối: đã đăng nhập ──');
+/* ══ 2. TAB GIAO THƯƠNG trong ứng dụng ════════════════════════════════════════ */
+console.log('── Tab Giao thương: đã đăng nhập ──');
 {
   const c = await b.newContext({ viewport: { width: 390, height: 900 }, deviceScaleFactor: 2 });
   await c.addCookies([COOKIE]);
@@ -105,7 +105,7 @@ console.log('── Tab Kết nối: đã đăng nhập ──');
   ok('ứng dụng nạp được (có thanh nav)', await p.locator('nav .nb').count() > 0);
   ok('có đúng 6 tab', await p.locator('nav .nb').count() === 6);
   ok('không lỗi JS', loi.length === 0, loi[0]);
-  ok('tab Kết nối đang mở', await p.locator('#v-gt.on').count() === 1);
+  ok('tab Giao thương đang mở', await p.locator('#v-gt.on').count() === 1);
 
   const chu = await p.locator('#v-gt').innerText();
 
@@ -133,7 +133,7 @@ console.log('── Tab Kết nối: đã đăng nhập ──');
   // hàng. Xanh --go trong sản phẩm này chỉ có một nghĩa: xong.
   ok('khối "Đang cần" hiện ra', await p.locator('#v-gt .gtcan').count() > 0);
 
-  await p.screenshot({ path: `${ANH}/tab-ket-noi.png`, fullPage: true });
+  await p.screenshot({ path: `${ANH}/tab-giao-thuong.png`, fullPage: true });
 
   // Lọc theo ngành, không gọi lại máy chủ.
   const truoc = await p.locator('#v-gt .gtc').count();

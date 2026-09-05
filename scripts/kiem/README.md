@@ -37,10 +37,11 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-vao-nhanh.mjs` | luồng `/vao` rút gọn: số điện thoại vào thẳng + passkey |
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
 | `kiem-ghep.mjs` | thuật toán ghép giao thương + danh mục ngành — **chạy thẳng, không cần máy chủ** |
-| `pw-giao-thuong.mjs` | tab Kết nối, trang `/giao-thuong`, hai mức lộ |
+| `pw-giao-thuong.mjs` | tab Giao thương, trang `/giao-thuong`, hai mức lộ |
 | `gieo-giao-thuong.sh` | gieo bốn gian hàng ở bốn nhóm cho `pw-giao-thuong.mjs` |
+| `pw-nav.mjs` | thanh nav sáu tab ở sáu khổ màn hình — xem cảnh báo dưới đây |
 
-## Sáu phép đối chứng đáng giữ nhất
+## Bảy phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -74,8 +75,16 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    được đối chứng bằng tay**: gỡ dòng `GT = await apiGet(...)` trong
    `openGianHang` ra thì nó đỏ, lắp lại thì xanh. Đây là lỗi mất dữ liệu
    loại nguy nhất — bốn ô "bán gì / bán cho ai / cần gì / giúp được gì" dùng
-   CHUNG giữa tab Nhóm và tab Kết nối, nên mở form từ bộ nhớ đệm rồi bấm Lưu
+   CHUNG giữa tab Nhóm và tab Giao thương, nên mở form từ bộ nhớ đệm rồi bấm Lưu
    là ghi đè bản mới bằng bản cũ, y hệt lỗi Đợt 1.
+
+7. **`pw-nav.mjs` đo BỀ RỘNG CHỮ, không đo chiều cao nút.** Bản đầu đo chiều
+   cao — đoán rằng nhãn dài sẽ xuống dòng và đội nút cao lên — và nó báo xanh
+   ở mọi khổ từ 300px tới 430px, kể cả những khổ nhãn đang tràn thật. Vì
+   `white-space:nowrap` khiến chữ TRÀN chứ không xuống dòng, còn `min-width:0`
+   khiến phần tràn không đẩy thanh nav rộng ra: cả phép đo chiều cao lẫn phép
+   đo `scrollWidth` của thanh nav đều mù. Phải so `lb.scrollWidth` với
+   `nb.clientWidth`. Đây là phép kiểm **đậu giả** mới nhất bị bắt, 5/9.
 
 **Chỗ dễ rò nhất của cả sản phẩm, kiểm ở `pw-giao-thuong.mjs`:** trang
 `/giao-thuong` là đường DUY NHẤT đưa dữ liệu người dùng ra internet. Hai phép

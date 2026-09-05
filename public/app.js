@@ -819,6 +819,13 @@ const ICON = {
            <path d="M17.2 12.8H5.6M8.6 9.8l-3 3 3 3"/>`),
 };
 
+/* Nhãn tab bọc trong <span class="lb"> để CSS rụng được chữ ở khổ hẹp mà vẫn
+   giữ icon (xem .nb .lb trong app.css). aria-label đặt luôn ở nút, không chỉ
+   khi chữ bị ẩn: lúc rụng chữ thì nút chỉ còn một hình, và không có aria-label
+   thì trình đọc màn hình đọc ra một nút trống. */
+const nutNav = (v, nhan) =>
+  `<button class="nb" data-v="${v}" aria-label="${nhan}">${ICON[v]}<span class="lb">${nhan}</span></button>`;
+
 function shellHtml() {
   return `
   <header><div class="wrap">
@@ -839,12 +846,12 @@ function shellHtml() {
     <section class="view" id="v-gt"></section>
   </main>
   <nav><div class="navin">
-    <button class="nb" data-v="nay">${ICON.nay}Hôm nay</button>
-    <button class="nb" data-v="bai">${ICON.bai}Bài</button>
-    <button class="nb" data-v="nhom">${ICON.nhom}Nhóm</button>
-    <button class="nb" data-v="kho">${ICON.kho}Tư liệu</button>
-    <button class="nb" data-v="quy">${ICON.quy}Quỹ</button>
-    <button class="nb" data-v="gt">${ICON.gt}Kết nối</button>
+    ${nutNav('nay', 'Hôm nay')}
+    ${nutNav('bai', 'Bài')}
+    ${nutNav('nhom', 'Nhóm')}
+    ${nutNav('kho', 'Tư liệu')}
+    ${nutNav('quy', 'Quỹ')}
+    ${nutNav('gt', 'Giao thương')}
   </div></nav>`;
 }
 

@@ -25,7 +25,7 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 
 **Ba việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Giao thương** (5/9) — tab Kết nối + trang công khai `/giao-thuong`. Chỗ
+1. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`. Chỗ
    DUY NHẤT N6 được bỏ, và là thứ duy nhất còn lý do sống sau ngày bảo vệ.
 2. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
 3. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
@@ -563,7 +563,7 @@ như hồi hai vai — so đôi một với ba vai sẽ cho phép bỏ trống c
 
 ## Giao thương — chỗ duy nhất N6 được bỏ, và vì sao
 
-Thêm 5/9 (migration 0016). Tab **Kết nối** trong ứng dụng, cộng trang công khai
+Thêm 5/9 (migration 0016). Tab **Giao thương** trong ứng dụng, cộng trang công khai
 `k3vaceo.cuongngo.app/giao-thuong`. Ngô Phú Cường quyết bỏ N6 cho riêng phạm vi
 này: *"việc ghép nhóm chỉ để làm bài tập"* — mà bài tập hết hạn 26/9.
 
@@ -649,10 +649,41 @@ và tìm vẫn ở giao diện.
    với cả trang. Trang `/lich` không lộ ra vì tiêu đề của nó gần như không có
    dấu. **Chỉ nhìn ảnh chụp mới thấy** — phép kiểm chuỗi không thấy.
 
-Nhãn tab là **"Kết nối"** chứ không phải "Giao thương": sáu tab trên khổ 360px
-còn 55px mỗi nút, mười một ký tự thì tràn xuống hai dòng và đội cao cả thanh
-nav. Chữ "Giao thương" vẫn dùng nguyên ở tiêu đề trong tab và trên trang công
-khai.
+### Thanh nav sáu tab: tab đang mở giữ chữ, năm tab kia còn icon
+
+Ngô Phú Cường quyết 5/9: giữ nguyên chữ "Giao thương", **chật thì bỏ chữ chứ
+không đổi tên tab cho vừa**. Số đo được (`scripts/kiem/pw-nav.mjs`):
+
+| khổ máy | nút rộng | "Giao thương" cần | |
+|---|---|---|---|
+| 320px | 49px | 75px | ✗ |
+| 390px | 61px | 75px | ✗ iPhone 12–15 |
+| 430px | 69px | 75px | ✗ kể cả Pro Max |
+| 520px | 82px | 75px | ✓ máy tính bảng trở lên |
+
+520px cũng chính là `--wrap`, bề rộng lớn nhất thanh nav từng đạt — trên nữa
+không rộng thêm. Nên nhãn đầy đủ **không vừa trên bất kỳ điện thoại nào**.
+
+Nhưng rụng chữ cả sáu tab thì lộ ra chuyện khác: **icon "Bài" và icon "Tư
+liệu" đều là hình trang giấy**, bỏ chữ đi là hai tab ấy gần như không phân
+biệt được. Vì vậy dưới 520px chỉ **tab đang mở** giữ chữ (`flex:1.8` để có chỗ),
+năm tab kia còn icon. Bấm sang tab nào là chữ hiện ra ngay tại đó.
+
+**Cạm bẫy của chính phép đo này — đã vấp một lần.** Bản đầu đo CHIỀU CAO nút,
+đoán rằng nhãn dài sẽ xuống dòng và đội nút cao lên. Nó báo xanh ở mọi khổ từ
+300px tới 430px, kể cả những khổ đang tràn thật. Lý do: `.lb` có
+`white-space:nowrap` nên chữ **tràn ra ngoài chứ không xuống dòng**, nút không
+cao lên; và `.nb` có `min-width:0` nên phần tràn cũng không đẩy `.navin` rộng
+ra, tức `scrollWidth > clientWidth` của thanh nav cũng im lặng. **Hai phép kiểm
+hiển nhiên nhất đều mù.** Phải so `lb.scrollWidth` với `nb.clientWidth`.
+
+Mọi nút có `aria-label`: khi rụng chữ thì nút chỉ còn một hình, không có
+aria-label là trình đọc màn hình đọc ra một nút trống.
+
+Con số trên vẫn lệch với máy thật — sandbox không ra được internet nên Google
+Fonts không tải, phép đo chạy trên font dự phòng của hệ thống. Font dự phòng
+rộng hơn Be Vietnam Pro, nên đây là phép đo **bi quan**: máy thật chỉ có thể
+rộng rãi hơn, không chật hơn.
 
 ### Hai điều chưa kiểm chứng được
 
