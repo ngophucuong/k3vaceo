@@ -36,9 +36,13 @@ ok('bỏ từ chung: không có từ đơn "muon"', !tuKhoa('muốn tìm thêm')
 
 /* ══ 3. Cắt từ quá chung, và HAI chốt an toàn ══════════════════════════════ */
 muc('3. Cắt từ khoá quá phổ biến');
-const nhieu = Array.from({ length: 30 }, () => tuKhoa('dịch vụ trọn gói'));
+// Ví dụ CỐ Ý không nằm trong CUM_CHUNG: cụm nào đã có trong danh sách sàn thì
+// bị cắt ngay ở tuKhoa() và không bao giờ tới được phép đếm — lấy nó làm ví dụ
+// thì phép kiểm này chỉ đang kiểm lại danh sách sàn, không kiểm phép đếm.
+const nhieu = Array.from({ length: 30 }, () => tuKhoa('giao hàng trọn gói'));
 const catNhieu = tuQuaChung(nhieu);
-ok("30 hồ sơ cùng 'dịch vụ' → cụm ấy bị cắt", catNhieu.has('dich vu'));
+ok("30 hồ sơ cùng 'trọn gói' → phép đếm tự cắt cụm ấy", catNhieu.has('tron goi'),
+   `cắt được: ${[...catNhieu].join(' | ')}`);
 
 const it = Array.from({ length: 5 }, () => tuKhoa('dịch vụ trọn gói'));
 ok('dưới 20 hồ sơ → KHÔNG cắt gì (chốt an toàn 1)', tuQuaChung(it).size === 0,
@@ -50,6 +54,34 @@ const hp = Array.from({ length: 21 }, (_, i) =>
   tuKhoa(i < 4 ? 'cắt gọt kim loại' : `ngành riêng số ${i}`));
 ok('21 hồ sơ, cụm của 4 người → chưa cắt (chốt an toàn 2)',
    !tuQuaChung(hp).has('cat got'));
+
+/* ══ 3b. HỒI QUY: hai cụm rác thấy trên DỮ LIỆU THẬT ngày 5/9 ══════════════
+   Ngô Phú Cường chụp màn tab Giao thương trên tên miền: bốn gợi ý, và cả bốn
+   giải thích bằng đúng hai cụm vô nghĩa — `cùng nhắc tới "thi truong"` và
+   `cùng nhắc tới "xuat va"`. Anh hỏi "đây là mock data à", tức gợi ý trông
+   như bịa. Đó là phép thử khắc nghiệt nhất mà bộ kiểm này chưa từng có: dữ
+   liệu thật của người thật, không phải bốn hồ sơ tôi tự dựng cho vừa ý mình. */
+muc('3b. Hồi quy: hai cụm rác của lần chạy thật đầu tiên');
+const kXuat = tuKhoa('Xuất và nhập khẩu nông sản');
+ok('"xuất và" KHÔNG thành từ khoá (mảnh vỡ chứa từ nối)', !kXuat.has('xuat va'),
+   `nhận: ${[...kXuat].join(' | ')}`);
+ok('  nhưng "nhap khau" thì vẫn giữ', kXuat.has('nhap khau'));
+ok('  và "nong san" vẫn giữ', kXuat.has('nong san'));
+ok('"thị trường" bị cắt kể cả khi dữ liệu còn thưa',
+   !tuKhoa('Mở rộng thị trường miền Bắc').has('thi truong'));
+ok('  "khách hàng" cũng vậy', !tuKhoa('Tìm khách hàng mới').has('khach hang'));
+ok('  nhưng "miền bắc" vẫn giữ', tuKhoa('Mở rộng thị trường miền Bắc').has('mien bac'));
+
+// Hai người chỉ trùng nhau ở cụm chung chung thì KHÔNG được thành gợi ý —
+// đúng cảnh trong ảnh chụp.
+const aChung = { id: 1, full_name: 'A', company: '', title: '',
+  sells_what: 'Mở rộng thị trường', sells_to: 'Khách hàng doanh nghiệp',
+  needs: 'Đối tác', offers: null, mo_ta: null };
+const bChung = { id: 2, full_name: 'B', company: '', title: '',
+  sells_what: 'Dịch vụ cho khách hàng', sells_to: 'Thị trường miền Nam',
+  needs: 'Đối tác', offers: null, mo_ta: null };
+ok('chỉ trùng cụm chung chung → KHÔNG gợi ý', xepGoiY(aChung, [bChung]).length === 0,
+   JSON.stringify(xepGoiY(aChung, [bChung])));
 
 /* ══ 4. Ba chiều ghép ══════════════════════════════════════════════════════ */
 muc('4. Ba chiều ghép và câu giải thích');

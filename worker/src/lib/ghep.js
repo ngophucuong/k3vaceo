@@ -28,14 +28,57 @@ export function boDau(s) {
     .toLowerCase();
 }
 
-// Từ đơn quá chung, loại khỏi phép đếm từ-đơn. Danh sách này CỐ Ý ngắn: chỗ
-// lọc thật sự là phép đếm độ phổ biến ở dưới, thứ tự thích nghi với dữ liệu
-// thật thay vì bắt tôi đoán trước.
+// Từ đơn quá chung, loại khỏi phép đếm từ-đơn.
 const TU_CHUNG = new Set([
   'cac', 'nhung', 'mot', 'cua', 'cho', 'voi', 'trong', 'ngoai', 've', 'khi',
   'duoc', 'nguoi', 'chung', 'toi', 'minh', 'ban', 'ho', 'day', 'kia', 'nay',
   'can', 'muon', 'tim', 'kiem', 'them', 'nhieu', 'moi', 'rat', 'hon', 'nhat',
   'lam', 'gia', 'tot', 'cao', 'thap', 'lon', 'nho', 'hay', 'nhu', 'thi', 'la',
+]);
+
+/* TỪ CHỨC NĂNG — bigram chứa một trong số này ở BẤT KỲ vị trí nào đều bị bỏ.
+   Thấy trên dữ liệu thật ngày 5/9: "xuất và nhập khẩu" sinh ra bigram
+   `"xuat va"`, và ứng dụng đem đúng mảnh vỡ ấy ra giải thích vì sao hai người
+   nên gặp nhau — `cùng nhắc tới "xuat va"`. Bản đầu chỉ lọc TỪ ĐƠN nên cặp
+   nào cũng được nhận, kể cả cặp nửa từ nửa liên từ.
+
+   Đây là chỗ khác `TU_CHUNG` ở trên: 'khach' và 'hang' đều tầm thường khi
+   đứng một mình, nhưng "khach hang" là một từ có nghĩa. Còn 'va' thì không
+   ghép được với gì để thành nghĩa.
+
+   DANH SÁCH NÀY PHẢI RẤT HẸP, và lý do đắt hơn vẻ ngoài của nó: sau khi bỏ
+   dấu, phần lớn từ nối tiếng Việt TRÙNG với một từ nội dung. Bản đầu của tôi
+   có 40 mục và lập tức cắt oan "vận tải" — vì 'tai' vừa là "tại" vừa là
+   "tải". Bộ kiểm bắt được ngay. Những mục đã phải gỡ, kèm từ bị nó giết:
+     tai → vận TẢI, TÀI chính     tu  → TƯ vấn        cua → CỬA hàng
+     cho → CHỢ đầu mối            trong → TRỒNG trọt  ve  → VÉ máy bay
+     khi → KHÍ đốt                thi → THI công      duoc → DƯỢC phẩm
+     den → ĐÈN                    bang → BẢNG, BĂNG   cung → CUNG cấp
+     con → CON giống              nen → NỀN tảng      chi → CHI phí
+     da  → DA giày                vi  → VI sinh, VÍ   ma  → MÃ số
+   Chỉ giữ những âm tiết mà sau khi bỏ dấu gần như không mang nghĩa nào khác
+   trong ngữ cảnh làm ăn. Thêm mục mới vào đây thì phải đi hỏi cùng câu ấy:
+   bỏ dấu xong nó còn là từ gì nữa? */
+const TU_NOI = new Set([
+  'va', 'cac', 'nhung', 'mot', 'hay', 'nhu', 'theo', 'truoc',
+  'nay', 'kia', 'ay', 'boi', 'neu', 'hoac', 'deu', 'se',
+]);
+
+/* CỤM CHUNG CỦA GIỚI KINH DOANH — sàn cứng, chạy CẢ KHI dữ liệu còn thưa.
+   Trước 5/9 tôi cố ý không viết danh sách này, với lý lẽ "danh sách viết tay
+   luôn thiếu đúng những cụm mà lớp NÀY hay dùng, phép đếm tự động thì thích
+   nghi được". Lý lẽ ấy đúng nhưng chưa đủ, và dữ liệu thật bác bỏ nó ngay
+   ngày đầu: phép đếm CHỈ chạy khi có từ 20 hồ sơ trở lên (chốt an toàn ngay
+   dưới), mà lúc mới mở thì chưa đủ — nên "thị trường" thành lý do ghép nối
+   cho bốn người liền, đọc lên như dữ liệu bịa.
+
+   Hai thứ bổ sung cho nhau chứ không thay thế: danh sách này lo lúc thưa,
+   phép đếm lo lúc dày và bắt được những cụm tôi không đoán trước. */
+const CUM_CHUNG = new Set([
+  'thi truong', 'khach hang', 'doanh nghiep', 'dich vu', 'san pham',
+  'cong ty', 'kinh doanh', 'phat trien', 'hop tac', 'chat luong',
+  'doi tac', 'nhu cau', 'uy tin', 'chuyen nghiep', 'gia canh tranh',
+  'toan quoc', 'ca nuoc', 'moi loai', 'da dang', 'chi phi',
 ]);
 
 // Tách chuỗi thành các âm tiết đã bỏ dấu. Tiếng Việt viết rời từng âm tiết
@@ -57,7 +100,14 @@ export function tuKhoa(...doan) {
   const ra = new Set();
   for (let i = 0; i < at.length; i++) {
     if (at[i].length >= 4 && !TU_CHUNG.has(at[i])) ra.add(at[i]);
-    if (i + 1 < at.length) ra.add(`${at[i]} ${at[i + 1]}`);
+    if (i + 1 >= at.length) continue;
+    // Cặp có từ nối ở một trong hai vế là mảnh vỡ giữa hai từ thật, không
+    // phải một từ — bỏ. Cặp nằm trong danh sách cụm chung thì có nghĩa nhưng
+    // không phân biệt được ai với ai — cũng bỏ.
+    if (TU_NOI.has(at[i]) || TU_NOI.has(at[i + 1])) continue;
+    const cum = `${at[i]} ${at[i + 1]}`;
+    if (CUM_CHUNG.has(cum)) continue;
+    ra.add(cum);
   }
   return ra;
 }

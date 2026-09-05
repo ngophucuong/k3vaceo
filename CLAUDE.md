@@ -940,6 +940,39 @@ Bốn điều đã trả giá hoặc suýt trả giá:
    liệu cần gặp nhà thầu, không cần gặp người bán vật liệu khác. Ngành để đó
    cho người dùng tự lọc.
 
+### Lần chạy thật đầu tiên bác bỏ hai giả định (5/9, ngay chiều hôm phát hành)
+
+Ngô Phú Cường chụp màn tab Giao thương trên tên miền và hỏi **"đây là mock
+data à"** — bốn gợi ý, cả bốn giải thích bằng đúng hai cụm vô nghĩa:
+`cùng nhắc tới "thi truong"` và `cùng nhắc tới "xuat va"`. Dữ liệu là THẬT
+(bốn người đều có trong roster gốc), nhưng lý do ghép đọc lên như bịa — mà
+gợi ý không thuyết phục thì tệ hơn không có gợi ý.
+
+**Giả định sai thứ nhất: "chỉ cần lọc TỪ ĐƠN là đủ".** Bigram được nhận vô
+điều kiện, nên "xuất và nhập khẩu" sinh ra `"xuat va"` — nửa từ nửa liên từ.
+Nay bigram chứa **từ nối** ở bất kỳ vế nào đều bị bỏ.
+
+**Giả định sai thứ hai: "phép đếm tự động thay được danh sách viết tay".** Tôi
+đã ghi hẳn lý lẽ ấy vào mục 2 ở trên — và nó đúng, nhưng chỉ đúng khi có dữ
+liệu. Phép đếm CHỈ chạy từ 20 hồ sơ trở lên (chốt an toàn), mà ngày đầu chưa
+đủ, nên "thị trường" thành lý do ghép cho bốn người liền. Nay có thêm
+`CUM_CHUNG` — danh sách sàn ~20 cụm của giới kinh doanh, chạy cả khi thưa.
+Hai thứ bổ sung nhau: danh sách lo lúc thưa, phép đếm lo lúc dày và bắt được
+cụm tôi không đoán trước.
+
+**Cái bẫy đắt nhất nằm ở bản vá, không nằm ở lỗi.** Danh sách từ nối bản đầu
+có 40 mục và lập tức **cắt oan "vận tải"** — vì bỏ dấu xong `'tai'` vừa là
+"tại" vừa là "tải". Bộ kiểm bắt ngay. Sau khi bỏ dấu, phần lớn từ nối tiếng
+Việt trùng với một từ nội dung: `tu`→TƯ vấn, `cua`→CỬA hàng, `cho`→CHỢ,
+`trong`→TRỒNG trọt, `khi`→KHÍ đốt, `duoc`→DƯỢC, `cung`→CUNG cấp, `chi`→CHI
+phí, `da`→DA giày. Danh sách nay chỉ còn 16 mục. Thêm mục mới thì phải hỏi
+đúng câu ấy: **bỏ dấu xong nó còn là từ gì nữa?**
+
+Giới hạn còn lại, chấp nhận có ý thức: mảnh vỡ kiểu `"rong thi"` (từ "mở rộng
+thị trường") vẫn lọt, vì `'thi'` phải giữ cho "THI công". Không chữa bằng cách
+loại luôn bigram chứa `TU_CHUNG` — làm thế thì `'gia'` giết "GIA công" và
+`'moi'` giết "MÔI trường", đắt hơn nhiều so với cái được.
+
 **Tính ở máy chủ, cố ý làm ngược nếp "lọc ở giao diện" của sổ thu** — không có
 build step nên `worker/src/lib/` không dùng lại được trong `public/app.js`,
 mà chép thuật toán sang tệp thứ hai thì hai bản lệch nhau trong im lặng. Cái
