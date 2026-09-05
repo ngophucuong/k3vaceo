@@ -1209,12 +1209,20 @@ trong tệp ấy CHƯA áp — cần người dùng xác nhận từng người 
 một vai cấp nhóm là mở nhầm quyền cơ cấu/phần bài/ngừng tham gia cho người
 không đúng.
 
-Sheet "DS lớp" cùng tệp (chữ ký buổi 21/8) cũng có **13 tên không khớp bất kỳ
-ai trong 134 người của roster** — có thể là học viên mới, có thể chỉ là biến
-thể tên/lỗi chính tả. Chưa xử lý, cần người dùng xác nhận từng người trước khi
-thêm vào roster. Trương Thị Ngọc Anh (xem mục ngay dưới) có thể là một trong
-13 tên này, nhưng chưa xác nhận được — cô ấy tới từ một dòng dữ liệu người
-dùng dán trực tiếp, không tra lại được với đúng sheet nào.
+Sheet "DS lớp" cùng tệp (chữ ký buổi 21/8) ban đầu có 13 tên không khớp ai
+trong roster — **đã rà từ 5/9** (migration 0028, rồi 0029): Nguyễn Thị Hoa và
+Võ Thị Trang được thêm hẳn, "Đậu Huy Đại" hoá ra là tên bị cụt của một người
+đã có sẵn (sửa thành "Đậu Huy Đại Việt"), và Nguyễn Tuấn Hùng (Nhóm 3) được
+thêm theo yêu cầu trực tiếp của Ngô Phú Cường — xem mục "Người thứ 139" ngay
+dưới. **Còn CHƯA xử lý**: "Vương Quốc Chung" (Nhóm 1, rất giống "Khương Quốc
+Chung" seq 75 nhưng người đó lại xuất hiện đầy đủ, riêng biệt ở Nhóm 5 trong
+cùng tệp — nhiều khả năng là hai người khác nhau, không phải lỗi chép) và sáu
+tên khác: Nguyễn Việt Anh (Nhóm 1), Nguyễn Thu Thảo (Nhóm 2, có số
+`0989588534` trong tệp), Nguyễn Tùng Lâm (Nhóm 5), Nguyễn Tuấn Đạt (Nhóm 7, có
+số `0961547806`), Lưu Thị Bích Ngọc (Nhóm 9, số ghi `904580955` — thiếu số 0
+đầu, chưa rõ có phải lỗi Excel làm rụng số 0 hay không), Đặng Hùng (Nhóm 10, số
+ghi `03845375x8` — có ký tự "x" lẫn vào, rõ ràng lỗi nhập liệu của Ban tổ
+chức). Cần người dùng xác nhận từng người trước khi thêm vào roster.
 
 ### Người thứ 135: Trương Thị Ngọc Anh, Nhóm 4 (migration 0023)
 
@@ -1252,6 +1260,34 @@ một cận trên cứng `seq > 134` chặn gán vai — nâng lên 135 (`SEQ_TO
 theo sẽ phải nâng tiếp nếu roster còn thêm người. `scripts/verify-d1.sql` CỐ Ý
 không sửa: nó xác nhận đúng bản nạp gốc 134 người, không phải trạng thái sống
 của roster — chỉ dùng khi nạp lại từ đầu.
+
+### Người thứ 139: Nguyễn Tuấn Hùng, Nhóm 3 (migration 0029)
+
+5/9, Ngô Phú Cường yêu cầu trực tiếp: "thêm 'Nguyễn Tuấn Hùng'". Tên này nằm
+trong danh sách "chưa xử lý" của đợt rà soát trước (mục ngay trên) — sheet "DS
+lớp" ghi TT=14, Nhóm 3, đơn vị "Công ty CP Đầu tư GemVN", không có ngày sinh,
+chức vụ, địa chỉ hay số điện thoại nào cho dòng này. Thêm nguyên vẹn những gì
+có, để trống phần còn lại — đúng nguyên tắc "thiếu thông tin thì để trống, đừng
+bịa". seq=139, nối tiếp ngay sau 138 (Võ Thị Trang, migration 0028).
+
+Không có số điện thoại nên anh ấy không tự vào được ở `/vao` — đã thêm dòng
+vào `scripts/data/bo-sung-dien-thoai.csv`. Nhưng khác các trường hợp trước:
+lần này KHÔNG cần chờ điền số. Tính năng "phát lại link mời cho cả lớp" vừa
+xong cùng ngày (mục "Phát lại link mời cho người ĐÃ ĐĂNG NHẬP" ở trên) mở ra
+một đường vòng sẵn có — bước NHẬN của một hồ sơ CHƯA từng có ai nhận
+(`postInviteClaim`, nhánh `!wasClaimed`) chỉ đòi email, không đòi số điện
+thoại (chốt `xacNhanLaiSo` chỉ chạy khi `wasClaimed`). Ngô Phú Cường hoặc Lưu
+Minh Tiến phát link cho anh ấy qua Danh bạ → Cả lớp là vào được ngay, không
+phải chờ ai điền số.
+
+Đây chính là lý do phù hợp để nói với Ngô Phú Cường: **toàn bộ danh sách trong
+`bo-sung-dien-thoai.csv` (44 người chưa có số + 6 người số đang sai/trùng +
+Nguyễn Tuấn Hùng vừa thêm = 51 dòng) đều có thể vào được NGAY bằng đường phát
+link mời này**, không cần đợi điền số điện thoại nữa — điền số chỉ còn cần
+thiết cho việc HỌ tự đăng nhập LẠI ở những lần sau nếu link mời bị mất hoặc hết
+hạn (magic-link email vẫn dùng được, nhưng phát lại link mời là đường nhanh
+nhất). Số điện thoại vẫn nên điền dần vì `/vao` là đường vào không cần Ban cán
+sự lớp đứng ra mỗi lần, nhưng nó không còn là chỗ chặn duy nhất.
 
 ### Bốn số điện thoại điền được từ tệp Ban tổ chức (migration 0020)
 
