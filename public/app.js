@@ -2086,16 +2086,26 @@ function suaDuocTuLieu(r) {
   return iAmOfficer();
 }
 
-// Ô chọn buổi học. Lấy từ HOME.lich_hoc — /api/home vốn chỉ trả 6 buổi SẮP
-// TỚI, nên tư liệu đang gắn vào một buổi đã qua sẽ không có trong danh sách.
-// Vì vậy luôn chèn thêm một dòng cho buổi đang gắn, kèm chính buoi_id ấy: nếu
-// không thì mở sheet sửa ra là ô nhảy về "Không gắn buổi nào", bấm Lưu một
-// phát là tư liệu bị gỡ khỏi buổi mà không ai định làm thế.
-function oChonBuoi(dangChon) {
-  const ds = (HOME?.lich_hoc ?? []).slice();
-  if (dangChon && !ds.some(b => b.id === dangChon)) {
+// Toàn bộ lịch của khoá (13 buổi, không lọc ngày) — CỐ Ý không dùng
+// HOME.lich_hoc: /api/home chỉ trả 6 buổi SẮP TỚI, nên gắn Tư liệu cho một
+// buổi ĐÃ QUA (ghi chú tóm tắt bài giảng sau khi học xong, đúng việc "Nội
+// dung Text" sinh ra để làm) sẽ không tìm thấy buổi đó trong ô chọn. Không
+// cache: 13 dòng một chỉ mục, rẻ hơn việc phải nhớ làm mới cache khi lịch đổi.
+async function layLichDayDu() {
+  try { return (await apiGet('/api/lich')).lich_hoc ?? []; }
+  catch { return HOME?.lich_hoc ?? []; } // mất mạng thì lùi về danh sách rút gọn, còn hơn không có gì
+}
+
+// Ô chọn buổi học. `ds` là danh sách ĐẦY ĐỦ từ layLichDayDu(). Vẫn giữ phần
+// chèn thêm dòng cho buổi đang gắn: phòng ca hiếm buổi đó đã bị xoá khỏi
+// lich_hoc mà tư liệu vẫn còn trỏ tới buoi_id cũ — không thì mở sheet sửa ra
+// là ô nhảy về "Không gắn buổi nào", bấm Lưu một phát là tư liệu bị gỡ khỏi
+// buổi mà không ai định làm thế.
+function oChonBuoi(dangChon, ds) {
+  const ban = (ds ?? []).slice();
+  if (dangChon && !ban.some(b => b.id === dangChon)) {
     const r = (KHO_LINKS || []).find(x => x.buoi_id === dangChon && x.buoi_ngay);
-    ds.unshift({ id: dangChon, ngay: r?.buoi_ngay ?? '', chu_de: r?.buoi_chu_de ?? 'buổi đã qua' });
+    ban.unshift({ id: dangChon, ngay: r?.buoi_ngay ?? '', chu_de: r?.buoi_chu_de ?? 'buổi đã qua' });
   }
   const nhan = b => {
     const [, m, d] = String(b.ngay || '').split('-');
@@ -2103,7 +2113,7 @@ function oChonBuoi(dangChon) {
     return `${ngay}${b.chu_de ?? ''}`;
   };
   return `<option value="">Không gắn buổi nào</option>`
-    + ds.map(b => `<option value="${b.id}"${b.id === dangChon ? ' selected' : ''}>${esc(nhan(b))}</option>`).join('');
+    + ban.map(b => `<option value="${b.id}"${b.id === dangChon ? ' selected' : ''}>${esc(nhan(b))}</option>`).join('');
 }
 
 // Nhãn "Buổi 28/8 · Quản trị chiến lược" cho tư liệu đã gắn vào một buổi. Đây
@@ -2158,10 +2168,11 @@ function veDongTuLieu(r, trongCum) {
 // Sửa một liên kết đã có — chủ yếu để DÁN ĐƯỜNG DẪN vào mục còn trống. Không
 // có màn này thì mục trống là trống vĩnh viễn, chỉ còn cách xoá đi tạo lại và
 // mất luôn ngày đăng lẫn người đăng.
-function openLinkEdit(id) {
+async function openLinkEdit(id) {
   const r = (KHO_LINKS || []).find(x => x.id === id);
   if (!r) return;
   const laText = r.kind === 'TEXT';
+  const dsBuoi = await layLichDayDu();
   openSheet(`
    <h3>Sửa ${laText ? 'ghi chú' : 'liên kết'}</h3>
    <p class="sub">${laText ? 'Sửa lại nội dung Markdown.'
@@ -2184,7 +2195,7 @@ function openLinkEdit(id) {
    <select id="eG">${[['bai','Cho bài'],['buoi','Theo buổi học'],['lop','Việc chung của lớp']]
      .map(([v, l]) => `<option value="${v}"${v === r.tag ? ' selected' : ''}>${l}</option>`).join('')}</select>
    <label class="f">Thuộc buổi học nào</label>
-   <select id="eB">${oChonBuoi(r.buoi_id)}</select>
+   <select id="eB">${oChonBuoi(r.buoi_id, dsBuoi)}</select>
    <div class="hintline">Gắn vào buổi thì nó hiện thêm dưới buổi ấy ở tab Hôm nay —
      vẫn là một liên kết, không phải bản sao.</div>
    <div class="foot" style="padding:10px 0 0">Phạm vi (${r.scope === 'class' ? 'cả lớp' : 'nhóm mình'}) không đổi được ở đây.
@@ -2276,7 +2287,7 @@ async function drawKho(tag) {
       : '<div class="card"><div class="cb mut">Chưa có liên kết nào trong mục này.</div></div>'}
   </div>
 
-  <button class="wide ghost" style="margin-top:12px" id="addLinkBtn">+ Gắn một liên kết</button>
+  <button class="wide ghost" style="margin-top:12px" id="addLinkBtn">+ Gắn Tư liệu</button>
   <div class="foot"></div>`;
 
   document.querySelectorAll('#v-kho [data-tag]').forEach(btn => { btn.onclick = () => drawKho(btn.dataset.tag); });
@@ -2294,7 +2305,8 @@ async function drawKho(tag) {
 // phải slide/file của Ban tổ chức (xem migration 0025). Cùng một sheet, một
 // nút bấm chuyển qua lại — không tách hai màn cho khỏi phải lặp lại các ô
 // dùng chung (Gọi là gì / Dùng cho / Thuộc buổi nào / Ai thấy được).
-function openLinkAdd() {
+async function openLinkAdd() {
+  const dsBuoi = await layLichDayDu();
   openSheet(`
    <h3>Gắn Tư liệu</h3>
    <div class="fl" style="margin-bottom:2px">
@@ -2315,7 +2327,7 @@ function openLinkAdd() {
    <label class="f">Gọi là gì</label><input id="lN" maxlength="200" placeholder="Báo cáo thị trường FMCG 2025">
    <label class="f">Dùng cho</label><select id="lT"><option value="bai">Cho bài</option><option value="buoi">Theo buổi</option><option value="lop">Lớp K03</option></select>
    <label class="f">Thuộc buổi học nào</label>
-   <select id="lB">${oChonBuoi(null)}</select>
+   <select id="lB">${oChonBuoi(null, dsBuoi)}</select>
    <div class="hintline">Chọn buổi thì tư liệu hiện thêm dưới buổi ấy ở tab Hôm nay.
      Vẫn là một dòng duy nhất, sửa ở đâu cũng đổi cả hai chỗ.</div>
    ${KHO_CAN_LOP ? `<label class="f">Ai thấy được</label>

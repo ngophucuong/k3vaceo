@@ -666,6 +666,36 @@ chắc các quy tắc chặn XSS không vô tình chặn luôn markdown đúng.
 không cần url nhưng bắt buộc content_md, hai chỗ sửa kèm ở trên, và giới hạn
 8.000 ký tự.
 
+### Bẫy thứ ba: ô chọn buổi không thấy buổi ĐÃ QUA
+
+Phát hiện ngay hôm sau khi tính năng lên thật (5/9) — Ngô Phú Cường thử gắn
+ghi chú LEAN vào đúng buổi 4/9 và báo "không gán được vì thiếu dữ liệu buổi".
+Đây chính xác là đúng loại việc "Nội dung Text" sinh ra để làm — tóm tắt MỘT
+BUỔI ĐÃ HỌC XONG — mà lại là trường hợp `oChonBuoi()` chưa từng xử lý đúng.
+
+`oChonBuoi()` đọc `HOME.lich_hoc`, mà `/api/home` chỉ trả **6 buổi SẮP TỚI**.
+Bẫy cũ ("`oChonBuoi()` luôn chèn thêm dòng cho buổi đang gắn", mục "Tư liệu
+gắn vào buổi học" ở trên) chỉ cứu được màn SỬA một tư liệu đã gắn sẵn — không
+cứu được màn TẠO MỚI, vì lúc đó chưa có `buoi_id` nào để chèn bù. Ngày 4/9 vừa
+qua khỏi "hôm nay" (5/9) là lập tức rơi khỏi danh sách, và người dùng nhìn
+thấy ô chọn thiếu đúng buổi mình cần mà không có lời giải thích nào.
+
+Sửa bằng cách đổi nguồn dữ liệu: `oChonBuoi()` nay nhận thẳng danh sách ĐẦY ĐỦ
+(hàm mới `layLichDayDu()`, gọi `GET /api/lich` — vốn đã trả toàn bộ 13 buổi
+không lọc ngày, chỉ là trước nay không route nào trong giao diện gọi tới nó)
+thay vì đọc `HOME.lich_hoc`. `openLinkAdd()`/`openLinkEdit()` phải chuyển
+thành `async` để `await` được danh sách này trước khi dựng sheet. Không cache:
+13 dòng một chỉ mục, rẻ hơn hẳn việc phải nhớ làm mới cache khi lịch đổi.
+
+Kèm luôn theo dữ liệu thật: **migration 0026** dán nguyên văn bản tóm tắt LEAN
+của Ngô Phú Cường vào đúng buổi 4/9 (`scope='class'` vì đây là bài giảng
+chung cả khoá, không phải ghi chép riêng Nhóm 6) — để khỏi bắt gõ lại một khối
+dán tay trên điện thoại sau khi vá xong.
+
+`pw-tulieu-text.mjs` có thêm một phép đối chứng cho đúng bẫy này: ô chọn buổi
+trong sheet "Gắn Tư liệu" phải liệt kê được một buổi ĐÃ QUA (4/9), không chỉ
+buổi trong 6 ngày sắp tới.
+
 ## Vai nhóm: ba, không phải hai
 
 `truong_nhom` · `pho_nhom` · **`tieu_bieu`** ("thành viên tiêu biểu", thêm

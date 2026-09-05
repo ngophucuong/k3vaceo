@@ -106,8 +106,16 @@ await p2.goto(B + '/#/kho'); await p2.waitForTimeout(2200);
 ok('ứng dụng thật sự nạp được (có thanh tab)', await p2.locator('.nb[data-v="kho"]').count() === 1);
 ok('không lỗi JS: ' + (loi2.join(' | ') || 'sạch'), loi2.length === 0);
 
-await p2.click('#addLinkBtn'); await p2.waitForTimeout(400);
+await p2.click('#addLinkBtn'); await p2.waitForTimeout(700);
 ok('mặc định mở ở chế độ Đường dẫn', await p2.locator('#modeUrlBox').isVisible());
+// ĐỐI CHỨNG: ô "Thuộc buổi học nào" phải liệt kê CẢ buổi đã qua, không chỉ 6
+// buổi sắp tới của /api/home — thứ mà "Nội dung Text" sinh ra để làm chính là
+// ghi lại tóm tắt MỘT BUỔI ĐÃ HỌC XONG. oChonBuoi() từng đọc HOME.lich_hoc,
+// khiến bấm "Gắn Tư liệu" cho một buổi hôm qua trở về trước là bó tay — lỗi
+// Ngô Phú Cường gặp thật ngày 5/9 khi buổi 4/9 đã rơi khỏi 6 buổi sắp tới.
+const oBuoi = await p2.locator('#lB option').allTextContents();
+ok('ô chọn buổi CÓ buổi đã qua (không chỉ 6 buổi sắp tới của /api/home)',
+   oBuoi.some(o => o.includes('4/9')));
 await p2.click('#modeText'); await p2.waitForTimeout(200);
 ok('bấm "Nội dung Text" thì ẩn ô đường dẫn, hiện ô nội dung',
    !(await p2.locator('#modeUrlBox').isVisible()) && await p2.locator('#modeTextBox').isVisible());
