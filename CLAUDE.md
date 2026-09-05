@@ -1167,6 +1167,43 @@ một lần đoán"), và đoán đủ 8 lần thì lần 9 phải 429 đúng h�
 một giờ sẽ khoá SỚM một lượt vì cộng dồn từ lượt chạy trước, không phải do mã
 sai (đã vấp và sửa ngay khi viết bộ kiểm này).
 
+### Vá kèm: hồ sơ chưa từng có số thì kẹt vĩnh viễn ở bước NHẬN LẠI (5/9 chiều)
+
+Đúng ngày phát hành tính năng trên, Ngô Phú Cường chụp lại màn hình thật: Đinh
+Khánh Toàn (Nhóm 9, roster KHÔNG có số điện thoại nào — nằm trong danh sách
+`bo-sung-dien-thoai.csv`) được phát lại link, mở lên gõ số điện thoại thật của
+mình vào rồi bấm Lưu — nhận `phone_mismatch` mãi mãi. Không phải gõ sai: hồ sơ
+này **chưa từng có số nào để đối chiếu**, nên `xacNhanLaiSo()` bản đầu (chỉ vài
+giờ trước) chặn CỨNG bất kể gõ gì, với lý do ghi thẳng trong code lúc đó "không
+có gì để soi thì an toàn hơn cho qua" — hoá ra đọc ngược: với ĐÚNG nhóm người
+này, "chặn hẳn" nghĩa là khoá vĩnh viễn một cửa vốn dĩ họ có quyền dùng.
+
+**Vì sao chặn hẳn là sai, không phải "an toàn hơn":** nhóm người không có số
+trong roster (44+ người, xem `bo-sung-dien-thoai.csv`) vốn dĩ NHẬN LẦN ĐẦU
+cũng không cần số — nhánh `!wasClaimed` chưa bao giờ gọi `xacNhanLaiSo()`. Bảo
+vệ họ từ trước tới giờ chỉ là "token không đoán được", không hơn. Bắt họ ĐÃ
+NHẬN xong rồi mới đòi một số không tồn tại là hạ THÊM một nấc — từ "vào được"
+xuống "kẹt vĩnh viễn" — chứ không phải giữ nguyên mức bảo vệ cũ.
+
+**Sửa**: `xacNhanLaiSo()` kiểm `soDoiChieu.length` TRƯỚC cả hạn mức đoán và
+`isValidVnPhone` — không có số nào để soi thì `return null` (cho qua) ngay,
+giống hệt nhánh nhận lần đầu. `getInvite()` trả thêm `has_phone_on_file`
+(dùng chung `soHopLeTuHoSo()`) để giao diện biết đường: `renderClaim` chỉ bắt
+buộc gõ số (`*`, chặn nút Lưu, hintline) khi `has_phone_on_file` là true; khi
+false thì đổi hẳn phụ đề thành "chưa từng có số điện thoại lưu — không cần xác
+nhận thêm" và cho để trống ô điện thoại.
+
+**Bài học về việc "fail closed" không phải lúc nào cũng đúng nhất**: quyết
+định ban đầu (chặn hẳn khi không có gì đối chiếu) hợp lý về LÝ THUYẾT an ninh
+nhưng sai về THỰC TẾ sản phẩm — nó biến một tính năng vừa mở ra cho cả lớp
+thành ngõ cụt cho đúng nhóm người cần nó nhất (người chưa có số, tức người
+CHƯA có cách nào khác để tự đăng nhập lại ngoài đường này hoặc `/dangnhap`
+bằng email). Chỉ lộ ra khi có người thật vấp phải, đúng bài học đã ghi nhiều
+lần trong tệp này: bộ kiểm cũ (`kiem-moi.mjs`, `pw-nhanlai.mjs`) chỉ dựng ca
+"có số" nên không bắt được — nay cả hai bộ kiểm có thêm ca "Kiểm Tra Không Số"
+(hồ sơ giả, `reset-moi.sh`) đúng khuôn Đinh Khánh Toàn, kiểm cả máy chủ lẫn
+giao diện thật.
+
 ### Lưu Minh Tiến — lớp trưởng CẤP LỚP, và trưởng Nhóm 8 (migration 0021 + 0022)
 
 Ngô Phú Cường xác nhận trực tiếp, kèm tệp "Trưởng, phó nhóm" Ban tổ chức gửi.

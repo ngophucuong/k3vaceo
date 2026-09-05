@@ -6,11 +6,18 @@ import { isValidVnPhone, phonesMatch } from '../lib/phone.js';
 import { clientIp, conQuota, ghiNhan } from '../lib/ratelimit.js';
 import { soHopLeTuHoSo, DOAN_SAI_MOI_HO_SO, DOAN_SAI_MOI_IP } from './onboard.js';
 
+async function laySoRosterCuaMember(env, member) {
+  return member.roster_id
+    ? env.DB.prepare('SELECT phone FROM roster WHERE id = ?').bind(member.roster_id).first()
+    : null;
+}
+
 export async function getInvite(env, token) {
   const member = await resolveInviteToken(env, token);
   if (!member) return error('invite_invalid_or_expired', 410);
   const group = await env.DB.prepare('SELECT no, label FROM groups WHERE id = ?').bind(member.group_id).first();
   const daNhan = !!member.claimed_at;
+  const person = await laySoRosterCuaMember(env, member);
   return json({
     member: {
       id: member.id,
@@ -24,6 +31,10 @@ export async function getInvite(env, token) {
       phone: daNhan ? null : member.phone,
       email: member.email,
       already_claimed: daNhan,
+      // Chỉ có ý nghĩa khi already_claimed: hồ sơ này có số nào để đối chiếu
+      // ở bước NHẬN LẠI không (xem xacNhanLaiSo). Giao diện dùng cờ này để
+      // KHÔNG bắt gõ một số sẽ chẳng bao giờ khớp — xem lý do ở xacNhanLaiSo.
+      has_phone_on_file: soHopLeTuHoSo(person, member).length > 0,
     },
     group,
   });
@@ -39,6 +50,19 @@ export async function getInvite(env, token) {
    doan_so_ip) với lần đăng nhập đầu ở /vao — không mở thêm một cửa dò số
    song song không bị khoá. */
 async function xacNhanLaiSo(env, request, member, body) {
+  const person = await laySoRosterCuaMember(env, member);
+  const soDoiChieu = soHopLeTuHoSo(person, member);
+  // Hồ sơ CHƯA TỪNG có số điện thoại nào — cả Ban tổ chức lẫn tự đặt — thì
+  // không có gì để đối chiếu. Bắt gõ đúng một số không tồn tại là khoá VĨNH
+  // VIỄN, không phải "an toàn hơn cho qua" như bản đầu viết: đúng nhóm người
+  // này (roster không có số — xem bo-sung-dien-thoai.csv) vốn NHẬN LẦN ĐẦU mà
+  // cũng không cần số (nhánh !wasClaimed không gọi hàm này) — cho qua ở đây
+  // chỉ GIỮ NGUYÊN mức bảo vệ họ vốn đã có (một token không đoán được), không
+  // hạ thấp thêm gì. Phát hiện thật 5/9: Đinh Khánh Toàn (Nhóm 9, không có số
+  // trong roster) không tài nào NHẬN LẠI được vì mọi số gõ vào đều báo sai —
+  // lỗi này không tự báo, chỉ lộ ra khi có người thật vấp phải.
+  if (!soDoiChieu.length) return null;
+
   const ip = clientIp(request);
   const hetPhan = !(await conQuota(env, 'doan_so_ho_so', `r${member.roster_id}`, DOAN_SAI_MOI_HO_SO))
                || !(await conQuota(env, 'doan_so_ip', ip, DOAN_SAI_MOI_IP));
@@ -47,13 +71,7 @@ async function xacNhanLaiSo(env, request, member, body) {
   // Gõ hụt một chữ số thì KHÔNG tính là một lần đoán — giống hệt doiChieu().
   if (!isValidVnPhone(body.phone)) return error('phone_invalid', 422);
 
-  const person = member.roster_id
-    ? await env.DB.prepare('SELECT phone FROM roster WHERE id = ?').bind(member.roster_id).first()
-    : null;
-  const soDoiChieu = soHopLeTuHoSo(person, member);
-  // Không có số nào để soi (hồ sơ không có roster_id, hoặc roster không có
-  // số) thì KHÔNG có cách nào xác nhận — chặn hẳn, an toàn hơn cho qua.
-  if (!soDoiChieu.length || !soDoiChieu.some(so => phonesMatch(so, body.phone))) {
+  if (!soDoiChieu.some(so => phonesMatch(so, body.phone))) {
     await ghiNhan(env, 'doan_so_ho_so', `r${member.roster_id}`);
     await ghiNhan(env, 'doan_so_ip', ip);
     return error('phone_mismatch', 401);

@@ -15,7 +15,13 @@
 // khoản người khác, và cửa đoán số vẫn có hạn mức thật (không mở song song
 // một đường dò số không bị khoá).
 //
-// Sáu phép ĐỐI CHỨNG:
+// Cập nhật 5/9 (chiều): phát hiện thật ngoài đời — Đinh Khánh Toàn (Nhóm 9,
+// roster KHÔNG có số điện thoại nào) được phát lại link mà không tài nào NHẬN
+// LẠI được, vì mọi số gõ vào đều báo sai — hồ sơ này không có gì để đối chiếu
+// nên bắt đúng một số không tồn tại là khoá VĨNH VIỄN. xacNhanLaiSo() nay cho
+// qua thẳng khi không có số nào để soi (đối chứng thứ tám bên dưới).
+//
+// Tám phép ĐỐI CHỨNG:
 //   1. Người thường (không phải Ban cán sự lớp) → 403 forbidden.
 //   2. Người ĐÃ nhận hồ sơ (roster 105) — phát lại được (200, không còn 409),
 //      nhưng GET /api/invite/:token phải giấu số điện thoại (phone: null).
@@ -31,6 +37,10 @@
 //      nhau, token cũ chết ngay (410), và hồ sơ mới tạo rơi đúng NHÓM ghi
 //      trong roster.group_label của NGƯỜI NHẬN — không đòi số điện thoại gì cả
 //      (hành vi CŨ, không đổi, vì đây là lần nhận đầu tiên).
+//   8. Người ĐÃ nhận hồ sơ nhưng roster KHÔNG có số nào để đối chiếu (ca
+//      "Kiểm Tra Không Số") → has_phone_on_file = false, và NHẬN LẠI được dù
+//      gõ số bậy hay không gõ số nào — không còn kẹt vĩnh viễn như Đinh Khánh
+//      Toàn đã gặp.
 //
 // Chạy:  bash scripts/kiem/reset-moi.sh  &&  node scripts/kiem/kiem-moi.mjs
 
@@ -159,6 +169,40 @@ ok(`token lần 2 vẫn còn hạn (nhận ${rTokenMoi.status})`, rTokenMoi.stat
 const bTokenMoi = await rTokenMoi.json();
 ok(`hồ sơ mới thuộc đúng Nhóm 9, không phải nhóm người phát link (nhận "${bTokenMoi.group?.label}")`,
    bTokenMoi.group?.label === 'Nhóm 9');
+
+// ── 8. Người ĐÃ nhận hồ sơ nhưng roster KHÔNG có số nào để đối chiếu ─────
+console.log('\n── Người ĐÃ nhận hồ sơ, KHÔNG có số nào để đối chiếu (Đinh Khánh Toàn, 5/9) ──');
+const rTimKhongSo = await get('/api/wizard/roster/search?q=Ki%E1%BB%83m+Tra+Kh%C3%B4ng+S%E1%BB%91');
+const idKhongSo = (await rTimKhongSo.json().catch(() => ({}))).people?.[0]?.roster_id;
+ok('tìm được roster giả "Kiểm Tra Không Số"', !!idKhongSo);
+
+const rMoiKhongSo = await post(`/api/danh-ba/${idKhongSo}/moi`, ckCuong);
+const bMoiKhongSo = await rMoiKhongSo.json().catch(() => ({}));
+ok(`phát link được cho hồ sơ không có số (nhận ${rMoiKhongSo.status})`, rMoiKhongSo.status === 200);
+const tokenKhongSo = bMoiKhongSo.url?.split('/i/')[1];
+
+const rXemKhongSo = await get('/api/invite/' + tokenKhongSo);
+const bXemKhongSo = await rXemKhongSo.json();
+ok('has_phone_on_file = false — giao diện biết đường không bắt gõ số vô ích',
+   bXemKhongSo.member?.has_phone_on_file === false);
+
+// Gõ một số BẤT KỲ, kể cả sai be bét — không có gì để đối chiếu thì không có
+// "sai" để bắt. Trước bản vá này, dòng dưới đây sẽ nhận 401 phone_mismatch
+// mãi mãi, đúng như Đinh Khánh Toàn đã gặp.
+const rClaimKhongSo = await postJson(`/api/invite/${tokenKhongSo}/claim`, null,
+  { email: 'khongso@example.com', phone: '0999999999' });
+ok(`claim với số bất kỳ vẫn 200, không còn kẹt vĩnh viễn (nhận ${rClaimKhongSo.status})`,
+   rClaimKhongSo.status === 200);
+
+// Phát lại lần hai, lần này claim KHÔNG kèm số nào — trước bản vá sẽ dính 422
+// phone_invalid vì hàm đòi số hợp lệ trước cả khi biết có gì để soi không.
+const rMoiKhongSo2 = await post(`/api/danh-ba/${idKhongSo}/moi`, ckCuong);
+const tokenKhongSo2 = (await rMoiKhongSo2.json().catch(() => ({}))).url?.split('/i/')[1];
+ok('phát lại lần hai vẫn ra token', !!tokenKhongSo2);
+const rClaimKhongSo2 = await postJson(`/api/invite/${tokenKhongSo2}/claim`, null,
+  { email: 'khongso2@example.com' });
+ok(`claim KHÔNG kèm số nào cũng 200 (nhận ${rClaimKhongSo2.status})`,
+   rClaimKhongSo2.status === 200);
 
 console.log(`\n${hong ? `✗ ${hong} phép kiểm đỏ` : '✓ tất cả xanh'}`);
 process.exit(hong ? 1 : 0);

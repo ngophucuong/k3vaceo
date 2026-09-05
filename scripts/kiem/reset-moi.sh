@@ -5,6 +5,9 @@
 #   - roster 105 (Nguyễn Thị Hằng Nhi, Nhóm 8) ĐÃ nhận hồ sơ — kiểm việc phát
 #     lại link mời cho người đã đăng nhập (mở rộng 5/9) và chốt chặn xác nhận
 #     lại số điện thoại ở bước nhận (routes/invite.js).
+#   - roster GIẢ "Kiểm Tra Không Số" (seq 9001, Nhóm 6) ĐÃ nhận hồ sơ nhưng
+#     KHÔNG có số điện thoại nào — kiểm ca đã trả giá thật 5/9 (Đinh Khánh
+#     Toàn, Nhóm 9): bắt gõ đúng một số không tồn tại là khoá vĩnh viễn.
 #   - hai phiên cố định: Ngô Phú Cường (uỷ viên Ban cán sự lớp, migration 0013)
 #     và Nguyễn Thị Thu Hương (thành viên thường Nhóm 6, không giữ vai gì) —
 #     để so 200 với 403.
@@ -52,6 +55,24 @@ SELECT r.cohort_id, g.id, r.id, r.full_name, r.title, r.company, r.phone,
        datetime('now'), 1, datetime('now'), datetime('now')
   FROM roster r JOIN groups g ON g.cohort_id = r.cohort_id AND g.label = r.group_label
  WHERE r.id = 105;
+
+-- Ca 'chưa từng có số nào' (phát hiện thật 5/9, Đinh Khánh Toàn Nhóm 9): một
+-- roster GIẢ (không dùng ai có thật, để không phụ thuộc id của bất kỳ ai)
+-- không có phone, ĐÃ nhận hồ sơ — kiểm nhánh mới của xacNhanLaiSo() (routes/
+-- invite.js): không có gì để đối chiếu thì KHÔNG chặn. seq 9001 nằm ngoài dải
+-- thật (tối đa 146), không đụng SEQ_TOI_DA của scripts/data/phan-vai.csv.
+DELETE FROM members WHERE roster_id IN (SELECT id FROM roster WHERE seq = 9001);
+DELETE FROM roster WHERE seq = 9001;
+
+INSERT INTO roster (cohort_id, seq, group_label, full_name, phone, source)
+SELECT (SELECT id FROM cohorts WHERE code = 'K03'), 9001, 'Nhóm 6', 'Kiểm Tra Không Số', NULL, 'kiem-moi.mjs';
+
+INSERT INTO members (cohort_id, group_id, roster_id, full_name, phone,
+                      claimed_at, is_active, created_at, updated_at)
+SELECT r.cohort_id, g.id, r.id, r.full_name, r.phone,
+       datetime('now'), 1, datetime('now'), datetime('now')
+  FROM roster r JOIN groups g ON g.cohort_id = r.cohort_id AND g.label = r.group_label
+ WHERE r.seq = 9001;
 
 INSERT INTO sessions (member_id, token_hash, expires_at)
 SELECT id, '$HASH_C', datetime('now', '+1 day')

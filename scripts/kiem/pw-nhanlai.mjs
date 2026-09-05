@@ -16,8 +16,12 @@
 //   3. Gõ sai số thì thấy đúng câu giải thích (không phải câu lỗi chung
 //      chung), gõ đúng số thì vào được thật — đăng nhập thành công, không chỉ
 //      dừng ở "không báo lỗi".
+//   4. (Cập nhật 5/9 chiều) Hồ sơ CHƯA TỪNG có số điện thoại nào để đối chiếu
+//      (ca thật: Đinh Khánh Toàn, Nhóm 9) thì KHÔNG bị bắt gõ số — để trống
+//      và bấm Lưu vẫn phải vào được, không kẹt vĩnh viễn ở lỗi "số không khớp".
 //
-// Cần reset-moi.sh (dựng phiên Ngô Phú Cường + roster 105 đã đăng nhập).
+// Cần reset-moi.sh (dựng phiên Ngô Phú Cường + roster 105 đã đăng nhập + hồ
+// sơ giả "Kiểm Tra Không Số" cho ca 4).
 //
 // Chạy:  bash scripts/kiem/reset-moi.sh  &&  node scripts/kiem/pw-nhanlai.mjs
 
@@ -102,5 +106,40 @@ ok('gõ ĐÚNG số thì vào được thật — rời khỏi màn /i/, không 
 ok('không lỗi JS ở màn nhận link: ' + (loi2.join(' | ') || 'sạch'), loi2.length === 0);
 
 await b2.close();
+
+// ── Ca "chưa từng có số nào để đối chiếu" (Đinh Khánh Toàn, 5/9 chiều) ─────
+// reset-moi.sh dựng sẵn hồ sơ giả "Kiểm Tra Không Số" (đã nhận, roster không
+// có số) đúng cho ca này — xem kiem-moi.mjs cho phần máy chủ. Ở đây kiểm
+// GIAO DIỆN: người nhận link không bị bắt gõ một số sẽ chẳng bao giờ khớp.
+console.log('\n── Màn nhận link khi hồ sơ CHƯA TỪNG có số để đối chiếu ──');
+const rTim = await fetch(`${B}/api/wizard/roster/search?q=` + encodeURIComponent('Kiểm Tra Không Số'),
+  { headers: { 'cf-connecting-ip': '203.0.113.90' } });
+const idKhongSo = (await rTim.json()).people?.[0]?.roster_id;
+const rMoi = await fetch(`${B}/api/danh-ba/${idKhongSo}/moi`, {
+  method: 'POST', headers: { cookie: 's=tk-cuong-moi-xuyennhom', 'cf-connecting-ip': '203.0.113.90' },
+});
+const tokenKhongSo = (await rMoi.json()).url?.split('/i/')[1];
+ok('lấy được link cho hồ sơ không có số', !!tokenKhongSo);
+
+const b3 = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--no-sandbox'] });
+const p3 = await (await b3.newContext({ viewport: { width: 390, height: 1100 } })).newPage();
+const loi3 = []; p3.on('pageerror', e => loi3.push(e.message));
+await p3.goto(`${B}/i/${tokenKhongSo}`); await p3.waitForTimeout(1200);
+
+ok('phụ đề nói rõ KHÔNG cần xác nhận thêm, không đòi gõ số',
+   (await p3.locator('.sub').innerText()).includes('không cần xác nhận thêm'));
+ok('nhãn "Điện thoại" KHÔNG có dấu * bắt buộc',
+   !(await p3.locator('label.f', { hasText: 'Điện thoại' }).innerText()).includes('*'));
+
+// Đối chứng quan trọng nhất của ca này: để TRỐNG ô điện thoại và bấm Lưu vẫn
+// phải qua được — trước bản vá, dòng dưới sẽ mãi mãi dừng ở "Cần gõ đúng số
+// điện thoại", đúng như Đinh Khánh Toàn đã vấp phải ngoài đời.
+await p3.fill('#cEmail', 'khongso-giaodien@example.com');
+await p3.click('#cSubmit'); await p3.waitForTimeout(900);
+ok('để TRỐNG số điện thoại vẫn vào được — không còn kẹt vĩnh viễn',
+   !p3.url().includes('/i/'));
+ok('không lỗi JS ở màn này: ' + (loi3.join(' | ') || 'sạch'), loi3.length === 0);
+await b3.close();
+
 console.log(`\n${hong ? `✗ ${hong} phép kiểm đỏ` : '✓ tất cả xanh'}`);
 process.exit(hong ? 1 : 0);

@@ -306,19 +306,26 @@ async function renderClaim(token) {
   // "gõ lại để chứng minh là mình", nên KHÔNG được điền sẵn giá trị nào, kẻo
   // ai cầm link cũng bấm Lưu là qua luôn mà chẳng cần biết số thật.
   const laNhanLai = member.already_claimed;
+  // Bắt buộc gõ số CHỈ khi có số thật để đối chiếu (xacNhanLaiSo, routes/
+  // invite.js) — hồ sơ chưa từng có số nào (xem bo-sung-dien-thoai.csv) thì
+  // bắt gõ một số sẽ không bao giờ khớp là khoá người ta vĩnh viễn, không
+  // phải an toàn hơn. Phát hiện thật 5/9: Đinh Khánh Toàn (Nhóm 9).
+  const batBuocSo = laNhanLai && member.has_phone_on_file;
   $('#claimcard').innerHTML = `
     <div class="lb">${esc(group.label)} · Khoá K03</div>
     <h1>${laNhanLai ? 'Sửa lại hồ sơ của bạn' : `Chào ${esc(short(member.full_name))}`}</h1>
-    <p class="sub">${laNhanLai
+    <p class="sub">${batBuocSo
       ? 'Hồ sơ này đã có người nhận. Gõ đúng SỐ ĐIỆN THOẠI đã đăng ký để xác nhận đúng là bạn, rồi sửa các ô khác nếu cần.'
+      : laNhanLai
+      ? 'Hồ sơ này đã có người nhận, nhưng chưa từng có số điện thoại lưu trong hệ thống — không cần xác nhận thêm. Sửa các ô cần thiết rồi bấm Lưu.'
       : 'Thông tin lấy từ danh sách Ban tổ chức, có chỗ đã cũ hoặc sai. Sửa lại cho đúng rồi xác nhận.'}</p>
     <label class="f">Họ tên</label><input value="${esc(member.full_name)}" disabled>
     <label class="f">Email <span style="color:var(--due)">*</span></label>
     <input id="cEmail" value="${esc(member.email)}" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
     <div class="hintline">Dùng để tự đăng nhập lại nếu mất link này.</div>
-    <label class="f">Điện thoại${laNhanLai ? ' <span style="color:var(--due)">*</span>' : ''}</label>
-    <input id="cPhone" value="${esc(member.phone)}" placeholder="${laNhanLai ? 'Số đã đăng ký với Ban tổ chức' : '09xx xxx xxx'}" inputmode="tel" maxlength="30">
-    ${laNhanLai ? `<div class="hintline">Bắt buộc — dùng để xác nhận đúng là bạn, không phải số muốn đổi sang.</div>` : ''}
+    <label class="f">Điện thoại${batBuocSo ? ' <span style="color:var(--due)">*</span>' : ''}</label>
+    <input id="cPhone" value="${esc(member.phone)}" placeholder="${batBuocSo ? 'Số đã đăng ký với Ban tổ chức' : '09xx xxx xxx'}" inputmode="tel" maxlength="30">
+    ${batBuocSo ? `<div class="hintline">Bắt buộc — dùng để xác nhận đúng là bạn, không phải số muốn đổi sang.</div>` : ''}
     <label class="f">Chức vụ</label><input id="cTitle" value="${esc(member.title)}" maxlength="120">
     <label class="f">Đơn vị</label><input id="cCompany" value="${esc(member.company)}" maxlength="160">
     <div id="cErr" class="errline" style="display:none"></div>
@@ -328,7 +335,7 @@ async function renderClaim(token) {
   $('#cSubmit').onclick = async () => {
     const email = $('#cEmail').value.trim();
     if (!email) { showErr('Cần điền email để dùng lần sau.'); return; }
-    if (laNhanLai && !$('#cPhone').value.trim()) {
+    if (batBuocSo && !$('#cPhone').value.trim()) {
       showErr('Cần gõ đúng số điện thoại đã đăng ký để xác nhận đúng là bạn.'); return;
     }
     const label = $('#cSubmit').textContent;

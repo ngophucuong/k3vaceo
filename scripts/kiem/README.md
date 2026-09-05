@@ -82,14 +82,14 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `reset-vao.sh` | trả hồ sơ thử về "chưa ai nhận" cho `pw-vao-nhanh.mjs` |
 | `kiem-tanso.mjs` | giới hạn tần suất — cả lớp cùng một WiFi có vào được không |
 | `kiem-danhba.mjs` | danh bạ lớp — số thật KHÔNG lọt ra ở người chưa đăng nhập, và bốn dòng hồ sơ chỉ hiện cho người đã đăng nhập |
-| `kiem-moi.mjs` | link mời xuyên nhóm cho Ban cán sự lớp (`POST /api/danh-ba/:id/moi`), **kể cả người đã đăng nhập** — đối chứng xác nhận lại số điện thoại và hạn mức đoán |
-| `pw-nhanlai.mjs` | giao diện của phát lại link cho người đã đăng nhập — ô điện thoại phải RỖNG, không lộ số thật |
+| `kiem-moi.mjs` | link mời xuyên nhóm cho Ban cán sự lớp (`POST /api/danh-ba/:id/moi`), **kể cả người đã đăng nhập** — đối chứng xác nhận lại số điện thoại, hạn mức đoán, và ca hồ sơ KHÔNG có số nào phải NHẬN LẠI được (không kẹt vĩnh viễn) |
+| `pw-nhanlai.mjs` | giao diện của phát lại link cho người đã đăng nhập — ô điện thoại phải RỖNG, không lộ số thật; và hồ sơ không có số thì không bị bắt gõ số |
 | `kiem-tulieu-text.mjs` | Tư liệu dạng Text: bắt buộc content_md, đếm công khai, layTuLieuTheoBuoi |
 | `pw-tulieu-text.mjs` | **an toàn XSS của `mdSafe()`** — bốn ca độc + bốn ca thuận + giao diện |
 | `kiem-tulieu-bai.mjs` | tư liệu gắn vào PHẦN BÀI (links.section_id): plan.js/links.js, **N6** qua nhóm khác |
 | `pw-tulieu-bai.mjs` | giao diện: sheet phần bài ↔ Gắn Tư liệu ↔ tab Tư liệu, "một dòng, ba màn" |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
-| `reset-moi.sh` | dựng hai phiên + hai hồ sơ thử cho `kiem-moi.mjs` |
+| `reset-moi.sh` | dựng hai phiên + ba hồ sơ thử cho `kiem-moi.mjs`/`pw-nhanlai.mjs`, gồm một hồ sơ giả không có số điện thoại |
 | `reset-tulieu-text.sh` | dựng phiên Ngô Phú Cường cho `kiem-tulieu-text.mjs` / `pw-tulieu-text.mjs` |
 | `reset-tulieu-bai.sh` | như trên, cộng seed một `plan_sections` của NHÓM KHÁC cho phép kiểm N6 |
 | `gieo-coso.mjs` · `gieo-moi.mjs` | sinh dữ liệu đối chứng, hai reset tự gọi |
@@ -99,7 +99,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Tám phép đối chứng đáng giữ nhất
+## Chín phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -172,6 +172,20 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    nhận link phải RỖNG khi đăng nhập lại — nếu giao diện lỡ điền sẵn số thật
    vào đó thì chốt chặn ở máy chủ coi như không tồn tại, vì bất kỳ ai mở link
    cũng đọc được số ngay trên màn hình rồi gõ y nguyên.
+
+9. **Hồ sơ CHƯA TỪNG có số điện thoại nào phải NHẬN LẠI được, không kẹt vĩnh
+   viễn (5/9 chiều).** Bản vá lỗ hổng ở mục 8 chặn cứng bước nhận lại khi
+   không có số nào để đối chiếu — hợp lý trên giấy ("không có gì để soi thì
+   an toàn hơn cho qua"), nhưng sai trên thực tế: đúng nhóm người không có số
+   (44+ người, `bo-sung-dien-thoai.csv`) là nhóm phụ thuộc NHIỀU NHẤT vào
+   đường phát lại link, mà họ lại là nhóm duy nhất không tài nào qua được chốt
+   ấy — gõ gì cũng `phone_mismatch`. Lộ ra bằng ảnh chụp thật của Ngô Phú
+   Cường (Đinh Khánh Toàn, Nhóm 9), không phải bộ kiểm tự bắt được, vì cả
+   `kiem-moi.mjs` lẫn `pw-nhanlai.mjs` khi đó chỉ dựng ca "có số". Phép kiểm
+   phải dựng riêng một hồ sơ giả KHÔNG có số (`reset-moi.sh`, "Kiểm Tra Không
+   Số") rồi chứng minh: `has_phone_on_file: false`, và claim với số bậy hay
+   không kèm số nào đều phải 200 — không phải "không còn 401" (đã có thể chỉ
+   vì đọc nhầm hồ sơ), mà đúng luồng đi hết tới cấp phiên.
 
 ## Chạy `kiem-tanso.mjs`
 
