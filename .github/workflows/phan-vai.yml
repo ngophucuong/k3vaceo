@@ -64,15 +64,30 @@ jobs:
             const d = raw.search(/[\[{]/), c = Math.max(raw.lastIndexOf("]"), raw.lastIndexOf("}"));
             const kq = JSON.parse(raw.slice(d, c + 1));
             const rows = (Array.isArray(kq) ? kq : [kq]).flatMap(x => (x && x.results) || []);
-            const canCo = require("fs").readFileSync("scripts/data/phan-vai.csv", "utf8")
-              .split("\n").filter(l => l.trim() && !l.trimStart().startsWith("#")).length - 1;
-            if (!rows.length) { console.error("✗ Không có vai cấp lớp nào — kiểm tra lại họ tên trong CSV."); process.exit(1); }
+            if (!rows.length) { console.error("✗ Không có vai nào đang hiệu lực — kiểm tra lại toàn bộ."); process.exit(1); }
             for (const r of rows)
-              console.log(`${String(r.vai).padEnd(11)} → ${r.nguoi} (${r.nhom_dang_o || "chưa có nhóm"}) · ${r.email} · từ ${r.tu_ngay}`);
-            if (rows.length !== canCo) {
-              console.error(`\n✗ CSV có ${canCo} vai nhưng D1 chỉ nhận ${rows.length}. Thường là họ tên viết lệch so với danh sách gốc.`);
-              process.exit(1);
+              console.log(`${String(r.vai).padEnd(11)} → ${r.nguoi} · ${r.pham_vi} · ${r.email} · từ ${r.tu_ngay}`);
+
+            // So khớp TỪNG DÒNG của CSV với danh sách vai đang hiệu lực — không
+            // so TỔNG SỐ, vì phần lớn vai cấp NHÓM (truong_nhom/pho_nhom/
+            // tieu_bieu) đến từ đường bình thường (wizard tự gán khi dựng
+            // không gian nhóm), không qua tệp này. So tổng số đã khiến bước
+            // này đỏ ngay từ lượt chạy đầu tiên (run #1) và mọi lượt sau đó,
+            // vì Nhóm 6 luôn có sẵn officer ngoài CSV — đỏ giả không báo đúng
+            // chuyện gì, chỉ dạy người ta bỏ qua màu đỏ của chính workflow này.
+            const dongCsv = require("fs").readFileSync("scripts/data/phan-vai.csv", "utf8")
+              .split("\n").map(l => l.replace(/\r$/, ""))
+              .filter(l => l.trim() && !l.trimStart().startsWith("#")).slice(1);
+            let thieu = 0;
+            for (const dong of dongCsv) {
+              // Chỉ cần ba cột đầu (vai, stt, tên) — ghi_chu (cột thứ tư) có
+              // thể chứa dấu phẩy/ngoặc kép, nhưng ba cột đầu thì không bao
+              // giờ, nên tách bằng dấu phẩy thường vẫn lấy đúng tên.
+              const [vai, , ten] = dong.split(",").map(s => s.trim());
+              const khop = rows.some(r => r.vai === vai && r.nguoi === ten);
+              if (!khop) { console.error(`✗ Chưa thấy "${vai} → ${ten}" trong vai đang hiệu lực.`); thieu++; }
             }
+            if (thieu) process.exit(1);
             console.log("\n✓ ĐÚNG HẾT. Ban cán sự lớp đã có quyền tạo đợt thu quỹ lớp và ghi sổ chi quỹ lớp.");
             console.log("  Họ vẫn phải tự đăng nhập ở /dangnhap để nhận hồ sơ trước khi dùng được.");
           '
