@@ -412,6 +412,51 @@ jobs:
             fi
           done
           [ "$loi" = "0" ] || { echo "::error::Giới hạn tần suất vẫn khoá oan — cả lớp ngồi chung WiFi sẽ không vào được."; exit 1; }
+          echo "--- /giao-thuong: đường DUY NHẤT đưa dữ liệu người dùng ra internet ---"
+          gt=0
+          for t in "" gt.js gt.css; do
+            m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app/giao-thuong/$t" || true)
+            if [ "$m" = "200" ]; then echo "  ✓ /giao-thuong/$t"; else echo "  ✗ /giao-thuong/$t = HTTP $m"; gt=1; fi
+          done
+          # Ngược hẳn /lich và /sotay: trang này PHẢI cho máy tìm kiếm vào, vì cả
+          # lý do nó tồn tại là để người lạ tìm thấy học viên. Kiểm ngược ở đây để
+          # ai đó thêm noindex "cho nhất quán" thì workflow kêu lên ngay.
+          if curl -sI https://k3vaceo.cuongngo.app/giao-thuong/ | grep -qi 'x-robots-tag: *noindex'; then
+            echo "  ✗ CÓ noindex — trang giao thương cố ý phải cho Google index"; gt=1
+          else
+            echo "  ✓ không có noindex (đúng chủ ý)"
+          fi
+
+          ckg=$(curl -s -o /tmp/gt.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/giao-thuong/cong-khai || true)
+          echo "  HTTP $ckg ($(cat /tmp/gt.json 2>/dev/null | wc -c) byte)"
+          [ "$ckg" = "200" ] || { echo "  ✗ đường công khai không mở được"; gt=1; }
+          # Đường trong lớp phải VẪN đòi đăng nhập. Bỏ N6 là bỏ ranh giới giữa các
+          # NHÓM, không phải bỏ ranh giới giữa lớp và người ngoài.
+          mi=$(curl -s -o /dev/null -w '%{http_code}' https://k3vaceo.cuongngo.app/api/giao-thuong || true)
+          if [ "$mi" = "401" ]; then echo "  ✓ /api/giao-thuong vẫn đòi đăng nhập"; else
+            echo "  ✗ /api/giao-thuong trả $mi cho người chưa đăng nhập"; gt=1; fi
+
+          node --input-type=commonjs -e '
+            const d = JSON.parse(require("fs").readFileSync("/tmp/gt.json", "utf8"));
+            const ng = d.nguoi || [];
+            let x = 0;
+            const ok = (m, c) => { console.log((c ? "  ✓ " : "  ✗ ") + m); if (!c) x++; };
+            // Trường nào lọt ra đây là lọt vĩnh viễn — Google đã lấy về thì gỡ
+            // khỏi D1 không gỡ được khỏi kết quả tìm kiếm.
+            const raw = JSON.stringify(d);
+            ok("không lộ nhóm (group_no/group_id)", !/group_no|group_id/.test(raw));
+            ok("không lộ cờ nội bộ (cong_khai/is_active/hien_lien_he)",
+               !/cong_khai|is_active|hien_lien_he/.test(raw));
+            // Ai tắt kèm liên hệ thì phone và email phải là null, không phải thiếu
+            // khoá — thiếu khoá nghĩa là mã đã đổi và phép kiểm này hết răng.
+            const roLienHe = ng.filter(p => p.phone === undefined || p.email === undefined);
+            ok("mọi hồ sơ đều khai báo phone/email (null nếu tắt)", roLienHe.length === 0);
+            const coSo = ng.filter(p => p.phone).length;
+            console.log(`  ${ng.length} gian hàng công khai, ${coSo} trong đó có kèm số điện thoại`);
+            if (ng.length === 0) console.log("  (chưa ai bật — trang hiện lời mời, không phải lỗi)");
+            if (x) { console.error(`::error::Đường giao thương công khai rò ${x} chỗ.`); process.exit(1); }
+          ' || gt=1
+          [ "$gt" = "0" ] || { echo "::error::Giao thương chưa chạy đúng trên tên miền."; exit 1; }
 
           KHOP="$khop" node --input-type=commonjs -e '
             const d = JSON.parse(require("fs").readFileSync("/tmp/health.json", "utf8"));

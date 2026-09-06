@@ -20,6 +20,13 @@
   Cache-Control: no-cache
 /sw.js
   Cache-Control: no-cache
+# Tệp của trang giao thương cũng phải nêu ở đây. Bài học cùng loại: /lich/lich.js
+# KHÔNG được nêu, nên tới giờ nó vẫn dính max-age=14400 mặc định của Pages —
+# sửa trang lịch xong thì bốn tiếng sau người quay lại mới thấy.
+/giao-thuong/gt.js
+  Cache-Control: no-cache
+/giao-thuong/gt.css
+  Cache-Control: no-cache
 
 # Sổ tay có tên và nơi công tác của cả nhóm — đừng để máy tìm kiếm gom về.
 /sotay/*
@@ -29,3 +36,13 @@
 # không cần máy tìm kiếm gom tên giảng viên và lịch một lớp cụ thể về.
 /lich/*
   X-Robots-Tag: noindex
+
+# /giao-thuong/ CỐ Ý KHÔNG có noindex — đừng thêm vào cho "nhất quán" với hai
+# mục trên. Hai trang kia là tiện ích cho người đã ở trong lớp; trang giao
+# thương thì cả lý do tồn tại là để người lạ đang tìm nhà cung cấp TÌM THẤY
+# được học viên. Chặn máy tìm kiếm là chỉ ai biết sẵn đường dẫn mới vào được,
+# mà người biết sẵn đường dẫn thì phần lớn đã quen nhau rồi.
+#
+# Điều kiện để chỗ này an toàn nằm ở nơi khác, và phải giữ nguyên: mỗi người
+# trên trang đều tự bật công tắc, mặc định là TẮT, và ngay cạnh công tắc có
+# đúng câu "Google tìm thấy được".

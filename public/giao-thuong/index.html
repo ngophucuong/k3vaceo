@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Giao thương — Học viên lớp CEO K03</title>
+<meta name="description" content="Danh mục giao thương của học viên lớp Giám đốc điều hành doanh nghiệp K03, VCCI × Đại học Andrews: họ bán gì, bán cho ai, và đang cần tìm gì.">
+
+<!-- CỐ Ý KHÔNG có noindex, khác hẳn /lich và /sotay (hai trang ấy đặt
+     X-Robots-Tag: noindex trong _headers). Đừng "sửa cho nhất quán".
+
+     Hai trang kia là tiện ích cho người đã ở trong lớp, và tên 134 người bị
+     máy tìm kiếm gom về thì chỉ có hại. Trang này thì ngược: cả lý do nó tồn
+     tại là để một người lạ đang tìm nhà cung cấp TÌM THẤY được học viên ở
+     đây. Không cho index thì phải biết trước đường dẫn mới vào được, mà ai
+     đã biết đường dẫn thì phần lớn đã quen nhau rồi.
+
+     Người nào có tên ở đây đều đã tự bật công tắc trong ứng dụng, và ngay
+     cạnh công tắc ấy có đúng câu này: trang công khai, Google tìm thấy được. -->
+<meta name="theme-color" content="#F3F3F1">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Giao thương — Học viên lớp CEO K03">
+<meta property="og:description" content="Họ bán gì, bán cho ai, và đang cần tìm gì. 134 học viên lớp Giám đốc điều hành doanh nghiệp K03 — VCCI × Đại học Andrews.">
+<meta property="og:locale" content="vi_VN">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/giao-thuong/gt.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap hd">
+    <div class="hl">
+      <span class="g">Giao thương</span>
+      <span class="s">Lớp CEO K03 · VCCI × Đại học Andrews</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <p class="mo">
+    Học viên lớp Giám đốc điều hành doanh nghiệp K03 tự giới thiệu việc mình làm:
+    <b>bán gì</b>, <b>bán cho ai</b>, và <b>đang cần tìm gì</b>.
+    Mỗi người ở đây đều tự bật, và tự chịu trách nhiệm về những gì mình viết.
+  </p>
+
+  <!-- Ô tìm và hàng chip ngành do JS đổ vào — giấu cho tới khi có dữ liệu,
+       vì một ô tìm nằm trên danh sách rỗng chỉ làm người ta gõ vào chỗ chết. -->
+  <section id="loc" hidden>
+    <input id="tim" type="search" class="tim" placeholder="Tìm theo tên, đơn vị, mặt hàng…"
+           autocomplete="off" spellcheck="false" aria-label="Tìm trong danh mục">
+    <div class="fl cuon" id="chip"></div>
+  </section>
+
+  <section id="ds" class="ds"><p class="dangtai">Đang tải danh mục…</p></section>
+
+  <p class="tong" id="tong" hidden></p>
+
+</main>
+
+<footer class="wrap">
+  <div class="moi">
+    <p class="t">Bạn là học viên K03?</p>
+    <p class="d">Mở gian hàng của bạn trong ứng dụng — điền bán gì, bán cho ai, rồi bật công khai.
+       Cả lớp thấy ngay; bật thêm một nấc nữa thì trang này cũng có bạn.</p>
+    <a class="big" href="/">Mở ứng dụng</a>
+  </div>
+  <p class="nho">
+    Ứng dụng chỉ hiển thị thông tin do chính học viên khai. Không thẩm định, không môi giới,
+    không giữ tiền — mọi giao dịch là việc riêng giữa hai bên.
+  </p>
+  <p><a href="/lich/">Lịch học của lớp</a> · <a href="/sotay/">Sổ tay hướng dẫn</a></p>
+</footer>
+
+<script src="/giao-thuong/gt.js"></script>
+</body>
+</html>
