@@ -162,7 +162,12 @@ export async function getHome(env, me) {
           da_nhan_ho_so: !!me.claimed_at,
           // Che bớt để người đứng cạnh không đọc được, nhưng vẫn đủ để chính
           // chủ nhận ra hộp thư nào sẽ nhận mã.
-          email_che: me.email ? cheEmail(me.email) : null },
+          email_che: me.email ? cheEmail(me.email) : null,
+          // Thư khi có thông báo mới. Mặc định BẬT (migration 0031) nên cột
+          // này không bao giờ NULL; đọc ra đây để tab Tài khoản vẽ đúng
+          // trạng thái công tắc ngay lần mở đầu, khỏi phải gọi thêm một
+          // đường riêng chỉ để lấy một bit.
+          mail_thong_bao: me.nhan_mail_thong_bao !== 0 },
     group,
     cohort,
     action,

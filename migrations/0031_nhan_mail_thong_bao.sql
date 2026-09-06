@@ -1,0 +1,19 @@
+-- Gửi thư khi có thông báo mới (Ngô Phú Cường yêu cầu 6/9).
+--
+-- Vì sao cần: thông báo đẩy đã dựng xong từ 28/8 nhưng đo trên D1 thật ngày
+-- 6/9 thì chỉ 2/146 người bật, và last_ok_at của cả hai đều NULL — chưa một
+-- gói tin nào từng gửi đi. Nói cách khác đăng thông báo lên ứng dụng xong là
+-- không ai biết, trừ khi họ tự mở ứng dụng ra xem. Nguyên văn Ngô Phú Cường:
+-- "một ứng dụng chết là có thông báo mới được đăng trên App nhưng không có
+-- notify đến".
+--
+-- MẶC ĐỊNH BẬT (1), và đây là quyết định có cân nhắc chứ không phải mặc
+-- định cho tiện: bắt 146 người tự đi bật thì tính năng báo tin coi như không
+-- tồn tại — đúng bài học của thông báo đẩy vừa đo được (2/146 tự bật).
+--
+-- Nhưng PHẢI có đường tắt, và lý do không phải là lịch sự: ai không tắt được
+-- sẽ bấm "Báo cáo spam", mà việc ấy đánh vào uy tín của CHÍNH tên miền đang
+-- gửi thư MÃ ĐĂNG NHẬP. Mã đăng nhập mới là thứ sống còn — 76% người xin mã
+-- trong 7 ngày qua dùng được nó. Mất đường ấy vì một thông báo phiền là đổi
+-- một thứ thiết yếu lấy một thứ tiện lợi.
+ALTER TABLE members ADD COLUMN nhan_mail_thong_bao INTEGER NOT NULL DEFAULT 1;

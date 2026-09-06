@@ -3,6 +3,7 @@ import { isClassCommittee, isGroupOfficer, logAudit, logActivity } from '../perm
 import { cleanText } from '../lib/validate.js';
 import { guiThongBaoDay } from './push.js';
 import { dungIcs, mocSqlite } from '../lib/ics.js';
+import { chonNguoiNhanMail, guiThongBaoMail } from './thong-bao-mail.js';
 
 // Lịch học và thông báo của lớp. Đọc thì ai cũng đọc được — đây là thứ cả 134
 // người cần. Ghi thì chỉ Ban cán sự lớp, vì lịch sai một ngày là cả lớp đi
@@ -293,7 +294,22 @@ export async function postThongBao(request, env, me, ctx, ip) {
   const day = guiThongBaoDay(env, me, { id: row.id, noi_dung: noiDung, capLop });
   if (ctx?.waitUntil) ctx.waitUntil(day); else await day.catch(() => {});
 
-  return json({ ok: true, id: row.id, cap: capLop ? 'lop' : 'nhom' });
+  // Và gửi THƯ — đường báo tin thật sự tới được người ta lúc này. Xem
+  // routes/thong-bao-mail.js: đo ngày 6/9 chỉ 2/146 người bật thông báo đẩy
+  // và chưa gói tin nào từng đi, nên chờ đường đẩy là chờ một thứ chưa chạy.
+  //
+  // Chọn người nhận NGAY (một truy vấn có chỉ mục) để trả con số về cho người
+  // đăng thấy "thư đang gửi cho N người"; việc gửi thì chạy nền như đường đẩy.
+  const nguoiNhanMail = await chonNguoiNhanMail(env, me, capLop);
+  const thu = guiThongBaoMail(env, me, {
+    noi_dung: noiDung, capLop, nguon: cleanText(body.nguon, 60), ds: nguoiNhanMail,
+  });
+  if (ctx?.waitUntil) ctx.waitUntil(thu); else await thu.catch(() => {});
+
+  return json({
+    ok: true, id: row.id, cap: capLop ? 'lop' : 'nhom',
+    mail: { nguoi_nhan: nguoiNhanMail.length },
+  });
 }
 
 // Đánh dấu đã xem: ghi lại ID thông báo lớn nhất mà người này ĐƯỢC PHÉP thấy.

@@ -23,39 +23,43 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Tám việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Chín việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
+1. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
+   dụng xong là gửi thư cho người trong phạm vi, kèm công tắc tắt của chính
+   chủ ở tab Tài khoản. Lý do làm: đo trên D1 thật thì thông báo đẩy chỉ có
+   **2/146 người bật và chưa gói tin nào từng đi** — xem mục riêng bên dưới.
+2. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
    Danh mục "bán gì, bán cho ai" của cả lớp, kèm ghép nối theo nhu cầu và
    một trang ai cũng mở được (Google index được). Chỗ DUY NHẤT dữ liệu người
    dùng ra khỏi tên miền, và chỉ của ai tự bật — xem mục riêng bên dưới.
-2. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+3. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
    Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
    1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
    tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
    bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
    trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
    người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
-3. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+4. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-4. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+5. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-5. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+6. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
    Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
-   người đã đăng nhập (mục #1 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
+   người đã đăng nhập (mục #3 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
    xem mục riêng bên dưới.
-6. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-7. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-8. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+7. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+8. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+9. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -292,6 +296,13 @@ như bài học của đường gửi thư ngày 24/8 ("thư nằm trong hộp t
 dòng log nói rằng nó đã đi"). Nhớ rằng **iPhone chỉ nhận khi ứng dụng ĐÃ cài
 lên màn hình chính**.
 
+**Cập nhật 6/9 — đo trên D1 thật, đây là con số quyết định:**
+`so_dang_ky = 2 · da_tung_gui_ok = 0 · loi_gan_nhat = null`. Chỉ **2/146 người**
+đã bật, `last_ok_at` của cả hai đều NULL, và không có lỗi nào — tức chưa lần
+nào THỬ gửi, chứ không phải gửi rồi hỏng. Đường đẩy vẫn giữ (miễn phí, tức
+thì), nhưng nó KHÔNG phải là thứ đang báo tin cho lớp và không nên chờ nó
+thành như vậy. Đó là lý do có mục "Thư khi có thông báo mới" ở trên.
+
 Khoá sinh bằng:
 
 ```bash
@@ -329,6 +340,99 @@ Ba chỗ trong Web Push sai là "gửi đi mà không ai nhận", không báo l�
 Vì vậy phép kiểm là **giải mã ngược**: đóng vai trình duyệt, giải gói ra và so
 từng ký tự — cộng một phép đối chứng sai khoá phải hỏng, để chắc phép kiểm có
 răng. Xem `scripts/tao-khoa-vapid.mjs` và bộ kiểm ở thư mục scratchpad.
+
+## Thư khi có thông báo mới — đường báo tin thật sự tới được người ta
+
+Thêm 6/9 (migration 0031). Ngô Phú Cường nguyên văn: *"Một ứng dụng chết là có
+thông báo mới được đăng trên App nhưng không có notify đến. Tôi muốn gửi mail
+để thông báo việc này."*
+
+**Con số làm nên quyết định, đo trên D1 thật ngày 6/9:** thông báo đẩy dựng
+xong từ 28/8, khoá VAPID đã đặt, giao diện đã mở nút — mà chỉ **2/146 người
+bật**, và `last_ok_at` của cả hai đều NULL: **chưa một gói tin nào từng đi**.
+Không lỗi nào cả, chỉ là chưa ai từng kích hoạt. Nói cách khác đăng thông báo
+lên ứng dụng xong là không ai biết, trừ khi họ tự mở ứng dụng ra xem. Chấm đỏ
+trên tab Hôm nay vẫn chạy trên mọi máy, nhưng nó chỉ báo cho người ĐÃ mở ứng
+dụng — mà đó chính là người không cần được báo.
+
+Vẫn nằm trong **lệch có chủ ý của N1** đã chốt ngày 24/8 (thông báo đẩy): thư
+này mang đúng một việc — "có tin mới, mở ứng dụng ra xem" — chứ không thành
+kênh nhắn tin thứ hai bên cạnh Zalo. Không nút trả lời, không chuỗi hội thoại,
+nội dung cắt còn 600 ký tự kèm đường dẫn mở ứng dụng.
+
+### Mặc định BẬT, và vì sao phải có đường tắt
+
+Cột `members.nhan_mail_thong_bao` mặc định `1`. Đây là quyết định có cân nhắc
+chứ không phải mặc định cho tiện: **bắt 146 người tự đi bật thì tính năng báo
+tin coi như không tồn tại** — đúng bài học của thông báo đẩy vừa đo được.
+
+Nhưng phải có đường tắt, và lý do không phải là lịch sự: ai không tắt được sẽ
+bấm **"Báo cáo spam"**, mà việc ấy đánh vào uy tín của CHÍNH tên miền đang gửi
+thư **MÃ ĐĂNG NHẬP**. Mã đăng nhập mới là thứ sống còn. Mất đường ấy vì một
+thông báo phiền là đổi một thứ thiết yếu lấy một thứ tiện lợi.
+
+Công tắc là của **chính chủ** (N5): `PUT /api/me/mail-thong-bao`, dùng phiên,
+không nhận `member_id` trong thân — không có chỗ nào để dò, và không ai tắt hộ
+được. `/api/home` trả `me.mail_thong_bao` để tab Tài khoản vẽ đúng ngay lần mở
+đầu.
+
+### Ô RIÊNG trong tab Tài khoản, đừng nhét chung với ô thông báo đẩy
+
+`veHopMail()` tách hẳn khỏi `veHopThongBao()`. Hàm sau **thoát sớm ở bốn
+nhánh**: trình duyệt không hỗ trợ đẩy, máy chủ chưa có khoá VAPID, iPhone chưa
+cài lên màn hình chính, và gọi hỏng. Nhét chung thì đúng những người KHÔNG
+nhận được thông báo đẩy — tức đúng những người cần thư nhất — lại là người
+không bao giờ nhìn thấy công tắc này.
+
+### BCC theo lô, không gửi riêng từng lá
+
+Worker có trần **50 lượt gọi ra ngoài mỗi request** (gói miễn phí), mà đường
+đẩy đã ăn vào chính trần ấy. Một thông báo cả lớp là 66 người có email lúc
+viết dòng này và sẽ thành 146 — gửi riêng từng lá là vượt trần rồi những người
+CUỐI danh sách lặng lẽ không nhận được gì, đúng loại hỏng khó tìm nhất.
+
+`MOI_LO = 40` chứ không phải 50: **Resend chặn ở 50 địa chỉ cho một lượt gọi**
+(tính gộp to + cc + bcc), đặt đúng 50 là chạm mép — thêm một dòng ở ô To là cả
+lô bị từ chối. Bcc đặt ở **tầng phong bì** (`RCPT TO` với SMTP, trường `bcc`
+với Resend), **không** viết vào tiêu đề thư: viết vào tiêu đề là phát tán cả
+sổ địa chỉ của lớp cho từng người nhận.
+
+Ô "To" là chính hòm thư gửi (`MAIL_FROM`) — để trống ô To thì nhiều máy chủ từ
+chối thẳng.
+
+### SỬA thông báo thì KHÔNG gửi thư lại
+
+Cùng lý do đã áp cho thông báo đẩy ở `patchThongBao` từ 5/9: sửa một dấu phẩy
+mà 66 người nhận thư lần nữa thì lần sau họ tắt hết, và mất luôn cả đường báo
+tin thật. `patchThongBao` không đụng gì tới đường thư — phúc đáp của nó KHÔNG
+có trường `mail`, và `kiem-mail-thongbao.mjs` kiểm đúng chỗ ấy.
+
+### Ma trận phạm vi phải TRÙNG KHÍT với `guiThongBaoDay()`
+
+`chonNguoiNhanMail()` (`routes/thong-bao-mail.js`) và `guiThongBaoDay()`
+(`routes/push.js`) phải chọn cùng một tập người: thông báo nhóm chỉ tới nhóm
+ấy, thông báo lớp mới tới cả khoá, và không gửi ngược cho chính người đăng.
+Lệch một chút là cùng một thông báo mà đường đẩy tới một nhóm người còn đường
+thư tới nhóm khác — không chỗ nào báo lỗi, chỉ có người kêu "sao tôi không
+nhận được".
+
+Con số người nhận được chọn **đồng bộ** (một truy vấn có chỉ mục) để trả về
+ngay trong phúc đáp — giao diện báo "Đã đăng — đang gửi thư cho N người", nên
+người đăng biết thư có đi hay không thay vì phải tin suông. Việc GỬI thì chạy
+nền trong `ctx.waitUntil`, như đường đẩy: người đăng không ngồi chờ, và gửi
+hỏng cũng không làm hỏng việc đăng — thông báo đã nằm trong D1.
+
+### Hai điều CHƯA kiểm chứng được
+
+- **Chưa một lá thư thông báo nào tới hộp thư thật.** Cục bộ không có máy chủ
+  thư, nên bộ kiểm chỉ chứng minh được ĐÚNG NGƯỜI được chọn, chưa chứng minh
+  được thư ĐI TỚI. Bằng chứng duy nhất đáng tin vẫn là thư nằm trong hộp thư —
+  đúng bài học của đường gửi thư ngày 24/8.
+- **Resend đếm hạn mức 100 thư/ngày theo LƯỢT GỌI hay theo ĐỊA CHỈ NHẬN?** Nếu
+  theo địa chỉ thì một thông báo cả lớp ăn 2/3 hạn mức ngày. Chỉ đo được bằng
+  bảng điều khiển Resend sau lần gửi thật đầu tiên. Đây là chỗ VPS của Ngô Phú
+  Cường sẽ có ích: đổi nhà cung cấp về sau chỉ là đổi `sendMail()` đi đường
+  khác, phần chọn người nhận và chia lô không đụng tới.
 
 ## Cảm giác ứng dụng: khoá zoom và chừa chỗ cho thanh trạng thái
 

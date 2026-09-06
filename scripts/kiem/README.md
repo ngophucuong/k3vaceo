@@ -90,6 +90,8 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tulieu-bai.mjs` | giao diện: sheet phần bài ↔ Gắn Tư liệu ↔ tab Tư liệu, "một dòng, ba màn" |
 | `pw-thongbao.mjs` | thông báo: URL dán thẳng thành link bấm được, sửa lại được, thanh B/I/gạch đầu dòng — và **N6 ở đường sửa trả 404 chứ không phải 403** |
 | `reset-thongbao.sh` | dựng phiên + một thông báo Nhóm 6 có URL dán thẳng + một thông báo của NHÓM KHÁC cho phép kiểm N6 |
+| `kiem-mail-thongbao.mjs` | **thư khi có thông báo mới**: ma trận phạm vi phải trùng khít đường đẩy, không gửi ngược người đăng, công tắc của chính chủ giảm đúng một người, và SỬA thì không gửi lại |
+| `reset-mail-thongbao.sh` | dựng HAI phiên (cần phiên thứ hai vì không ai tắt hộ được — N5) và đọc sẵn mẫu số ra `mail-mau-so.json` |
 | `pw-mobile.mjs` | cảm giác ứng dụng: chừa chỗ thanh trạng thái, khoá zoom, ô nhập 16px — và **số điện thoại vẫn copy được** |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
 | `reset-moi.sh` | dựng hai phiên + ba hồ sơ thử cho `kiem-moi.mjs`/`pw-nhanlai.mjs`, gồm một hồ sơ giả không có số điện thoại |
@@ -106,7 +108,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Mười bốn phép đối chứng đáng giữ nhất
+## Mười sáu phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -244,6 +246,24 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    đo `scrollWidth` của thanh nav đều mù. Phải so `lb.scrollWidth` với
    `nb.clientWidth`. Đây là phép kiểm **đậu giả** mới nhất bị bắt, 5/9.
 
+15. **`kiem-mail-thongbao.mjs` đọc mẫu số từ D1, không hỏi chính API.** Hỏi
+   `/api/thong-bao` "có bao nhiêu người nhận" rồi so với chính nó là một phép
+   kiểm không có răng. Cùng lý do, phép "lớp nhiều hơn nhóm" so hai con số
+   **API** trả về với nhau chứ không so hai mẫu số D1 với nhau — hai mẫu số D1
+   lệch nhau là điều hiển nhiên, không mã nào làm nó sai được. Đã đối chứng:
+   gỡ điều kiện phạm vi trong `chonNguoiNhanMail()` ra thì phép "thông báo
+   NHÓM" đỏ ngay (30 thay vì 5), còn phép so-hai-mẫu-số vẫn xanh.
+
+16. **Công tắc thư kiểm trong `pw-thongbao.mjs` phải chạy trong hoàn cảnh
+   KHÔNG có thông báo đẩy.** Ô thư là ô RIÊNG, cố ý không nhét vào
+   `veHopThongBao()` vì hàm ấy thoát sớm ở bốn nhánh — nhét chung thì đúng
+   những người không nhận được thông báo đẩy (tức những người cần thư nhất)
+   lại là người không bao giờ thấy công tắc. Chromium không cài lên màn hình
+   chính và cục bộ không có khoá VAPID, nên bộ kiểm đang đứng đúng trong một
+   trong bốn nhánh ấy: nó khẳng định `#pushNut` VẮNG MẶT rồi mới đòi
+   `#mailNut` có mặt. Và nó đọc lại `/api/home` sau mỗi lần bấm — đổi chữ trên
+   màn hình mà máy chủ không ghi nhận là đúng loại hỏng không ai thấy.
+
 **Chỗ dễ rò nhất của cả sản phẩm, kiểm ở `pw-giao-thuong.mjs`:** trang
 `/giao-thuong` là đường DUY NHẤT đưa dữ liệu người dùng ra internet. Hai phép
 kiểm phải giữ nguyên răng — người CHƯA bật `cong_khai` phải vắng mặt hoàn
@@ -271,6 +291,13 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
 - **Gửi thư.** Không có máy chủ thư, nên `502 mail_send_failed` là kết quả
   ĐÚNG ở đây — nó chứng tỏ route chạy hết đường tới bước gửi. Đòi 2xx là đòi
   thứ môi trường không làm được, rồi sẽ phải nới ra, mà nới thì hết răng.
+
+  **Và một bẫy mới của chính bộ kiểm thư (6/9):** đừng gọi `wrangler d1
+  execute --local` GIỮA CHỪNG một bộ kiểm đang chạy để lấy mẫu số. `wrangler
+  dev` giữ khoá tệp SQLite từ lúc khởi động, nên lượt gọi ấy cắt ngang kết nối
+  HTTP đang mở và bộ kiểm chết với `UND_ERR_SOCKET: other side closed` — trông
+  y hệt máy chủ sập, mà `curl` ngay sau đó vẫn trả 200. Đọc trước, lúc server
+  còn TẮT, rồi ghi ra tệp (`reset-mail-thongbao.sh` → `mail-mau-so.json`).
 
   **Nhưng `.dev.vars` phải trỏ SMTP vào một cổng ĐÓNG trên máy này**, ví dụ
   `SMTP_HOST=127.0.0.1` / `SMTP_PORT=2525`. Để nguyên `smtp.gmail.com` như tệp

@@ -196,11 +196,17 @@ function resendCauHinh(env) {
   } : null;
 }
 
-async function guiQuaResend(cf, { to, subject, text }) {
+async function guiQuaResend(cf, { to, bcc, subject, text }) {
+  const than_gui = { from: cf.from, to: [addressOnly(to)], subject, text };
+  // `bcc` để gửi MỘT lá cho nhiều người mà họ không thấy địa chỉ của nhau.
+  // Đây không phải chuyện tiện tay: Worker có trần số lượt gọi ra ngoài mỗi
+  // request (gói miễn phí 50), nên gửi riêng từng lá cho 66 người là vượt
+  // trần và những người cuối danh sách lặng lẽ không nhận được gì.
+  if (bcc?.length) than_gui.bcc = bcc.map(addressOnly);
   const tra = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: `Bearer ${cf.key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ from: cf.from, to: [addressOnly(to)], subject, text }),
+    body: JSON.stringify(than_gui),
   });
   const than = await tra.text();
   if (!tra.ok) {
@@ -226,19 +232,19 @@ async function guiQuaResend(cf, { to, subject, text }) {
 // Nên: Resend trước (đường HTTP, không vướng cổng 465 và không có socket để
 // bị cắt giữa chừng), hỏng thì lùi về SMTP. Chỉ khi CẢ HAI hỏng mới ném lỗi,
 // và câu lỗi ghi cả hai chỗ hỏng để lần sau khỏi phải đoán.
-export async function sendMail(env, { to, subject, text }) {
+export async function sendMail(env, { to, bcc, subject, text }) {
   const cf = resendCauHinh(env);
-  if (!cf) return guiQuaSmtp(env, { to, subject, text });
+  if (!cf) return guiQuaSmtp(env, { to, bcc, subject, text });
 
   try {
-    return await guiQuaResend(cf, { to, subject, text });
+    return await guiQuaResend(cf, { to, bcc, subject, text });
   } catch (loiResend) {
     // Không có đường SMTP nào để lùi về thì ném thẳng lỗi Resend.
     const c = docCauHinhSmtp(env);
     if (!(c.host && c.user && c.pass && c.from)) throw loiResend;
 
     try {
-      return await guiQuaSmtp(env, { to, subject, text });
+      return await guiQuaSmtp(env, { to, bcc, subject, text });
     } catch (loiSmtp) {
       const err = new Error('cả hai đường gửi thư đều hỏng');
       err.buoc = `Resend: ${loiResend?.buoc || loiResend?.message || loiResend}`
@@ -248,7 +254,7 @@ export async function sendMail(env, { to, subject, text }) {
   }
 }
 
-async function guiQuaSmtp(env, { to, subject, text }) {
+async function guiQuaSmtp(env, { to, bcc, subject, text }) {
   // Kiểm riêng bộ bí mật SMTP, KHÔNG hỏi mailerConfigured(): hàm ấy trả true
   // chỉ vì có RESEND_API_KEY, nên khi Resend hỏng mà SMTP trống thì ta lại đi
   // mở socket tới host undefined và báo lỗi sai chỗ.
@@ -326,8 +332,13 @@ async function guiQuaSmtp(env, { to, subject, text }) {
 
     await send(writer, `MAIL FROM:<${addressOnly(from)}>`);
     await expect(reader, [250], 'MAIL FROM');
-    await send(writer, `RCPT TO:<${addressOnly(to)}>`);
-    await expect(reader, [250, 251], 'RCPT TO');
+    // Người nhận ẩn đi bằng RCPT TO ở tầng PHONG BÌ, KHÔNG có dòng Bcc: trong
+    // phần tiêu đề — đó mới là cách bcc hoạt động đúng. Viết địa chỉ vào tiêu
+    // đề là mọi người đọc được danh sách của nhau, tức phát tán danh bạ lớp.
+    for (const ai of [to, ...(bcc ?? [])]) {
+      await send(writer, `RCPT TO:<${addressOnly(ai)}>`);
+      await expect(reader, [250, 251], 'RCPT TO');
+    }
     await send(writer, 'DATA');
     await expect(reader, [354], 'DATA');
 

@@ -1355,7 +1355,7 @@ function soanThongBao(id) {
   openSheet(`
    <h3>${cu ? 'Sửa thông báo' : 'Thêm thông báo'}</h3>
    <p class="sub">${cu
-     ? 'Sửa xong bấm Lưu. Người đã nhận thông báo đẩy sẽ KHÔNG bị báo lại lần nữa.'
+     ? 'Sửa xong bấm Lưu. Không gửi thư và không báo đẩy lại lần nữa — sửa một dấu phẩy mà cả lớp nhận thư thêm lần nữa thì lần sau họ tắt hết.'
      : `Thứ cần biết mà không gắn vào một buổi cụ thể. Đây không phải chỗ nhắn tin —
         nguyên tắc N1: Zalo để bàn, ứng dụng để chốt.`}</p>
    ${cu ? `<div class="hintline">Gửi cho: <b>${cu.group_id == null ? 'Cả lớp' : esc(nhom)}</b> —
@@ -1363,7 +1363,7 @@ function soanThongBao(id) {
      : dangLop ? `<label class="f">Ai nhận</label>
    <select id="tbCap"><option value="nhom">${esc(nhom)} — chỉ nhóm mình</option>
      <option value="lop">Cả lớp — 134 người</option></select>
-   <div class="hintline" id="tbCapHint"></div>` : `<div class="hintline">Thông báo này chỉ ${esc(nhom)} thấy.</div>`}
+   <div class="hintline" id="tbCapHint"></div>` : `<div class="hintline">Thông báo này chỉ ${esc(nhom)} thấy. Người trong nhóm nhận một lá thư báo tin.</div>`}
    <label class="f">Nội dung</label>
    <div class="mdbar" id="tbBar">
      <button type="button" data-md="b" title="Chữ đậm"><b>B</b></button>
@@ -1390,8 +1390,8 @@ function soanThongBao(id) {
     const ve = () => {
       const lop = $('#tbCap').value === 'lop';
       $('#tbCapHint').innerHTML = lop
-        ? '<b>Cả 134 người nhận.</b> Ai đã bật thông báo đẩy sẽ nhận ngay trên điện thoại. Đăng nhầm khó rút lại.'
-        : 'Chỉ người trong nhóm bạn thấy. Nhóm khác không đọc được.';
+        ? '<b>Cả lớp nhận.</b> Mỗi người có email sẽ nhận một lá thư báo tin; ai đã bật thông báo đẩy còn nhận ngay trên điện thoại. Đăng nhầm khó rút lại.'
+        : 'Chỉ người trong nhóm bạn thấy. Nhóm khác không đọc được. Người trong nhóm nhận một lá thư báo tin.';
       $('#tbNguon').value = lop ? 'Ban tổ chức' : (HOME?.group?.label || '');
     };
     $('#tbCap').onchange = ve; ve();
@@ -1404,11 +1404,20 @@ function soanThongBao(id) {
     const than = {
       noi_dung: $('#tbND').value, nguon: $('#tbNguon').value, het_han: $('#tbHan').value || null,
     };
+    // Số người nhận thư chỉ biết được SAU khi máy chủ trả lời, mà submitting()
+    // nhận câu báo từ trước — nên giữ nó ra ngoài rồi toast lại sau. Nói con số
+    // ra là người đăng biết ngay thư có đi hay không, khỏi phải tin suông.
+    let bao = id ? 'Đã lưu' : 'Đã đăng thông báo';
     submitting($('#tbLuu'), async () => {
       if (id) await apiPatch(`/api/thong-bao/${id}`, than);
-      else await apiPost('/api/thong-bao', { cap: $('#tbCap') ? $('#tbCap').value : 'nhom', ...than });
+      else {
+        const j = await apiPost('/api/thong-bao',
+          { cap: $('#tbCap') ? $('#tbCap').value : 'nhom', ...than });
+        const n = j?.mail?.nguoi_nhan ?? 0;
+        bao = n ? `Đã đăng — đang gửi thư cho ${n} người` : 'Đã đăng thông báo';
+      }
       await refreshHome();
-    }, id ? 'Đã lưu' : 'Đã đăng thông báo');
+    }, null).then(ok => { if (ok) toast(bao); });
   };
 }
 
@@ -3470,6 +3479,7 @@ async function openMe() {
    <button class="wide ghost" id="meEdit" style="margin-bottom:14px">Sửa hồ sơ của tôi</button>
    <div id="pkBox" class="mut" style="margin-bottom:14px">Đang xem passkey…</div>
    <div id="pushBox" class="mut" style="margin-bottom:14px">Đang xem thông báo…</div>
+   <div id="mailBox" class="mut" style="margin-bottom:14px"></div>
    <div class="sa"><button class="big c" id="meClose">Đóng</button>
      <button class="big go" id="meLogout" style="background:var(--due)">Đăng xuất</button></div>`);
   $('#meClose').onclick = closeSheet;
@@ -3484,6 +3494,7 @@ async function openMe() {
   };
   drawPasskeyBox();
   veHopThongBao();
+  veHopMail();
 }
 
 /* ─── Thông báo đẩy ───
@@ -3503,6 +3514,35 @@ function laIosChuaCai() {
     || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const daCai = window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true;
   return ios && !daCai;
+}
+
+/* ─── Thư khi có thông báo mới ───
+   Ô RIÊNG, cố ý KHÔNG nhét vào veHopThongBao(): hàm ấy thoát sớm ở bốn nhánh
+   (trình duyệt không hỗ trợ đẩy, máy chủ chưa có khoá VAPID, iPhone chưa cài
+   lên màn hình chính, gọi hỏng). Nhét chung thì đúng những người KHÔNG nhận
+   được thông báo đẩy — tức đúng những người cần thư nhất — lại là người không
+   bao giờ nhìn thấy công tắc này. */
+function veHopMail() {
+  const box = $('#mailBox');
+  if (!box) return;
+  const bat = HOME?.me?.mail_thong_bao !== false;
+  box.innerHTML = `
+    <div style="margin-bottom:8px">${bat
+      ? '<b style="color:var(--ink)">Đang nhận thư</b> mỗi khi lớp hoặc nhóm có thông báo mới.'
+      : 'Không nhận thư khi có thông báo mới. Chấm đỏ trên tab Hôm nay vẫn báo cho bạn.'}</div>
+    <button class="wide ghost" id="mailNut" style="padding:11px;font-size:14px">
+      ${bat ? 'Tắt thư thông báo' : 'Bật thư thông báo'}</button>`;
+  $('#mailNut').onclick = async () => {
+    const nut = $('#mailNut');
+    nut.disabled = true; nut.textContent = 'Đang lưu…';
+    try {
+      const j = await apiPut('/api/me/mail-thong-bao', { bat: !bat });
+      // Cập nhật bản trong bộ nhớ để vẽ lại đúng ngay, khỏi chờ /api/home.
+      if (HOME?.me) HOME.me.mail_thong_bao = j.bat;
+      toast(j.bat ? 'Sẽ nhận thư khi có thông báo mới' : 'Đã tắt thư thông báo');
+    } catch (e) { toast(errText(e)); }
+    veHopMail();
+  };
 }
 
 async function veHopThongBao() {

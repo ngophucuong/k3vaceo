@@ -25,6 +25,7 @@ import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, 
          postDeclareFor, deleteFund } from './routes/funds.js';
 import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, postThongBao,
          postThongBaoDaXem, patchThongBao, deleteThongBao } from './routes/lich.js';
+import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
@@ -301,6 +302,11 @@ export default {
       if (pathname === '/api/push/trang-thai' && method === 'GET') return getPushTrangThai(env, me);
       if (pathname === '/api/push/dang-ky' && method === 'POST') return postPushDangKy(request, env, me);
       if (pathname === '/api/push/huy' && method === 'POST') return postPushHuy(request, env, me);
+
+      // Thư khi có thông báo mới — công tắc của chính chủ (N5).
+      if (pathname === '/api/me/mail-thong-bao' && method === 'PUT') {
+        return putMailThongBao(request, env, me);
+      }
       if ((m = pathname.match(/^\/api\/thong-bao\/(\d+)$/)) && method === 'PATCH') {
         return patchThongBao(request, env, me, Number(m[1]), ip);
       }

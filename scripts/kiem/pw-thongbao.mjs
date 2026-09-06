@@ -120,6 +120,32 @@ ok('lưu từ giao diện đi tới máy chủ thật',
    (home4.thong_bao ?? []).find(t => t.id === cua6.id)?.noi_dung === 'KIEMTB_nhom6 **chốt** cuối');
 ok('thẻ thông báo hiện chữ đậm đã dựng', await p.locator('#v-nay .warn b').count() >= 1);
 
+/* ══ Công tắc "thư khi có thông báo mới" (migration 0031) ══════════════════
+   Ô RIÊNG trong tab Tài khoản, cố ý không nhét vào veHopThongBao(). Hàm ấy
+   thoát sớm ở bốn nhánh — và Chromium không cài lên màn hình chính, không có
+   khoá VAPID cục bộ, chính là một trong bốn nhánh ấy. Nếu công tắc thư nằm
+   chung ô thì ĐÚNG những người không nhận được thông báo đẩy (tức những người
+   cần thư nhất) lại là người không bao giờ nhìn thấy nó. Phép kiểm này chạy
+   trong đúng hoàn cảnh đó, nên nó chứng minh được điều ấy. */
+console.log('── Giao diện: công tắc thư khi có thông báo mới ──');
+await p.click('#avMe');   // ảnh đại diện ở đầu trang mở sheet Tài khoản
+await p.waitForTimeout(700);
+ok('ô đẩy đã thoát sớm (Chromium không nhận được thông báo đẩy)',
+   !(await p.locator('#pushNut').count()));
+ok('công tắc thư VẪN hiện — không bị ô đẩy nuốt mất', await p.locator('#mailNut').count() === 1);
+const nhanTruoc = (await p.locator('#mailNut').textContent()).trim();
+ok(`mặc định là ĐANG BẬT (nút ghi "${nhanTruoc}")`, nhanTruoc === 'Tắt thư thông báo');
+
+await p.click('#mailNut'); await p.waitForTimeout(600);
+ok('bấm một cái là đổi nhãn', (await p.locator('#mailNut').textContent()).trim() === 'Bật thư thông báo');
+const sauTat = await fetch(`${B}/api/home`, { headers: { cookie: CK } }).then(r => r.json());
+ok('và máy chủ ghi nhận thật, không chỉ đổi chữ trên màn hình',
+   sauTat?.me?.mail_thong_bao === false);
+
+await p.click('#mailNut'); await p.waitForTimeout(600);
+const sauBat = await fetch(`${B}/api/home`, { headers: { cookie: CK } }).then(r => r.json());
+ok('bật lại được', sauBat?.me?.mail_thong_bao === true);
+
 ok('không lỗi JS: ' + (loi.join(' | ') || 'sạch'), loi.length === 0);
 await p.screenshot({ path: '/tmp/k3vaceo-thongbao.png' });
 await b.close();
