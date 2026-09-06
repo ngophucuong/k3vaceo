@@ -23,6 +23,12 @@ HASH_C=$(printf '%s' "$TOK_C" | sha256sum | cut -d' ' -f1)
 
 npx wrangler d1 execute k3vaceo --local --command "
 DELETE FROM links WHERE title LIKE 'KIEMTULIEU\\_%' ESCAPE '\\';
+-- Dọn cả NHẬT KÝ, không chỉ dữ liệu. Bước dọn dẹp cuối pw-tulieu-text.mjs ghi
+-- một dòng `gỡ liên kết "KIEMTULIEU_giaodien"`, dòng ấy nằm lại trong activity
+-- và hiện ở dòng hoạt động tab Hôm nay của LƯỢT SAU — đủ để một locator tìm
+-- theo chữ tóm nhầm phần tử đang ẩn. Xoá links mà để lại nhật ký thì bộ kiểm
+-- vẫn tự cắn vào chính nó, chỉ là qua một đường vòng.
+DELETE FROM activity WHERE summary LIKE '%KIEMTULIEU\\_%' ESCAPE '\\';
 DELETE FROM sessions WHERE member_id IN (SELECT id FROM members WHERE full_name = 'Ngô Phú Cường');
 INSERT INTO sessions (member_id, token_hash, expires_at)
 SELECT id, '$HASH_C', datetime('now', '+1 day')

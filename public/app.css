@@ -470,6 +470,24 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
 .mdview li{margin:0 0 4px}
 .mdview a{color:var(--go)}
 .mdview > :first-child{margin-top:0}
+/* URL dán thẳng dài 60-70 ký tự là chuyện thường trong thông báo. Không có
+   dòng này thì nó đẩy toạc thẻ ra và cả trang trượt ngang. */
+.mdview a{overflow-wrap:anywhere}
+
+/* Bản gọn cho thông báo ở tab Hôm nay — cùng một hàm dựng (mdSafe), chỉ khác
+   cỡ chữ và lề, không viết bộ quy tắc thứ hai. */
+.mdview.nho{font-size:14px;line-height:1.55}
+.mdview.nho p,.mdview.nho ul,.mdview.nho ol{margin:0 0 6px}
+.mdview.nho h4,.mdview.nho h5,.mdview.nho h6{margin:10px 0 4px;font-size:14.5px}
+.mdview.nho > :last-child{margin-bottom:0}
+
+/* Thanh B / I / gạch đầu dòng / liên kết của ô soạn thông báo. */
+.mdbar{display:flex;gap:6px;margin:0 0 7px}
+.mdbar button{min-width:36px;height:32px;border-radius:8px;font-size:13.5px;color:var(--ink2);
+  background:var(--surf);box-shadow:inset 0 0 0 1px var(--line2);transition:transform .14s}
+.mdbar button:active{transform:scale(.93)}
+.mdxem{background:var(--surf2);border-radius:10px;padding:11px 13px;margin:0 0 14px;
+  box-shadow:inset 0 0 0 1px var(--line);min-height:44px}
 
 /* Nhãn buổi trên dòng ở tab Tư liệu — nửa còn lại của cùng một lối tắt. */
 .nb-buoi{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 6px;

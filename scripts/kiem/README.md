@@ -88,6 +88,8 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tulieu-text.mjs` | **an toàn XSS của `mdSafe()`** — bốn ca độc + bốn ca thuận + giao diện |
 | `kiem-tulieu-bai.mjs` | tư liệu gắn vào PHẦN BÀI (links.section_id): plan.js/links.js, **N6** qua nhóm khác |
 | `pw-tulieu-bai.mjs` | giao diện: sheet phần bài ↔ Gắn Tư liệu ↔ tab Tư liệu, "một dòng, ba màn" |
+| `pw-thongbao.mjs` | thông báo: URL dán thẳng thành link bấm được, sửa lại được, thanh B/I/gạch đầu dòng — và **N6 ở đường sửa trả 404 chứ không phải 403** |
+| `reset-thongbao.sh` | dựng phiên + một thông báo Nhóm 6 có URL dán thẳng + một thông báo của NHÓM KHÁC cho phép kiểm N6 |
 | `pw-mobile.mjs` | cảm giác ứng dụng: chừa chỗ thanh trạng thái, khoá zoom, ô nhập 16px — và **số điện thoại vẫn copy được** |
 | `reset-tanso.sh` | dọn sổ tần suất và gieo lời mời cho `kiem-tanso.mjs` |
 | `reset-moi.sh` | dựng hai phiên + ba hồ sơ thử cho `kiem-moi.mjs`/`pw-nhanlai.mjs`, gồm một hồ sơ giả không có số điện thoại |
@@ -100,7 +102,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Mười phép đối chứng đáng giữ nhất
+## Mười một phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -203,6 +205,17 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
     style: Chromium trên máy chủ không có "tai thỏ" nên `env(safe-area-inset-*)`
     luôn bằng 0, computed style không phân biệt được "đã chừa chỗ" với "quên
     chừa" — đúng cái lỗi cần bắt.
+
+11. **Bộ kiểm tự cắn vào chính nó qua NHẬT KÝ, không qua dữ liệu (5/9).**
+    `pw-tulieu-text.mjs` dọn sạch mục Tư liệu nó tạo ra ở cuối mỗi lượt — nhưng
+    chính việc dọn ấy ghi một dòng `gỡ liên kết "KIEMTULIEU_giaodien"` vào
+    `activity`, và dòng đó hiện lại ở DÒNG HOẠT ĐỘNG tab Hôm nay của lượt SAU.
+    `getByText(TIEU_DE).first()` không giới hạn phạm vi liền tóm đúng phần tử
+    đang ẩn ấy rồi chờ 30 giây cho nó hiện ra. Triệu chứng đọc lên y như một
+    lỗi giao diện vừa gây ra, nên suýt đổ oan cho bản sửa đang làm — phải
+    `git stash` rồi chạy lại mới biết. Hai bài học: locator của bộ kiểm giao
+    diện phải **giới hạn trong đúng khung đang xét** (`#v-kho`), và reset phải
+    dọn **cả nhật ký**, không chỉ dọn bảng dữ liệu.
 
 ## Chạy `kiem-tanso.mjs`
 

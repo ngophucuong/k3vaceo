@@ -43,11 +43,18 @@ async function thuMD(md) {
     let el = document.getElementById('xss-scratch');
     if (!el) { el = document.createElement('div'); el.id = 'xss-scratch'; document.body.appendChild(el); }
     window.__X1 = window.__X2 = window.__X3 = window.__X4 = undefined;
+    window.__X5 = window.__X6 = undefined;
     el.innerHTML = window.mdSafe(md);
+    // Bốn ca độc đầu chạy ngay lúc gắn vào DOM. Ca dán-thẳng (__X5) lại nấp
+    // trong một thuộc tính sự kiện, chỉ nổ khi có người rê chuột qua — nên
+    // phải KÍCH nó, không thì phép kiểm xanh mà chẳng chứng minh được gì.
+    el.querySelectorAll('a').forEach(a => a.dispatchEvent(
+      new MouseEvent('mouseover', { bubbles: true })));
     return {
       html: el.innerHTML,
       text: el.textContent,
-      xChay: !!(window.__X1 || window.__X2 || window.__X3 || window.__X4),
+      xChay: !!(window.__X1 || window.__X2 || window.__X3 || window.__X4
+             || window.__X5 || window.__X6),
     };
   }, md);
 }
@@ -93,6 +100,42 @@ const hop4 = await thuMD('[trang chủ](https://example.com)');
 ok('link https hợp lệ vẫn ra thẻ <a> mở tab mới',
    hop4.html.includes('href="https://example.com"') && hop4.html.includes('target="_blank"'));
 
+/* ── URL DÁN THẲNG (thêm 5/9) ────────────────────────────────────────────────
+   Ngô Phú Cường gửi ảnh một thông báo có dán nguyên si đường dẫn Outline dài
+   66 ký tự: đọc được mà bấm không được. Không ai gõ cú pháp [chữ](url) khi
+   dán link, nên mdSafe() phải tự nhận. Đây là chỗ dễ mở lại lỗ XSS nhất
+   trong cả hàm, vì nó là quy tắc DUY NHẤT dựng thuộc tính href từ chữ người
+   dùng gõ mà KHÔNG có cú pháp bao quanh làm hàng rào. */
+const dan1 = await thuMD('Chi tiết: https://outline.cuongngo.app/s/5e30f127-59a7-472f-aa03-abae19f2d8c2');
+ok('URL dán thẳng thành thẻ <a> bấm được',
+   dan1.html.includes('href="https://outline.cuongngo.app/s/5e30f127-59a7-472f-aa03-abae19f2d8c2"'));
+ok('nhãn hiện ra được rút gọn, không tràn thẻ (có dấu …)', dan1.html.includes('…'));
+ok('bỏ tiền tố https:// khỏi nhãn cho gọn', dan1.text.includes('outline.cuongngo.app/s/'));
+
+// Dấu chấm cuối câu KHÔNG được nuốt vào link, nếu không thì bấm ra 404.
+const dan2 = await thuMD('Xem tại https://vi.wikipedia.org/wiki/VCCI.');
+ok('dấu câu cuối câu nằm NGOÀI href',
+   dan2.html.includes('href="https://vi.wikipedia.org/wiki/VCCI"') && dan2.text.trim().endsWith('.'));
+
+// Cú pháp [chữ](url) và URL dán thẳng ĐỨNG CẠNH NHAU: bước tự nhận URL chạy
+// SAU, nên nếu thẻ <a> vừa dựng còn nằm trong chuỗi thì nó tóm luôn địa chỉ
+// trong href rồi lồng <a> vào giữa <a> — HTML hỏng, link bấm ra chỗ khác.
+const dan3 = await thuMD('[trang](https://a.example.com) và https://b.example.com');
+ok('không lồng thẻ <a> vào trong thẻ <a>', !/<a[^>]*>[^<]*<a/i.test(dan3.html));
+ok('cả hai link đều còn đúng địa chỉ',
+   dan3.html.includes('href="https://a.example.com"') && dan3.html.includes('href="https://b.example.com"'));
+
+// Ca ĐỘC của riêng đường dán thẳng: nhét dấu nháy kép vào giữa URL để thử
+// thoát ra khỏi thuộc tính href. esc() đã đổi " thành &quot; TRƯỚC khi quy
+// tắc này chạy, nên nó nằm yên trong giá trị thuộc tính chứ không cắt được.
+const dan4 = await thuMD('https://x.example.com/a"onmouseover="window.__X5=1');
+ok('URL có dấu nháy kép KHÔNG thoát ra được khỏi href', !dan4.xChay);
+ok('không sinh thuộc tính onmouseover thật', !/\sonmouseover\s*=/i.test(dan4.html));
+
+// javascript: dán thẳng phải trơ như cũ — quy tắc mới chỉ bắt https://.
+const dan5 = await thuMD('javascript:window.__X6=1');
+ok('javascript: dán thẳng KHÔNG thành link', !dan5.html.includes('<a '));
+
 await p.screenshot({ path: 'mdsafe-scratch.png' });
 await b.close();
 
@@ -127,7 +170,14 @@ await p2.click('#lSave'); await p2.waitForTimeout(700);
 ok('sheet đóng lại sau khi lưu (lưu thành công)', !(await p2.locator('#lSave').isVisible().catch(() => false)));
 ok('mục mới hiện trong danh sách Tư liệu', await p2.getByText(TIEU_DE).count() > 0);
 
-await p2.getByText(TIEU_DE).first().click(); await p2.waitForTimeout(500);
+// Tìm TRONG tab Tư liệu, không tìm cả trang. Bước dọn dẹp ở cuối tệp này ghi
+// một dòng nhật ký `gỡ liên kết "KIEMTULIEU_giaodien"`, và dòng ấy hiện lại ở
+// DÒNG HOẠT ĐỘNG của tab Hôm nay trong LƯỢT CHẠY SAU — đang ẩn vì tab khác
+// đang mở. getByText() không giới hạn phạm vi sẽ tóm đúng cái ẩn đó rồi chờ
+// mãi cho nó hiện ra. Đây là đúng cái bẫy "bộ kiểm phải chạy lại được nhiều
+// lần" đã ghi trong README (phép đối chứng số 3), lần này tự cắn vào chính
+// mình qua một đường vòng: nhật ký, không phải dữ liệu.
+await p2.locator('#v-kho').getByText(TIEU_DE).first().click(); await p2.waitForTimeout(500);
 ok('bấm vào mở sheet xem nội dung, render đúng Markdown',
    (await p2.locator('.mdview h4').innerText().catch(() => '')) === 'Tiêu đề UI');
 ok('không lỗi JS sau khi mở sheet xem: ' + (loi2.join(' | ') || 'sạch'), loi2.length === 0);

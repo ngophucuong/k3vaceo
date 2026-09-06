@@ -668,6 +668,74 @@ trang chưa hề nạp** (quên bật `[assets]` nên `/` trả JSON — trang k
 thì tất nhiên không có lỗi JS). Mọi bộ kiểm giao diện nay mở đầu bằng một phép
 khẳng định rằng ứng dụng THẬT SỰ nạp được.
 
+## Thông báo: link bấm được, sửa lại được, và thanh B/I/gạch đầu dòng
+
+Thêm 5/9 sau khi Ngô Phú Cường gửi ảnh một thông báo của Nhóm 6 có dán nguyên
+si đường dẫn Outline dài 66 ký tự: **đọc được mà bấm không được**, đăng rồi thì
+không sửa lại được, và không có cách nào làm đậm hay xuống gạch đầu dòng.
+
+**Không viết bộ dựng thứ hai.** Thông báo nay đi qua đúng `mdSafe()` đã có sẵn
+cho Tư liệu dạng Text — cùng một hàm, cùng bộ kiểm XSS (`pw-tulieu-text.mjs`),
+chỉ thêm lớp CSS `.mdview.nho` cho vừa thẻ nhỏ. Viết một bộ quy tắc riêng cho
+thông báo là có ngày hai bên lệch nhau ở đúng chỗ nguy hiểm nhất.
+
+### mdSafe() nay tự nhận URL dán thẳng — chỗ dễ hở nhất của cả hàm
+
+Không ai gõ cú pháp `[chữ](url)` khi dán link vào thông báo. Nhưng đây là quy
+tắc **DUY NHẤT dựng thuộc tính `href` từ chữ người dùng gõ mà không có cú pháp
+bao quanh làm hàng rào**, nên ba điều phải giữ nguyên:
+
+1. **`esc()` vẫn chạy TRƯỚC.** Nhờ vậy `"` đã thành `&quot;` từ lâu trước khi
+   quy tắc này chạy: URL có dấu nháy kép nằm yên trong giá trị thuộc tính chứ
+   không cắt ra ngoài được. Ca độc `https://x.example.com/a"onmouseover=…` có
+   phép kiểm riêng, và phép kiểm ấy **kích sự kiện `mouseover` thật** — không
+   kích thì nó xanh mà chẳng chứng minh được gì, vì mã độc nấp trong thuộc
+   tính chỉ nổ khi có người rê chuột qua.
+2. **Chỉ bắt `https://`.** `javascript:` dán thẳng không khớp cú pháp nên trơ
+   như cũ — không có nhánh xử lý riêng thì không có gì để quên xử lý.
+3. **Cú pháp `[chữ](url)` phải cất vào kho TRƯỚC, rồi mới quét URL trần.** Để
+   nguyên thẻ `<a>` vừa dựng trong chuỗi thì bước quét sau tóm luôn địa chỉ nằm
+   trong `href` rồi lồng `<a>` vào giữa `<a>`. Dùng dấu giữ chỗ `\u0000` — và
+   vì thế phải quét sạch `\u0000` khỏi văn bản gốc ở đầu hàm, không thì người
+   dùng chèn được HTML tuỳ ý qua chính dấu giữ chỗ ấy.
+
+Thêm hai chi tiết nhỏ mà thiếu thì lộ ngay: **nhãn hiện ra rút gọn còn 38 ký
+tự** (href giữ nguyên đường dẫn đầy đủ) — link Outline dài 66 ký tự để nguyên
+là tràn thẻ; và **dấu câu cuối câu không được nuốt vào link**, "xem tại
+https://x.vn/a." thì dấu chấm là của câu văn, nuốt vào là bấm ra 404. Không cắt
+dấu `;` vì URL đã esc() mang `&amp;` ở cuối.
+
+### Sửa thông báo: `PATCH /api/thong-bao/:id`
+
+Trước đó chỉ có gỡ xuống rồi đăng lại — mà làm vậy thì mất "mới", chấm đỏ nổi
+lên lần nữa, và ai bật thông báo đẩy lại bị báo thêm một lần cho cùng một tin.
+
+Hai điều **CỐ Ý không cho**:
+- **Đổi cấp (nhóm ↔ lớp)** — cùng lý do `PATCH /api/links/:id` không cho đổi
+  `scope`: biến thông báo nội bộ thành của cả lớp là đem việc nhóm cho 146
+  người đọc, mà nhật ký chỉ ghi "đã sửa" (N6). Giao diện cũng bỏ hẳn ô chọn.
+- **Gửi lại thông báo đẩy** — sửa một dấu phẩy mà 134 điện thoại kêu lần nữa
+  thì lần sau người ta tắt thông báo đẩy, mất luôn cả đường báo tin thật.
+
+Chốt chặn N6 giống hệt `deleteThongBao`: lọc theo phạm vi ĐỌC trước, nên thông
+báo của nhóm khác trả **404 chứ không phải 403** — 403 là xác nhận id ấy có
+thật. `pw-thongbao.mjs` kiểm đúng con số 404 này, vì phép kiểm chỉ hỏi "có bị
+chặn không" sẽ đậu cả với 403.
+
+### Thanh định dạng: chèn dấu Markdown, KHÔNG dùng contenteditable
+
+`ganThanhSoan()` (`public/app.js`) chèn `**`, `*`, `- `, `[chữ](url)` vào ô
+`<textarea>`. **Thứ lưu xuống D1 phải là văn bản thuần** — đó chính là điều
+kiện để `mdSafe()` esc() trước rồi mới dựng thẻ. Lưu HTML người dùng gõ ra là
+mở lại đúng lỗ XSS mà cả bộ kiểm kia sinh ra để canh.
+
+Gạch đầu dòng làm theo **DÒNG** chứ không theo vùng bôi đen: bôi giữa chừng hai
+dòng rồi chèn `- ` vào đúng vị trí con trỏ thì ra dấu gạch nằm lửng giữa câu.
+
+Kèm **ô xem trước dựng bằng chính `mdSafe()`** — không ai trong lớp biết
+Markdown là gì, bấm B rồi thấy ngay chữ đậm hiện ra ở dưới thì không phải giải
+thích cú pháp, và người soạn thấy đúng thứ người đọc sẽ thấy.
+
 ## Tư liệu dạng "Nội dung Text" — lệch có chủ ý thứ hai với N2
 
 Thêm 5/9 (migration 0025). Ngô Phú Cường hỏi có đưa được nội dung dạng text

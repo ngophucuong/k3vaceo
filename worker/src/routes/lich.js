@@ -313,6 +313,52 @@ export async function postThongBaoDaXem(env, me) {
   return json({ ok: true });
 }
 
+/* Sửa lại thông báo đã đăng (Ngô Phú Cường yêu cầu 5/9). Trước đó chỉ có gỡ
+   xuống rồi đăng lại — mà làm vậy thì mất luôn "mới", chấm đỏ nổi lên lần
+   nữa, và ai bật thông báo đẩy lại bị báo thêm một lần cho cùng một tin.
+
+   Hai điều CỐ Ý không cho:
+   · Đổi CẤP (nhóm ↔ lớp) — cùng lý do PATCH /api/links/:id không cho đổi
+     scope: biến thông báo nội bộ của nhóm thành của cả lớp là đem việc nhóm
+     cho 146 người đọc, mà nhật ký chỉ ghi "đã sửa" chứ không ai để ý (N6).
+   · Gửi lại thông báo đẩy — sửa một dấu phẩy mà 134 điện thoại kêu lần nữa
+     thì lần sau người ta tắt thông báo đẩy, mất luôn cả đường báo tin thật. */
+export async function patchThongBao(request, env, me, id, ip) {
+  // Lọc theo phạm vi ĐỌC trước, y hệt deleteThongBao: thông báo nội bộ của
+  // nhóm khác phải "không tồn tại" chứ không phải "bị từ chối" — 403 là xác
+  // nhận id đó có thật (N6, quy ước 6).
+  const cu = await env.DB.prepare(
+    `SELECT * FROM thong_bao WHERE id = ? AND cohort_id = ?
+       AND (group_id IS NULL OR group_id = ?)`
+  ).bind(id, me.cohort_id, me.group_id).first();
+  if (!cu) return error('not_found', 404);
+
+  const duoc = cu.group_id === null
+    ? await phaiLaBanCanSu(env, me)
+    : await isGroupOfficer(env, me.id, me.group_id);
+  if (!duoc) return error('forbidden', 403);
+
+  // Chỉ ghi đè trường thật sự gửi lên — gửi thiếu thì giữ nguyên, không xoá
+  // trắng (cùng khuôn với patchLink và postInviteClaim).
+  const body = await readJson(request);
+  const noiDung = 'noi_dung' in body ? cleanText(body.noi_dung, 1000) : cu.noi_dung;
+  if (!noiDung) return error('noi_dung_required', 422);
+  const hetHan = 'het_han' in body ? cleanText(body.het_han, 10) : cu.het_han;
+  if (hetHan && !ngayHopLe(hetHan)) return error('ngay_invalid', 422);
+  const nguon = 'nguon' in body ? cleanText(body.nguon, 60) : cu.nguon;
+
+  await env.DB.prepare(
+    'UPDATE thong_bao SET noi_dung = ?, nguon = ?, het_han = ? WHERE id = ?'
+  ).bind(noiDung, nguon, hetHan || null, id).run();
+
+  await logAudit(env, {
+    actorId: me.id, action: 'thongbao.edit', targetType: 'thong_bao', targetId: id,
+    before: { noi_dung: cu.noi_dung, nguon: cu.nguon, het_han: cu.het_han },
+    after: { noi_dung: noiDung, nguon, het_han: hetHan || null }, ip,
+  });
+  return json({ ok: true, id });
+}
+
 export async function deleteThongBao(env, me, id, ip) {
   // Lọc theo phạm vi ĐỌC trước: thông báo nội bộ của nhóm khác phải "không tồn
   // tại" chứ không phải "bị từ chối" — 403 là xác nhận id đó có thật (N6).

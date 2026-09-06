@@ -24,7 +24,7 @@ import { listFunds, postFund, patchFund, getFundQr, postDeclare, deleteDeclare, 
          listExpenses, postExpense, patchExpense, deleteExpense, getClassMembers,
          postDeclareFor, deleteFund } from './routes/funds.js';
 import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, postThongBao,
-         postThongBaoDaXem, deleteThongBao } from './routes/lich.js';
+         postThongBaoDaXem, patchThongBao, deleteThongBao } from './routes/lich.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
 import {
@@ -287,6 +287,9 @@ export default {
       if (pathname === '/api/push/trang-thai' && method === 'GET') return getPushTrangThai(env, me);
       if (pathname === '/api/push/dang-ky' && method === 'POST') return postPushDangKy(request, env, me);
       if (pathname === '/api/push/huy' && method === 'POST') return postPushHuy(request, env, me);
+      if ((m = pathname.match(/^\/api\/thong-bao\/(\d+)$/)) && method === 'PATCH') {
+        return patchThongBao(request, env, me, Number(m[1]), ip);
+      }
       if ((m = pathname.match(/^\/api\/thong-bao\/(\d+)$/)) && method === 'DELETE') {
         return deleteThongBao(env, me, Number(m[1]), ip);
       }

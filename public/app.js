@@ -28,14 +28,47 @@ const vnDate = s => { const d = new Date(String(s).replace(' ', 'T') + 'Z'); ret
    CỐ Ý không hỗ trợ ảnh/bảng/```code```/tiêu đề lồng danh sách: phạm vi chỉ
    cần đủ cho một ghi chú bài giảng, không phải một trình soạn Markdown đầy đủ. */
 function mdSafe(raw) {
-  const dong = esc(raw).split('\n');
+  // \u0000 làm DẤU GIỮ CHỖ cho liên kết đã dựng xong (xem dongInline), nên phải
+  // quét sạch khỏi văn bản gốc trước: còn nó trong nội dung thì dấu giữ chỗ
+  // không còn là của riêng ta nữa và người dùng chèn được HTML tuỳ ý vào.
+  const dong = esc(raw).replace(/\u0000/g, '').split('\n');
   const khoi = [];
   let ds = null; // { the: 'ul'|'ol', hang: [] } — danh sách đang mở, gộp các dòng liền nhau
 
-  const dongInline = s => s
-    .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-    .replace(/\*(.+?)\*/g, '<i>$1</i>')
-    .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  // Rút gọn phần HIỆN RA của một URL dán thẳng; href giữ nguyên đường dẫn đầy
+  // đủ. Thông báo dán link Outline dài 66 ký tự thì đọc lên chỉ thấy một dãy
+  // UUID tràn cả thẻ — cắt còn tên miền cộng đầu đường dẫn thì vẫn biết bấm
+  // vào sẽ đi đâu (tên miền là thứ duy nhất nói được điều ấy).
+  const nhanGon = u => {
+    const s = u.replace(/^https:\/\//, '').replace(/\/$/, '');
+    return s.length > 38 ? s.slice(0, 37) + '…' : s;
+  };
+  const neo = (url, chu) =>
+    `<a href="${url}" target="_blank" rel="noopener noreferrer">${chu}</a>`;
+
+  const dongInline = s => {
+    const kho = [];
+    const giu = html => `\u0000${kho.push(html) - 1}\u0000`;
+    return s
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/\*(.+?)\*/g, '<i>$1</i>')
+      // Cú pháp [chữ](url) đi TRƯỚC và cất ngay vào kho. Để nguyên thẻ <a>
+      // trong chuỗi thì bước tự nhận URL bên dưới sẽ tóm luôn địa chỉ nằm
+      // trong href rồi lồng thẻ <a> vào giữa thẻ <a>.
+      .replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, (_, chu, url) => giu(neo(url, chu)))
+      // URL DÁN THẲNG, không cú pháp gì. Đây mới là cách người ta bỏ link vào
+      // thông báo thật (xem ảnh Ngô Phú Cường gửi 5/9: một dòng Outline dán
+      // nguyên si, đọc được mà bấm không được).
+      .replace(/https:\/\/[^\s<]+/g, url => {
+        // Dấu câu cuối câu không thuộc về link: "xem tại https://x.vn/a." thì
+        // dấu chấm là của câu văn. KHÔNG cắt dấu ; vì URL đã esc() mang &amp;
+        // ở cuối, cắt đi là hỏng địa chỉ.
+        const duoi = url.match(/[.,:!?)\]]+$/);
+        const that = duoi ? url.slice(0, -duoi[0].length) : url;
+        return giu(neo(that, nhanGon(that))) + (duoi ? duoi[0] : '');
+      })
+      .replace(/\u0000(\d+)\u0000/g, (_, i) => kho[i]);
+  };
 
   const dongDs = () => { if (ds) { khoi.push(`<${ds.the}>${ds.hang.join('')}</${ds.the}>`); ds = null; } };
   let doan = [];
@@ -1066,7 +1099,10 @@ function drawNay() {
   });
   if ($('#inviteBtn')) $('#inviteBtn').onclick = openInviteSheet;
   if ($('#lichThem')) $('#lichThem').onclick = () => suaBuoi(null);
-  if ($('#tbThem')) $('#tbThem').onclick = themThongBao;
+  if ($('#tbThem')) $('#tbThem').onclick = () => soanThongBao(null);
+  document.querySelectorAll('#v-nay [data-suatb]').forEach(b => {
+    b.onclick = () => soanThongBao(Number(b.dataset.suatb));
+  });
   document.querySelectorAll('#v-nay [data-buoi]').forEach(b => {
     b.onclick = () => suaBuoi(Number(b.dataset.buoi));
   });
@@ -1189,10 +1225,12 @@ function veThongBao() {
   <div class="sect">
     <div class="eb">Thông báo${HOME.thong_bao_moi ? ` <span class="c">${HOME.thong_bao_moi} mới</span>` : ''}</div>
     ${ds.length ? ds.map(t => `<div class="warn" style="margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">
-      <div style="flex:1;min-width:0">${esc(t.noi_dung)}
+      <div style="flex:1;min-width:0"><div class="mdview nho">${mdSafe(t.noi_dung)}</div>
         <div style="font-size:11.5px;color:var(--ink3);margin-top:4px;font-weight:400">
           ${t.group_id == null ? 'Cả lớp' : 'Riêng nhóm'}${t.nguon ? ' · ' + esc(t.nguon) : ''}${t.moi ? ' · mới' : ''}</div></div>
-      ${goDuoc(t) ? `<button class="ico" data-xoatb="${t.id}" aria-label="Gỡ thông báo">✕</button>` : ''}
+      ${goDuoc(t) ? `<div style="display:flex;gap:2px;flex:0 0 auto">
+        <button class="ico" data-suatb="${t.id}" aria-label="Sửa thông báo">✎</button>
+        <button class="ico" data-xoatb="${t.id}" aria-label="Gỡ thông báo">✕</button></div>` : ''}
     </div>`).join('')
       : '<div class="card"><div class="cb mut">Chưa có thông báo nào.</div></div>'}
     ${dangLop || dangNhom ? `<button class="wide ghost" id="tbThem" style="margin-top:2px">+ Thêm thông báo</button>` : ''}
@@ -1247,26 +1285,90 @@ function suaBuoi(id) {
   };
 }
 
-function themThongBao() {
+/* Thanh định dạng cho một ô soạn thảo. Chèn đúng dấu Markdown mà mdSafe()
+   hiểu — CỐ Ý không dùng contenteditable hay trình soạn thảo giàu định dạng
+   nào: thứ lưu xuống D1 phải là VĂN BẢN THUẦN, đó chính là điều kiện để
+   mdSafe() esc() trước rồi mới dựng thẻ. Lưu HTML người dùng gõ ra là mở lại
+   đúng lỗ XSS mà pw-tulieu-text.mjs sinh ra để canh.
+
+   Kèm ô xem trước, vì không ai trong lớp biết Markdown là gì: bấm B rồi thấy
+   ngay chữ đậm hiện ra ở dưới thì không cần giải thích cú pháp. */
+function ganThanhSoan(barId, taId, xemId) {
+  const ta = $('#' + taId);
+  const veXem = () => { if ($('#' + xemId)) $('#' + xemId).innerHTML = mdSafe(ta.value); };
+
+  const boc = (truoc, sau, mau) => {
+    const d = ta.selectionStart, c = ta.selectionEnd;
+    ta.setRangeText(truoc + (ta.value.slice(d, c) || mau) + sau, d, c, 'select');
+    ta.focus(); veXem();
+  };
+  // Gạch đầu dòng làm theo DÒNG chứ không theo vùng bôi đen: bôi giữa chừng
+  // hai dòng rồi chèn "- " vào đúng chỗ con trỏ thì ra dấu gạch nằm lửng giữa
+  // câu, không thành danh sách.
+  const dauDong = dau => {
+    const d = ta.selectionStart, c = ta.selectionEnd;
+    const dau1 = ta.value.lastIndexOf('\n', d - 1) + 1;
+    const het = ta.value.indexOf('\n', c) === -1 ? ta.value.length : ta.value.indexOf('\n', c);
+    const khoi = ta.value.slice(dau1, het) || 'Ý thứ nhất';
+    ta.setRangeText(khoi.split('\n').map(l => l.startsWith(dau) ? l : dau + l).join('\n'),
+                    dau1, het, 'select');
+    ta.focus(); veXem();
+  };
+
+  $('#' + barId).querySelectorAll('[data-md]').forEach(b => {
+    b.onclick = () => ({
+      b: () => boc('**', '**', 'chữ đậm'),
+      i: () => boc('*', '*', 'chữ nghiêng'),
+      ul: () => dauDong('- '),
+      link: () => boc('[', '](https://)', 'chữ hiện ra'),
+    })[b.dataset.md]();
+  });
+  ta.oninput = veXem;
+  veXem();
+}
+
+// id = null là đăng mới, có id là sửa lại thông báo đã đăng.
+function soanThongBao(id) {
+  const cu = id ? (HOME.thong_bao ?? []).find(x => x.id === id) : null;
+  if (id && !cu) { toast('Không tìm thấy thông báo'); return; }
   const dangLop = !!HOME.can_sua_lich;
   const nhom = HOME?.group?.no ? `Nhóm ${HOME.group.no}` : 'nhóm mình';
+  // Cấp (ai nhận) KHÔNG sửa được — cùng lý do PATCH /api/links/:id không cho
+  // đổi scope: biến thông báo của nhóm thành của lớp là đem việc nội bộ cho
+  // 146 người đọc (N6). Muốn đổi thì gỡ xuống rồi đăng lại.
   openSheet(`
-   <h3>Thêm thông báo</h3>
-   <p class="sub">Thứ cần biết mà không gắn vào một buổi cụ thể. Đây không phải chỗ nhắn tin —
-     nguyên tắc N1: Zalo để bàn, ứng dụng để chốt.</p>
-   ${dangLop ? `<label class="f">Ai nhận</label>
+   <h3>${cu ? 'Sửa thông báo' : 'Thêm thông báo'}</h3>
+   <p class="sub">${cu
+     ? 'Sửa xong bấm Lưu. Người đã nhận thông báo đẩy sẽ KHÔNG bị báo lại lần nữa.'
+     : `Thứ cần biết mà không gắn vào một buổi cụ thể. Đây không phải chỗ nhắn tin —
+        nguyên tắc N1: Zalo để bàn, ứng dụng để chốt.`}</p>
+   ${cu ? `<div class="hintline">Gửi cho: <b>${cu.group_id == null ? 'Cả lớp' : esc(nhom)}</b> —
+       không đổi được. Muốn đổi thì gỡ xuống rồi đăng lại.</div>`
+     : dangLop ? `<label class="f">Ai nhận</label>
    <select id="tbCap"><option value="nhom">${esc(nhom)} — chỉ nhóm mình</option>
      <option value="lop">Cả lớp — 134 người</option></select>
    <div class="hintline" id="tbCapHint"></div>` : `<div class="hintline">Thông báo này chỉ ${esc(nhom)} thấy.</div>`}
    <label class="f">Nội dung</label>
-   <textarea id="tbND" rows="4" maxlength="1000" placeholder="Chương trình tham quan kiến tập chuyển sang chiều thứ Sáu 11/9/2026."></textarea>
-   <label class="f">Ai phát</label><input id="tbNguon" maxlength="60" value="${dangLop ? 'Ban tổ chức' : esc(nhom)}">
-   <label class="f">Ẩn sau ngày</label><input id="tbHan" type="date">
+   <div class="mdbar" id="tbBar">
+     <button type="button" data-md="b" title="Chữ đậm"><b>B</b></button>
+     <button type="button" data-md="i" title="Chữ nghiêng"><i>I</i></button>
+     <button type="button" data-md="ul" title="Gạch đầu dòng">☰</button>
+     <button type="button" data-md="link" title="Chèn liên kết">🔗</button>
+   </div>
+   <textarea id="tbND" rows="5" maxlength="1000"
+     placeholder="Chương trình tham quan kiến tập chuyển sang chiều thứ Sáu 11/9/2026.">${esc(cu?.noi_dung || '')}</textarea>
+   <div class="hintline">Dán thẳng đường dẫn cũng được — nó tự thành liên kết bấm được.</div>
+   <label class="f">Xem trước</label>
+   <div class="mdxem mdview nho" id="tbXem"></div>
+   <label class="f">Ai phát</label><input id="tbNguon" maxlength="60"
+     value="${esc(cu ? (cu.nguon || '') : (dangLop ? 'Ban tổ chức' : nhom))}">
+   <label class="f">Ẩn sau ngày</label><input id="tbHan" type="date" value="${esc(cu?.het_han || '')}">
    <div class="hintline">Quá ngày này thì thông báo tự thôi hiện. Để trống là hiện mãi.</div>
    <div id="tbErr" class="errline" style="display:none"></div>
    <div class="sa"><button class="big c" id="tbThoi">Thôi</button>
-     <button class="big go" id="tbLuu">Đăng</button></div>`);
+     <button class="big go" id="tbLuu">${cu ? 'Lưu' : 'Đăng'}</button></div>`);
   $('#tbThoi').onclick = closeSheet;
+  ganThanhSoan('tbBar', 'tbND', 'tbXem');
 
   if ($('#tbCap')) {
     const ve = () => {
@@ -1283,13 +1385,14 @@ function themThongBao() {
     if (!$('#tbND').value.trim()) {
       $('#tbErr').textContent = 'Phải có nội dung.'; $('#tbErr').style.display = 'block'; return;
     }
+    const than = {
+      noi_dung: $('#tbND').value, nguon: $('#tbNguon').value, het_han: $('#tbHan').value || null,
+    };
     submitting($('#tbLuu'), async () => {
-      await apiPost('/api/thong-bao', {
-        cap: $('#tbCap') ? $('#tbCap').value : 'nhom',
-        noi_dung: $('#tbND').value, nguon: $('#tbNguon').value, het_han: $('#tbHan').value || null,
-      });
+      if (id) await apiPatch(`/api/thong-bao/${id}`, than);
+      else await apiPost('/api/thong-bao', { cap: $('#tbCap') ? $('#tbCap').value : 'nhom', ...than });
       await refreshHome();
-    }, 'Đã đăng thông báo');
+    }, id ? 'Đã lưu' : 'Đã đăng thông báo');
   };
 }
 
