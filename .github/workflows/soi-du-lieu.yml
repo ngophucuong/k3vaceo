@@ -112,6 +112,18 @@ jobs:
               WHERE NOT EXISTS (SELECT 1 FROM members m
                                  WHERE m.roster_id = r.id AND m.claimed_at IS NOT NULL)"
 
+          # Thông báo đẩy: "có gửi" và "có tới" là hai chuyện khác nhau.
+          # guiThongBaoDay() chỉ gửi cho ai CÓ DÒNG trong push_subscriptions —
+          # không ai bật thì nó lặng lẽ trả {gui: 0}, không lỗi, không dấu vết.
+          # last_ok_at là bằng chứng DUY NHẤT máy chủ đẩy đã nhận gói tin.
+          soi "Thông báo đẩy: bao nhiêu người đã bật, và có gửi được không" \
+            "SELECT COUNT(*) AS so_dang_ky,
+                    SUM(CASE WHEN disabled_at IS NULL THEN 1 ELSE 0 END) AS con_hieu_luc,
+                    SUM(CASE WHEN last_ok_at IS NOT NULL THEN 1 ELSE 0 END) AS da_tung_gui_ok,
+                    MAX(last_ok_at) AS lan_gui_ok_gan_nhat,
+                    MAX(last_error) AS loi_gan_nhat
+               FROM push_subscriptions"
+
           soi "Tên miền email — bắt lỗi gõ nhầm khi tự khai" \
             "SELECT LOWER(substr(email, instr(email,'@')+1)) AS mien,
                     COUNT(*) AS so_nguoi
