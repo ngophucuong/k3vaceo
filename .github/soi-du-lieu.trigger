@@ -14,3 +14,7 @@ còn bao nhiêu số bị hai người dùng chung.
 lần: 6 — lượt 5 đỏ vì "soi: command not found": hàm soi() định nghĩa ở bước
 "Soi cả lớp", còn ba phép đo mới bị chèn vào bước "Đọc" — mỗi `run:` là một
 shell riêng nên hàm không đi theo sang bước sau. Đã chuyển vào đúng bước.
+
+lần: 7 — vá chính phép kiểm vừa thêm: GLOB '0[0-9]*' chỉ soi hai ký tự đầu
+nên số "03845375x8" (lẫn chữ x) lọt qua. Đo được: cách cũ đếm 3 số sai
+khuôn, cách đúng đếm 4.

@@ -143,10 +143,15 @@ jobs:
           # chìa. Migration 0033 vừa gỡ một ca như thế (0914544449, hai người
           # tên Tiến) — phép đo này xác nhận trên D1 THẬT, và bắt được ca mới
           # nếu về sau có ai điền trùng.
+          # GLOB '0[0-9]*' CHỈ soi hai ký tự đầu — `03845375x8` (số của Đặng
+          # Hùng, lẫn chữ "x") lọt qua sạch vì nó dài đúng 10 và bắt đầu bằng
+          # "0" rồi "3". Phải soi TOÀN chuỗi bằng GLOB '*[^0-9]*'. Đo được:
+          # cách cũ đếm 3, cách đúng đếm 4. Cùng lỗi ấy có ở
+          # bo-sung-dien-thoai.yml, đã sửa kèm.
           soi "Toàn vẹn số điện thoại của roster" \
             "SELECT (SELECT COUNT(*) FROM roster WHERE phone IS NULL) AS chua_co_so,
                     (SELECT COUNT(*) FROM roster WHERE phone IS NOT NULL
-                       AND (phone NOT GLOB '0[0-9]*' OR LENGTH(phone) <> 10)) AS sai_khuon,
+                       AND (LENGTH(phone) <> 10 OR phone NOT GLOB '0*' OR phone GLOB '*[^0-9]*')) AS sai_khuon,
                     (SELECT COUNT(*) FROM (SELECT phone FROM roster
                        WHERE phone IS NOT NULL GROUP BY phone HAVING COUNT(*) > 1))
                       AS so_bi_dung_chung"
