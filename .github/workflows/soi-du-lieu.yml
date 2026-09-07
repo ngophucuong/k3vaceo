@@ -151,6 +151,33 @@ jobs:
               WHERE m.email = '$em'" 2>&1 | tail -20
 
           echo
+          # Toàn vẹn số điện thoại. `roster.phone` là bí mật DUY NHẤT mở cửa
+          # /vao cho một hồ sơ chưa ai nhận (soHopLeTuHoSo, routes/onboard.js),
+          # nên hai người chung một số nghĩa là hai cánh cửa mở bằng cùng một
+          # chìa. Migration 0033 vừa gỡ một ca như thế (0914544449, hai người
+          # tên Tiến) — phép đo này xác nhận trên D1 THẬT, và bắt được ca mới
+          # nếu về sau có ai điền trùng.
+          soi "Toàn vẹn số điện thoại của roster" \
+            "SELECT (SELECT COUNT(*) FROM roster WHERE phone IS NULL) AS chua_co_so,
+                    (SELECT COUNT(*) FROM roster WHERE phone IS NOT NULL
+                       AND (phone NOT GLOB '0[0-9]*' OR LENGTH(phone) <> 10)) AS sai_khuon,
+                    (SELECT COUNT(*) FROM (SELECT phone FROM roster
+                       WHERE phone IS NOT NULL GROUP BY phone HAVING COUNT(*) > 1))
+                      AS so_bi_dung_chung"
+
+          # Ai còn dùng chung số với ai — cần TÊN chứ không chỉ con số, vì mỗi
+          # ca phải phân định riêng bằng bằng chứng ngoài đời.
+          soi "Cụ thể những ai đang chung số" \
+            "SELECT phone AS so, COUNT(*) AS so_nguoi,
+                    GROUP_CONCAT(full_name, ' | ') AS nhung_ai
+               FROM roster WHERE phone IS NOT NULL
+              GROUP BY phone HAVING COUNT(*) > 1"
+
+          # Hai người tên Tiến sau migration 0033: số phải nằm ở ĐÚNG MỘT hồ sơ.
+          soi "Hai người tên Tiến (kiểm migration 0033)" \
+            "SELECT seq, full_name, COALESCE(phone,'(trống)') AS so, group_label
+               FROM roster WHERE seq IN (65, 102) ORDER BY seq"
+
           echo "════ Mã đã sinh trong 3 giờ qua ════"
           echo "Mỗi dòng ở đây = một lần Worker THẬT SỰ gọi gửi thư."
           $WRANGLER --command \
