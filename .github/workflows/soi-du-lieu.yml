@@ -137,20 +137,6 @@ jobs:
               WHERE created_at > datetime('now','-3 hours')
                 AND bucket IN ('otp_email','otp_request','otp_verify')
               GROUP BY bucket, ip ORDER BY so_lan DESC LIMIT 20"
-
-      - name: Đọc
-        run: |
-          em=$(printf '%s' "$EMAIL" | sed "s/'/''/g")
-
-          echo "════ Hồ sơ của $EMAIL ════"
-          $WRANGLER --command \
-            "SELECT m.id, m.full_name, g.label AS nhom, m.is_active,
-                    COALESCE(m.claimed_at,'(chưa nhận chỗ)') AS nhan_cho,
-                    COALESCE(m.email_verified_at,'(chưa xác minh email)') AS xac_minh
-               FROM members m LEFT JOIN groups g ON g.id = m.group_id
-              WHERE m.email = '$em'" 2>&1 | tail -20
-
-          echo
           # Toàn vẹn số điện thoại. `roster.phone` là bí mật DUY NHẤT mở cửa
           # /vao cho một hồ sơ chưa ai nhận (soHopLeTuHoSo, routes/onboard.js),
           # nên hai người chung một số nghĩa là hai cánh cửa mở bằng cùng một
@@ -178,6 +164,20 @@ jobs:
             "SELECT seq, full_name, COALESCE(phone,'(trống)') AS so, group_label
                FROM roster WHERE seq IN (65, 102) ORDER BY seq"
 
+
+      - name: Đọc
+        run: |
+          em=$(printf '%s' "$EMAIL" | sed "s/'/''/g")
+
+          echo "════ Hồ sơ của $EMAIL ════"
+          $WRANGLER --command \
+            "SELECT m.id, m.full_name, g.label AS nhom, m.is_active,
+                    COALESCE(m.claimed_at,'(chưa nhận chỗ)') AS nhan_cho,
+                    COALESCE(m.email_verified_at,'(chưa xác minh email)') AS xac_minh
+               FROM members m LEFT JOIN groups g ON g.id = m.group_id
+              WHERE m.email = '$em'" 2>&1 | tail -20
+
+          echo
           echo "════ Mã đã sinh trong 3 giờ qua ════"
           echo "Mỗi dòng ở đây = một lần Worker THẬT SỰ gọi gửi thư."
           $WRANGLER --command \

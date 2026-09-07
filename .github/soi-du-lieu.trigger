@@ -10,3 +10,7 @@ tế bao nhiêu người đã bật thông báo đẩy, và đã có gói tin n�
 lần: 5 — xác nhận trên D1 THẬT rằng migration 0033 đã gỡ đúng: số
 0914544449 nay chỉ còn ở một hồ sơ (Lưu Minh Tiến), và đếm xem cả roster
 còn bao nhiêu số bị hai người dùng chung.
+
+lần: 6 — lượt 5 đỏ vì "soi: command not found": hàm soi() định nghĩa ở bước
+"Soi cả lớp", còn ba phép đo mới bị chèn vào bước "Đọc" — mỗi `run:` là một
+shell riêng nên hàm không đi theo sang bước sau. Đã chuyển vào đúng bước.
