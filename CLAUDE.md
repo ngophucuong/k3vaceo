@@ -85,7 +85,7 @@ cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trướ
 
 **Ba việc cần làm tiếp, xếp theo mức chặn:**
 
-1. **Điền 46 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (40
+1. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
    người chưa có số nào, 6 số sai hoặc trùng — đã điền được 4/44 người chưa có
    số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020; thêm một
    người mới migration 0023 vào thẳng nhóm "sai" vì số trong tệp gốc thiếu một
@@ -1675,6 +1675,42 @@ khuôn "vai cấp lớp tách khỏi vai cấp nhóm" đã dùng cho Ngô Phú C
 có thêm quyền `isClassOfficer` — mở đợt thu và ghi sổ chi quỹ LỚP — bên cạnh
 `isClassCommittee` đã có (phát link mời xuyên nhóm, giống Cường).
 
+### `0914544449` là của Lưu Minh Tiến — và vì sao phải gỡ ngay (migration 0033)
+
+Số này nằm trong `roster` của CẢ HAI người tên Tiến từ lần nạp đầu, và đã nằm
+trong `bo-sung-dien-thoai.csv` nhóm "đang SAI" suốt từ Đợt 5 mà không ai biết
+nó là của ai. **Thư mời kiến tập 11/9** (Ban tổ chức, 6/9) phân định giúp: nó
+ghi rõ **Lưu Minh Tiến — trưởng đoàn — 0914.544.449**. Ngô Phú Cường xác nhận
+7/9.
+
+**Việc cần làm hoá ra ngược với dự đoán ban đầu.** Tôi đã định "điền số cho
+Lưu Minh Tiến" — nhưng đọc D1 thì số ấy ĐÃ có sẵn ở cả `roster.phone` lẫn
+`members.phone` của anh từ migration 0021, `claimed_at` còn trống, tức anh tự
+đăng nhập được từ lâu rồi. Cái hỏng không phải chỗ thiếu, mà là **bản sao nằm
+ở hồ sơ Lê Minh Tiến**.
+
+**Vì sao bản sao ấy phải gỡ NGAY, không chờ có số thật của Lê Minh Tiến:**
+`soHopLeTuHoSo()` (`routes/onboard.js`) nhận `roster.phone` làm bí mật mở cửa
+`/vao`, và cửa ấy mở được hồ sơ CHƯA AI NHẬN — Lê Minh Tiến chưa nhận. Trước
+6/9 số này chỉ nằm trong danh sách nội bộ; từ 6/9 nó nằm trong **một tờ thư
+mời phát cho 146 người**. Nghĩa là bất kỳ ai đọc thư mời đều vào được `/vao`,
+chọn tên Lê Minh Tiến, gõ đúng số ấy và chiếm hồ sơ của anh. Cùng dạng lỗ hổng
+đã vá ở `postInviteClaim` ngày 5/9, chỉ khác là chìa khoá lần này vừa được
+chính Ban tổ chức in ra và phát đi.
+
+Gỡ số thì anh Lê Minh Tiến không tự vào `/vao` được nữa — nhưng anh vốn dĩ
+cũng không nên vào bằng số của người khác. Đường vào của anh là link mời, một
+cú chạm ở Danh bạ → Cả lớp.
+
+Migration 0033 gỡ có guard hai lớp: chỉ động khi số VẪN LÀ bản trùng ấy (ai đó
+đã điền số thật thì không đè lên), và chỉ khi anh CHƯA nhận hồ sơ — đã nhận thì
+`/vao` đóng vĩnh viễn nên số thôi là chìa khoá, mà lại là bản ghi lịch sử nên
+giữ. Hồ sơ Lưu Minh Tiến KHÔNG đụng tới.
+
+Sau migration này, `roster` còn đúng **một** số bị hai người dùng chung:
+`0985981808` của hai người CÙNG TÊN Phan Thị Thanh Nga (Nhóm 6 và Nhóm 9) —
+chưa có bằng chứng nào phân định được, vẫn treo.
+
 ### Việc còn treo: dữ liệu "Trưởng, phó nhóm" của 8 nhóm còn lại
 
 Tệp Excel "Final_Danh_sách_ký_K03_15.08" Ban tổ chức gửi có sheet **"Trưởng,
@@ -2031,7 +2067,9 @@ chỗ nào để dò).
 **Dữ liệu chặn luồng này** — 49 dòng, xem `scripts/data/bo-sung-dien-thoai.csv`:
 - 44 người chưa có số nào (Nhóm 6: 6 người) → chưa tự nhận diện được
 - Lê Trung Đức: `098778525` thiếu một chữ số
-- `0914544449` dùng chung cho Lưu Minh Tiến (Nhóm 5) và Lê Minh Tiến (Nhóm 8)
+- ~~`0914544449` dùng chung cho Lưu Minh Tiến (Nhóm 5) và Lê Minh Tiến (Nhóm 8)~~
+  → **đã phân định 7/9, xem mục riêng bên dưới**: số ấy là của Lưu Minh Tiến;
+  bản sao ở hồ sơ Lê Minh Tiến đã gỡ (migration 0033)
 - `0985981808` dùng chung cho **hai người cùng tên** Phan Thị Thanh Nga, một ở
   Nhóm 6 một ở Nhóm 9 — vì vậy CSV khoá theo `seq` chứ không theo tên
 
