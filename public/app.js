@@ -2339,7 +2339,7 @@ function openLinkText(id) {
   if (!r) return;
   openSheet(`
    <h3>${esc(r.title)}</h3>
-   <p class="sub">${nhanGan(r) || 'Ghi chú tự viết — không phải slide hay tài liệu của Ban tổ chức.'}</p>
+   <p class="sub">${nhanGan(r) || 'Nội dung gõ thẳng trong ứng dụng — không có tệp đính kèm.'}</p>
    <div class="mdview">${mdSafe(r.content_md || '')}</div>
    <div class="sa" style="margin-top:18px"><button class="big go" id="mvC">Đóng</button></div>`);
   $('#mvC').onclick = closeSheet;

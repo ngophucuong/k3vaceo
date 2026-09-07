@@ -1375,6 +1375,33 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
   "Buổi sáng"/"Buổi chiều" cho 5/9 chứ không suy ra khung giờ — bịa giờ ra thì
   tệp `.ics` ghi sai cho lịch điện thoại của 134 người.
 
+  **Buổi 11/9 điền đủ ngày 6/9 (migration 0032)** — Ngô Phú Cường gửi thư mời
+  chính thức của Ban tổ chức: kiến tập Nhà máy Dược Thái Minh Hi-Tech, 7h30–
+  13h30, xe đón tại Số 3 Liễu Giai. Dòng `lich_hoc` cho 11/9 đã có từ trước
+  nhưng còn là bản tạm ("Tham quan kiến tập", giờ 13:30 không căn cứ). Lại
+  **UPDATE tại chỗ** như 0019, giữ nguyên `id` — đổi `id` là đổi UID trong tệp
+  `.ics`, và lịch điện thoại của 146 người sẽ có HAI buổi 11/9 thay vì một
+  buổi được cập nhật. Toàn văn thư mời đi vào một ghi chú "Nội dung Text" gắn
+  vào đúng buổi ấy, `scope='class'`.
+
+  **`ghi_chu` PHẢI NGẮN — chỉ ảnh chụp mới thấy.** Giao diện in `ghi_chu` vào
+  dòng đầu thẻ buổi học, kiểu CHỮ HOA cỡ 11px, cùng dòng với ngày và giờ. Bản
+  đầu của 0032 ghi đủ địa chỉ + tên Ban Lãnh đạo + nguồn chi phí → **bốn dòng
+  chữ hoa đè lên chính tên buổi học**. Không phép kiểm chuỗi nào thấy được.
+  Nay chỉ còn "Xe đón 7h30 tại Số 3 Liễu Giai · KCN Thạch Thất, Hòa Lạc" —
+  lúc 7 giờ sáng thì "đứng ở đâu" là thứ duy nhất người ta cần, và nó cũng là
+  thứ duy nhất người xem lịch trên ĐIỆN THOẠI đọc được (`ghi_chu` đi thẳng vào
+  `DESCRIPTION` của `.ics`). Phần còn lại nằm trong ghi chú Text ngay dưới,
+  cách đúng một cú chạm. `giang_vien` để TRỐNG: thư mời không nêu giảng viên,
+  mà `lib/ics.js` in ra "Giảng viên: …" — điền Ban Lãnh đạo Thái Minh vào đó
+  là nói sai vai trò của họ.
+
+  **CỐ Ý KHÔNG thêm dòng `lich_hoc` cho buổi giao lưu 13h30–16h00** sau chương
+  trình: thư mời ghi rõ "nội dung cụ thể sẽ được thông báo sau" và chi phí do
+  người tham gia tự chia. Đưa một buổi chưa chốt vào `.ics` là ghi vào lịch
+  điện thoại của 146 người một cuộc hẹn chưa chắc có. Nó nằm ở mục "Lưu ý"
+  trong ghi chú Text, đúng chỗ của nó.
+
   Chủ đề ba buổi đầu (15/8–22/8) ĐỌC TỪ TÊN THƯ MỤC Drive, còn 4/9 và 5/9 đọc
   thẳng từ nguyên văn thông báo; "Thái Hoà" của buổi 22/8 là suy ra từ khuôn
   tên — sai thì Ban cán sự lớp bấm ✎ sửa được, không cần migration. Nhờ ba buổi
