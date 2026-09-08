@@ -1,0 +1,22 @@
+-- Đính kèm Ghi chú (links.kind='TEXT') vào Thông báo.
+--
+-- Ngô Phú Cường hỏi 8/9: "trong thông báo gán Ghi chú vào như thế nào?" —
+-- tra ra CHƯA có đường nào. Soạn thông báo chỉ nhắc được bằng CHỮ THƯỜNG
+-- ("xem thêm ở tab Lịch, tên ghi chú là …"), không bấm được, người đọc phải
+-- tự đi tìm.
+--
+-- Đúng khuôn "một dòng, nhiều màn" đã dùng cho links.buoi_id (migration
+-- 0014) và links.section_id (nối dây 5/9): vẫn đúng MỘT dòng trong links,
+-- không nhân đôi, không bảng "shortcut". Đặt cột ở PHÍA thong_bao (không
+-- phải thêm links.thong_bao_id) vì quan hệ ở đây khác buoi_id/section_id:
+-- hai cột ấy nói "dòng links này THUỘC VỀ buổi/phần nào" (sở hữu), còn cột
+-- này nói "thông báo này THAM CHIẾU ghi chú nào" (không sở hữu) — một Ghi
+-- chú có thể đã gắn sẵn vào một buổi học TỪ TRƯỚC, độc lập với việc có
+-- thông báo nào trỏ tới nó hay không.
+--
+-- CỐ Ý KHÔNG hạn chế "chỉ ghi chú CHƯA gắn buổi/phần bài nào": ca thật nhất
+-- sinh ra tính năng này là NGƯỢC LẠI — Thư mời kiến tập 11/9 (migration
+-- 0032) đã gắn sẵn vào buổi 11/9, và chính vì đã có sẵn ở đó nên mới muốn
+-- thông báo cũng trỏ tới, không phải chép lại nội dung lần hai.
+ALTER TABLE thong_bao ADD COLUMN ghi_chu_id INTEGER REFERENCES links(id);
+CREATE INDEX ix_thongbao_ghichu ON thong_bao(ghi_chu_id);

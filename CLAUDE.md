@@ -23,43 +23,49 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
 `claude/content-deployment-continuation-m2inni`.
 
-**Chín việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Mười việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
+1. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
+   dạng B/I/gạch đầu dòng và ô xem trước gắn thêm vào sheet Sửa ghi chú/Gắn
+   Tư liệu (trước đó chỉ có ở sheet soạn thông báo). Phát hiện tình cờ một
+   N6 THẬT có từ trước khi làm việc này: `GET /api/lich` trả về thông báo
+   nội bộ của MỌI nhóm, không lọc phạm vi — đã vá cùng lúc. Xem mục riêng
+   bên dưới.
+2. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
    dụng xong là gửi thư cho người trong phạm vi, kèm công tắc tắt của chính
    chủ ở tab Tài khoản. Lý do làm: đo trên D1 thật thì thông báo đẩy chỉ có
    **2/146 người bật và chưa gói tin nào từng đi** — xem mục riêng bên dưới.
-2. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
+3. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
    Danh mục "bán gì, bán cho ai" của cả lớp, kèm ghép nối theo nhu cầu và
    một trang ai cũng mở được (Google index được). Chỗ DUY NHẤT dữ liệu người
    dùng ra khỏi tên miền, và chỉ của ai tự bật — xem mục riêng bên dưới.
-3. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+4. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
    Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
    1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
    tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
    bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
    trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
    người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
-4. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+5. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-5. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+6. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-6. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+7. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
    Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
-   người đã đăng nhập (mục #3 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
+   người đã đăng nhập (mục #4 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
    xem mục riêng bên dưới.
-7. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-8. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-9. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
+8. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+9. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+10. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
    ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
    thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
    lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
@@ -851,6 +857,64 @@ dòng rồi chèn `- ` vào đúng vị trí con trỏ thì ra dấu gạch nằ
 Kèm **ô xem trước dựng bằng chính `mdSafe()`** — không ai trong lớp biết
 Markdown là gì, bấm B rồi thấy ngay chữ đậm hiện ra ở dưới thì không phải giải
 thích cú pháp, và người soạn thấy đúng thứ người đọc sẽ thấy.
+
+### Đính kèm Ghi chú vào thông báo (migration 0034)
+
+Thêm 8/9. Ngô Phú Cường hỏi thẳng: "trong thông báo gán Ghi chú vào như thế
+nào?" — tra ra CHƯA có đường nào. Soạn thông báo trước đó chỉ nhắc được bằng
+**chữ thường** ("xem thêm ở tab Lịch, tên ghi chú là …"), không bấm được,
+người đọc phải tự đi tìm — đúng cảnh vừa vá cho URL dán thẳng ở trên, chỉ khác
+đối tượng là một Ghi chú nội bộ chứ không phải một địa chỉ https.
+
+**Cột đặt ở phía `thong_bao` (`ghi_chu_id INTEGER REFERENCES links(id)`), không
+phải thêm `links.thong_bao_id`.** Khác hẳn `links.buoi_id`/`links.section_id`
+— hai cột ấy nói "dòng `links` này THUỘC VỀ buổi/phần nào" (sở hữu), còn cột
+mới nói "thông báo này THAM CHIẾU ghi chú nào" (không sở hữu). Một Ghi chú có
+thể đã gắn sẵn vào một buổi học từ trước, độc lập với việc có thông báo nào
+trỏ tới nó hay không — và **CỐ Ý không hạn "chỉ ghi chú chưa gắn buổi/phần bài
+nào"**: ca thật nhất sinh ra tính năng này là NGƯỢC LẠI, Thư mời kiến tập 11/9
+(migration 0032) đã gắn sẵn vào buổi 11/9, và chính vì đã có sẵn ở đó nên mới
+muốn thông báo cũng trỏ tới, không phải chép nội dung lần hai.
+
+**`docGhiChuId()` (`routes/lich.js`) kiểm HAI thứ, không chỉ một:**
+1. **Phạm vi (N6)** — `(scope = 'class' OR group_id = ?)` theo nhóm của NGƯỜI
+   SOẠN. Đính kèm ghi chú của nhóm khác trả 404 chứ không phải 403, đúng chốt
+   N6 đã dùng xuyên suốt.
+2. **Loại** — `kind = 'TEXT'`. Một liên kết Drive/Sheet không phải Ghi chú,
+   dù cùng `scope='class'` mà người soạn đọc được thoải mái, vẫn bị chặn vì
+   sai LOẠI chứ không phải sai PHẠM VI — hai nhánh lỗi khác nhau, `kiem-
+   thongbao-ghichu.mjs` giữ ca kiểm riêng cho từng nhánh.
+
+**Đọc lại (`/api/home`) lọc theo phạm vi của NGƯỜI XEM, không phải người
+đăng** — cùng nguyên lý `layTuLieuTheoBuoi()` đã dùng cho tư liệu gắn buổi.
+Một thông báo cấp lớp đính kèm ghi chú riêng của Nhóm 6 là tổ hợp HỢP LỆ
+(`docGhiChuId` không cấm — cùng lý lẽ đã dùng cho Bài↔Tư liệu cấp lớp): người
+Nhóm 7 vẫn đọc được thông báo, chỉ riêng phần ghi chú đính kèm lặng lẽ không
+hiện với họ. Không chặn tổ hợp này, giống hệt cách đã quyết cho phần bài.
+
+**Giao diện dùng lại NGUYÊN `veTuLieuGan()`**, không viết bộ vẽ thứ hai:
+`/api/home` định dạng lại `thong_bao[].tu_lieu` đúng khuôn dữ liệu mà hàm ấy
+đã đọc cho buổi học/phần bài, nên ghi chú đính kèm hiện dưới thông báo bằng
+đúng dòng "Ghi chú · <tên> ›" quen thuộc, bấm vào mở đúng sheet — không có
+JS mới nào phải viết ở phía hiển thị.
+
+**Thanh B/I/gạch đầu dòng và ô xem trước cũng gắn vào CHÍNH sheet Sửa ghi chú
+và Gắn Tư liệu** (`openLinkEdit`/`openLinkAdd`, dùng lại `ganThanhSoan()`) —
+trước đó chỉ có ở sheet soạn thông báo, còn ô soạn Ghi chú vẫn là textarea
+trơn dù cùng dùng `mdSafe()` để hiển thị. Ngô Phú Cường hỏi riêng "Việc sửa
+ghi chú có được không?" trước khi có tính năng này; trả lời khi đó là "được
+nhưng chưa có thanh định dạng" — nay đã có, cùng một hàm cho cả ba nơi soạn
+Markdown trong ứng dụng (thông báo, sửa ghi chú, tạo ghi chú mới).
+
+**Một N6 thật, có từ trước, phát hiện tình cờ khi thêm cột này:** `getLich()`
+(route `GET /api/lich`, không gác theo vai) trả về **toàn bộ** `thong_bao`
+của khoá, thiếu điều kiện `(group_id IS NULL OR group_id = ?)` — bất kỳ ai
+đăng nhập gọi thẳng route này cũng đọc được thông báo nội bộ của MỌI nhóm.
+Giao diện không lộ ra vì `layLichDayDu()` (nơi duy nhất gọi route này, để
+dựng ô chọn buổi cho sheet Gắn Tư liệu) chỉ đọc `.lich_hoc`, chưa từng đọc
+`.thong_bao` — nhưng quy ước 6 là kiểm ở máy chủ, không tin sự im lặng ấy của
+giao diện. Đã vá cùng lúc, khớp điều kiện với `/api/home` và
+`postThongBaoDaXem`.
 
 ## Tư liệu dạng "Nội dung Text" — lệch có chủ ý thứ hai với N2
 

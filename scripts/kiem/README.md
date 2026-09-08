@@ -88,8 +88,9 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tulieu-text.mjs` | **an toàn XSS của `mdSafe()`** — bốn ca độc + bốn ca thuận + giao diện |
 | `kiem-tulieu-bai.mjs` | tư liệu gắn vào PHẦN BÀI (links.section_id): plan.js/links.js, **N6** qua nhóm khác |
 | `pw-tulieu-bai.mjs` | giao diện: sheet phần bài ↔ Gắn Tư liệu ↔ tab Tư liệu, "một dòng, ba màn" |
-| `pw-thongbao.mjs` | thông báo: URL dán thẳng thành link bấm được, sửa lại được, thanh B/I/gạch đầu dòng — và **N6 ở đường sửa trả 404 chứ không phải 403** |
-| `reset-thongbao.sh` | dựng phiên + một thông báo Nhóm 6 có URL dán thẳng + một thông báo của NHÓM KHÁC cho phép kiểm N6 |
+| `pw-thongbao.mjs` | thông báo: URL dán thẳng thành link bấm được, sửa lại được, thanh B/I/gạch đầu dòng, **đính kèm Ghi chú** (migration 0034) và thanh định dạng ở CHÍNH sheet Sửa ghi chú/Gắn Tư liệu — và **N6 ở đường sửa trả 404 chứ không phải 403** |
+| `kiem-thongbao-ghichu.mjs` | đính kèm Ghi chú vào thông báo: đúng phạm vi N6, đúng loại TEXT (không phải mọi tư liệu), sửa/gỡ đính kèm đúng khuôn merge-not-overwrite |
+| `reset-thongbao.sh` | dựng phiên + một thông báo Nhóm 6 có URL dán thẳng + một thông báo của NHÓM KHÁC cho phép kiểm N6 + bốn Ghi chú/liên kết fixture cho phép kiểm đính kèm |
 | `kiem-mail-thongbao.mjs` | **thư khi có thông báo mới**: ma trận phạm vi phải trùng khít đường đẩy, không gửi ngược người đăng, công tắc của chính chủ giảm đúng một người, và SỬA thì không gửi lại |
 | `reset-mail-thongbao.sh` | dựng HAI phiên (cần phiên thứ hai vì không ai tắt hộ được — N5) và đọc sẵn mẫu số ra `mail-mau-so.json` |
 | `pw-mobile.mjs` | cảm giác ứng dụng: chừa chỗ thanh trạng thái, khoá zoom, ô nhập 16px — và **số điện thoại vẫn copy được** |
@@ -108,7 +109,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Mười sáu phép đối chứng đáng giữ nhất
+## Mười chín phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -263,6 +264,38 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    trong bốn nhánh ấy: nó khẳng định `#pushNut` VẮNG MẶT rồi mới đòi
    `#mailNut` có mặt. Và nó đọc lại `/api/home` sau mỗi lần bấm — đổi chữ trên
    màn hình mà máy chủ không ghi nhận là đúng loại hỏng không ai thấy.
+
+17. **Đính kèm Ghi chú vào thông báo phải kiểm ĐÚNG LOẠI, không chỉ đúng
+   phạm vi.** `docGhiChuId()` chặn cả một liên kết KHÔNG PHẢI TEXT (kind
+   DRIVE chẳng hạn) dù nó `scope='class'` và người soạn đọc được thoải mái —
+   sai LOẠI khác hẳn sai PHẠM VI, và một phép kiểm chỉ hỏi "có bị chặn
+   không" sẽ không phân biệt được hai nhánh lỗi ấy. `kiem-thongbao-ghichu.mjs`
+   giữ ba fixture riêng (cấp lớp, riêng Nhóm 6, riêng Nhóm 7, và một DRIVE)
+   để mỗi nhánh có đúng một ca kiểm. Đã đối chứng: gỡ điều kiện `kind='TEXT'`
+   VÀ điều kiện phạm vi khỏi câu SQL của `docGhiChuId()` thì cả hai phép đối
+   chứng 2 và 3 đỏ ngay (nhận 200 thay vì 404).
+
+18. **Bốn cột `SELECT id, noi_dung, nguon, het_han FROM thong_bao WHERE
+   cohort_id = ?` của `getLich()` THIẾU điều kiện phạm vi — phát hiện tình
+   cờ khi thêm `ghi_chu_id`, không phải đi tìm.** Route `GET /api/lich`
+   không gác theo vai (bất kỳ ai đăng nhập cũng gọi được), và câu này trả về
+   TOÀN BỘ thông báo của khoá, kể cả thông báo nội bộ của nhóm khác — một
+   N6 thật, có từ trước migration 0034. Giao diện không lộ ra vì
+   `layLichDayDu()` (nơi duy nhất gọi route này) chỉ đọc `.lich_hoc`, chưa
+   từng đọc `.thong_bao` — nhưng quy ước 6 (CLAUDE.md) là kiểm ở máy chủ,
+   không tin giao diện im lặng ấy. Đã vá cùng lúc, thêm điều kiện
+   `(group_id IS NULL OR group_id = ?)` khớp với `/api/home` và
+   `postThongBaoDaXem`.
+
+19. **`reset-thongbao.sh` từng vỡ FOREIGN KEY constraint ở chính lượt chạy
+   lại thứ hai** khi thêm bốn fixture ghi chú cho tính năng đính kèm: một
+   thông báo dựng thủ công bằng tay (không theo khuôn `KIEMTB\_%`) trong lúc
+   chụp ảnh minh hoạ vẫn còn trỏ `ghi_chu_id` vào một fixture, nên
+   `DELETE FROM links WHERE title LIKE 'KIEMTBGC\_%'` ở lượt sau chết ngay —
+   D1 cục bộ enforce khoá ngoại (`thong_bao.ghi_chu_id REFERENCES
+   links(id)`) còn D1 thật thì không, nên lỗi chỉ lộ ra đúng ở môi trường
+   dùng để kiểm. Sửa bằng cách dọn CẢ hai chiều: xoá `thong_bao` trỏ vào
+   fixture sắp xoá TRƯỚC khi xoá chính fixture ấy.
 
 **Chỗ dễ rò nhất của cả sản phẩm, kiểm ở `pw-giao-thuong.mjs`:** trang
 `/giao-thuong` là đường DUY NHẤT đưa dữ liệu người dùng ra internet. Hai phép

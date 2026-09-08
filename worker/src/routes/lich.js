@@ -132,10 +132,18 @@ export async function getLich(env, me) {
          FROM lich_hoc WHERE cohort_id = ?
         ORDER BY ngay, COALESCE(tu_gio, '00:00')`
     ).bind(me.cohort_id).all(),
+    // N6: phát hiện khi thêm cột ghi_chu_id (migration 0034) — câu này THIẾU
+    // điều kiện phạm vi, nên bất kỳ người đã đăng nhập nào gọi GET /api/lich
+    // cũng đọc được thông báo NỘI BỘ của MỌI nhóm, không chỉ nhóm mình. Giao
+    // diện không lộ ra vì layLichDayDu() (nơi duy nhất gọi route này) chỉ
+    // dùng .lich_hoc, chưa từng đọc .thong_bao — nhưng quy ước 6 (CLAUDE.md)
+    // là kiểm ở máy chủ, không tin giao diện. Cùng điều kiện đã dùng ở
+    // /api/home và postThongBaoDaXem.
     env.DB.prepare(
-      `SELECT id, noi_dung, nguon, het_han FROM thong_bao WHERE cohort_id = ?
+      `SELECT id, noi_dung, nguon, het_han FROM thong_bao
+        WHERE cohort_id = ? AND (group_id IS NULL OR group_id = ?)
         ORDER BY id DESC`
-    ).bind(me.cohort_id).all(),
+    ).bind(me.cohort_id, me.group_id).all(),
     layTuLieuTheoBuoi(env, me),
   ]);
   return json({
@@ -250,6 +258,30 @@ export async function deleteBuoi(env, me, id, ip) {
   return json({ ok: true });
 }
 
+/* Ghi chú (links.kind='TEXT') mà một thông báo đính kèm — migration 0034.
+   Trả { loi } nếu sai, { ghiChuId } nếu được. Cùng khuôn docBuoiId/
+   docSectionId của links.js.
+
+   CỐ Ý không hạn "chỉ ghi chú chưa gắn buổi/phần bài nào" — xem lý do đầy
+   đủ trong migration 0034: ca thật nhất (Thư mời kiến tập 11/9) đã gắn sẵn
+   vào một buổi, và chính vì thế mới cần thông báo trỏ tới.
+
+   Điều kiện `(scope = 'class' OR group_id = ?)` là chốt N6: người soạn chỉ
+   đính kèm được ghi chú mà CHÍNH HỌ đọc được — không thì mở khoá cho việc
+   thông báo trỏ tới ghi chú riêng của nhóm khác. */
+async function docGhiChuId(env, me, body) {
+  if (!('ghi_chu_id' in body)) return {};
+  if (body.ghi_chu_id === null || body.ghi_chu_id === '') return { ghiChuId: null };
+  const id = Number(body.ghi_chu_id);
+  if (!Number.isInteger(id) || id <= 0) return { loi: error('ghichu_invalid', 422) };
+  const co = await env.DB.prepare(
+    `SELECT id FROM links WHERE id = ? AND kind = 'TEXT' AND removed_at IS NULL
+       AND cohort_id = ? AND (scope = 'class' OR group_id = ?)`
+  ).bind(id, me.cohort_id, me.group_id).first();
+  if (!co) return { loi: error('ghichu_not_found', 404) };
+  return { ghiChuId: id };
+}
+
 // Thông báo có hai cấp, và quyền đăng khác nhau:
 //   cap = 'lop'  → cả khoá đọc, chỉ Ban cán sự lớp đăng
 //   cap = 'nhom' → chỉ nhóm mình đọc, trưởng/phó nhóm đăng
@@ -269,12 +301,14 @@ export async function postThongBao(request, env, me, ctx, ip) {
   if (!noiDung) return error('noi_dung_required', 422);
   const hetHan = cleanText(body.het_han, 10);
   if (hetHan && !ngayHopLe(hetHan)) return error('ngay_invalid', 422);
+  const { loi: loiGhiChu, ghiChuId } = await docGhiChuId(env, me, body);
+  if (loiGhiChu) return loiGhiChu;
 
   const row = await env.DB.prepare(
-    `INSERT INTO thong_bao (cohort_id, group_id, noi_dung, nguon, het_han, created_by)
-     VALUES (?, ?, ?, ?, ?, ?) RETURNING id`
+    `INSERT INTO thong_bao (cohort_id, group_id, noi_dung, nguon, het_han, ghi_chu_id, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`
   ).bind(me.cohort_id, capLop ? null : me.group_id, noiDung,
-         cleanText(body.nguon, 60), hetHan || null, me.id).first();
+         cleanText(body.nguon, 60), hetHan || null, ghiChuId ?? null, me.id).first();
 
   await logAudit(env, {
     actorId: me.id, action: 'thongbao.create', targetType: 'thong_bao', targetId: row.id,
@@ -362,15 +396,18 @@ export async function patchThongBao(request, env, me, id, ip) {
   const hetHan = 'het_han' in body ? cleanText(body.het_han, 10) : cu.het_han;
   if (hetHan && !ngayHopLe(hetHan)) return error('ngay_invalid', 422);
   const nguon = 'nguon' in body ? cleanText(body.nguon, 60) : cu.nguon;
+  const { loi: loiGhiChu, ghiChuId } = await docGhiChuId(env, me, body);
+  if (loiGhiChu) return loiGhiChu;
+  const ghiChu = 'ghi_chu_id' in body ? ghiChuId : cu.ghi_chu_id;
 
   await env.DB.prepare(
-    'UPDATE thong_bao SET noi_dung = ?, nguon = ?, het_han = ? WHERE id = ?'
-  ).bind(noiDung, nguon, hetHan || null, id).run();
+    'UPDATE thong_bao SET noi_dung = ?, nguon = ?, het_han = ?, ghi_chu_id = ? WHERE id = ?'
+  ).bind(noiDung, nguon, hetHan || null, ghiChu ?? null, id).run();
 
   await logAudit(env, {
     actorId: me.id, action: 'thongbao.edit', targetType: 'thong_bao', targetId: id,
-    before: { noi_dung: cu.noi_dung, nguon: cu.nguon, het_han: cu.het_han },
-    after: { noi_dung: noiDung, nguon, het_han: hetHan || null }, ip,
+    before: { noi_dung: cu.noi_dung, nguon: cu.nguon, het_han: cu.het_han, ghi_chu_id: cu.ghi_chu_id },
+    after: { noi_dung: noiDung, nguon, het_han: hetHan || null, ghi_chu_id: ghiChu ?? null }, ip,
   });
   return json({ ok: true, id });
 }

@@ -1242,6 +1242,7 @@ function veThongBao() {
     <div class="eb">Thông báo${HOME.thong_bao_moi ? ` <span class="c">${HOME.thong_bao_moi} mới</span>` : ''}</div>
     ${ds.length ? ds.map(t => `<div class="warn" style="margin-bottom:8px;display:flex;gap:10px;align-items:flex-start">
       <div style="flex:1;min-width:0"><div class="mdview nho">${mdSafe(t.noi_dung)}</div>
+        ${veTuLieuGan(t)}
         <div style="font-size:11.5px;color:var(--ink3);margin-top:4px;font-weight:400">
           ${t.group_id == null ? 'Cả lớp' : 'Riêng nhóm'}${t.nguon ? ' · ' + esc(t.nguon) : ''}${t.moi ? ' · mới' : ''}</div></div>
       ${goDuoc(t) ? `<div style="display:flex;gap:2px;flex:0 0 auto">
@@ -1344,11 +1345,16 @@ function ganThanhSoan(barId, taId, xemId) {
 }
 
 // id = null là đăng mới, có id là sửa lại thông báo đã đăng.
-function soanThongBao(id) {
+// async vì phải tải danh sách ghi chú đính kèm được (layGhiChu()) trước khi
+// dựng sheet — đúng khuôn openLinkAdd()/openLinkEdit() đã đổi thành async
+// cùng lý do với oChonBuoi()/oChonPhan().
+async function soanThongBao(id) {
   const cu = id ? (HOME.thong_bao ?? []).find(x => x.id === id) : null;
   if (id && !cu) { toast('Không tìm thấy thông báo'); return; }
   const dangLop = !!HOME.can_sua_lich;
   const nhom = HOME?.group?.no ? `Nhóm ${HOME.group.no}` : 'nhóm mình';
+  const ghiChuHienId = cu?.tu_lieu?.[0]?.id ?? null;
+  const dsGhiChu = await layGhiChu();
   // Cấp (ai nhận) KHÔNG sửa được — cùng lý do PATCH /api/links/:id không cho
   // đổi scope: biến thông báo của nhóm thành của lớp là đem việc nội bộ cho
   // 146 người đọc (N6). Muốn đổi thì gỡ xuống rồi đăng lại.
@@ -1376,6 +1382,9 @@ function soanThongBao(id) {
    <div class="hintline">Dán thẳng đường dẫn cũng được — nó tự thành liên kết bấm được.</div>
    <label class="f">Xem trước</label>
    <div class="mdxem mdview nho" id="tbXem"></div>
+   <label class="f">Đính kèm ghi chú</label>
+   <select id="tbGC">${oChonGhiChu(ghiChuHienId, dsGhiChu)}</select>
+   <div class="hintline">Bấm vào tên trong danh sách là mở đúng ghi chú ấy ngay dưới thông báo — kể cả ghi chú đã gắn sẵn vào một buổi học.</div>
    <label class="f">Ai phát</label><input id="tbNguon" maxlength="60"
      value="${esc(cu ? (cu.nguon || '') : (dangLop ? 'Ban tổ chức' : nhom))}">
    <label class="f">Ẩn sau ngày</label><input id="tbHan" type="date" value="${esc(cu?.het_han || '')}">
@@ -1403,6 +1412,7 @@ function soanThongBao(id) {
     }
     const than = {
       noi_dung: $('#tbND').value, nguon: $('#tbNguon').value, het_han: $('#tbHan').value || null,
+      ghi_chu_id: $('#tbGC').value === '' ? null : Number($('#tbGC').value),
     };
     // Số người nhận thư chỉ biết được SAU khi máy chủ trả lời, mà submitting()
     // nhận câu báo từ trước — nên giữ nó ra ngoài rồi toast lại sau. Nói con số
@@ -2263,6 +2273,27 @@ function suaDuocTuLieu(r) {
 // buổi ĐÃ QUA (ghi chú tóm tắt bài giảng sau khi học xong, đúng việc "Nội
 // dung Text" sinh ra để làm) sẽ không tìm thấy buổi đó trong ô chọn. Không
 // cache: 13 dòng một chỉ mục, rẻ hơn việc phải nhớ làm mới cache khi lịch đổi.
+// Ghi chú (kind='TEXT') mà một thông báo có thể đính kèm. Trả TẤT CẢ tư
+// liệu Text người soạn đọc được — CỐ Ý không lọc "chưa gắn buổi/phần bài
+// nào": ca thật nhất (thư mời kiến tập) là một ghi chú ĐÃ gắn sẵn vào một
+// buổi, muốn thông báo cũng trỏ tới chứ không chép nội dung lần hai. Máy
+// chủ (docGhiChuId, routes/lich.js) lọc N6 lại lần nữa, không tin ở đây.
+async function layGhiChu() {
+  try { return ((await apiGet('/api/links?tag=all')).links ?? []).filter(l => l.kind === 'TEXT'); }
+  catch { return (KHO_LINKS ?? []).filter(l => l.kind === 'TEXT'); }
+}
+
+// Ô chọn ghi chú đính kèm cho thông báo. `hienId` là ghi chú đang gắn (sửa
+// thông báo cũ) — chèn thêm dòng cho nó nếu vì lý do gì đó rơi khỏi `ds`,
+// đúng khuôn oChonBuoi()/oChonPhan(): không thì sheet sửa mở ra là ô nhảy
+// về "Không đính kèm" và bấm Lưu một phát là gỡ mất đính kèm không định gỡ.
+function oChonGhiChu(hienId, ds) {
+  const co = ds.some(r => r.id === hienId);
+  const day = !co && hienId ? [{ id: hienId, title: '(ghi chú đã gỡ hoặc hết quyền xem)' }] : [];
+  return `<option value="">Không đính kèm</option>` +
+    [...day, ...ds].map(r => `<option value="${r.id}"${r.id === hienId ? ' selected' : ''}>${esc(r.title)}</option>`).join('');
+}
+
 async function layLichDayDu() {
   try { return (await apiGet('/api/lich')).lich_hoc ?? []; }
   catch { return HOME?.lich_hoc ?? []; } // mất mạng thì lùi về danh sách rút gọn, còn hơn không có gì
@@ -2383,8 +2414,16 @@ async function openLinkEdit(id) {
      : r.url ? 'Đổi đường dẫn, tên hoặc loại.' : 'Mục này chưa có đường dẫn — dán vào đây.'}</p>
    ${laText ? `
    <label class="f">Nội dung (Markdown)</label>
+   <div class="mdbar" id="eBar">
+     <button type="button" data-md="b" title="Chữ đậm"><b>B</b></button>
+     <button type="button" data-md="i" title="Chữ nghiêng"><i>I</i></button>
+     <button type="button" data-md="ul" title="Gạch đầu dòng">☰</button>
+     <button type="button" data-md="link" title="Chèn liên kết">🔗</button>
+   </div>
    <textarea id="eC" maxlength="8000" rows="8">${esc(r.content_md || '')}</textarea>
    <div class="hintline">Hỗ trợ # tiêu đề, **đậm**, *nghiêng*, danh sách -, link [chữ](https://…).</div>
+   <label class="f">Xem trước</label>
+   <div class="mdxem mdview nho" id="eXem"></div>
    ` : `
    <label class="f">Đường dẫn</label>
    <input id="eU" inputmode="url" spellcheck="false" placeholder="https://drive.google.com/…" value="${esc(r.url || '')}">
@@ -2420,6 +2459,7 @@ async function openLinkEdit(id) {
     $('#eBuoiBox').style.display = $('#eG').value === 'buoi' ? '' : 'none';
     $('#ePhanBox').style.display = $('#eG').value === 'bai' ? '' : 'none';
   };
+  if (laText) ganThanhSoan('eBar', 'eC', 'eXem');
   $('#eLuu').onclick = () => submitting($('#eLuu'), async () => {
     // Cả hai ô chọn luôn có mặt trong DOM (chỉ ẩn/hiện theo tag), nên đọc giá
     // trị của cả hai bất kể ô nào đang hiện — đúng cách buổi học đã làm từ
@@ -2561,8 +2601,16 @@ async function openLinkAdd(preSection) {
    <div id="modeTextBox" style="display:none">
      <p class="sub">Ghi chú do bạn tự viết — ứng dụng lưu nguyên văn, không phải một đường dẫn.</p>
      <label class="f">Nội dung (Markdown)</label>
+     <div class="mdbar" id="lBar">
+       <button type="button" data-md="b" title="Chữ đậm"><b>B</b></button>
+       <button type="button" data-md="i" title="Chữ nghiêng"><i>I</i></button>
+       <button type="button" data-md="ul" title="Gạch đầu dòng">☰</button>
+       <button type="button" data-md="link" title="Chèn liên kết">🔗</button>
+     </div>
      <textarea id="lC" maxlength="8000" rows="8" placeholder="# Tiêu đề&#10;&#10;Gõ ghi chú ở đây."></textarea>
      <div class="hintline">Tối đa 8.000 ký tự. Hỗ trợ # tiêu đề, **đậm**, *nghiêng*, danh sách -, link [chữ](https://…).</div>
+     <label class="f">Xem trước</label>
+     <div class="mdxem mdview nho" id="lXem"></div>
    </div>
    <label class="f">Gọi là gì</label><input id="lN" maxlength="200" placeholder="Báo cáo thị trường FMCG 2025">
    <label class="f">Dùng cho</label><select id="lT"><option value="bai">Cho bài</option><option value="buoi">Theo buổi</option><option value="lop">Lớp K03</option></select>
@@ -2585,6 +2633,7 @@ async function openLinkAdd(preSection) {
    <div class="sa"><button class="big c" id="lCancel">Thôi</button>
      <button class="big go" id="lSave">Gắn vào</button></div>`);
   $('#lCancel').onclick = closeSheet;
+  ganThanhSoan('lBar', 'lC', 'lXem');
 
   $('#lT').onchange = () => {
     $('#lBuoiBox').style.display = $('#lT').value === 'buoi' ? '' : 'none';

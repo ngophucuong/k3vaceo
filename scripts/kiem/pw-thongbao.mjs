@@ -145,6 +145,86 @@ ok('và máy chủ ghi nhận thật, không chỉ đổi chữ trên màn hình
 await p.click('#mailNut'); await p.waitForTimeout(600);
 const sauBat = await fetch(`${B}/api/home`, { headers: { cookie: CK } }).then(r => r.json());
 ok('bật lại được', sauBat?.me?.mail_thong_bao === true);
+await p.click('#meClose'); await p.waitForTimeout(400);
+
+/* ══ Đính kèm Ghi chú vào Thông báo (migration 0034) ═════════════════════
+   Ngô Phú Cường hỏi 8/9 "trong thông báo gán Ghi chú vào như thế nào?" —
+   trước đó chỉ nhắc bằng chữ thường, không bấm được. Phép API đã kiểm ở
+   kiem-thongbao-ghichu.mjs (đúng phạm vi N6, đúng loại TEXT); ở đây kiểm
+   ĐƯỜNG THẬT người dùng đi: mở sheet Thêm thông báo, thấy ô chọn ghi chú,
+   chọn một cái, Lưu, và ghi chú ấy hiện ra BẤM ĐƯỢC ngay dưới thông báo. */
+console.log('\n── Giao diện: đính kèm Ghi chú vào thông báo ──');
+await p.click('#tbThem'); await p.waitForTimeout(500);
+ok('sheet Thêm thông báo có ô "Đính kèm ghi chú"', await p.locator('#tbGC').count() === 1);
+const coTuyChonGC = await p.locator('#tbGC option', { hasText: 'KIEMTBGC_lop' }).count();
+ok('ô chọn liệt kê được ghi chú đã gieo (KIEMTBGC_lop)', coTuyChonGC === 1);
+// KIEMTBGC_nhom7 KHÔNG được liệt kê — N6 chặn ngay từ đường đọc /api/links,
+// không đợi tới lúc lưu mới báo lỗi.
+ok('KHÔNG liệt kê ghi chú của nhóm khác (N6)',
+   await p.locator('#tbGC option', { hasText: 'KIEMTBGC_nhom7' }).count() === 0);
+
+await p.fill('#tbND', 'KIEMTB_gc_giaodien'); await p.waitForTimeout(150);
+await p.selectOption('#tbGC', { label: 'KIEMTBGC_lop' });
+await p.click('#tbLuu'); await p.waitForTimeout(900);
+
+const homeGC = await fetch(`${B}/api/home`, { headers: { cookie: CK } }).then(r => r.json());
+const tbGC = (homeGC.thong_bao ?? []).find(t => t.noi_dung === 'KIEMTB_gc_giaodien');
+ok('lưu từ giao diện đi tới máy chủ thật, đúng ghi chú', tbGC?.tu_lieu?.[0]?.title === 'KIEMTBGC_lop');
+
+// Ghi chú đính kèm phải hiện ra BẤM ĐƯỢC ngay dưới đúng thông báo ấy —
+// dùng lại veTuLieuGan() nên phải ra đúng dấu hiệu data-xemtext như buổi
+// học/phần bài đã dùng, không phải một cách vẽ riêng.
+const theTb = p.locator('#v-nay .warn').filter({ hasText: 'KIEMTB_gc_giaodien' });
+const nutGC = theTb.locator('[data-xemtext]');
+ok('thẻ thông báo hiện dòng "Ghi chú" bấm được', await nutGC.count() === 1);
+await nutGC.click(); await p.waitForTimeout(500);
+ok('bấm vào mở đúng sheet ghi chú ấy',
+   (await p.locator('#sheet h3').innerText()) === 'KIEMTBGC_lop');
+ok('nội dung ghi chú hiện đúng', (await p.locator('#sheet .mdview').innerText()).includes('Nội dung ghi chú cấp lớp'));
+await p.click('#mvC'); await p.waitForTimeout(300);
+
+// Dọn — không để rác KIEMTB_gc_giaodien lại cho lượt sau.
+{
+  const j = await fetch(`${B}/api/home`, { headers: { cookie: CK } }).then(r => r.json());
+  const t = (j.thong_bao ?? []).find(x => x.noi_dung === 'KIEMTB_gc_giaodien');
+  if (t) await fetch(`${B}/api/thong-bao/${t.id}`, { method: 'DELETE', headers: { cookie: CK } });
+}
+
+/* ══ Thanh B/I/gạch đầu dòng + xem trước cũng phải có ở CHÍNH Ghi chú ═════
+   Ngô Phú Cường hỏi trước đó "Việc sửa ghi chú có được không?" — trả lời là
+   có, nhưng ô soạn khi ấy chỉ là textarea trơn, không thanh định dạng, không
+   xem trước — khác hẳn ô soạn thông báo. Nay dùng CHUNG ganThanhSoan(), nên
+   kiểm ở đây là kiểm đúng một điểm dễ quên: gắn thanh vào ĐÚNG sheet Sửa ghi
+   chú (ô id="eC"/"eBar"/"eXem"), không phải chỉ sheet thông báo. */
+console.log('\n── Giao diện: thanh định dạng ở sheet Sửa ghi chú ──');
+await p.click('.nb[data-v="kho"]').catch(async () => { await p.goto(B + '/#/kho'); });
+await p.waitForTimeout(1000);
+const dongKho = p.locator('#v-kho').getByText('KIEMTBGC_lop', { exact: false }).first();
+await dongKho.scrollIntoViewIfNeeded();
+const theKho = p.locator('#v-kho .rsw, #v-kho .fd, #v-kho > div')
+  .filter({ hasText: 'KIEMTBGC_lop' }).last();
+await theKho.locator('[data-sualink]').first().click();
+await p.waitForTimeout(600);
+ok('sheet Sửa ghi chú có thanh định dạng', await p.locator('#eBar [data-md]').count() === 4);
+ok('sheet Sửa ghi chú có ô xem trước', await p.locator('#eXem').count() === 1);
+await p.locator('#eC').selectText();
+await p.click('#eBar [data-md="b"]'); await p.waitForTimeout(200);
+ok('bấm B trong sheet Sửa ghi chú bọc đúng **…**',
+   (await p.locator('#eC').inputValue()).startsWith('**'));
+ok('xem trước cập nhật theo', await p.locator('#eXem b').count() === 1);
+await p.click('#eThoi'); await p.waitForTimeout(300);
+
+console.log('\n── Giao diện: thanh định dạng ở sheet Gắn Tư liệu (tạo mới) ──');
+await p.click('#addLinkBtn');
+await p.waitForTimeout(600);
+await p.click('#modeText'); await p.waitForTimeout(300);
+ok('sheet Gắn Tư liệu (chế độ Text) có thanh định dạng', await p.locator('#lBar [data-md]').count() === 4);
+ok('sheet Gắn Tư liệu (chế độ Text) có ô xem trước', await p.locator('#lXem').count() === 1);
+await p.fill('#lC', 'chữ'); await p.waitForTimeout(150);
+await p.locator('#lC').selectText();
+await p.click('#lBar [data-md="i"]'); await p.waitForTimeout(200);
+ok('bấm I trong sheet Gắn Tư liệu bọc đúng *…*', (await p.locator('#lC').inputValue()) === '*chữ*');
+await p.click('#lCancel'); await p.waitForTimeout(300);
 
 ok('không lỗi JS: ' + (loi.join(' | ') || 'sạch'), loi.length === 0);
 await p.screenshot({ path: '/tmp/k3vaceo-thongbao.png' });

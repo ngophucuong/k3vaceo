@@ -123,14 +123,25 @@ export async function getHome(env, me) {
     ).bind(me.cohort_id).all(),
     // Thông báo hai cấp: group_id NULL là của cả lớp, có số là của riêng nhóm
     // ấy. Người Nhóm 5 không được thấy thông báo nội bộ của Nhóm 6 (N6).
+    //
+    // LEFT JOIN ghi chú đính kèm (migration 0034) — lọc theo phạm vi đọc của
+    // NGƯỜI XEM, không phải người đăng: một thông báo cấp lớp đính kèm ghi
+    // chú riêng của Nhóm 6 (hợp lệ, docGhiChuId không cấm tổ hợp này — cùng
+    // lý lẽ đã ghi cho Bài↔Tư liệu cấp lớp) thì người Nhóm 7 vẫn đọc được
+    // thông báo, chỉ riêng phần ghi chú đính kèm lặng lẽ không hiện — đúng
+    // cách layTuLieuTheoBuoi() đã làm cho tư liệu gắn buổi, không phải một
+    // cách xử lý mới.
     env.DB.prepare(
-      `SELECT id, noi_dung, nguon, het_han, group_id, created_at,
-              id > COALESCE(?, 0) AS moi
-         FROM thong_bao
-        WHERE cohort_id = ? AND (group_id IS NULL OR group_id = ?)
-          AND (het_han IS NULL OR het_han >= date('now', '+7 hours'))
-        ORDER BY id DESC LIMIT 5`
-    ).bind(me.thong_bao_xem_id ?? 0, me.cohort_id, me.group_id).all(),
+      `SELECT tb.id, tb.noi_dung, tb.nguon, tb.het_han, tb.group_id, tb.created_at,
+              tb.id > COALESCE(?, 0) AS moi,
+              l.id AS gc_id, l.title AS gc_title, l.content_md AS gc_content_md
+         FROM thong_bao tb
+         LEFT JOIN links l ON l.id = tb.ghi_chu_id AND l.removed_at IS NULL
+                           AND (l.scope = 'class' OR l.group_id = ?)
+        WHERE tb.cohort_id = ? AND (tb.group_id IS NULL OR tb.group_id = ?)
+          AND (tb.het_han IS NULL OR tb.het_han >= date('now', '+7 hours'))
+        ORDER BY tb.id DESC LIMIT 5`
+    ).bind(me.thong_bao_xem_id ?? 0, me.group_id, me.cohort_id, me.group_id).all(),
     // Tư liệu gắn vào buổi. Dùng CHUNG hàm với /api/lich để hai màn không thể
     // lọc khác nhau — cùng một liên kết mà hiện ở màn này, mất ở màn kia là
     // lỗi không chỗ nào báo.
@@ -145,7 +156,12 @@ export async function getHome(env, me) {
     ban: env.COMMIT_SHA ?? null,
     hom_nay: nayRes?.d ?? null,
     lich_hoc: (lichRes.results ?? []).map(b => ({ ...b, tu_lieu: tuLieuBuoi.get(b.id) ?? [] })),
-    thong_bao: tbRes.results ?? [],
+    // Định dạng lại thành `tu_lieu: [...]` — đúng khuôn dữ liệu mà
+    // veTuLieuGan() ở giao diện đã đọc cho buổi học và phần bài, nên
+    // thông báo dùng lại được NGUYÊN hàm ấy, không viết bộ vẽ thứ hai.
+    thong_bao: (tbRes.results ?? []).map(({ gc_id, gc_title, gc_content_md, ...t }) => ({
+      ...t, tu_lieu: gc_id ? [{ id: gc_id, title: gc_title, content_md: gc_content_md, kind: 'TEXT' }] : [],
+    })),
     // Số thông báo chưa xem — giao diện chấm đỏ lên tab Hôm nay. Đây là đường
     // báo tin chạy được trên MỌI máy, không cần quyền, không cần cài gì; thông
     // báo đẩy chỉ là lớp thêm cho ai cài ứng dụng lên màn hình chính.
