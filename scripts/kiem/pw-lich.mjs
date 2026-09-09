@@ -47,7 +47,16 @@ ok('có nút thêm vào lịch', await p.locator('#nutIcs').isVisible());
 ok('nút trỏ đúng tệp ics',
    (await p.locator('#nutIcs').getAttribute('href')) === '/api/lich/k3vaceo.ics');
 ok('có đếm ngược tới buổi bảo vệ', await p.locator('#dem').isVisible());
-ok('nói rõ lịch chưa đủ buổi', /Còn \d+ buổi chưa công bố lịch/.test(vb));
+
+// Băng "chưa đủ buổi" chỉ hiện khi số buổi ĐÃ CÓ còn dưới `sessions_total`
+// (13, khớp mục 1.4 SRS — đếm THEO CHỦ ĐỀ, không theo dòng lich_hoc). Số
+// dòng thật đã VƯỢT con số đó từ lâu vì một buổi giảng nhiều khi tách thành
+// 2-3 dòng (28/8, 5/9, 11/9 đều vậy) — nên đây KHÔNG phải hằng số đứng yên,
+// tính lại mỗi lần chạy giống hệt công thức trong lich.js, đừng ghi cứng.
+const daCo = d.buoi.filter(b => !b.da_huy).length;
+const conThieu = daCo < (d.khoa?.sessions_total ?? 0);
+ok(conThieu ? 'nói rõ lịch chưa đủ buổi' : `đã đủ ${daCo} ≥ ${d.khoa?.sessions_total} buổi, băng "chưa đủ" thôi hiện`,
+   conThieu === /Còn \d+ buổi chưa công bố lịch/.test(vb));
 // Lịch trải tháng 8 sang tháng 9 — thiếu nhãn tháng thì "11 Th sáu" đọc như 11/8
 const soThang = new Set(d.buoi.map(x => x.ngay.slice(0, 7))).size;
 ok(`có ${soThang} nhãn tháng cho ${soThang} tháng`, await p.locator('.thang').count() === soThang);
