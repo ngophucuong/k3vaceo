@@ -1824,6 +1824,52 @@ Chỉ thêm vào `roster` — KHÔNG tự tạo `members`. Người thật khớ
 Ban cán sự lớp phát link mời qua tính năng xuyên nhóm mới làm (mục "Link mời
 xuyên nhóm" ở trên), hoặc cô ấy tự nhận ở `/vao` một khi có đúng số.
 
+**Cập nhật 9/9 — chuyển sang Nhóm 6 (migration 0036).** Giữa 4/9 và 9/9 cô ấy
+đã có hồ sơ `members` (id 43) và tự nhận qua email `anhttn@mindx.com.vn` chỉ
+MỘT NGÀY sau khi được thêm vào roster — nhanh hơn nhiều so với việc chờ ai đó
+sửa số điện thoại sai, nên gần như chắc chắn đi qua đường phát link mời xuyên
+nhóm chứ không phải `/vao`. Ngô Phú Cường yêu cầu chuyển cô ấy sang Nhóm 6.
+
+Đây là loại migration **đầu tiên** đổi `group_id` của một hồ sơ ĐANG HOẠT
+ĐỘNG — không giống 0021/0022 (vụ Lưu Minh Tiến), cả hai đều là sửa nhóm ngay
+LÚC TẠO hồ sơ, không phải chuyển một người đã tồn tại. Không có route nào làm
+việc này: `patchMember` không nhận trường `group_id`, nó chỉ ghi một lần lúc
+tạo hồ sơ rồi khoá cứng.
+
+Trước khi viết migration, phải soi D1 THẬT trả lời hai câu — thiếu một trong
+hai là để lại rác không chỗ nào báo lỗi:
+1. **Đang giữ chức ở Nhóm 4 không?** Nếu có mà không supersede vai đó, quyền
+   quản lý Nhóm 4 (sổ thu, cơ cấu, cho người khác ngừng tham gia) vẫn dính
+   sau khi chuyển — người không còn là thành viên Nhóm 4 mà vẫn điều hành nó.
+2. **Đang giữ phần bài hay suất thuyết trình ở Nhóm 4 không?** Nếu có mà
+   không nhả về "chưa ai nhận" (đúng cách "ngừng tham gia" đã làm), một phần
+   vẫn đứng tên cô ấy mà `GET /api/plan` lọc theo `group_id` mới nên cô ấy
+   không còn thấy để cập nhật.
+
+Soi bằng cách thêm tạm một bước vào `.github/workflows/soi-du-lieu.yml` (workflow
+"chỉ đọc" đã có sẵn cho đúng việc này), xoá ngay sau khi đọc được kết quả —
+đúng nếp mỗi lần dùng workflow ấy: chỉnh nội dung cho câu hỏi hiện tại, không
+để lại cruft của lần trước. **Lượt soi đầu tự vấp đúng bẫy đã ghi ngay trong
+chính tệp đó** ("lần: 3"): dùng `$WRANGLER --command ... | tail -20` thay vì
+hàm `soi()` (dùng `--json` rồi lọc qua `jq`), nên mọi khối chỉ còn `"success"`/
+`"meta"`, mất sạch `"results"` — bốn truy vấn đều trông như trống trơn dù
+`rows_read` > 0. Sửa bằng cách copy hàm `soi()` vào TRONG CHÍNH bước đó (không
+gọi chéo sang bước "Soi cả lớp" ở trên — mỗi `run:` là một shell riêng, bài
+học "lần: 6" của cùng tệp).
+
+Kết quả soi lại: **cả hai câu đều là KHÔNG** — không giữ chức, không giữ phần
+bài/suất thuyết trình nào ở Nhóm 4. Đây là ca đơn giản nhất có thể: migration
+0036 chỉ một câu `UPDATE members SET group_id = ...`, khoá chặt điều kiện
+`WHERE id = 43 AND roster_id = 135 AND group_id = <Nhóm 4>` (không chỉ theo
+`full_name` — tên trùng nhau không hiếm trong roster này). `roster.group_label`
+GIỮ NGUYÊN 'Nhóm 4' làm bản ghi lịch sử, đúng quy ước đã dùng cho mọi lần lệch
+nhóm trước.
+
+**Nếu về sau lặp lại việc này cho người khác — mẫu chung, không riêng ca
+này**: LUÔN soi lại officers và plan_sections trước, đừng giả định "chắc cũng
+đơn giản như lần trước". Một người đang giữ chức hoặc đang giữ phần bài thì
+đổi `group_id` suông để lại quyền/phần việc dính vào nhóm cũ, im lặng.
+
 **Bẫy suýt vấp phải, đã sửa kèm**: `roster_total` từng bị `deploy.yml` VÀ ba
 bộ kiểm (`kiem-tanso.mjs`, `kiem-danhba.mjs`, `kiem-moi.mjs`) ghi cứng thành
 `=== 134` — thêm một người là bốn chỗ đó đỏ hết, đúng kiểu lỗi `group6_members`
