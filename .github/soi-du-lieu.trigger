@@ -23,3 +23,8 @@ lần: 8 — soi Trương Thị Ngọc Anh trước khi đổi Nhóm 4 sang Nhó
 members (đã có hồ sơ hoạt động chưa), officers, plan_sections, id thật của
 hai nhóm. Bước mới TỰ CHỨA, không gọi hàm soi() của bước khác — đúng bài
 học lần 6 ở trên.
+
+lần: 9 — lượt 8 tự vấp đúng lỗi đã ghi ở lần 3: dùng `$WRANGLER --command
+... | tail -20` thay vì hàm soi() dùng jq, nên mọi khối chỉ còn "success"/
+"meta", mất sạch "results". Sửa bằng cách copy hàm soi() vào trong chính
+bước này (không gọi chéo bước khác, vẫn giữ bài học lần 6).

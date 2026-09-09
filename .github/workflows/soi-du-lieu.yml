@@ -181,31 +181,39 @@ jobs:
       # này sau khi có câu trả lời.
       - name: Soi Trương Thị Ngọc Anh — trước khi đổi Nhóm 4 sang Nhóm 6
         run: |
-          echo "════ roster (bản gốc Ban tổ chức) ════"
-          $WRANGLER --command \
-            "SELECT id, seq, group_label, phone, company FROM roster
-              WHERE full_name = 'Trương Thị Ngọc Anh'" 2>&1 | tail -20
+          # LƯỢT ĐẦU ĐÃ HỎNG bằng đúng lỗi mà bước "Soi cả lớp" ở trên đã ghi
+          # chú sẵn: `tail -N` cắt mất chính phần "results" của JSON, chỉ còn
+          # "success"/"meta" — mọi khối đều trống trơn dù rows_read > 0. Sửa
+          # bằng cách copy hàm soi() (không gọi chéo bước khác — mỗi `run:`
+          # là một shell riêng, bài học "lần: 6").
+          soi() {
+            echo "════ $1 ════"
+            npx wrangler d1 execute k3vaceo --remote --yes --json \
+              --config worker/wrangler.toml --command "$2" 2>/dev/null \
+              | sed -n '/^\[/,$p' \
+              | jq -r '.[0].results[] | to_entries | map("\(.key)=\(.value)") | join("  ·  ")' \
+              || echo "  (không đọc được kết quả)"
+            echo
+          }
 
-          echo
-          echo "════ members — đã có hồ sơ hoạt động chưa? ════"
-          $WRANGLER --command \
+          soi "roster (bản gốc Ban tổ chức)" \
+            "SELECT id, seq, group_label, phone, company FROM roster
+              WHERE full_name = 'Trương Thị Ngọc Anh'"
+
+          soi "members — đã có hồ sơ hoạt động chưa?" \
             "SELECT m.id, m.roster_id, g.no AS nhom_so, g.label AS nhom_ten,
                     m.is_active, m.claimed_at, m.phone, m.email
                FROM members m LEFT JOIN groups g ON g.id = m.group_id
-              WHERE m.full_name = 'Trương Thị Ngọc Anh'" 2>&1 | tail -20
+              WHERE m.full_name = 'Trương Thị Ngọc Anh'"
 
-          echo
-          echo "════ officers — đang giữ chức ở đâu không? ════"
-          $WRANGLER --command \
+          soi "officers — đang giữ chức ở đâu không?" \
             "SELECT o.id, o.group_id, g.no AS nhom_so, o.role
                FROM officers o
                JOIN members m ON m.id = o.member_id
                LEFT JOIN groups g ON g.id = o.group_id
-              WHERE m.full_name = 'Trương Thị Ngọc Anh' AND o.superseded_at IS NULL" 2>&1 | tail -20
+              WHERE m.full_name = 'Trương Thị Ngọc Anh' AND o.superseded_at IS NULL"
 
-          echo
-          echo "════ plan_sections — đang giữ phần bài / suất thuyết trình ở nhóm nào? ════"
-          $WRANGLER --command \
+          soi "plan_sections — đang giữ phần bài / suất thuyết trình ở nhóm nào?" \
             "SELECT ps.id, ps.ord, ps.title, g.no AS nhom_so,
                     (ps.owner_member_id = m.id) AS la_nguoi_phu_trach,
                     (ps.present_member_id = m.id) AS la_nguoi_thuyet_trinh
@@ -213,12 +221,10 @@ jobs:
                JOIN plans p ON p.id = ps.plan_id
                JOIN groups g ON g.id = p.group_id
                JOIN members m ON m.full_name = 'Trương Thị Ngọc Anh'
-              WHERE ps.owner_member_id = m.id OR ps.present_member_id = m.id" 2>&1 | tail -20
+              WHERE ps.owner_member_id = m.id OR ps.present_member_id = m.id"
 
-          echo
-          echo "════ id thật của Nhóm 4 và Nhóm 6 ════"
-          $WRANGLER --command \
-            "SELECT id, no, label FROM groups WHERE no IN (4,6)" 2>&1 | tail -10
+          soi "id thật của Nhóm 4 và Nhóm 6" \
+            "SELECT id, no, label FROM groups WHERE no IN (4,6)"
 
       - name: Đọc
         run: |
