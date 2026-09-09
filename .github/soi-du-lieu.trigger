@@ -18,3 +18,8 @@ shell riêng nên hàm không đi theo sang bước sau. Đã chuyển vào đú
 lần: 7 — vá chính phép kiểm vừa thêm: GLOB '0[0-9]*' chỉ soi hai ký tự đầu
 nên số "03845375x8" (lẫn chữ x) lọt qua. Đo được: cách cũ đếm 3 số sai
 khuôn, cách đúng đếm 4.
+
+lần: 8 — soi Trương Thị Ngọc Anh trước khi đổi Nhóm 4 sang Nhóm 6: roster,
+members (đã có hồ sơ hoạt động chưa), officers, plan_sections, id thật của
+hai nhóm. Bước mới TỰ CHỨA, không gọi hàm soi() của bước khác — đúng bài
+học lần 6 ở trên.
