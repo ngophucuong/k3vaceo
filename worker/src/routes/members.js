@@ -171,7 +171,10 @@ export async function putMemberProfile(request, env, me, targetId) {
 // mọi phép đếm sĩ số — mà lời khai đóng quỹ cũ vẫn còn nguyên để số dư dò
 // được ra từng dòng.
 
-async function chucDangGiu(env, memberId) {
+// export: dùng lại nguyên khuôn "đang giữ chức thì chặn" cho routes/doi-nhom.js
+// (xin đổi nhóm) — hai bản sao riêng thì sớm muộn lệch nhau, đúng bài học đã
+// ghi nhiều lần trong CLAUDE.md cho các hàm dùng chung khác (cheEmail, v.v).
+export async function chucDangGiu(env, memberId) {
   return env.DB.prepare(
     `SELECT role, group_id FROM officers
       WHERE member_id = ? AND superseded_at IS NULL LIMIT 1`

@@ -9,6 +9,7 @@ import { clientIp, conQuota, ghiNhan } from './lib/ratelimit.js';
 import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
 import { getDanhBa, postDanhBaMoi } from './routes/danh-ba.js';
+import { getDoiNhom, postDoiNhom, postDuyetDoiNhom, postTuChoiDoiNhom, postHuyDoiNhom } from './routes/doi-nhom.js';
 import { listMembers, getMember, patchMember, putMemberProfile,
          postNgungThamGia, postThamGiaLai, listNgung } from './routes/members.js';
 import { getOfficers, putOfficers } from './routes/officers.js';
@@ -201,6 +202,21 @@ export default {
       }
       if ((m = pathname.match(/^\/api\/members\/(\d+)\/invite$/)) && method === 'POST') {
         return postMemberInvite(request, env, me, Number(m[1]));
+      }
+
+      // Xin đổi nhóm — tự phục vụ (xem migrations/0037_yeu_cau_doi_nhom.sql).
+      // Trưởng/phó/tiêu biểu của nhóm ĐÍCH duyệt, không phải Ban cán sự lớp và
+      // không phải nhóm đi — Ngô Phú Cường chọn trực tiếp qua AskUserQuestion.
+      if (pathname === '/api/doi-nhom' && method === 'GET') return getDoiNhom(env, me);
+      if (pathname === '/api/doi-nhom' && method === 'POST') return postDoiNhom(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/doi-nhom\/(\d+)\/duyet$/)) && method === 'POST') {
+        return postDuyetDoiNhom(env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/doi-nhom\/(\d+)\/tu-choi$/)) && method === 'POST') {
+        return postTuChoiDoiNhom(request, env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/doi-nhom\/(\d+)\/huy$/)) && method === 'POST') {
+        return postHuyDoiNhom(env, me, Number(m[1]));
       }
 
       // Giao thương: CỐ Ý không lọc theo nhóm (lệch N6 có chủ ý, Ngô Phú Cường

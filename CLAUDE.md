@@ -25,50 +25,54 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 
 **Mười việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
+1. **Xin đổi nhóm — tự phục vụ** (9/9, migration 0037). Ngay sau khi chuyển
+   tay Trương Thị Ngọc Anh sang Nhóm 6 bằng migration 0036, Ngô Phú Cường hỏi
+   thẳng "có thể thêm chức năng xin đổi nhóm không, ai là phê duyệt thì phù
+   hợp" — muốn việc lặp lại tự chạy được, không phải chờ tôi viết migration
+   tay mỗi lần. Trả lời qua AskUserQuestion: **TRƯỞNG/PHÓ NHÓM ĐÍCH duyệt**,
+   không phải Ban cán sự lớp, không phải cả hai nhóm cùng đồng ý — nhóm ĐI
+   chỉ CẦN BIẾT (qua "Hoạt động gần đây"), không cần ĐỒNG Ý. Xem mục riêng
+   bên dưới.
+2. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
    dạng B/I/gạch đầu dòng và ô xem trước gắn thêm vào sheet Sửa ghi chú/Gắn
    Tư liệu (trước đó chỉ có ở sheet soạn thông báo). Phát hiện tình cờ một
    N6 THẬT có từ trước khi làm việc này: `GET /api/lich` trả về thông báo
    nội bộ của MỌI nhóm, không lọc phạm vi — đã vá cùng lúc. Xem mục riêng
    bên dưới.
-2. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
+3. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
    dụng xong là gửi thư cho người trong phạm vi, kèm công tắc tắt của chính
    chủ ở tab Tài khoản. Lý do làm: đo trên D1 thật thì thông báo đẩy chỉ có
    **2/146 người bật và chưa gói tin nào từng đi** — xem mục riêng bên dưới.
-3. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
+4. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
    Danh mục "bán gì, bán cho ai" của cả lớp, kèm ghép nối theo nhu cầu và
    một trang ai cũng mở được (Google index được). Chỗ DUY NHẤT dữ liệu người
    dùng ra khỏi tên miền, và chỉ của ai tự bật — xem mục riêng bên dưới.
-4. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+5. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
    Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
    1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
    tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
    bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
    trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
    người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
-5. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+6. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-6. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+7. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-7. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+8. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
    Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
-   người đã đăng nhập (mục #4 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
+   người đã đăng nhập (mục #5 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
    xem mục riêng bên dưới.
-8. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-9. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
-10. **Giới hạn tần suất: đếm lần đoán, đừng đếm người.** Rà lại đợt trên thì lộ
-   ra: cả lớp ngồi chung một WiFi hội trường là đường vào tự khoá lại — người
-   thứ 11 vào lần đầu, lượt thứ 21 đăng nhập passkey, và link mời chết ngay từ
-   lượt đầu vì dùng chung thùng với passkey. Đo được, không phải suy đoán.
+9. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+10. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
 
 **Một cái bẫy đã trả giá, đừng vấp lại:** `deploy.yml` ghim **tên nhánh** ở
 `on.push.branches`. Đổi nhánh làm việc mà quên sửa dòng ấy thì mọi commit đẩy
@@ -652,6 +656,140 @@ báo lỗi, chỉ ra số sai:
 Ngoài ra: phần bài và suất thuyết trình được **nhả về "chưa ai nhận"** — một
 phần mang tên người đã nghỉ trông như đã có người làm, tệ hơn để trống. Phiên
 bị xoá, lời mời chưa dùng bị hết hạn, đăng ký thông báo đẩy bị tắt.
+
+## Xin đổi nhóm — tự phục vụ
+
+Thêm 9/9 (migration 0037). Ngay sau khi chuyển tay Trương Thị Ngọc Anh sang
+Nhóm 6 (migration 0036, Nhóm 4 → Nhóm 6 — viết migration thủ công vì chưa có
+đường nào khác), Ngô Phú Cường hỏi thẳng: "Có thể thêm chức năng xin đổi nhóm
+có được không, ai là phê duyệt thì phù hợp." Muốn việc lặp lại này tự chạy
+được, không phải chờ tôi soi D1 rồi viết migration tay mỗi lần có người muốn
+chuyển nhóm.
+
+### Ai duyệt — đã hỏi trực tiếp, không tự đoán
+
+Ba phương án đưa ra qua AskUserQuestion: Ban cán sự lớp duyệt, trưởng/phó nhóm
+ĐÍCH duyệt, hay cần cả hai nhóm (đi lẫn đến) cùng đồng ý. Ngô Phú Cường chọn:
+**TRƯỞNG/PHÓ NHÓM ĐÍCH DUYỆT**. Lý lẽ khớp với cách quyền đã phân trong toàn
+bộ ứng dụng:
+
+- Nhóm ĐÍCH là bên duy nhất chịu hậu quả thật — sĩ số đổi, phải chia lại phần
+  bài, thêm một suất thuyết trình. Nhóm ĐI không mất gì mà cũng không có
+  quyền giữ người ở lại (N5 — chính chủ tự quyết, không ai có quyền cấm một
+  người muốn rời nhóm).
+- Không cần Ban cán sự lớp: việc nội bộ giữa hai nhóm không cần leo lên cấp
+  lớp mỗi lần, đúng tinh thần "trưởng/phó nhóm tự vận hành nhóm mình" xuyên
+  suốt từ Đợt 1 (cơ cấu, phần bài, ngừng tham gia đều vậy).
+- Không cần HAI nhóm đồng ý: thêm một bên duyệt là thêm một chỗ đơn có thể
+  kẹt vô thời hạn nếu nhóm đi không màng trả lời. Nhóm đi chỉ CẦN BIẾT, không
+  cần ĐỒNG Ý — `logActivity()` ghi vào feed "Hoạt động gần đây" của CẢ HAI
+  nhóm khi duyệt xong, dùng lại nguyên hạ tầng có sẵn (`routes/home.js`),
+  không dựng đường báo tin mới.
+
+### Bảng `yeu_cau_doi_nhom` và chốt chặn ở tầng DB
+
+`migrations/0037_yeu_cau_doi_nhom.sql`. `trang_thai` là `cho_duyet | da_duyet
+| tu_choi | da_huy`; `tu_group_id` chụp lại nhóm hiện tại LÚC NỘP ĐƠN, dùng để
+phát hiện đơn đã lỗi thời nếu group_id người xin đổi khác đi giữa lúc nộp và
+lúc duyệt (`postDuyetDoiNhom` so `member.group_id` hiện tại với `yc.tu_group_id`,
+lệch thì trả `nhom_hien_tai_da_doi` thay vì ghi đè lung tung).
+
+`ux_doinhom_dang_cho` là UNIQUE INDEX MỘT PHẦN (`WHERE trang_thai =
+'cho_duyet'`) — mỗi người chỉ một đơn CHỜ DUYỆT tại một thời điểm, chặn ở
+tầng DB nên không có khe hở giữa lúc kiểm và lúc ghi (bấm nhanh hai lần, hay
+hai tab). `postDoiNhom` bắt lỗi UNIQUE bằng `String(err).includes('UNIQUE')`,
+đúng khuôn `postInviteClaim`/`patchMember` đã dùng cho `ux_member_email`.
+
+Không lưu `cohort_id` riêng — `member_id`/`tu_group_id`/`den_group_id` đều đã
+neo vào đúng một cohort qua `members`/`groups`, đúng khuôn `push_subscriptions`
+(migration 0012) đã bỏ cột này vì lý do tương tự.
+
+### Dùng LẠI `chucDangGiu()`, không viết bản sao — và kiểm HAI LẦN
+
+`routes/members.js` xuất `chucDangGiu()` (trước chỉ dùng nội bộ cho
+`postNgungThamGia`) để `routes/doi-nhom.js` import lại nguyên hàm — hai bản
+sao thì sớm muộn lệch nhau, đúng bài học đã ghi nhiều lần trong tệp này cho
+các hàm dùng chung khác (`cheEmail`, `soHopLeTuHoSo`).
+
+Chốt chặn "đang giữ chức thì không xin đổi nhóm được" kiểm HAI LẦN: một lần ở
+`postDoiNhom` (chặn sớm, giao diện không bày ra một form sẽ bị từ chối), một
+lần NỮA ở `postDuyetDoiNhom` ngay trước khi ghi — phòng đua: ai đó có thể đã
+gán chức cho người này SAU khi họ nộp đơn, trong lúc đơn còn chờ duyệt. Thiếu
+lần kiểm thứ hai thì cơ cấu có thể đứng tên một người vừa rời nhóm, đúng lỗi
+đã trả giá ở "ngừng tham gia" (mục trên), nay áp lại cho một đường ghi khác.
+
+### N6: sai nhóm nhận 404, không phải 403 — giống hệt khuôn cũ
+
+`postDuyetDoiNhom`/`postTuChoiDoiNhom` chỉ kiểm ĐÚNG một điều kiện đủ:
+`isGroupOfficer(env, me.id, yc.den_group_id)`. Officer của một nhóm KHÁC (kể
+cả chính nhóm ĐI) cố duyệt/từ chối một đơn không nhắm vào nhóm mình nhận
+`404 not_found`, không phải 403 — 403 là xác nhận id đó có thật (quy ước 6
+CLAUDE.md), đúng khuôn `docSectionId()`/`docGhiChuId()` đã dùng cho Bài↔Tư
+liệu và đính kèm Ghi chú. `kiem-doi-nhom.mjs` đối chứng bằng một officer của
+nhóm thứ ba, thử CẢ HAI route (thiếu điều kiện ở một trong hai là hở).
+
+### Phần bài phải nhả ra — đúng lỗi cũ, đường ghi mới
+
+Duyệt xong thì `plan_sections.owner_member_id`/`present_member_id` ở nhóm CŨ
+phải về NULL, đúng nguyên khuôn `postNgungThamGia` — một phần mang tên người
+đã sang nhóm khác trông như đã có người làm, tệ hơn để trống.
+`reset-doi-nhom.sh` gán sẵn cho người xin giữ phần bài cuối (ord=7) của Nhóm
+6 TRƯỚC khi nộp đơn, rồi `kiem-doi-nhom.mjs` xác nhận `nha_phan` trong phúc
+đáp duyệt KHÔNG rỗng và phần ấy đã về `owner_member_id = null` qua
+`GET /api/plan` — không chỉ tin suông vào con số trả về.
+
+### `cua_toi` — trạng thái là lời báo, không cần cờ "đã xem" riêng
+
+`GET /api/doi-nhom` trả `cua_toi` = đơn GẦN NHẤT của người gọi có
+`trang_thai <> 'da_huy'` — cố ý loại `da_huy` vì đó là chuyện chính người này
+vừa tự bấm, không có gì để nhắc lại. Hệ quả, đã kiểm chứ không suy đoán: huỷ
+một đơn xong thì `cua_toi` KHÔNG lùi về `null` nếu còn một đơn `tu_choi`/
+`da_duyet` cũ hơn — nó lùi về đúng đơn ấy, vì đó vẫn là trạng thái đáng nói
+nhất. Không cần thêm cột "đã xem": chỉ cần loại đúng một giá trị khỏi diện
+xét, giao diện luôn vẽ đúng theo `trang_thai` hiện có.
+
+Sheet "Xin đổi nhóm" (`openXinDoiNhom()`, `public/app.js`) LUÔN đọc lại
+`/api/doi-nhom` trước khi vẽ (quy ước 3 CLAUDE.md). Đơn đang chờ ưu tiên hiện
+TRƯỚC "đang giữ chức": huỷ đơn (`postHuyDoiNhom`) không đòi hỏi gì về chức
+vụ, nên nếu ai đó vừa được gán chức sau khi đã nộp đơn thì vẫn phải thấy
+đường huỷ, không bị chặn đứng ở một màn chỉ có nút "Đã hiểu".
+
+### Officer nhóm đích thấy đơn ở CHÍNH tab Nhóm, không phải sheet riêng
+
+`veDonDoiNhomVao()` vẽ thẳng vào tab Nhóm (cạnh mục "Đã ngừng tham gia"),
+cùng khuôn `drawJoinRequests()` đã dùng cho xin vào nhóm ở wizard: duyệt bấm
+một phát, từ chối mở một sheet nhỏ để ghi lý do. Khác `join_requests` (người
+xin CHƯA có phiên nên không có gì để đọc lại): người xin đổi nhóm đã đăng
+nhập, nên `ly_do_tu_choi` được ghi lại và chính họ đọc được qua GET của
+mình — không bắt chước máy móc "decideJoinRequest không nhắn gì khi từ chối".
+
+### Bộ kiểm — một bẫy tự vấp ngay lượt chạy lại đầu tiên
+
+`kiem-doi-nhom.mjs` (9 phép đối chứng, kể cả N6 và phần bài ở trên) và
+`pw-doi-nhom.mjs` (giao diện, hai phiên trong cùng một trình duyệt: người xin
+và officer nhóm đích) đều xanh ngay lượt đầu. Nhưng `reset-doi-nhom.sh` lúc
+đầu KHÔNG trả `group_id` của người xin (Nguyễn Thị Thu Hương, mượn từ fixture
+`reset-moi.sh`) về Nhóm 6 trước khi seed lại — bộ kiểm lượt MỘT thật sự
+CHUYỂN NHÓM cô ấy sang Nhóm 7 (đúng điều nó kiểm), nên lượt HAI mở đầu với cô
+ấy đã ở Nhóm 7, và mọi bước sau đó đổ domino: nộp lại "đến Nhóm 7" hoá ra là
+"đang ở nhóm này rồi", "đến Nhóm 6" (nhóm cũ) lại thành hợp lệ. Đúng bài học
+đã ghi ở mục 3 của "Mười chín phép đối chứng đáng giữ nhất"
+(`scripts/kiem/README.md`): bộ kiểm phải chạy lại được nhiều lần, và một bộ
+kiểm THẬT SỰ đổi trạng thái (không chỉ đọc) thì reset phải trả trạng thái ấy
+về gốc, không chỉ dọn bảng phụ.
+
+Hai officer dùng để duyệt (`Kiểm Đổi Nhóm Đích` ở Nhóm 7, `Kiểm Đổi Nhóm
+Khác` ở Nhóm 8) đều dựng tay, không mượn ai có thật — kể cả Nhóm 8 vốn đã có
+Lưu Minh Tiến (`truong_nhom` thật, migration 0021): phép kiểm N6 không nên
+phụ thuộc "ai đang giữ vai gì" ngoài đời, vai thật có thể đổi bất cứ lúc nào
+mà bộ kiểm không hay.
+
+### Chưa kiểm chứng được
+
+Chưa ai dùng tính năng này với dữ liệu thật. Nhóm 7 hiện chưa có officer
+thật nào trong 10 nhóm (chỉ Nhóm 6 và Nhóm 8 có) — đơn đầu tiên xin vào Nhóm
+7 ngoài đời sẽ không có ai duyệt được cho tới khi nhóm đó tự vận hành hoặc có
+người được gán vai qua `PUT /api/officers`.
 
 ## Dấu ✓ cho trạng thái hoàn thành
 

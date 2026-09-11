@@ -183,6 +183,15 @@ const ERR_TEXT = {
   khong_phai_khai_ho: 'Người này tự khai chứ không phải ai khai hộ, nên bạn không gỡ được.',
   member_not_in_round: 'Người này không thuộc đợt thu ấy.',
   thuoc_quy_khoa: 'Đợt đã mở rồi thì không đổi được sổ nhận tiền — số dư hai sổ sẽ nhảy cùng lúc.',
+  // Xin đổi nhóm (routes/doi-nhom.js)
+  dang_giu_chuc_nhom: 'Bạn đang giữ chức vụ trong cơ cấu nhóm — nhờ ai đó thay chức vụ ấy trước khi đổi nhóm.',
+  dang_giu_chuc_lop: 'Bạn đang giữ chức vụ cấp lớp — nhờ ai đó thay chức vụ ấy trước khi đổi nhóm.',
+  nhom_khong_hop_le: 'Chưa chọn được nhóm muốn đến.',
+  da_o_nhom_nay: 'Bạn đang ở nhóm này rồi.',
+  dang_co_don_cho_duyet: 'Bạn đang có một đơn xin đổi nhóm chờ duyệt — huỷ đơn đó trước nếu muốn đổi nơi khác.',
+  da_xu_ly_roi: 'Đơn này đã được xử lý rồi — thử tải lại.',
+  nguoi_da_ngung_tham_gia: 'Người này đã ngừng tham gia, không duyệt được nữa.',
+  nhom_hien_tai_da_doi: 'Nhóm hiện tại của người này đã đổi khác lúc họ nộp đơn — thử tải lại.',
 };
 const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
 
@@ -2080,6 +2089,8 @@ async function veDanhBaNhom() {
         <div class="fi"><div class="k">Giúp được gì</div><div class="v ${m.profile.offers ? '' : 'blank'}">${esc(m.profile.offers) || 'Chưa điền'}</div></div>
         <button class="wide ghost" style="padding:11px;font-size:14px" data-edit="${m.id}">
           ${m.id === HOME.me.id ? 'Sửa hồ sơ của tôi' : 'Sửa giúp — rồi báo lại chính chủ'}</button>
+        ${m.id === HOME.me.id
+          ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" id="xinDoiNhom">Xin đổi nhóm</button>` : ''}
         ${officer ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px" data-invite="${m.id}" data-invite-vao="${m.claimed ? 1 : 0}">Phát lại link mời cho người này</button>` : ''}
         ${officer && m.id !== HOME.me.id
           ? `<button class="wide ghost" style="padding:11px;font-size:14px;margin-top:8px;color:var(--due)" data-ngung="${m.id}">Ngừng tham gia nhóm</button>` : ''}
@@ -2087,10 +2098,13 @@ async function veDanhBaNhom() {
   </div>
   ${officer ? `<button class="wide ghost" id="themNguoi" style="margin-top:12px">+ Thêm người vào nhóm</button>` : ''}
   <div class="foot">Ai biết số điện thoại người còn trống thì điền hộ, chính chủ sửa lại sau.</div>
+  <div id="dsDoiNhomVao"></div>
   <div id="dsNgung"></div>`;
 
   noiChip();
   if ($('#themNguoi')) $('#themNguoi').onclick = openThemNguoi;
+  if ($('#xinDoiNhom')) $('#xinDoiNhom').onclick = openXinDoiNhom;
+  if (officer) veDonDoiNhomVao();
   if (officer) veNguoiDaNgung();
 
   document.querySelectorAll('#v-nhom [data-toggle]').forEach(btn => {
@@ -2191,6 +2205,139 @@ async function veNguoiDaNgung() {
       } catch (e) { b.disabled = false; toast(errText(e)); }
     };
   });
+}
+
+// ── Xin đổi nhóm (routes/doi-nhom.js) ───────────────────────────────────────
+// Trưởng/phó/tiêu biểu của nhóm ĐÍCH duyệt, không phải nhóm hiện tại — nhóm đi
+// chỉ thấy tin qua "Hoạt động gần đây" khi đơn được duyệt, không cần đồng ý.
+//
+// Luôn đọc lại /api/doi-nhom trước khi mở sheet (quy ước 3 CLAUDE.md): trạng
+// thái "đang giữ chức" hay "đơn đang chờ" có thể đổi giữa hai lần mở, và hiện
+// sai ở đây là mời bấm vào một nút sẽ bị máy chủ từ chối.
+async function openXinDoiNhom() {
+  openSheet(`<h3>Xin đổi nhóm</h3><p class="sub">Đang tải…</p>`);
+  let d;
+  try { d = await apiGet('/api/doi-nhom'); }
+  catch (e) { closeSheet(); toast(errText(e)); return; }
+
+  // Đơn đang chờ luôn ưu tiên hiện trước "đang giữ chức": huỷ đơn không đòi
+  // hỏi gì về chức vụ (postHuyDoiNhom không kiểm chucDangGiu), nên nếu ai đó
+  // vừa được gán chức SAU khi đã nộp đơn, họ vẫn phải thấy đường huỷ chứ
+  // không bị chặn đứng ở màn "đã hiểu" không nút nào khác.
+  const cua = d.cua_toi;
+  if (cua && cua.trang_thai === 'cho_duyet') {
+    openSheet(`<h3>Xin đổi nhóm</h3>
+      <div class="card"><div class="cb">
+        <div class="fi"><div class="k">Đang chờ duyệt</div><div class="v">${esc(cua.den_nhom_label)}</div></div>
+        ${cua.ly_do ? `<div class="fi"><div class="k">Lý do bạn ghi</div><div class="v">${esc(cua.ly_do)}</div></div>` : ''}
+      </div></div>
+      <p class="sub">Trưởng hoặc phó ${esc(cua.den_nhom_label)} sẽ duyệt hoặc từ chối. Huỷ được bất cứ lúc nào trước khi họ quyết định.</p>
+      <div class="sa"><button class="big c" id="xdnC">Đóng</button>
+        <button class="big c" style="color:var(--due)" id="xdnHuy">Huỷ đơn</button></div>`);
+    $('#xdnC').onclick = closeSheet;
+    $('#xdnHuy').onclick = () => submitting($('#xdnHuy'), async () => {
+      await apiPost(`/api/doi-nhom/${cua.id}/huy`);
+      await drawNhom();
+    }, 'Đã huỷ đơn xin đổi nhóm');
+    return;
+  }
+
+  if (d.dang_giu_chuc) {
+    openSheet(`<h3>Xin đổi nhóm</h3>
+      <p class="sub">Bạn đang giữ một chức vụ trong cơ cấu (nhóm hoặc lớp). Nhờ ai đó thay chức vụ ấy trước —
+        không thì cơ cấu vẫn đứng tên bạn ở một nhóm bạn không còn tham gia.</p>
+      <div class="sa"><button class="big go" id="xdnC">Đã hiểu</button></div>`);
+    $('#xdnC').onclick = closeSheet;
+    return;
+  }
+
+  const nhomHienTai = HOME.group?.no;
+  const chonDuoc = (d.nhom ?? []).filter(n => n.no !== nhomHienTai);
+
+  // Đơn trước (đã duyệt hoặc bị từ chối) — báo cho biết, không chặn nộp đơn
+  // mới: bị từ chối một lần vẫn xin lại được ngay (migration 0037).
+  // .was đọc đúng kiểu (11.5px, màu mờ) chỉ khi nằm TRONG .fi — đây là ghi
+  // chú đứng riêng, không phải một trường trong .fi, nên phải tự ghi lại
+  // đúng ba khai báo ấy bằng inline style thay vì mượn class.
+  let baoTruoc = '';
+  if (cua?.trang_thai === 'da_duyet') {
+    baoTruoc = `<div style="font-size:11.5px;color:var(--ink3);margin-bottom:10px">Đơn trước: đã chuyển từ ${esc(cua.tu_nhom_label)} sang ${esc(cua.den_nhom_label)}.</div>`;
+  } else if (cua?.trang_thai === 'tu_choi') {
+    baoTruoc = `<div style="font-size:11.5px;color:var(--ink3);margin-bottom:10px">Đơn xin sang ${esc(cua.den_nhom_label)} trước đó đã bị từ chối${cua.ly_do_tu_choi ? `: ${esc(cua.ly_do_tu_choi)}` : '.'}</div>`;
+  }
+
+  openSheet(`<h3>Xin đổi nhóm</h3>
+    <p class="sub">Trưởng hoặc phó của nhóm bạn muốn đến sẽ duyệt đơn này. Nhóm hiện tại không cần đồng ý, nhưng sẽ thấy tin bạn đã chuyển đi.</p>
+    ${baoTruoc}
+    <label class="f">Muốn chuyển đến</label>
+    <select id="xdnNhom">${chonDuoc.map(n => `<option value="${n.no}">${esc(n.label)}</option>`).join('')}</select>
+    <label class="f">Lý do (không bắt buộc)</label>
+    <textarea id="xdnLy" maxlength="200" rows="3" placeholder="Giúp trưởng/phó nhóm kia hiểu vì sao bạn muốn sang"></textarea>
+    <div class="sa"><button class="big c" id="xdnC">Thôi</button><button class="big go" id="xdnOK">Gửi đơn</button></div>`);
+  $('#xdnC').onclick = closeSheet;
+  $('#xdnOK').onclick = () => submitting($('#xdnOK'), async () => {
+    await apiPost('/api/doi-nhom', { den_nhom_so: Number($('#xdnNhom').value), ly_do: $('#xdnLy').value });
+    await drawNhom();
+  }, 'Đã gửi đơn xin đổi nhóm');
+}
+
+// Đơn xin VÀO nhóm mình — chỉ trưởng/phó/tiêu biểu thấy (khớp officer ở
+// drawNhom), máy chủ lọc lại bằng isGroupOfficer nên giấu ở đây chỉ để khỏi
+// bày nút bấm vào là 404. Cùng khuôn drawJoinRequests(): duyệt bấm một phát,
+// từ chối mở một sheet nhỏ để ghi lý do (người xin đọc được lý do này qua
+// chính GET /api/doi-nhom của họ, khác join_requests nơi người xin chưa có
+// phiên nên không có gì để đọc lại).
+async function veDonDoiNhomVao() {
+  const hop = $('#dsDoiNhomVao');
+  if (!hop) return;
+  let ds = [];
+  try { ds = (await apiGet('/api/doi-nhom')).cho_nhom_toi ?? []; } catch { return; }
+  if (!ds.length) { hop.innerHTML = ''; return; }
+  hop.innerHTML = `
+    <div class="eb ebbuoi" style="margin-top:26px">Đơn xin vào nhóm <span class="c">${ds.length}</span></div>
+    <div class="card"><div class="cb" style="padding:2px 14px">
+      ${ds.map(y => `<div class="fd">
+        ${avatar(y.full_name)}
+        <div class="x"><b>${esc(y.full_name)}</b>
+          <div style="font-size:11.5px;margin-top:2px" class="st-no">Từ ${esc(y.tu_nhom_label)}${
+            (y.title || y.company) ? ' · ' + esc([y.title, y.company].filter(Boolean).join(' · ')) : ''}</div>
+          ${y.ly_do ? `<div style="font-size:12.5px;margin-top:3px">${esc(y.ly_do)}</div>` : ''}</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="tg" data-tuchoi="${y.id}">từ chối</button>
+          <button class="tg go" data-duyet="${y.id}">duyệt</button>
+        </div></div>`).join('')}
+    </div></div>
+    <div class="foot">Duyệt xong người này chuyển hẳn sang nhóm bạn; phần bài họ đang giữ ở nhóm cũ được nhả ra cho người khác nhận.</div>`;
+
+  hop.querySelectorAll('[data-duyet]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const r = await apiPost(`/api/doi-nhom/${b.dataset.duyet}/duyet`);
+        toast(r.nha_phan?.length
+          ? `Đã duyệt ${short(r.full_name)} · nhả ${r.nha_phan.length} phần bài ở nhóm cũ`
+          : `Đã duyệt ${short(r.full_name)}`);
+        await drawNhom();
+      } catch (e) { b.disabled = false; toast(errText(e)); }
+    };
+  });
+  hop.querySelectorAll('[data-tuchoi]').forEach(b => {
+    b.onclick = () => xacNhanTuChoiDoiNhom(Number(b.dataset.tuchoi));
+  });
+}
+
+function xacNhanTuChoiDoiNhom(id) {
+  openSheet(`<h3>Từ chối đơn xin vào nhóm?</h3>
+    <p class="sub">Người xin đọc được lý do này ở màn "Xin đổi nhóm" của họ — không bắt buộc ghi.</p>
+    <label class="f">Lý do (không bắt buộc)</label>
+    <textarea id="tcLy" maxlength="200" rows="3" placeholder="vd: nhóm đã đủ người"></textarea>
+    <div class="sa"><button class="big c" id="tcC">Thôi</button>
+      <button class="big go" id="tcOK">Từ chối đơn</button></div>`);
+  $('#tcC').onclick = closeSheet;
+  $('#tcOK').onclick = () => submitting($('#tcOK'), async () => {
+    await apiPost(`/api/doi-nhom/${id}/tu-choi`, { ly_do: $('#tcLy').value });
+    await drawNhom();
+  }, 'Đã từ chối đơn');
 }
 
 // Luôn đọc hồ sơ từ máy chủ trước khi mở form. Lấy từ bộ nhớ đệm sẽ có lúc
