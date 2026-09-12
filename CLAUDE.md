@@ -975,6 +975,30 @@ dòng chữ có bốn dấu thăng lủng lẳng. Không phép kiểm chuỗi n�
 `pw-tro-ly.mjs` mới thấy. Nay nhận tới `#{1,6}` và **KẸP** ở `h6`
 (`Math.min(m[1].length + 3, 6)`) — `#`/`##`/`###` vẫn ra đúng h4/h5/h6 như cũ.
 
+### Số hiệu phần bài lệch một nấc — lỗi thứ hai, bắt được khi dựng demo
+
+Sửa 12/9, vài giờ sau khi phát hành. `plan_sections.ord` chạy 0..7 với **ord=0
+là phần MỞ ĐẦU** ("Sản phẩm và khách hàng mục tiêu"), nên bảy phần ĐÁNH SỐ
+trong bản Word của giảng viên là ord 1..7 — và giao diện in thẳng `s.ord`, bỏ
+số ở ord=0 (`public/app.js`). Trợ lý thì viết `ord + 1` ở **ba chỗ**: tiêu đề
+phiên (`routes/tro-ly.js`), nhãn tám phần trong bối cảnh nhóm và tên bản thảo
+lượt chốt (`tro-ly/prompt.js`).
+
+Hệ quả: học viên mở **"Phần 1 · Nghiên cứu Marketing"** ở tab Bài, trợ lý dẫn
+dắt bằng **"Phần 2"**, và bản thảo chốt xuống Ghi chú cũng mang sai số hiệu.
+Không chỗ nào báo lỗi — cùng họ với phép kiểm "D1 phải trùng từng ký tự với
+`giao-trinh.js`": bị chấm bằng một cái thước mình không nhìn thấy.
+
+Nay một hàm duy nhất `nhanPhan(ord, ten)` trong `tro-ly/prompt.js` giữ quy tắc
+đánh số, cả ba chỗ gọi nó. `kiem-tro-ly.mjs` có phép 2b canh hai chiều: số của
+trợ lý phải khớp số giao diện cho tám dòng THẬT trong D1, **và** `public/app.js`
+phải vẫn in `s.ord` trần — đổi cách đánh số ở giao diện thì phép kiểm đỏ, để
+hai bên cùng được sửa chứ không lệch nhau trong im lặng.
+
+Phiên nào mở TRƯỚC lượt deploy này giữ nguyên tiêu đề cũ (chỉ là cái nhãn, nội
+dung không sai) — không viết migration sửa lại vì bảng `tro_ly_phien` trên bản
+thật lúc sửa vẫn chưa có phiên thật nào.
+
 ### Bộ kiểm — và điều nó KHÔNG chứng minh được
 
 `kiem-tro-ly.mjs` (máy chủ) + `pw-tro-ly.mjs` (giao diện), mỗi bộ chạy hai
@@ -1778,6 +1802,33 @@ Bản thảo gốc là `so-tay.tpl.html` **ở thư mục scratchpad của phiê
 **Chỉ bản tên miền nằm trong repo.** Bản thảo và ba script dựng ở scratchpad,
 phiên mới là mất. Muốn sửa sổ tay thì sửa thẳng `public/sotay/index.html` —
 HTML thường, CSS và JS để rời, đọc được và sửa được.
+
+**Cập nhật 12/9 — thêm mục "Trợ lý KHKD"** (`#troly`, mục 3 của sổ tay), gồm
+một **cuộc hội thoại demo bảy lượt** dựng theo đúng luật cứng của trợ lý. Ngô
+Phú Cường yêu cầu: *"bạn có thể thử một cuộc hội thoại để làm hướng dẫn demo
+cho học viên hiểu chức năng không?"*
+
+**Nói rõ trong chính trang đó rằng đây là bản DỰNG, không phải bản ghi một
+phiên có thật** — sandbox không gọi được `api.deepseek.com` (mục trên), nên
+không lượt hỏi đáp thật nào chạy được ở đây. Một trang hướng dẫn trình bày văn
+bản do tôi viết như thể là câu trả lời của mô hình thì chính nó là lỗi "AI bịa
+nguồn" mà cả tính năng sinh ra để chống. Bao giờ có phiên thật thì thay bằng
+ảnh chụp phiên ấy, và bỏ dòng cảnh báo đi.
+
+Demo cố ý dựng quanh một **mâu thuẫn số học có thật** (18 tỷ ↔ 6 nhà máy ↔ bếp
+1.200 suất/ngày): thứ phân biệt trợ lý này với một ô chat thường không phải là
+nó trả lời trôi chảy, mà là nó **bắt được chỗ hai phần bài nói ngược nhau**.
+Một demo toàn câu hỏi lịch sự thì không ai hiểu để làm gì.
+
+Ba chỗ sổ tay đã lỗi thời, sửa kèm (đọc lại `public/app.js` để đối chiếu, không
+sửa theo trí nhớ): "Năm tab" → **Sáu tab** (Giao thương thêm 5/9), tiêu đề
+"Nhóm" → **Danh bạ** (đổi tên 28/8) kèm hai thẻ Nhóm/Cả lớp và luật che số
+điện thoại. Phần Giao thương **vẫn chưa có mục riêng** trong sổ tay — cần ảnh
+chụp thật, chưa làm.
+
+`deploy.yml` nay grep `id="troly"` trong `/sotay` tải về từ tên miền: Pages
+xuất bản hụt một tệp thì trang vẫn trả 200 với bản CŨ và không chỗ nào kêu —
+đúng cái bẫy đệm đã trả giá ngày 25/8 với `/app.js`.
 
 Ba điều đã trả giá để biết, đừng vấp lại:
 

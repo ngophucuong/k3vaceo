@@ -106,7 +106,7 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-doi-nhom.mjs` | xin đổi nhóm: ai duyệt, đơn trùng, **N6 qua officer nhóm thứ ba**, nhả phần bài |
 | `pw-doi-nhom.mjs` | giao diện xin đổi nhóm — hai phiên trong một trình duyệt (người xin và officer nhóm đích) |
 | `reset-doi-nhom.sh` | dựng bốn phiên + hai officer giả cho hai bộ kiểm trên, và **trả group_id của người xin về Nhóm 6** |
-| `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
+| `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
@@ -117,7 +117,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Hai mươi bốn phép đối chứng đáng giữ nhất
+## Hai mươi lăm phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -357,6 +357,16 @@ Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ khôn
    thật trên tên miền từ 25/8). Đúng vì vậy mà `soiBanLucMo()` được viết thành
    **chỉ hiện băng, không tự tải lại**: thứ không kiểm được thì đừng đặt nó
    vào đường khởi động của 146 người.
+
+25. **Số hiệu phần bài phải khớp HAI CHIỀU — và một chiều là `public/app.js`.**
+   `plan_sections.ord` chạy 0..7 với ord=0 là phần MỞ ĐẦU, nên giao diện in
+   thẳng `s.ord`; trợ lý từng viết `ord + 1` và gọi "Phần 2" cho đúng cái ứng
+   dụng gọi "Phần 1" (sửa 12/9). Phép 2b của `kiem-tro-ly.mjs` vì vậy không
+   chỉ so `nhanPhan()` với hằng số trong `giao-trinh.js` — nó còn **grep chính
+   biểu thức đánh số trong `public/app.js`**, để ai đổi cách đánh số ở giao
+   diện thì bộ kiểm đỏ và hai bên cùng được sửa. Kèm một phép đối chứng có
+   răng: công thức cũ `ord + 1` phải TRƯỢT.
+
 ## Chạy `kiem-tanso.mjs`
 
 ```bash

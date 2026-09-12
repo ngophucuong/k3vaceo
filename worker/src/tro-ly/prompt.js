@@ -14,6 +14,26 @@ import { nenTriThuc, VI_DU_PHAN, YEU_CAU_PHAN } from './giao-trinh.js';
 // lượt phỏng vấn — cắt ở đây, ưu tiên phần ĐANG BÀN.
 const NGAN_SACH_NOI_DUNG = 6000;
 
+/* ══ Số hiệu phần bài ══════════════════════════════════════════════════════
+   PHẢI trùng khít với số học viên đang nhìn thấy trong ứng dụng. `ord` chạy
+   0..7, mà ord=0 là phần MỞ ĐẦU ("Sản phẩm và khách hàng mục tiêu") — bảy
+   phần ĐÁNH SỐ trong bản Word của giảng viên là ord 1..7. Giao diện in thẳng
+   `s.ord` và bỏ số ở ord=0 (`public/app.js`), nên ở đây phải làm y hệt.
+
+   Viết `ord + 1` là trợ lý gọi "Phần 2" cho đúng thứ ứng dụng gọi "Phần 1" —
+   không chỗ nào báo lỗi, chỉ có học viên mở "Phần 1 · Nghiên cứu Marketing"
+   rồi bị trợ lý dẫn dắt bằng một số hiệu khác, và bản thảo chốt xuống Ghi chú
+   cũng mang sai số. Cùng lý lẽ với việc `kiem-tro-ly.mjs` so từng ký tự yêu
+   cầu giảng viên giữa D1 và `giao-trinh.js`: bị chấm bằng cái thước mình
+   không nhìn thấy là lỗi tệ nhất của tính năng này.
+
+   Một chỗ duy nhất, dùng chung cho cả tiêu đề phiên, bối cảnh nhóm và lượt
+   chốt — ba bản sao thì sớm muộn lệch nhau. */
+export function nhanPhan(ord, ten) {
+  const t = String(ten ?? '').trim();
+  return Number.isInteger(ord) && ord > 0 ? `Phần ${ord}. ${t}` : t;
+}
+
 /* ══ LUẬT CỨNG ════════════════════════════════════════════════════════════
    Bốn luật đầu lấy thẳng từ tài liệu giảng viên, không phải tôi nghĩ ra:
    - "AI làm được / chỉ anh chị làm được" (trang 18)
@@ -100,7 +120,7 @@ export function boiCanhNhom({ nhom, plan, phans, ordDangBan }) {
   const dong = [];
   for (const p of phans ?? []) {
     const dangBan = p.ord === ordDangBan;
-    const nhan = `Phần ${p.ord + 1}. ${p.title} — tiến độ ${p.pct ?? 0}%`;
+    const nhan = `${nhanPhan(p.ord, p.title)} — tiến độ ${p.pct ?? 0}%`;
     if (!dangBan) {
       dong.push(`${nhan}${p.note ? ` · ghi chú: ${catBot(p.note, 160)}` : ' · chưa có ghi chú'}`);
       continue;
@@ -135,7 +155,7 @@ export function loiHePhongVan({ giaiDoan, boiCanh, ordDangBan }) {
 /** Lời hệ thống cho lượt CHỐT — dựng bản thảo từ chính câu trả lời của học viên. */
 export function loiHeChot({ boiCanh, ordDangBan }) {
   const ten = Number.isInteger(ordDangBan)
-    ? `Phần ${ordDangBan + 1}. ${YEU_CAU_PHAN[ordDangBan]?.ten ?? ''}`
+    ? nhanPhan(ordDangBan, YEU_CAU_PHAN[ordDangBan]?.ten)
     : 'phần bài đang bàn';
   return `${LUAT_CUNG}\n\n${nenTriThuc()}\n\n${boiCanh}
 

@@ -337,6 +337,15 @@ jobs:
           else
             echo "  ✓ không bị luật vét /* nuốt"
           fi
+          # Mục Trợ lý KHKD là thứ mới nhất của sổ tay (12/9). Grep tên mục
+          # chứ không chỉ đếm byte: Pages xuất bản hụt một tệp thì /sotay vẫn
+          # trả 200 với bản CŨ, và không chỗ nào kêu — đúng cái bẫy đệm đã trả
+          # giá ngày 25/8 với /app.js.
+          if grep -q 'id="troly"' /tmp/sotay.html; then
+            echo "  ✓ có mục Trợ lý KHKD (bản mới đã lên)"
+          else
+            echo "  ✗ /sotay chưa có mục Trợ lý KHKD — Pages còn phục vụ bản cũ"; loi=1
+          fi
           for t in sotay.css sotay.js anh/07-quy-nut-toi-da-chuyen.jpg; do
             m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app/sotay/$t")
             if [ "$m" = "200" ]; then echo "  ✓ /sotay/$t"; else echo "  ✗ /sotay/$t = HTTP $m"; loi=1; fi

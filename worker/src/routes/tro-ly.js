@@ -15,7 +15,7 @@ import { logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 import { conQuota, ghiNhan } from '../lib/ratelimit.js';
 import { llmCauHinh, goiLLM, LoiLLM } from '../lib/llm.js';
-import { boiCanhNhom, loiHePhongVan, loiHeChot } from '../tro-ly/prompt.js';
+import { boiCanhNhom, loiHePhongVan, loiHeChot, nhanPhan } from '../tro-ly/prompt.js';
 
 const CAU_HOI_MAX = 4000;      // một lượt học viên gõ vào
 const BAN_THAO_MAX = 8000;     // trùng NOI_DUNG_MAX của links.content_md
@@ -187,7 +187,9 @@ export async function postPhien(request, env, me, ip) {
 
   await ghiNhan(env, 'tro_ly', `m${me.id}`);
 
-  const tieuDe = section ? `Phần ${section.ord + 1}. ${section.title}`
+  // Số hiệu phần lấy từ nhanPhan() — phải trùng với nhãn ở tab Bài, xem chú
+  // thích của hàm ấy trong tro-ly/prompt.js.
+  const tieuDe = section ? nhanPhan(section.ord, section.title)
     : (giaiDoan === 'de_tai' ? 'Chọn đề tài' : 'Tập phản biện');
   const phien = await env.DB.prepare(
     `INSERT INTO tro_ly_phien (group_id, section_id, mo_boi, tieu_de, giai_doan,

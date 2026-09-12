@@ -23,6 +23,12 @@
 //      0038 hứa hẳn trong chú thích rằng phép kiểm này tồn tại. Lệch thì học
 //      viên đọc một thước trên màn hình còn trợ lý chấm bằng một thước khác —
 //      không chỗ nào báo lỗi, chỉ có lời khuyên sai.
+//  2b. LỆCH SỐ HIỆU PHẦN: trợ lý phải gọi phần bài đúng cái tên học viên đang
+//      nhìn thấy ở tab Bài. `ord` chạy 0..7 với ord=0 là phần MỞ ĐẦU, nên bảy
+//      phần đánh số của bản Word là ord 1..7 — giao diện in thẳng `s.ord`.
+//      Trợ lý từng viết `ord + 1` (sửa 12/9): mở "Phần 1 · Nghiên cứu
+//      Marketing" mà trợ lý dẫn dắt bằng "Phần 2", và bản thảo chốt xuống Ghi
+//      chú cũng mang sai số. Cùng họ với phép 2 — không chỗ nào báo lỗi.
 //   3. N6 — phiên của NHÓM KHÁC: cả bốn route (GET / hỏi / chốt / đóng) phải
 //      trả 404, KHÔNG phải 403 (quy ước 6 CLAUDE.md). Kèm phép đối chứng
 //      thuận: chính phiên của mình thì 200 — thiếu vế này thì một lỗi làm mọi
@@ -60,6 +66,7 @@
 
 import { readFileSync } from 'node:fs';
 import { YEU_CAU_PHAN } from '../../worker/src/tro-ly/giao-trinh.js';
+import { nhanPhan } from '../../worker/src/tro-ly/prompt.js';
 
 const TAT = process.argv[2] === 'tat';
 let hong = 0;
@@ -134,6 +141,36 @@ for (const y of YEU_CAU_PHAN) {
     console.log(`      code: ${JSON.stringify(String(y.yeu_cau).slice(0, 90))}`);
   }
 }
+
+// ── 2b. SỐ HIỆU PHẦN: trợ lý phải gọi ĐÚNG cái tên học viên đang nhìn ────
+// Cùng họ với phép kiểm ngay trên: hai chỗ phải trùng nhau, mà lệch thì không
+// chỗ nào báo lỗi. `ord` chạy 0..7 với ord=0 là phần MỞ ĐẦU, nên bảy phần đánh
+// số của bản Word là ord 1..7 — giao diện in thẳng `s.ord`. Trợ lý từng viết
+// `ord + 1`: học viên mở "Phần 1 · Nghiên cứu Marketing" thì trợ lý dẫn dắt
+// bằng "Phần 2", và bản thảo chốt xuống Ghi chú cũng mang sai số hiệu.
+console.log('\n── Số hiệu phần bài: trợ lý phải trùng nhãn ở tab Bài ──');
+const appjs = readFileSync(new URL('../../public/app.js', import.meta.url), 'utf8');
+// Nếu giao diện đổi cách đánh số thì phép kiểm này phải ĐỎ để hai bên cùng
+// được sửa — đó chính là việc của nó.
+ok("giao diện vẫn in số phần bằng `s.ord` trần (không +1), và bỏ số ở ord=0",
+  appjs.includes("s.ord === 0 ? '' : 'Phần ' + s.ord + ' · '"));
+for (const y of YEU_CAU_PHAN) {
+  const nhan = nhanPhan(y.ord, y.ten);
+  const mong = y.ord === 0 ? y.ten : `Phần ${y.ord}. ${y.ten}`;
+  ok(`ord ${y.ord} → "${nhan}"`, nhan === mong);
+}
+// Phép đối chứng có răng: đúng cái công thức cũ phải TRƯỢT ở đây.
+ok('công thức cũ (ord + 1) bị bắt: "Phần 2" không bao giờ là Nghiên cứu Marketing',
+  nhanPhan(1, 'Nghiên cứu Marketing') !== 'Phần 2. Nghiên cứu Marketing');
+// Và số hiệu phải khớp với chính dòng D1 mà tab Bài đang vẽ, không chỉ khớp
+// với hằng số trong giao-trinh.js.
+const lechPhan = (plan.sections ?? []).filter(s2 => {
+  const soTroLy = (nhanPhan(s2.ord, s2.title).match(/^Phần (\d+)\./) ?? [])[1] ?? '';
+  const soGiaoDien = s2.ord === 0 ? '' : String(s2.ord);
+  return soTroLy !== soGiaoDien;
+});
+ok(`tám phần trong D1: số hiệu trợ lý khớp số hiệu giao diện (lệch: ${lechPhan.length})`,
+  lechPhan.length === 0);
 
 // ── Tra id của ba phiên gieo sẵn ─────────────────────────────────────────
 const tl6 = await jget('/api/tro-ly', ckCuong);

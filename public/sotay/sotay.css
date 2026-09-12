@@ -217,3 +217,47 @@ code{
   border:1px solid var(--net); border-radius:5px; padding:1px 6px;
 }
 @media (prefers-reduced-motion:reduce){ *{transition:none !important; animation:none !important} }
+
+/* ── Hội thoại demo với Trợ lý KHKD ──
+   Bong bóng dựng bằng chính bảng màu của sổ tay, không thêm màu mới. Bong
+   bóng học viên đảo nền bằng --muc/--giay (đúng khuôn .tlbb.toi trong
+   public/app.css) chứ KHÔNG dùng --luc: cặp màu xanh trong sản phẩm này có
+   đúng một nghĩa, "người thu đã nhận tiền". */
+.hoithoai{
+  display:grid; gap:13px; margin:0 0 18px; padding:18px;
+  background:var(--the2); border:1px solid var(--net); border-radius:var(--r);
+}
+.bong{
+  max-width:54ch; border-radius:var(--r2); padding:12px 15px;
+  font-size:14.5px; line-height:1.56;
+}
+.bong > :last-child{margin-bottom:0}
+.bong p{margin:0 0 9px; max-width:none}
+.bong ul{margin:0 0 9px; padding-left:19px; max-width:none}
+.bong ol{margin:0 0 9px; padding-left:21px; max-width:none}
+.bong li{margin-bottom:5px}
+.bong .vai{
+  font-family:var(--so); font-size:10.5px; font-weight:600; letter-spacing:.13em;
+  text-transform:uppercase; opacity:.6; display:block; margin-bottom:7px;
+}
+.bong.tl{background:var(--the); border:1px solid var(--net); justify-self:start}
+.bong.toi{background:var(--muc); color:var(--giay); justify-self:end}
+@media (max-width:560px){ .bong{max-width:100%} }
+
+/* Gợi ý khung trả lời — thứ phân biệt trợ lý này với một ô chat thường:
+   mỗi câu hỏi luôn kèm một khung CÓ CHỖ TRỐNG, không bao giờ điền sẵn số. */
+.goiy{
+  background:var(--cam-nen); border:1px solid var(--cam-net); border-radius:9px;
+  padding:9px 12px; font-size:13.8px; line-height:1.5; color:var(--muc);
+}
+.goiy b{color:var(--cam)}
+
+/* Nhãn [FACT] / [ASSUMPTION] / [TARGET] — kỷ luật của giảng viên, trang 17. */
+.nd{
+  font-family:var(--so); font-size:10.5px; font-weight:600; letter-spacing:.05em;
+  border-radius:5px; padding:1px 5px; white-space:nowrap; border:1px solid;
+}
+.nd-f{color:var(--luc); background:var(--luc-nen); border-color:var(--luc-net)}
+.nd-a{color:var(--cam); background:var(--cam-nen); border-color:var(--cam-net)}
+.nd-t{color:var(--muc2); background:var(--the2); border-color:var(--net2)}
+.bong.toi .nd{opacity:.95}
