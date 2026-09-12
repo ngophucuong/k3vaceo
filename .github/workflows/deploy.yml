@@ -542,7 +542,7 @@ jobs:
             // dùng tự đặt, đánh đỏ cả lượt deploy vì một bí mật ngoài repo là
             // đúng thứ đã quyết không làm ở chỗ đệm trình duyệt.
             if (!d.tro_ly?.bat) {
-              console.log('::warning::Trợ lý KHKD: Worker CHƯA thấy DEEPSEEK_API_KEY — giao diện sẽ ẩn nút và route trả 503.');
+              console.log("::warning::Trợ lý KHKD: Worker CHƯA thấy DEEPSEEK_API_KEY — giao diện sẽ ẩn nút và route trả 503.");
             } else {
               console.log(`✓ Trợ lý KHKD: khoá đã tới Worker · model ${d.tro_ly.model}`);
             }
@@ -550,8 +550,24 @@ jobs:
             // d1 không qua deploy — nên nó có thể đang tắt trong khi mọi thứ
             // khác xanh. Nói ra, đừng để lượt deploy sau đi tìm xem vì sao
             // học viên không thấy nút nào.
+            // KHÔNG ĐƯỢC có một dấu nháy ĐƠN nào trong khối này, kể cả
+            // trong CHÚ THÍCH. Cả đoạn node nằm trong một chuỗi shell bọc bằng
+            // nháy đơn, mà trong nháy đơn shell KHÔNG có cơ chế thoát nào cả:
+            // gặp nháy đơn thứ hai là nó ĐÓNG chuỗi ngay, phần còn lại rơi ra
+            // cho shell đọc. Bản đầu nhét một câu SQL có nháy đơn vào đây và
+            // cả bước kiểm tên miền chết bằng
+            // `syntax error near unexpected token (` ở lượt deploy #111 — mã
+            // Worker lên hoàn toàn bình thường, chỉ phép kiểm tự chết. Vì vậy
+            // câu SQL dưới đây viết nháy đơn bằng thoát \\u0027 của JS: trong
+            // TỆP không có một ký tự nháy đơn nào, node mới dựng ra nó.
+            // Muốn sửa khối này thì kiểm bằng máy, đừng nhìn bằng mắt:
+            //   python3 -c "import yaml,io; [io.open(...).write(s[\\"run\\"]) ...]"
+            //   rồi bash -n trên tệp vừa trích.
             if (d.tro_ly && d.tro_ly.cong_tac === false) {
-              console.log('::warning::Trợ lý KHKD đang TẮT bằng công tắc trong D1 (cai_dat.tro_ly_bat = 0). Bật lại: wrangler d1 execute k3vaceo --remote --command "UPDATE cai_dat SET gia_tri = \'1\' WHERE khoa = \'tro_ly_bat\'"');
+              console.log("::warning::Trợ lý KHKD đang TẮT bằng công tắc trong D1 "
+                + "(cai_dat.tro_ly_bat = 0), nên học viên không thấy thẻ trợ lý nào. Bật lại: "
+                + "npx wrangler d1 execute k3vaceo --remote --command "
+                + "\"UPDATE cai_dat SET gia_tri = \u00271\u0027 WHERE khoa = \u0027tro_ly_bat\u0027\"");
             }
             console.log(`\n  bản đang chạy: ${String(d.version || "(chưa ghi)").slice(0, 8)} · đường gửi thư: ${d.mailer || "?"}`);
             console.log(process.env.KHOP === "1"

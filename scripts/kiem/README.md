@@ -109,6 +109,7 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
+| `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
 
 Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
 đúng với dữ liệu đang nằm trong D1 cục bộ. Trước 27/8 `coso.json` nằm ở thư mục
@@ -375,6 +376,43 @@ một phép canh `wrangler.toml` đúng chỗ này).
 Sandbox không ra được internet, nên mọi lượt gọi đều đi vào nhánh hỏng. Bằng
 chứng duy nhất đáng tin vẫn là một phiên thật trên tên miền — đúng bài học của
 đường gửi thư ngày 24/8.
+
+## `kiem-deploy-yml.mjs` — một dòng luật, và vì sao nó đáng một tệp riêng
+
+```bash
+node scripts/kiem/kiem-deploy-yml.mjs      # không cần máy chủ, chạy trong 1 giây
+```
+
+Luật: **trong một khối `node -e '…'` của `deploy.yml` không được có một dấu
+nháy đơn nào** — kể cả trong chuỗi JS, kể cả trong chú thích.
+
+Trong nháy đơn, shell KHÔNG có cơ chế thoát nào cả: gặp nháy đơn thứ hai là nó
+ĐÓNG chuỗi ngay, phần tiếp theo rơi ra ngoài cho shell đọc như mã lệnh. Hai
+kiểu hỏng, và kiểu thứ nhất mới là kiểu nguy:
+
+1. **Số nháy đơn CHẴN, phần lọt ra không có ký tự đặc biệt** → shell ghép lại
+   thành một chuỗi và mọi thứ *trông như* vẫn chạy. Nhưng mọi dấu `"` trong
+   phần lọt ra bị ĂN MẤT, nên **node nhận một chuỗi KHÁC hẳn thứ đọc thấy
+   trong tệp**. Không có gì báo lỗi.
+2. **Có `(` hay `)` trong phần lọt ra** → `syntax error near unexpected token`,
+   cả bước kiểm chết.
+
+Cả hai đã xảy ra thật ở lượt deploy **#111** (12/9, commit Trợ lý KHKD): mã
+Worker lên bình thường, migration áp xong, Pages xuất bản xong — chỉ bước
+"Kiểm tra tên miền thật" tự chết. Đo lại bằng cách đặt một `node` GIẢ lên
+`PATH` để bắt đúng chuỗi shell truyền vào `-e`: **tệp có 4.542 byte, node chỉ
+nhận được 2.225.** Tức là chuỗi ấy đã hỏng từ trước cả lúc nó chết hẳn.
+
+Cách viết thay thế, cho cả ba loại nội dung:
+
+| Cần gì | Viết thế nào |
+|---|---|
+| chuỗi JS | nháy kép `"…"` hoặc backtick `` `…` `` |
+| nháy đơn trong DỮ LIỆU (câu SQL) | `\u0027` — thoát của JS, tệp không có ký tự nháy đơn thật |
+| chú thích | viết lại cho không có dấu nháy đơn |
+
+Bộ kiểm này **đã được đối chứng**: nhét lại đúng dòng cũ thì nó đỏ ngay, và
+chỉ đỏ đúng khối có lỗi.
 
 ## Hai chỗ môi trường này không kiểm được
 

@@ -89,6 +89,21 @@ lên đều **không deploy** — tab Actions im lặng, không lỗi, không c�
 triệu chứng duy nhất là người dùng bảo "vào không thấy gì mới". Đã xảy ra ngày
 28/8 với bốn commit liền.
 
+**Bẫy thứ ba, trong CHÍNH `deploy.yml`, trả giá ở lượt deploy #111 (12/9):**
+mọi khối `node -e '…'` trong workflow nằm trong một chuỗi shell bọc bằng NHÁY
+ĐƠN, mà trong nháy đơn shell **không có cơ chế thoát nào cả** — gặp nháy đơn
+thứ hai là đóng chuỗi ngay. Một dòng `console.log('::warning::…')` viết bằng
+nháy đơn làm node nhận **2.225 byte thay vì 4.542** (đo bằng một `node` giả
+đặt lên `PATH` để bắt đúng chuỗi truyền vào `-e`), và một dấu `(` lọt ra ngoài
+thì cả bước kiểm chết bằng `syntax error near unexpected token (`. Mã Worker
+lên hoàn toàn bình thường, migration áp xong, Pages xuất bản xong — chỉ phép
+kiểm tự chết, nên deploy đỏ mà ứng dụng vẫn đúng.
+
+Luật từ nay: **trong khối `node -e` không được có một nháy đơn nào**, kể cả
+trong chú thích; nháy đơn trong DỮ LIỆU (câu SQL chẳng hạn) viết bằng `\u0027`.
+`node scripts/kiem/kiem-deploy-yml.mjs` canh đúng luật này, chạy trong một
+giây và không cần máy chủ — chạy nó mỗi khi đụng vào `deploy.yml`.
+
 `deploy.yml` nay tự trả lời câu ấy mỗi lượt: nó tải `/app.js` từ tên miền hai
 lần (bình thường và ép làm mới) rồi **so băm với tệp trong repo**. Ép làm mới
 vẫn khác thì Pages chưa xuất bản thật → đánh đỏ. Chỉ lượt tải bình thường khác
