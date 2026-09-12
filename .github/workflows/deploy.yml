@@ -128,6 +128,12 @@ jobs:
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          # Trợ lý KHKD. Ngô Phú Cường đặt thẳng khoá này làm Secret trên
+          # Cloudflare ngày 12/9 nên nó vốn đã sống sót qua deploy (vòng lặp
+          # dưới chỉ `put`, không xoá cái nào không có trong danh sách). Để tên
+          # ở đây để ai đặt thêm vào GitHub Secrets thì cũng được đồng bộ —
+          # dòng trống thì bị bỏ qua, không tạo ra bí mật rỗng.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
         run: |
           da=
@@ -138,7 +144,7 @@ jobs:
           for name in SMTP_HOST SMTP_PORT SMTP_SECURE \
                       SMTP_USER SMTP_PASS MAIL_FROM \
                       SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL \
-                      RESEND_API_KEY \
+                      RESEND_API_KEY DEEPSEEK_API_KEY \
                       VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
             # Bỏ qua cái không đặt: đẩy chuỗi rỗng lên là tạo ra một bí mật rỗng,
             # trông như "đã có" mà thực ra không dùng được.
@@ -153,6 +159,44 @@ jobs:
       # vài lượt chứ đừng kết luận vội. Và phân biệt cho rõ: trả về JSON là
       # Worker Route đã chen được vào; trả về HTML là request rơi xuống Pages
       # (vì _redirects có luật bắt tất cả /* → /index.html).
+      # Khoá LLM có DÙNG ĐƯỢC không — khác hẳn câu "khoá đã tới Worker chưa"
+      # mà /api/health trả lời. Sandbox của phiên Claude Code không ra được
+      # internet nên không tài nào thử được ở đó; runner của GitHub thì ra
+      # được, nên đây là chỗ DUY NHẤT hỏi thẳng nhà cung cấp "khoá này còn
+      # sống không" trước khi học viên bấm vào và nhận một lỗi khó hiểu.
+      #
+      # Gọi đúng một lượt nhỏ nhất (max_tokens 1) nên chi phí gần bằng không.
+      # Bỏ qua trong im lặng nếu khoá chưa có trong GitHub Secrets — Ngô Phú
+      # Cường đặt nó thẳng vào Cloudflare, hợp lệ, chỉ là bước này không soi
+      # được khoá đó. Muốn bước này chạy thì thêm cùng khoá vào GitHub Secrets.
+      - name: Kiểm tra khoá DeepSeek còn sống không
+        if: steps.check.outputs.skip != 'true'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "· Bỏ qua: chưa có DEEPSEEK_API_KEY trong GitHub Secrets."
+            echo "  (Khoá đặt thẳng trên Cloudflare vẫn chạy — bước này chỉ không soi được nó."
+            echo "   Thêm cùng khoá vào GitHub Secrets thì mỗi lần deploy sẽ tự kiểm.)"
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/ds.json -w '%{http_code}' -m 45 \
+                 -X POST https://api.deepseek.com/chat/completions \
+                 -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+                 -H 'Content-Type: application/json' \
+                 -d '{"model":"deepseek-chat","max_tokens":1,"messages":[{"role":"user","content":"ping"}]}' \
+                 || echo 000)
+          echo "HTTP $code"
+          head -c 500 /tmp/ds.json 2>/dev/null; echo
+          case "$code" in
+            200) echo "✓ Khoá DeepSeek dùng được." ;;
+            401|403) echo "::error::Khoá DeepSeek bị từ chối (HTTP $code) — sai khoá hoặc đã bị thu hồi."; exit 1 ;;
+            402) echo "::error::Tài khoản DeepSeek hết số dư (HTTP 402). Trợ lý sẽ không trả lời được."; exit 1 ;;
+            429) echo "::warning::DeepSeek trả 429 (chạm hạn mức lúc kiểm). Khoá có vẻ đúng, nhưng đang bị giới hạn." ;;
+            000) echo "::warning::Không gọi được api.deepseek.com từ runner — chưa kết luận được gì về khoá." ;;
+            *)   echo "::error::DeepSeek trả HTTP $code — xem thân lỗi ở trên."; exit 1 ;;
+          esac
+
       - name: Kiểm tra tên miền thật
         id: kiemtra
         if: steps.check.outputs.skip != 'true'
@@ -493,6 +537,22 @@ jobs:
               console.log(`${ok ? "✓" : "✗"} ${k}: ${JSON.stringify(d[k])} (mong đợi ${JSON.stringify(v)})`);
             }
             if (sai) { console.error(`::error::${sai} chỗ lệch ở /api/health.`); process.exit(1); }
+            // Khoá Trợ lý KHKD đã sang tới Worker chưa. Chỉ CẢNH BÁO chứ
+            // không đánh hỏng: khoá nằm trong Secret của Cloudflare do người
+            // dùng tự đặt, đánh đỏ cả lượt deploy vì một bí mật ngoài repo là
+            // đúng thứ đã quyết không làm ở chỗ đệm trình duyệt.
+            if (!d.tro_ly?.bat) {
+              console.log('::warning::Trợ lý KHKD: Worker CHƯA thấy DEEPSEEK_API_KEY — giao diện sẽ ẩn nút và route trả 503.');
+            } else {
+              console.log(`✓ Trợ lý KHKD: khoá đã tới Worker · model ${d.tro_ly.model}`);
+            }
+            // Công tắc trong D1 là thứ KHÁC khoá, và tắt được bằng một lệnh
+            // d1 không qua deploy — nên nó có thể đang tắt trong khi mọi thứ
+            // khác xanh. Nói ra, đừng để lượt deploy sau đi tìm xem vì sao
+            // học viên không thấy nút nào.
+            if (d.tro_ly && d.tro_ly.cong_tac === false) {
+              console.log('::warning::Trợ lý KHKD đang TẮT bằng công tắc trong D1 (cai_dat.tro_ly_bat = 0). Bật lại: wrangler d1 execute k3vaceo --remote --command "UPDATE cai_dat SET gia_tri = \'1\' WHERE khoa = \'tro_ly_bat\'"');
+            }
             console.log(`\n  bản đang chạy: ${String(d.version || "(chưa ghi)").slice(0, 8)} · đường gửi thư: ${d.mailer || "?"}`);
             console.log(process.env.KHOP === "1"
               ? "\n✓ /api/health đúng hết, và đúng bản vừa deploy. Ứng dụng đã chạy thật trên tên miền."

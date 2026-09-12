@@ -18,14 +18,23 @@ Hai tài liệu gốc do người dùng cung cấp, không nằm trong repo:
 
 Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao diện.
 
-## Đang ở đâu (cập nhật 27/8)
+## Đang ở đâu (cập nhật 12/9)
 
-Đã chạy thật trên `k3vaceo.cuongngo.app`, deploy #69 xanh. Nhánh làm việc:
-`claude/content-deployment-continuation-m2inni`.
+Đã chạy thật trên `k3vaceo.cuongngo.app`. Nhánh mà `deploy.yml` ghim:
+`claude/content-deployment-continuation-m2inni` — mọi thay đổi phải tới ĐÓ thì
+tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
 
-**Mười việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Mười một việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Xin đổi nhóm — tự phục vụ** (9/9, migration 0037). Ngay sau khi chuyển
+1. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
+   này, và là lần đầu tiên nó **tốn tiền theo lượt dùng** cùng lần đầu **bỏ
+   HAI nguyên tắc gốc cùng lúc (N1 và N2)**. Ngô Phú Cường đưa hai tài liệu
+   của giảng viên rồi nói thẳng: *"Loại bỏ các rào cản N1, N2 bạn khảo sát và
+   cung cấp một Agent hữu dụng cho học viên"*, và làm rõ phạm vi: *"Agent này
+   sẽ phỏng vấn và dẫn dắt TỪ Ý TƯỞNG đến việc đặt các câu hỏi và (gợi ý) trả
+   lời cho học viên khi xây dựng KHKD"*. Xem mục riêng bên dưới — đọc TRƯỚC
+   khi đụng vào bất cứ thứ gì trong `worker/src/tro-ly/`.
+2. **Xin đổi nhóm — tự phục vụ** (9/9, migration 0037). Ngay sau khi chuyển
    tay Trương Thị Ngọc Anh sang Nhóm 6 bằng migration 0036, Ngô Phú Cường hỏi
    thẳng "có thể thêm chức năng xin đổi nhóm không, ai là phê duyệt thì phù
    hợp" — muốn việc lặp lại tự chạy được, không phải chờ tôi viết migration
@@ -33,46 +42,46 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
    không phải Ban cán sự lớp, không phải cả hai nhóm cùng đồng ý — nhóm ĐI
    chỉ CẦN BIẾT (qua "Hoạt động gần đây"), không cần ĐỒNG Ý. Xem mục riêng
    bên dưới.
-2. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
+3. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
    dạng B/I/gạch đầu dòng và ô xem trước gắn thêm vào sheet Sửa ghi chú/Gắn
    Tư liệu (trước đó chỉ có ở sheet soạn thông báo). Phát hiện tình cờ một
    N6 THẬT có từ trước khi làm việc này: `GET /api/lich` trả về thông báo
    nội bộ của MỌI nhóm, không lọc phạm vi — đã vá cùng lúc. Xem mục riêng
    bên dưới.
-3. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
+4. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
    dụng xong là gửi thư cho người trong phạm vi, kèm công tắc tắt của chính
    chủ ở tab Tài khoản. Lý do làm: đo trên D1 thật thì thông báo đẩy chỉ có
    **2/146 người bật và chưa gói tin nào từng đi** — xem mục riêng bên dưới.
-4. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
+5. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
    Danh mục "bán gì, bán cho ai" của cả lớp, kèm ghép nối theo nhu cầu và
    một trang ai cũng mở được (Google index được). Chỗ DUY NHẤT dữ liệu người
    dùng ra khỏi tên miền, và chỉ của ai tự bật — xem mục riêng bên dưới.
-5. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+6. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
    Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
    1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
    tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
    bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
    trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
    người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
-6. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+7. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-7. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+8. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-8. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+9. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
    Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
-   người đã đăng nhập (mục #5 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
+   người đã đăng nhập (mục #6 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
    xem mục riêng bên dưới.
-9. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-10. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+10. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+11. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
 
 **Một cái bẫy đã trả giá, đừng vấp lại:** `deploy.yml` ghim **tên nhánh** ở
 `on.push.branches`. Đổi nhánh làm việc mà quên sửa dòng ấy thì mọi commit đẩy
@@ -93,19 +102,24 @@ deploy là production khi `--branch` TRÙNG nhánh ấy; sửa nó theo nhánh g
 thì deploy tụt xuống hạng "xem thử", workflow vẫn xanh mà tên miền vẫn chạy bản
 cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trước.
 
-**Ba việc cần làm tiếp, xếp theo mức chặn:**
+**Bốn việc cần làm tiếp, xếp theo mức chặn:**
 
-1. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
+1. **Mở một phiên Trợ lý KHKD THẬT trên tên miền** — đây là phép nghiệm thu
+   duy nhất cho tính năng lớn nhất vừa thêm, và sandbox không làm được (xem
+   mục riêng). Hỏng thì `hong_o_buoc` trong phúc đáp 502 nói ngay hỏng ở bước
+   nào. Kèm theo: thêm `DEEPSEEK_API_KEY` vào **GitHub Secrets** (ngoài
+   Cloudflare) để `deploy.yml` tự kiểm khoá còn sống mỗi lượt deploy.
+2. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
    người chưa có số nào, 6 số sai hoặc trùng — đã điền được 4/44 người chưa có
    số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020; thêm một
    người mới migration 0023 vào thẳng nhóm "sai" vì số trong tệp gốc thiếu một
    chữ số). Chưa điền thì từng ấy người không tự vào được — đây là chỗ chặn số
    một, và nó không phải việc lập trình.
-2. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
+3. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
    cho những lần đăng nhập sau, mà nó CHƯA từng chạy trọn vẹn trên tên miền
    thật lần nào. Hỏng thì đường vào lại chỉ còn mã email, tức chưa thật sự bỏ
    được OTP.
-3. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
+4. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
    Existing Headers"**. Không sửa được trong repo.
 
 **Một việc nên làm ở buổi học đầu tiên có người dùng thật:** đứng cạnh xem
@@ -129,11 +143,23 @@ Chưa làm: những thứ SRS mục 1.4 đã xếp ngoài phạm vi v1 (chat, th
 
 Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sai kỹ thuật:
 
-- **N1 — Zalo để bàn, ứng dụng để chốt.** Không chat. ~~Không thông báo đẩy~~
-  → **đã lệch có chủ ý ngày 24/8**, Ngô Phú Cường quyết sau khi được nêu rõ đây
-  là đổi bản chất sản phẩm chứ không phải thêm tính năng. Phần "không chat" GIỮ
-  NGUYÊN, và thông báo đẩy chỉ mang đúng một việc — "có tin mới, mở ứng dụng ra
-  xem" — chứ không thành kênh nhắn tin thứ hai bên cạnh Zalo.
+- **N1 — Zalo để bàn, ứng dụng để chốt.** ~~Không chat.~~ ~~Không thông báo
+  đẩy~~ → **đã lệch có chủ ý HAI LẦN**, Ngô Phú Cường quyết cả hai:
+  - **24/8, thông báo đẩy.** Quyết sau khi được nêu rõ đây là đổi bản chất sản
+    phẩm chứ không phải thêm tính năng. Thông báo đẩy chỉ mang đúng một việc —
+    "có tin mới, mở ứng dụng ra xem" — chứ không thành kênh nhắn tin thứ hai
+    bên cạnh Zalo.
+  - **12/9, HỘI THOẠI với Trợ lý KHKD.** Đây là vế "không chat" — vế nặng hơn
+    hẳn — và Ngô Phú Cường bỏ nó có chủ đích, sau khi tôi nêu rõ nó là một
+    nguyên tắc gốc chứ không phải một chi tiết kỹ thuật: *"Loại bỏ các rào cản
+    N1, N2 bạn khảo sát và cung cấp một Agent hữu dụng cho học viên."*
+
+    **Phần N1 còn nguyên giá trị và PHẢI giữ:** ứng dụng vẫn KHÔNG có chat
+    NGƯỜI-VỚI-NGƯỜI. Trợ lý là hội thoại giữa một học viên và một công cụ,
+    không phải chỗ nhóm bàn bạc với nhau — không @ ai được, không nhóm nào
+    đọc được phiên của nhóm khác, và bàn bạc vẫn ở Zalo. Bao giờ có người xin
+    "cho cả nhóm cùng chat trong một phiên" thì đó là mở lại N1 thật sự, và
+    là một quyết định KHÁC, phải hỏi lại.
 - **N2 — Ứng dụng không giữ file.** Chỉ lưu URL. Không upload. → **đã cân
   nhắc lại và GIỮ NGUYÊN ngày 26/8**, sau khi Ngô Phú Cường hỏi thẳng về upload
   lên Cloudflare R2 và được nêu rõ cả hai vế. Đừng mở lại cuộc bàn này nếu
@@ -156,6 +182,24 @@ Vi phạm mấy điều này là sai bản chất sản phẩm, không phải sa
   (slide giảng viên). Ghi chú Markdown người trong lớp tự gõ không phải bản
   sao của ai — N2 vẫn nguyên vẹn cho việc không upload file/không giữ bản sao
   slide-PDF-ảnh, mục "Đường dẫn" không đổi gì.
+
+  **Cập nhật 12/9: LẦN NÀY THÌ CÓ — Trợ lý KHKD giữ một bản sao hướng dẫn của
+  giảng viên**, chép vào `worker/src/tro-ly/giao-trinh.js` và vào cột
+  `plan_sections.requirement` của cả 10 nhóm. Ngô Phú Cường quyết sau khi tôi
+  nêu rõ đúng vế này của N2. Ba điều làm nó khác hẳn chuyện upload slide, và
+  **cả ba phải còn đúng thì quyết định này mới còn đúng**:
+  - Chép **chữ**, không chép **tệp**. Không có file nào của giảng viên nằm
+    trên máy chủ; thứ được chép là 1.698 ký tự YÊU CẦU (chữ đỏ trong bản Word)
+    — thứ vốn dĩ phải nói cho học viên biết để họ làm bài, không phải tài sản
+    giảng viên đem đi bán.
+  - **KHÔNG chép case mẫu RiVita** (37.448 ký tự chữ đen) nguyên văn. Chỉ tám
+    đoạn rút gọn làm ví dụ về HÌNH DẠNG một phần bài tốt. Đó mới là phần có
+    thể coi là tài sản.
+  - Bản sao ấy **hiện công khai cho chính học viên đọc** ở tab Bài, không nấp
+    trong prompt. Học viên bị chấm bằng thước nào thì nhìn thấy đúng thước ấy
+    — và `kiem-tro-ly.mjs` so từng ký tự hai bản để hai bên không lệch nhau.
+
+  Mục "Đường dẫn" và việc **không upload file** vẫn KHÔNG đổi gì cả.
 - **N3 — Ứng dụng không giữ tiền.** Tiền vào thẳng tài khoản người thu.
 - **N4 — Tự giác là chính.** Không xác minh email, không OTP, không đối soát.
 - **N5 — Chính chủ tự sửa được thông tin của mình**, không qua ai duyệt.
@@ -211,7 +255,7 @@ xác nhận mới thành "người thu đã nhận".
 
 ```bash
 cd worker
-cp .dev.vars.example .dev.vars     # đặt RP_ID=localhost
+cp .dev.vars.example .dev.vars     # RP_ID=localhost; SMTP và LLM_BASE_URL trỏ loopback
 # mở comment khối [assets] cuối wrangler.toml để phục vụ cả giao diện
 rm -rf .wrangler/state && npx wrangler d1 migrations apply k3vaceo --local
 npx wrangler dev --port 8787 --local
@@ -229,6 +273,12 @@ npx wrangler dev --port 8787 --local
 
 - Không ra được internet → `img.vietqr.io` không tải được ảnh QR bao giờ.
   Giao diện có nhánh dự phòng và test kiểm nhánh đó.
+- **`api.deepseek.com` cũng vậy** — log dev nói nguyên văn `HTTP 403 Host not
+  in allowlist`. Nhưng khác `img.vietqr.io`, lượt gọi này **TREO** chứ không
+  hỏng ngay: request treo tới khi workerd cắt kết nối và bộ kiểm chết với
+  `UND_ERR_SOCKET: other side closed`. Vì vậy `.dev.vars` phải trỏ
+  `LLM_BASE_URL` vào cổng ĐÓNG `127.0.0.1:2526` — cùng cách chữa đã dùng cho
+  `SMTP_HOST`. **Hệ quả: không lượt hỏi đáp THẬT nào kiểm được ở đây.**
 - **Không gọi được cả vào `k3vaceo.cuongngo.app`.** Proxy trả 403 ở bước
   CONNECT (`curl: (56) CONNECT tunnel failed`), curl báo mã `000`. Đừng tưởng
   deploy hỏng. Muốn nhìn tên miền thật thì **thêm phép kiểm vào `deploy.yml`**
@@ -253,6 +303,10 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
 - `webauthn_challenges` — chỗ giữ challenge giữa hai chặng của passkey.
 - `plan_sections.present_member_id` / `present_minutes` — phân công thuyết
   trình; tách bảng riêng chỉ để giữ hai cột là thừa.
+- `tro_ly_phien` / `tro_ly_tin` / `cai_dat` (migration 0038) — Trợ lý KHKD.
+  SRS viết trước khi có tính năng này, và chính nó là chỗ lệch N1/N2 lớn nhất
+  (xem mục riêng). `cai_dat` là bảng cấu hình chạy-thời-gian ĐẦU TIÊN của dự
+  án: mọi tính năng trước đều miễn phí nên không cần công tắc tắt gấp.
 
 ## Cạm bẫy của D1 thật — trả giá bằng bốn lần chạy hỏng
 
@@ -656,6 +710,245 @@ báo lỗi, chỉ ra số sai:
 Ngoài ra: phần bài và suất thuyết trình được **nhả về "chưa ai nhận"** — một
 phần mang tên người đã nghỉ trông như đã có người làm, tệ hơn để trống. Phiên
 bị xoá, lời mời chưa dùng bị hết hạn, đăng ký thông báo đẩy bị tắt.
+
+## Trợ lý KHKD — thứ lớn nhất, và thứ đầu tiên tốn tiền
+
+Thêm 12/9 (migration 0038). Ngô Phú Cường đưa hai tài liệu gốc của giảng viên
+(`HD_XD_va_BV_KHKD_cuoi_khoa.pdf`, `Huong_dan_lap_KHKD.docx`) rồi mô tả đúng
+thứ anh muốn: *"hỏi đáp phỏng vấn như một trợ lý hướng dẫn phân tích khoảng
+trống, hướng dẫn trả lời theo nội dung học viên đưa vào, có thể lưu trữ phiên
+hỏi đáp"*. Tôi nêu hai rào cản N1 và N2; anh trả lời: *"Loại bỏ các rào cản
+N1, N2 bạn khảo sát và cung cấp một Agent hữu dụng cho học viên"*, rồi làm rõ
+phạm vi: *"Agent này sẽ phỏng vấn và dẫn dắt TỪ Ý TƯỞNG đến việc đặt các câu
+hỏi và (gợi ý) trả lời cho học viên khi xây dựng KHKD"*.
+
+Xem mục N1 và N2 ở trên cho phần "vì sao được phép". Mục này ghi phần "làm
+thế nào", và **những chỗ sai được mà không chỗ nào báo lỗi**.
+
+### Nhà cung cấp là DeepSeek, khoá nằm trong Secret của Cloudflare
+
+`DEEPSEEK_API_KEY`, Ngô Phú Cường tự đặt vào Worker `k3vaceo-api`. API tương
+thích khuôn OpenAI nên một lượt `fetch` là đủ — **không thêm thư viện nào**,
+đúng nếp đã dùng cho Resend và Web Push (mục 8 SRS). `worker/src/lib/llm.js`
+chỉ lo chuyên chở, không biết gì về KHKD; đổi nhà cung cấp về sau là sửa đúng
+tệp ấy.
+
+**Tôi KHÔNG kiểm được khoá ấy còn sống hay không từ sandbox này**, và đó là
+câu trả lời thẳng cho câu hỏi "test giúp tôi API key đó có work không". Hai
+chặn độc lập, cả hai đều không lách được:
+1. Sandbox không ra được internet — log dev nói nguyên văn `HTTP 403 Host not
+   in allowlist: api.deepseek.com`.
+2. Secret của Cloudflare là **ghi-một-chiều**: đặt vào được, đọc ra không.
+
+Ba đường đã dựng để bản THẬT tự trả lời câu ấy, xếp theo mức chắc chắn:
+- **`deploy.yml` → bước "Kiểm tra khoá DeepSeek còn sống không"** gọi thẳng
+  DeepSeek với `max_tokens: 1` rồi phân loại 200 / 401 / 402 / 429. Bước này
+  chỉ chạy khi `DEEPSEEK_API_KEY` **cũng có trong GitHub Secrets** — đặt ở
+  Cloudflare thôi thì nó lặng lẽ bỏ qua. Muốn có câu trả lời dứt điểm mỗi
+  lượt deploy thì thêm khoá vào GitHub Secrets nữa.
+- **`/api/health` → `tro_ly`**: `bat` (khoá đã sang tới Worker chưa) và
+  `cong_tac` (công tắc trong D1 có bật không) — **hai câu hỏi khác nhau nên
+  hai trường khác nhau**, gộp một thì tắt trợ lý bằng một lệnh d1 mà deploy
+  vẫn xanh. **Tuyệt đối không in một mẩu nào của khoá ra đây**, khác hẳn khối
+  `push` (khoá VAPID công khai in 8 ký tự đầu được): khoá LLM là khoá TÍNH
+  TIỀN. `kiem-tro-ly.mjs` quét chuỗi `sk-` trong phúc đáp để canh đúng chỗ này.
+- **`hong_o_buoc` trong mọi phúc đáp 502** — `chua_cau_hinh` · `cau_hinh_sai`
+  · `goi_api` · `qua_lau` · `api_tu_choi` · `phuc_dap_la` · `phuc_dap_rong`.
+  Đây là đường duy nhất đọc được sự thật khi log Worker câm, đúng bài học đã
+  trả giá ở đường gửi thư ngày 24/8. Giao diện in luôn tên bước vào câu báo
+  lỗi (`errTroLy` trong `public/app.js`): "Không xong, thử lại" thì học viên
+  không nói lại được gì cho tôi.
+
+`LLM_BASE_URL` đổi được đích gọi, **chỉ nhận `https://` hoặc loopback** — chốt
+chống GÕ NHẦM chứ không phải chống kẻ tấn công (ai sửa được biến môi trường
+thì cũng sửa được chính tệp ấy): một `http://` ra ngoài là gửi khoá tính tiền
+qua đường không mã hoá và không chỗ nào báo lỗi. `.dev.vars` trỏ nó vào **cổng
+đóng 2526** — cùng lý do `SMTP_HOST` trỏ về loopback, xem mục bộ kiểm bên dưới.
+**Bản thật phải để trống**; `kiem-tro-ly.mjs` có một phép canh `wrangler.toml`.
+
+### Nền tri thức: 2.820 token, không RAG, không nhúng vector
+
+Hai tài liệu cộng lại hơn 40.000 ký tự — nhưng **chữ ĐỎ trong bản Word tách
+được bằng máy**, và khi tách ra thì phần YÊU CẦU chỉ có **1.698 ký tự** trên
+**37.448 ký tự** ví dụ minh hoạ (case RiVita). Đó là phát hiện làm cả thiết kế
+này khả thi: nhét trọn nền tri thức vào lời hệ thống, không cần RAG, không cần
+cơ sở dữ liệu vector, không cần build step — đúng mục 8 SRS.
+
+`worker/src/tro-ly/giao-trinh.js` giữ ba thứ: `THUOC_CHAM` (thước chấm, ba
+lăng kính của ba thầy, **sáu cổng kiểm soát**, sáu lỗi mất niềm tin, kỷ luật
+`[FACT]/[ASSUMPTION]/[TARGET]`), `YEU_CAU_PHAN` (yêu cầu tám phần), và
+`VI_DU_PHAN` (tám đoạn RiVita **rút gọn**, chỉ để nêu HÌNH DẠNG một phần tốt
+— xem mục N2 ở trên cho lý do không chép nguyên văn).
+
+**Bảy phần đánh số của bản Word cộng phần mở đầu khớp ĐÚNG tám `plan_sections`
+sẵn có** (migration 0003). Không phải trùng hợp may mắn cần khai thác cẩn thận
+— nó có nghĩa là **không phải đổi khung bài 14 ngày trước buổi bảo vệ**, và
+mọi thứ đã gắn vào phần bài (tư liệu, phân công, thuyết trình) đứng nguyên.
+
+Năm phần có chữ đỏ chép **NGUYÊN VĂN**; ba phần còn lại (Sản phẩm/khách hàng,
+Lộ trình, Rủi ro) bản Word KHÔNG có chữ đỏ nên yêu cầu **suy ra từ thước chấm
+trong PDF**, và `giao-trinh.js` đánh dấu `nguyen_van: false` cho đúng ba phần
+ấy — không trình bày suy luận của tôi như lời giảng viên.
+
+**Migration 0038 ghi cùng những câu ấy vào `plan_sections.requirement` của cả
+10 nhóm.** Việc này có giá trị ĐỘC LẬP: kể cả trợ lý không bao giờ chạy, cả
+lớp vẫn đọc được yêu cầu đầy đủ thay vì bản tóm tắt một dòng có từ Đợt 2. An
+toàn vì `patchSection` (`routes/plan.js`) **không có nhánh nào ghi vào cột
+này** — chỉ nhận `owner_member_id`, `pct`, `note` — nên cập nhật hàng loạt
+không đè lên sửa tay của ai.
+
+**Hai bản ấy phải TRÙNG TỪNG KÝ TỰ**, và `kiem-tro-ly.mjs` so từng phần để
+bắt lệch. Lý do không phải là sạch sẽ: lệch thì học viên đọc một thước trên
+màn hình còn trợ lý chấm bằng một thước khác — bị chấm bằng một cái thước mình
+không nhìn thấy, mà không chỗ nào báo lỗi, chỉ có lời khuyên sai.
+
+### Prompt: phần TĨNH lên trước, vì tiền
+
+`worker/src/tro-ly/prompt.js` xếp vai trò → luật cứng → nền tri thức (TĨNH)
+rồi mới tới bối cảnh nhóm (ĐỘNG). DeepSeek **tự đệm phần đầu prompt** khi nó
+lặp lại y hệt giữa các lượt; đảo thứ tự là mất đệm cho ~2.800 token ở MỌI lượt
+của MỌI nhóm. `goiLLM()` trả `token_dem` (`prompt_cache_hit_tokens`) để kiểm
+chứng bằng số thật chứ không tin suông — **chưa ai đọc con số ấy trên bản
+thật, đó là việc của phiên đầu tiên chạy thật**.
+
+Chín luật cứng, bốn luật đầu lấy thẳng từ tài liệu giảng viên chứ không phải
+tôi nghĩ ra (trang 17–22 của PDF). Hai luật đáng nhớ nhất:
+
+- **"MỖI LƯỢT HỎI ĐÚNG MỘT CÂU."** Người đang trả lời là chủ doanh nghiệp bận
+  rộn gõ trên điện thoại. Bắn năm câu một lúc là họ trả lời câu đầu rồi bỏ.
+- **"SAU MỖI CÂU HỎI, LUÔN KÈM MỘT GỢI Ý CÁCH TRẢ LỜI"** — Ngô Phú Cường yêu
+  cầu thêm, và nó suýt mâu thuẫn với luật "không bao giờ tự sinh số liệu".
+  Cách hoà: gợi ý là một **khung câu có chỗ trống** (`"Phân khúc của chúng tôi
+  là [nhóm khách hàng], quy mô khoảng [số] khách, nguồn: [báo cáo nào]"`), và
+  luật ghi thẳng **"TUYỆT ĐỐI KHÔNG điền sẵn con số vào chỗ trống"**. Điền sẵn
+  thì học viên chép một con số không phải của mình vào bài đi bảo vệ — đúng
+  lỗi "AI bịa nguồn" mà giảng viên xếp vào sáu lỗi làm hội đồng mất niềm tin.
+
+Và luật **"TÌM LỖI VÀ MÂU THUẪN, KHÔNG KHEN BÀI"** là nguyên văn hướng dẫn
+dùng AI của giảng viên (trang 19). Một trợ lý khen bài thì tệ hơn không có.
+
+### Giai đoạn tự nhận ra từ D1, không bắt học viên tự khai
+
+`nhanGiaiDoan()` (`routes/tro-ly.js`) đọc dữ liệu nhóm rồi chọn một trong ba
+nhiệm vụ — đây chính là vế **"dẫn dắt TỪ Ý TƯỞNG"** của yêu cầu:
+
+| Giai đoạn | Khi nào | Trợ lý làm gì |
+|---|---|---|
+| `de_tai` | nhóm chưa có `topic_product`/`topic_customers` | dẫn chọn đề tài, hỏi trong nhóm ai đang điều hành doanh nghiệp nào |
+| `viet_phan` | mở từ trong một phần bài, hoặc tiến độ trung bình < 70% | lượt đầu SOI KHOẢNG TRỐNG theo sáu cổng, rồi phỏng vấn từng câu |
+| `phan_bien` | tiến độ trung bình ≥ 70%, mở cho cả bài | đóng vai hội đồng, hỏi vặn |
+
+Bắt học viên tự khai "tôi đang ở đâu" là bắt họ hiểu một khái niệm của tôi
+trước khi nhận được gì — đúng thứ trang `/lich` công khai sinh ra để tránh
+("nhận trước, khai sau").
+
+### Bốn chốt chặn, xếp theo GIÁ, rẻ nhất hỏi trước
+
+`congTacVaKhoa()` + `conLuot()` trong `routes/tro-ly.js`. Thứ tự là cố ý —
+chỉ khi cả bốn qua mới tiêu tiền:
+
+1. **Công tắc tắt** — `cai_dat.tro_ly_bat`. Bảng `cai_dat` sinh ra cho đúng
+   việc này: `deploy.yml` mất khoảng hai phút, quá chậm khi cần dừng gấp. Một
+   lệnh `wrangler d1 execute --remote` tắt được tức thì, không cần deploy.
+   ```
+   UPDATE cai_dat SET gia_tri = '0' WHERE khoa = 'tro_ly_bat';
+   ```
+2. **Có khoá chưa** — thiếu thì 503, giao diện ẩn HẲN thẻ trợ lý (không bày
+   một nút bấm vào là 503).
+3. **Trần mỗi người mỗi NGÀY** (40, đổi trong `cai_dat`). **Khoá theo
+   `member_id`, KHÔNG theo IP** — cả lớp ngồi chung WiFi hội trường là chuyện
+   thường xuyên ở đây (bài học 27/8), khoá theo IP thì người thứ hai trong
+   phòng đã hết lượt. `conQuota()` nhận thêm tham số cửa sổ `'-1 day'`; mặc
+   định `'-1 hour'` giữ nguyên cho mọi chỗ gọi cũ.
+4. **Trần mỗi PHIÊN** (30) — chặn một phiên phình vô hạn, vì mỗi lượt gửi lại
+   TOÀN BỘ lịch sử: lượt thứ 50 tốn gấp nhiều lần lượt đầu.
+
+**`ghiNhan` đứng SAU `goi`**, nên một lượt gọi HỎNG không ăn mất lượt của học
+viên. `postPhien` cũng ghi dòng phiên **sau** khi gọi xong — đảo lại là mỗi
+lần mạng chập để lại một phiên rỗng trong danh sách của nhóm. Cả hai đều có
+phép đối chứng riêng.
+
+### N6 vẫn nguyên vẹn: phiên của nhóm khác trả 404, không phải 403
+
+`docPhien()` lọc `group_id` ngay trong truy vấn, nên cả bốn route (đọc / hỏi /
+chốt / đóng) trả **404** — 403 là xác nhận id đó có thật (quy ước 6). Và
+`postPhien` kiểm `section_id` bằng JOIN `plan_sections → plans` theo
+`group_id`: thiếu điều kiện ấy thì Nhóm 6 neo được phiên vào phần bài của
+Nhóm 7 — vỡ N6 ngay ở khâu GHI, không đợi tới khâu đọc. Đúng khuôn
+`docSectionId()` của Bài↔Tư liệu.
+
+**Phiên là của NHÓM, không phải của cá nhân.** Cả nhóm đọc lại được phiên của
+nhau và hỏi tiếp vào đó — bài là việc chung, mà nhóm nào cũng chia nhau viết.
+
+### Chốt bản thảo: ghi thành GHI CHÚ, không ghi vào `plan_sections.note`
+
+`postChot` dựng bản thảo từ chính câu trả lời của học viên rồi ghi một dòng
+`links` `kind='TEXT'`, `tag='bai'`, `section_id=…`. **Không** ghi vào
+`plan_sections.note`: cột ấy bị `cleanText(body.note, 500)` cắt còn 500 ký tự
+và mang nghĩa "ghi chú tiến độ", không phải chỗ chứa một bản thảo. Ghi chú thì
+có sẵn 8.000 ký tự, hiện ngay ở tab Bài dưới huy hiệu 📎, và sửa được bằng
+thanh B/I đã có từ 8/9 — **không phải viết một màn hình mới nào**.
+
+### Giao diện: bốn điều cố ý
+
+`veHoiThoai()` trong `public/app.js`, CSS ở cuối `public/app.css`.
+
+1. **Câu trả lời của mô hình đi qua CHÍNH `mdSafe()`**, không viết bộ dựng thứ
+   hai. Đây là chỗ DUY NHẤT trong ứng dụng mà `innerHTML` nhận chữ của một hệ
+   thống NGOÀI; prompt có dặn nó đừng sinh HTML, nhưng "đã dặn rồi" không phải
+   chốt chặn — chốt chặn là `mdSafe()` **esc() TRƯỚC rồi mới parse**.
+   `pw-tro-ly.mjs` gieo bốn ca độc vào đúng chỗ câu trả lời của trợ lý.
+2. **`.tlbox` có thanh cuộn RIÊNG.** `veHoiThoai()` đẩy màn xuống cuối bằng
+   `box.scrollTop = box.scrollHeight`; không có `overflow-y` thì đó là một
+   lệnh RỖNG, câu vừa gửi nằm ngoài tầm nhìn, và học viên tưởng gửi hỏng.
+3. **Nút Gửi khoá lại trong lúc chờ.** Một lượt gọi mất hàng chục giây; không
+   khoá thì họ bấm ba lần và tốn ba lượt hạn mức cho một câu hỏi. Kèm chỗ giữ
+   chỗ "Trợ lý đang nghĩ…" nhấp nháy — màn hình đứng im mới là thứ làm người
+   ta bấm lại.
+4. **Ô nhập KHÔNG tự xoá cho tới khi máy chủ nhận xong.** Gửi hỏng mà đã xoá
+   thì học viên mất luôn đoạn vừa gõ — trên điện thoại đó là chuyện lớn. Đây
+   là phép đối chứng quan trọng thứ hai của `pw-tro-ly.mjs`, và nó có răng
+   thật: trong sandbox thì gửi LUÔN hỏng.
+
+**Bong bóng người dùng dùng `--ink` đảo nền, KHÔNG dùng `--go-bg`/`--go`** —
+cặp màu ấy trong sản phẩm này có đúng MỘT nghĩa: người thu đã nhận tiền.
+
+### Một lỗi thật bắt được bằng ảnh chụp, không bằng đọc code
+
+`mdSafe()` chỉ nhận tiêu đề tới `###` (`#{1,3}`) — mà **mô hình dùng `####`
+thoải mái**, nên một mục `#### Khoảng trống ở cổng 02 SỐ` rơi xuống thành một
+dòng chữ có bốn dấu thăng lủng lẳng. Không phép kiểm chuỗi nào thấy; chạy
+`pw-tro-ly.mjs` mới thấy. Nay nhận tới `#{1,6}` và **KẸP** ở `h6`
+(`Math.min(m[1].length + 3, 6)`) — `#`/`##`/`###` vẫn ra đúng h4/h5/h6 như cũ.
+
+### Bộ kiểm — và điều nó KHÔNG chứng minh được
+
+`kiem-tro-ly.mjs` (máy chủ) + `pw-tro-ly.mjs` (giao diện), mỗi bộ chạy hai
+lượt: bình thường và `tat`. Xem `scripts/kiem/README.md`.
+
+**Nói thẳng cái chưa kiểm chứng được:** sandbox không ra được internet, nên
+**chưa một lượt hỏi đáp THẬT nào từng chạy**. Bộ kiểm chứng minh được mọi thứ
+đứng TRƯỚC lượt gọi ra ngoài, cộng nhánh HỎNG của chính nó. Nó KHÔNG chứng
+minh được rằng mô hình trả lời đúng, hay khoá còn tiền. Bằng chứng duy nhất
+đáng tin là một phiên thật trên tên miền — đúng bài học của đường gửi thư
+ngày 24/8 ("thư nằm trong hộp thư, không phải một dòng log nói rằng nó đã đi").
+
+Vì vậy `.dev.vars` trỏ `LLM_BASE_URL` vào **cổng đóng 2526**: `fetch` tới
+`api.deepseek.com` trong sandbox không hỏng, nó **TREO** — request treo tới
+khi workerd cắt, bộ kiểm chết với `UND_ERR_SOCKET: other side closed`, và
+không phép nào đọc được `hong_o_buoc`. Đúng cái bẫy đã ghi cho SMTP, đúng
+cách chữa đã dùng ở đó.
+
+### Ba việc phải làm trên bản thật, không làm được ở đây
+
+1. **Mở một phiên thật và đọc nó** — đây là phép nghiệm thu duy nhất. Nếu 502
+   thì `hong_o_buoc` nói ngay hỏng ở đâu.
+2. **Thêm `DEEPSEEK_API_KEY` vào GitHub Secrets** (ngoài Cloudflare) để bước
+   kiểm khoá trong `deploy.yml` chạy mỗi lượt deploy.
+3. **Đọc `token_vao`/`token_ra`/`token_dem` trong bảng `tro_ly_phien`** sau
+   vài phiên thật: biết đang tốn bao nhiêu, và biết việc xếp phần TĨNH lên
+   trước có thật sự ăn đệm hay không. Trần 40 lượt/người/ngày đặt theo phỏng
+   đoán, chưa theo số đo — chỉnh bằng một dòng `cai_dat`, không cần deploy.
 
 ## Xin đổi nhóm — tự phục vụ
 
@@ -2344,8 +2637,12 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "bốn phép đối chứng đáng giữ nhất" và hai chỗ môi
-  trường sandbox không kiểm được.
+  trước khi chạy — có mục "hai mươi hai phép đối chứng đáng giữ nhất" và hai
+  chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
-- Commit vào nhánh `claude/read-content-deployment-plan-dpsv8m`, không tạo PR
-  trừ khi được yêu cầu.
+- **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày
+  9/9): nhánh phiên làm việc hiện tại, VÀ
+  `claude/content-deployment-continuation-m2inni` — nhánh mà `deploy.yml` ghim
+  ở `on.push.branches`. Đẩy thiếu nhánh thứ hai thì code vào repo mà tên miền
+  không đổi gì, đúng cái bẫy đã ghi ở đầu tệp này. Không tạo PR trừ khi được
+  yêu cầu.

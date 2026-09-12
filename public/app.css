@@ -610,3 +610,37 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
 /* Làm mờ chứ không giấu: giấu đi thì người ta không biết là CÓ lựa chọn ấy,
    rồi bật công khai xong lại tưởng số điện thoại mặc nhiên ra theo. */
 .gtsw.mo{opacity:.45}
+
+/* ─── TRỢ LÝ KHKD (sheet hội thoại, veHoiThoai() trong app.js) ───────────────
+   Ba điều cố ý ở khối này:
+
+   1. `.tlbox` PHẢI có thanh cuộn RIÊNG, không để sheet cuộn hộ. `veHoiThoai()`
+      đẩy màn xuống cuối bằng `box.scrollTop = box.scrollHeight` sau mỗi lượt —
+      không có `overflow-y` ở đây thì câu vừa gửi nằm ngoài tầm nhìn và học
+      viên tưởng gửi hỏng, trong khi thật ra chỉ là chưa cuộn tới. Kèm
+      `overscroll-behavior:contain` để cuộn hết hội thoại thì DỪNG, không kéo
+      lây cả sheet trôi theo (cùng lý lẽ đã ghi cho chính `.sheet`).
+   2. Bong bóng của người dùng KHÔNG dùng cặp `--go-bg`/`--go`. Cặp màu ấy
+      trong sản phẩm này có đúng một nghĩa — người thu đã nhận tiền — nên đem
+      tô lời nhắn là phá quy ước màu. Dùng `--ink` đảo nền, đúng kiểu nút
+      `.big.go` đã dùng cho "đây là thứ bạn vừa làm".
+   3. `max-width:84%` cho cả hai phía: bong bóng chạm hai mép màn là mất đường
+      viền thị giác giữa "trợ lý hỏi" và "tôi trả lời", mà đó là thứ duy nhất
+      phân biệt hai vai trong một khối chữ dài. */
+.tlbox{display:flex;flex-direction:column;gap:9px;max-height:46vh;max-height:46dvh;
+  overflow-y:auto;overscroll-behavior:contain;padding:2px 1px 4px;margin:0 0 14px;
+  -webkit-overflow-scrolling:touch}
+.tlbb{max-width:84%;border-radius:14px;padding:10px 13px;font-size:14px;line-height:1.55;
+  overflow-wrap:anywhere}
+/* Người dùng: nền đậm, nằm bên phải. */
+.tlbb.toi{align-self:flex-end;background:var(--ink);color:#fff;white-space:pre-wrap;
+  border-bottom-right-radius:5px}
+/* Trợ lý: nền trắng viền nhạt, nằm bên trái. Chữ do mô hình sinh ra đi qua
+   mdSafe() nên bên trong là `.mdview.nho`, không phải văn bản thuần. */
+.tlbb.tl{align-self:flex-start;background:var(--surf);
+  box-shadow:inset 0 0 0 1px var(--line);border-bottom-left-radius:5px}
+.tlbb.tl .mdview a{overflow-wrap:anywhere}
+/* Chỗ giữ chỗ trong lúc chờ máy chủ. Một lượt gọi mất hàng chục giây — không
+   có gì nhấp nháy ở đây thì màn hình đứng im và người ta bấm Gửi lần nữa. */
+.tlbb.dangcho{color:var(--ink3);font-style:italic;animation:tlnhay 1.5s ease-in-out infinite}
+@keyframes tlnhay{0%,100%{opacity:1}50%{opacity:.45}}

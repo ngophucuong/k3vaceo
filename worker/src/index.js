@@ -10,6 +10,7 @@ import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
 import { getDanhBa, postDanhBaMoi } from './routes/danh-ba.js';
 import { getDoiNhom, postDoiNhom, postDuyetDoiNhom, postTuChoiDoiNhom, postHuyDoiNhom } from './routes/doi-nhom.js';
+import { getTroLy, postPhien, getPhien, postHoi, postChot, postDong } from './routes/tro-ly.js';
 import { listMembers, getMember, patchMember, putMemberProfile,
          postNgungThamGia, postThamGiaLai, listNgung } from './routes/members.js';
 import { getOfficers, putOfficers } from './routes/officers.js';
@@ -30,6 +31,7 @@ import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
+import { llmCauHinh } from './lib/llm.js';
 import {
   postRegisterOptions, postRegisterVerify, postLoginOptions, postLoginVerify,
   listPasskeys, deletePasskey,
@@ -219,6 +221,25 @@ export default {
         return postHuyDoiNhom(env, me, Number(m[1]));
       }
 
+      // Trợ lý KHKD — phỏng vấn học viên theo thước chấm của giảng viên.
+      // Tính năng ĐẦU TIÊN của dự án tốn tiền thật theo lượt dùng: mọi route
+      // dưới đây kiểm công tắc tắt trong `cai_dat` TRƯỚC khi làm gì khác, xem
+      // congTacVaKhoa() trong routes/tro-ly.js.
+      if (pathname === '/api/tro-ly' && method === 'GET') return getTroLy(env, me);
+      if (pathname === '/api/tro-ly/phien' && method === 'POST') return postPhien(request, env, me, ip);
+      if ((m = pathname.match(/^\/api\/tro-ly\/phien\/(\d+)$/)) && method === 'GET') {
+        return getPhien(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/tro-ly\/phien\/(\d+)\/hoi$/)) && method === 'POST') {
+        return postHoi(request, env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/tro-ly\/phien\/(\d+)\/chot$/)) && method === 'POST') {
+        return postChot(env, me, Number(m[1]), ip);
+      }
+      if ((m = pathname.match(/^\/api\/tro-ly\/phien\/(\d+)\/dong$/)) && method === 'POST') {
+        return postDong(env, me, Number(m[1]));
+      }
+
       // Giao thương: CỐ Ý không lọc theo nhóm (lệch N6 có chủ ý, Ngô Phú Cường
       // quyết 5/9 — lý lẽ ở migrations/0016_giao_thuong.sql). Đường sửa thì
       // chỉ chính chủ, không có bản sửa hộ.
@@ -363,7 +384,7 @@ async function handleHealth(env) {
   // phải bí mật, ứng dụng đưa nó cho mọi trình duyệt) — đủ để đối chiếu đúng
   // cặp khoá, không lộ gì thêm.
   const pushCf = pushCauHinh(env);
-  const [roster, groups, group6Members, group6Lead] = await Promise.all([
+  const [roster, groups, group6Members, group6Lead, troLyCongTac] = await Promise.all([
     env.DB.prepare('SELECT COUNT(*) AS n FROM roster').first(),
     env.DB.prepare('SELECT COUNT(*) AS n FROM groups').first(),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM members m JOIN groups g ON g.id = m.group_id WHERE g.no = 6`).first(),
@@ -373,6 +394,7 @@ async function handleHealth(env) {
        JOIN members m ON m.id = o.member_id
        WHERE g.no = 6 AND o.role = 'truong_nhom' AND o.superseded_at IS NULL`
     ).first(),
+    env.DB.prepare("SELECT gia_tri FROM cai_dat WHERE khoa = 'tro_ly_bat'").first(),
   ]);
   return json({
     ok: true,
@@ -388,5 +410,19 @@ async function handleHealth(env) {
     version: env.COMMIT_SHA ?? null,
     // Đường gửi thư đang dùng. Chỉ nói TÊN đường, không lộ khoá.
     mailer: env.RESEND_API_KEY ? 'resend' : (env.SMTP_HOST ? 'smtp' : 'chưa cấu hình'),
+    // Trợ lý KHKD: khoá đã sang tới Worker chưa, và đang gọi model nào. Cùng
+    // lý do với khối `push` ở trên — sandbox không gọi được vào tên miền thật
+    // nên đây là chỗ DUY NHẤT kiểm được từ bên ngoài rằng bí mật đã tới nơi.
+    // Chỉ trả CÓ/KHÔNG và tên model, tuyệt đối không trả một mẩu nào của khoá:
+    // khoá LLM là khoá tính tiền, khác hẳn khoá CÔNG KHAI của VAPID.
+    // `bat` và `cong_tac` là HAI câu hỏi khác nhau, cố ý tách làm hai trường:
+    //   bat      — khoá đã sang tới Worker chưa (việc của deploy)
+    //   cong_tac — công tắc trong D1 có đang bật không (việc của vận hành)
+    // Gộp một trường thì lúc ai đó tắt trợ lý bằng một lệnh d1, `/api/health`
+    // vẫn báo "bat: true" và phép kiểm trong deploy.yml vẫn xanh — một cái tên
+    // mang hai nghĩa là đúng loại bẫy tệp CLAUDE.md đã ghi nhiều lần.
+    tro_ly: llmCauHinh(env)
+      ? { bat: true, model: llmCauHinh(env).model, cong_tac: (troLyCongTac?.gia_tri ?? '1') === '1' }
+      : { bat: false, cong_tac: (troLyCongTac?.gia_tri ?? '1') === '1' },
   });
 }

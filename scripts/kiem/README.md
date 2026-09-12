@@ -103,13 +103,19 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-giao-thuong.mjs` | tab Giao thương, trang `/giao-thuong`, hai mức lộ |
 | `gieo-giao-thuong.sh` | gieo bốn gian hàng ở bốn nhóm cho `pw-giao-thuong.mjs` |
 | `pw-nav.mjs` | thanh nav sáu tab ở sáu khổ màn hình — xem cảnh báo dưới đây |
+| `kiem-doi-nhom.mjs` | xin đổi nhóm: ai duyệt, đơn trùng, **N6 qua officer nhóm thứ ba**, nhả phần bài |
+| `pw-doi-nhom.mjs` | giao diện xin đổi nhóm — hai phiên trong một trình duyệt (người xin và officer nhóm đích) |
+| `reset-doi-nhom.sh` | dựng bốn phiên + hai officer giả cho hai bộ kiểm trên, và **trả group_id của người xin về Nhóm 6** |
+| `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
+| `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
+| `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
 
 Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
 đúng với dữ liệu đang nằm trong D1 cục bộ. Trước 27/8 `coso.json` nằm ở thư mục
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Mười chín phép đối chứng đáng giữ nhất
+## Hai mươi hai phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -297,6 +303,34 @@ Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả
    dùng để kiểm. Sửa bằng cách dọn CẢ hai chiều: xoá `thong_bao` trỏ vào
    fixture sắp xoá TRƯỚC khi xoá chính fixture ấy.
 
+20. **`pw-tro-ly.mjs` kiểm XSS trên chữ do MỘT MÔ HÌNH sinh ra, không phải
+   chữ người trong lớp gõ.** Mọi chỗ khác dùng `mdSafe()` đều nhận chữ của
+   người trong lớp; câu trả lời của trợ lý là chỗ DUY NHẤT nhận chữ của một
+   hệ thống ngoài rồi đưa thẳng vào `innerHTML`. Prompt có dặn nó đừng sinh
+   HTML, nhưng "đã dặn rồi" không phải chốt chặn. Giữ nguyên cả HAI vế như
+   `pw-tulieu-text.mjs`: mã độc không chạy, **và** chuỗi độc vẫn còn nguyên
+   trong `.textContent` — bị vô hiệu hoá chứ không bị âm thầm xoá mất.
+   Chính phép này bắt được một lỗi thật ngay lượt đầu: `mdSafe()` chỉ nhận
+   tiêu đề tới `###`, mà mô hình dùng `####` thoải mái, nên một mục `####`
+   rơi xuống thành dòng chữ có bốn dấu thăng lủng lẳng. Đọc code không thấy;
+   phải chạy mới thấy.
+
+21. **`.tlbox` phải có thanh cuộn RIÊNG, và phép kiểm phải NHỒI THÊM nội
+   dung để hỏi cho đúng câu.** `veHoiThoai()` đẩy màn xuống cuối bằng
+   `box.scrollTop = box.scrollHeight` sau mỗi lượt; không có `overflow-y`
+   thì đó là một lệnh RỖNG và câu vừa gửi nằm ngoài tầm nhìn — học viên
+   tưởng gửi hỏng. Phép kiểm nhồi 30 bong bóng độn trước khi đo, vì hỏi
+   "hôm nay có đủ chữ để tràn không" là hỏi sai câu (cùng dạng sai lầm với
+   phép đo chiều cao nút ở `pw-nav.mjs`).
+
+22. **Hai bộ kiểm trợ lý dùng CHUNG một lượt reset, nên cái chạy trước không
+   được đóng mất phiên của cái chạy sau.** `kiem-tro-ly.mjs` cố ý đóng phiên
+   "chạm trần" chứ không phải phiên gắn phần bài, và có một phép cuối khẳng
+   định phiên kia VẪN MỞ; `pw-tro-ly.mjs` chọn phiên theo TIÊU ĐỀ chứ không
+   bấm "cái đầu tiên" (thứ tự danh sách theo `updated_at`, đổi tuỳ bộ nào vừa
+   chạy). Bản đầu vi phạm cả hai và chết bằng một cú Playwright timeout 30
+   giây không nói được gì — mất một lúc mới nhìn ra thủ phạm là chính bộ kiểm.
+
 **Chỗ dễ rò nhất của cả sản phẩm, kiểm ở `pw-giao-thuong.mjs`:** trang
 `/giao-thuong` là đường DUY NHẤT đưa dữ liệu người dùng ra internet. Hai phép
 kiểm phải giữ nguyên răng — người CHƯA bật `cong_khai` phải vắng mặt hoàn
@@ -313,6 +347,34 @@ bash scripts/kiem/reset-tanso.sh && node scripts/kiem/kiem-tanso.mjs
 Nó giả lập địa chỉ IP bằng header `cf-connecting-ip` — đúng thứ `clientIp()`
 đọc trên bản thật — nên một tiến trình đóng được cả vai "cả lớp chung một
 WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài liệu RFC 5737.
+
+## Chạy bộ kiểm Trợ lý KHKD
+
+Hai lượt, vì công tắc tắt nằm trong D1 mà chạm D1 lúc server đang chạy là
+server chết:
+
+```bash
+bash scripts/kiem/reset-tro-ly.sh                                  \
+  && node scripts/kiem/kiem-tro-ly.mjs                             \
+  && node scripts/kiem/pw-tro-ly.mjs        # hai bộ dùng CHUNG một lượt reset
+
+bash scripts/kiem/reset-tro-ly.sh tat                               \
+  && node scripts/kiem/kiem-tro-ly.mjs tat                          \
+  && node scripts/kiem/pw-tro-ly.mjs tat
+```
+
+**`.dev.vars` phải có `LLM_BASE_URL=http://127.0.0.1:2526/chat/completions`** —
+cùng lý do `SMTP_HOST` trỏ về loopback (xem mục cuối trang). `fetch` tới
+`api.deepseek.com` trong sandbox không hỏng, nó TREO: request treo tới khi
+workerd cắt, bộ kiểm chết với `UND_ERR_SOCKET: other side closed`, và không
+phép nào đọc được `hong_o_buoc`. Một cổng ĐÓNG thì lỗi nổi lên trong 20ms.
+`.dev.vars.example` đã ghi sẵn dòng ấy; **bản thật phải để trống** (bộ kiểm có
+một phép canh `wrangler.toml` đúng chỗ này).
+
+Điều bộ kiểm này **KHÔNG** chứng minh được: một câu trả lời thật của mô hình.
+Sandbox không ra được internet, nên mọi lượt gọi đều đi vào nhánh hỏng. Bằng
+chứng duy nhất đáng tin vẫn là một phiên thật trên tên miền — đúng bài học của
+đường gửi thư ngày 24/8.
 
 ## Hai chỗ môi trường này không kiểm được
 

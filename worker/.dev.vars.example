@@ -11,3 +11,18 @@ SMTP_SECURE=starttls
 SMTP_USER=ten@gmail.com
 SMTP_PASS=mat-khau-ung-dung-16-ky-tu
 MAIL_FROM=Nhóm 6 K03 <ten@gmail.com>
+
+# ── Trợ lý KHKD ────────────────────────────────────────────────────────────
+# Khoá DeepSeek. Bản thật đặt bằng `wrangler secret put DEEPSEEK_API_KEY`
+# (hoặc qua GitHub Secrets — deploy.yml tự đồng bộ mỗi lần deploy). Thiếu khoá
+# thì /api/tro-ly trả 503, giao diện ẩn thẻ trợ lý, mọi thứ khác chạy bình
+# thường. Giá trị dưới đây là khoá GIẢ, chỉ để mở đường code chạy tới nơi.
+DEEPSEEK_API_KEY=sk-khong-that-chi-de-kiem
+
+# CỐ Ý trỏ vào một CỔNG ĐÓNG trên máy này — y hệt lý do SMTP_HOST ở trên trỏ
+# về 127.0.0.1. Sandbox không ra được internet, mà `fetch` tới api.deepseek.com
+# thì TREO chứ không hỏng ngay: request treo tới khi workerd cắt, bộ kiểm chết
+# giữa chừng với `UND_ERR_SOCKET: other side closed` và không đọc được
+# `hong_o_buoc`. Cổng đóng thì lỗi nổi lên tức thì và đọc được.
+# BẢN THẬT PHẢI BỎ TRỐNG DÒNG NÀY — để trống là gọi thẳng api.deepseek.com.
+LLM_BASE_URL=http://127.0.0.1:2526/chat/completions

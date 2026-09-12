@@ -78,9 +78,14 @@ function mdSafe(raw) {
     const d = goc.trim();
     let m;
     if (d === '') { dongDoan(); dongDs(); continue; }
-    if ((m = d.match(/^(#{1,3})\s+(.+)$/))) {
+    if ((m = d.match(/^(#{1,6})\s+(.+)$/))) {
       dongDoan(); dongDs();
-      const cap = m[1].length + 3; // #→h4 ##→h5 ###→h6, đủ nhỏ để không phá bố cục sheet
+      // #→h4 ##→h5 ###→h6, đủ nhỏ để không phá bố cục sheet. Sâu hơn thì KẸP
+      // lại ở h6 chứ không bỏ qua: Trợ lý KHKD sinh ra chữ Markdown do MỘT MÔ
+      // HÌNH viết, mà mô hình dùng #### thoải mái — bản đầu chỉ nhận tới ###
+      // nên một mục #### rơi xuống thành dòng chữ có bốn dấu thăng lủng lẳng.
+      // Bắt được nhờ pw-tro-ly.mjs, không phải nhờ đọc code.
+      const cap = Math.min(m[1].length + 3, 6);
       khoi.push(`<h${cap}>${dongInline(m[2])}</h${cap}>`);
       continue;
     }
@@ -192,8 +197,24 @@ const ERR_TEXT = {
   da_xu_ly_roi: 'Đơn này đã được xử lý rồi — thử tải lại.',
   nguoi_da_ngung_tham_gia: 'Người này đã ngừng tham gia, không duyệt được nữa.',
   nhom_hien_tai_da_doi: 'Nhóm hiện tại của người này đã đổi khác lúc họ nộp đơn — thử tải lại.',
+  // Trợ lý KHKD (routes/tro-ly.js)
+  tro_ly_da_tat: 'Trợ lý đang tắt. Nhắn Ban cán sự lớp nếu cần bật lại.',
+  tro_ly_chua_cau_hinh: 'Máy chủ chưa được cấu hình để gọi trợ lý.',
+  tro_ly_loi: 'Trợ lý không trả lời được lúc này. Thử lại sau một lát.',
+  het_luot_hom_nay: 'Hết lượt hỏi trợ lý cho hôm nay — mai hỏi tiếp.',
+  phien_da_dong: 'Phiên này đã đóng. Mở phiên mới nếu muốn hỏi tiếp.',
+  phien_qua_dai: 'Phiên này dài quá rồi. Mở phiên mới để trợ lý tập trung vào việc còn lại.',
+  phien_khong_gan_phan: 'Phiên này không gắn vào phần bài nào nên chưa chép bản thảo được.',
+  noi_dung_required: 'Chưa gõ gì để gửi.',
 };
 const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
+
+/* Riêng lỗi trợ lý thì KÈM TÊN BƯỚC HỎNG vào câu báo. Sandbox không gọi được
+   ra internet và `wrangler tail` đã từng im lặng cả ngày (CLAUDE.md), nên khi
+   trợ lý hỏng trên tên miền thật, người dùng đọc hộ chính là con mắt duy nhất
+   — "hỏng ở bước api_tu_choi" phân biệt được sai khoá với mạng chết, còn
+   "Không xong — thử lại" thì không nói được gì. */
+const errTroLy = e => errText(e) + (e?.data?.hong_o_buoc ? ` (hỏng ở bước ${e.data.hong_o_buoc})` : '');
 
 /* ═══════════ GỌI API ═══════════ */
 async function api(path, opts = {}) {
@@ -1571,6 +1592,7 @@ async function drawBai() {
     throw e;
   }
   $('#v-bai').dataset.loaded = '1';
+  await layTroLy();
   const { plan, sections, suggestions, insights, overall_pct, can_assign } = PLAN;
   const pres = PLAN.presentation ?? { total_minutes: 0, limit_minutes: 20, speaker_count: 0 };
   const topicDone = plan.topic_product && plan.topic_customers;
@@ -1597,6 +1619,26 @@ async function drawBai() {
     ${can_assign ? `<button class="wide ghost" id="topicBtn" style="margin-top:13px;padding:11px;font-size:14px">
         ${topicDone ? 'Sửa đề tài' : 'Chốt đề tài'}</button>` : ''}
   </div></div>
+
+  ${TROLY?.bat ? `
+  <div class="eb" style="margin-top:26px">Trợ lý KHKD</div>
+  <div class="card"><div class="cb">
+    <div class="mut" style="margin-bottom:11px">
+      ${topicDone
+        ? 'Trợ lý đọc bài của nhóm, soi khoảng trống theo sáu cổng kiểm soát của giảng viên, rồi hỏi từng câu để anh chị viết tiếp. Mở từ trong mỗi phần bài, hoặc bấm dưới đây để tập phản biện cả bài.'
+        : 'Nhóm chưa chốt đề tài. Trợ lý dẫn anh chị chọn đề tài trước — hỏi từng câu, không bắt ngồi trước trang trắng.'}
+    </div>
+    <button class="wide ghost" id="tlMo" style="padding:11px;font-size:14px">
+      ${topicDone ? 'Tập phản biện cả bài' : 'Bắt đầu: chọn đề tài'}</button>
+    ${(TROLY.phien ?? []).length ? `
+      <div class="eb ebbuoi" style="margin:18px 0 8px">Phiên đã hỏi <span class="c">${TROLY.phien.length}</span></div>
+      ${TROLY.phien.slice(0, 6).map(f => `<div class="fd">
+        <div class="x"><b>${esc(f.tieu_de || 'Phiên hỏi đáp')}</b>
+          <div style="font-size:11.5px;margin-top:2px" class="st-no">${esc(short(f.mo_boi_ten || ''))} · ${f.so_luot} lượt${f.trang_thai === 'da_dong' ? ' · đã đóng' : ''}</div></div>
+        <button class="tg" data-tlphien="${f.id}">mở lại</button>
+      </div>`).join('')}` : ''}
+  </div></div>
+  <div class="foot">Trợ lý không làm bài thay. Nó hỏi đúng câu hội đồng sẽ hỏi, và không bao giờ tự bịa con số — cần số nào nó hỏi anh chị số đó.</div>` : ''}
 
   <div class="eb" style="margin-top:26px">Tám phần <span class="c ${overall_pct === 100 ? 'xong' : ''}">${overall_pct === 100 ? '✓ xong' : overall_pct + '%'}</span></div>
   <div class="card">${sections.map(s => {
@@ -1662,6 +1704,10 @@ async function drawBai() {
   });
   $('#addInsight').onclick = openInsightAdd;
   if ($('#topicBtn')) $('#topicBtn').onclick = openTopicEdit;
+  if ($('#tlMo')) $('#tlMo').onclick = () => moPhienTroLy(null);
+  document.querySelectorAll('#v-bai [data-tlphien]').forEach(b => {
+    b.onclick = () => moPhienCu(Number(b.dataset.tlphien));
+  });
   document.querySelectorAll('#v-bai [data-present]').forEach(b => {
     b.onclick = () => openPresentEdit(Number(b.dataset.present));
   });
@@ -1717,6 +1763,108 @@ function openTopicEdit() {
   }, 'Đã lưu đề tài');
 }
 
+/* ─── Trợ lý KHKD ───────────────────────────────────────────────────────────
+   Phỏng vấn học viên theo thước chấm của giảng viên (routes/tro-ly.js). Bốn
+   điều cố ý trong màn này:
+
+   1. Trạng thái đọc một lần vào TROLY rồi giữ — /api/tro-ly chỉ đổi khi có
+      phiên mới, không đáng gọi lại mỗi lần vẽ tab Bài.
+   2. Câu trả lời của trợ lý đi qua CHÍNH mdSafe() đã dùng cho Ghi chú và
+      Thông báo, không viết bộ dựng thứ hai — nó esc() trước rồi mới parse
+      markdown, nên nội dung mô hình sinh ra không mở được lỗ XSS dù nó có
+      trả về thẻ HTML.
+   3. Nút gửi khoá lại trong lúc chờ. Một lượt gọi mất hàng chục giây; không
+      khoá thì học viên bấm ba lần và tốn ba lượt hạn mức cho một câu hỏi.
+   4. Ô nhập KHÔNG tự xoá cho tới khi máy chủ nhận xong. Gửi hỏng mà đã xoá
+      thì học viên mất luôn đoạn vừa gõ — trên điện thoại đó là chuyện lớn. */
+let TROLY = null;
+
+async function layTroLy(lamMoi) {
+  if (TROLY && !lamMoi) return TROLY;
+  try { TROLY = await apiGet('/api/tro-ly'); } catch { TROLY = { bat: false, phien: [] }; }
+  return TROLY;
+}
+
+function veBongBong(t) {
+  return t.vai === 'nguoi'
+    ? `<div class="tlbb toi">${esc(t.noi_dung)}</div>`
+    : `<div class="tlbb tl"><div class="mdview nho">${mdSafe(t.noi_dung)}</div></div>`;
+}
+
+// Mở phiên MỚI. sectionId null = phiên cho cả bài (chọn đề tài hoặc tập phản
+// biện — máy chủ tự nhận ra nhóm đang ở giai đoạn nào, giao diện không đoán).
+async function moPhienTroLy(sectionId) {
+  openSheet(`<h3>Trợ lý KHKD</h3><p class="sub">Đang đọc bài của nhóm và soi khoảng trống… việc này mất một lúc.</p>`);
+  let p;
+  try {
+    p = await apiPost('/api/tro-ly/phien', sectionId ? { section_id: sectionId } : {});
+  } catch (e) { closeSheet(); toast(errTroLy(e)); return; }
+  TROLY = null;
+  veHoiThoai({ id: p.id, tieu_de: p.tieu_de, section_id: p.section_id, trang_thai: 'dang_mo', tin: p.tin });
+}
+
+async function moPhienCu(id) {
+  openSheet(`<h3>Trợ lý KHKD</h3><p class="sub">Đang mở lại phiên…</p>`);
+  let p;
+  try { p = await apiGet(`/api/tro-ly/phien/${id}`); }
+  catch (e) { closeSheet(); toast(errTroLy(e)); return; }
+  veHoiThoai(p);
+}
+
+function veHoiThoai(p) {
+  const dongRoi = p.trang_thai === 'da_dong';
+  openSheet(`
+    <h3>${esc(p.tieu_de || 'Trợ lý KHKD')}</h3>
+    <p class="sub">Trợ lý hỏi — anh/chị trả lời. Nó không tự bịa số: cần con số nào nó sẽ hỏi.</p>
+    <div class="tlbox" id="tlBox">${(p.tin || []).map(veBongBong).join('')}</div>
+    ${dongRoi
+      ? `<div class="hintline">Phiên này đã đóng. Mở phiên mới nếu muốn hỏi tiếp.</div>`
+      : `<textarea id="tlIn" rows="3" maxlength="4000" placeholder="Trả lời câu hỏi của trợ lý…"></textarea>
+         <div class="hintline">Chưa có số thật thì cứ nói "chưa có" — trợ lý sẽ ghi là còn thiếu, không bịa hộ.</div>`}
+    ${p.section_id ? `<button class="wide ghost" id="tlChot" style="margin-top:10px;padding:11px;font-size:14px">Chép bản thảo vào phần bài</button>` : ''}
+    <div class="sa"><button class="big c" id="tlDong">Đóng</button>
+      ${dongRoi ? '' : `<button class="big go" id="tlGui">Gửi</button>`}</div>`);
+
+  const box = $('#tlBox');
+  if (box) box.scrollTop = box.scrollHeight;
+  $('#tlDong').onclick = closeSheet;
+
+  if ($('#tlGui')) {
+    $('#tlGui').onclick = async () => {
+      const o = $('#tlIn');
+      const cau = (o.value || '').trim();
+      if (!cau) { o.focus(); return; }
+      const nut = $('#tlGui');
+      nut.disabled = true; nut.textContent = 'Đang hỏi…';
+      box.insertAdjacentHTML('beforeend', veBongBong({ vai: 'nguoi', noi_dung: cau }));
+      box.insertAdjacentHTML('beforeend', `<div class="tlbb tl dangcho" id="tlCho">Trợ lý đang nghĩ…</div>`);
+      box.scrollTop = box.scrollHeight;
+      try {
+        const r = await apiPost(`/api/tro-ly/phien/${p.id}/hoi`, { noi_dung: cau });
+        $('#tlCho')?.remove();
+        box.insertAdjacentHTML('beforeend', veBongBong({ vai: 'tro_ly', noi_dung: r.tra_loi }));
+        box.scrollTop = box.scrollHeight;
+        o.value = '';          // chỉ xoá SAU khi máy chủ đã nhận
+        if (r.so_luot >= r.tran - 3) {
+          toast(`Còn ${Math.max(0, r.tran - r.so_luot)} lượt trong phiên này`);
+        }
+      } catch (e) {
+        $('#tlCho')?.remove();
+        toast(errTroLy(e));
+      }
+      nut.disabled = false; nut.textContent = 'Gửi';
+    };
+  }
+
+  if ($('#tlChot')) {
+    $('#tlChot').onclick = () => submitting($('#tlChot'), async () => {
+      await apiPost(`/api/tro-ly/phien/${p.id}/chot`);
+      TROLY = null;
+      await drawBai();
+    }, 'Đã chép bản thảo thành một Ghi chú trong phần bài');
+  }
+}
+
 async function openSectionEdit(sectionId) {
   const s = PLAN.sections.find(x => x.id === sectionId);
   const sg = PLAN.suggestions[String(s.ord)];
@@ -1728,6 +1876,7 @@ async function openSectionEdit(sectionId) {
    <h3>${s.ord === 0 ? '' : 'Phần ' + s.ord + ' · '}${esc(s.title)}</h3>
    <p class="sub">${esc(s.requirement)}</p>
    ${veTuLieuGan(s)}
+   ${TROLY?.bat ? `<button class="wide ghost" id="sTroLy" style="padding:11px;font-size:14px;margin-bottom:8px">Hỏi trợ lý về phần này</button>` : ''}
    <button class="wide ghost" id="sAddLink" style="padding:11px;font-size:14px;margin-bottom:14px">+ Gắn tư liệu cho phần này</button>
    ${sg && canAssign ? `<div class="card" style="margin-bottom:14px"><div class="cb" style="display:flex;align-items:center;gap:11px">
      ${avatar(sg.full_name)}<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--go);font-weight:600">Gợi ý theo chức vụ</div>
@@ -1752,6 +1901,7 @@ async function openSectionEdit(sectionId) {
 
   $('#sCancel').onclick = closeSheet;
   $('#sAddLink').onclick = () => openLinkAdd(sectionId);
+  if ($('#sTroLy')) $('#sTroLy').onclick = () => moPhienTroLy(sectionId);
   document.querySelectorAll('#sheet [data-xemtext]').forEach(b => {
     b.onclick = () => openLinkText(Number(b.dataset.xemtext));
   });

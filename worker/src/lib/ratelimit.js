@@ -30,12 +30,18 @@ export function clientIp(request) {
 // Còn chỗ trong hạn mức không — KHÔNG ghi gì. Khoá có thể là địa chỉ IP, địa
 // chỉ email, hay số thứ tự hồ sơ; cột trong D1 vẫn tên là `ip` vì đổi tên cột
 // đòi một migration mà không được thêm gì.
-export async function conQuota(env, bucket, khoa, limitPerHour) {
+//
+// `cuaSo` mặc định '-1 hour' để MỌI chỗ gọi cũ giữ nguyên hành vi. Thêm tham
+// số này vì Trợ lý KHKD đếm theo NGÀY chứ không theo giờ: một phiên phỏng vấn
+// kéo dài cả buổi là bình thường, khoá theo giờ sẽ cắt ngang giữa cuộc. Thà
+// thêm một tham số có mặc định còn hơn chép lại phép đếm ra tệp thứ hai rồi
+// hai bản lệch nhau.
+export async function conQuota(env, bucket, khoa, limit, cuaSo = '-1 hour') {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM rate_events
-     WHERE bucket = ? AND ip = ? AND created_at > datetime('now', '-1 hour')`
-  ).bind(bucket, khoa).first();
-  return (row?.n ?? 0) < limitPerHour;
+     WHERE bucket = ? AND ip = ? AND created_at > datetime('now', ?)`
+  ).bind(bucket, khoa, cuaSo).first();
+  return (row?.n ?? 0) < limit;
 }
 
 // Ghi một lần thử vào sổ.
