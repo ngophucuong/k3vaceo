@@ -110,13 +110,14 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
+| `pw-banmoi.mjs` | băng "Có bản mới" + phép soi bản lúc mở trang — **đếm số lượt nạp tài liệu**, vì hàm này gọi `location.reload()` trên đường khởi động của mọi người dùng |
 
 Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chúng chỉ
 đúng với dữ liệu đang nằm trong D1 cục bộ. Trước 27/8 `coso.json` nằm ở thư mục
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Hai mươi hai phép đối chứng đáng giữ nhất
+## Hai mươi bốn phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -338,7 +339,24 @@ kiểm phải giữ nguyên răng — người CHƯA bật `cong_khai` phải v�
 toàn, và số điện thoại của người TẮT `hien_lien_he` không được có trong HTML.
 Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ không ai muốn đưa.
 
+23. **`page.on('load')` KHÔNG bắn cho `location.reload()` ở môi trường này.**
+   Bản đầu của `pw-banmoi.mjs` đếm lượt nạp bằng sự kiện `load` và đọc ra 0 ở
+   đúng ba ca quan trọng nhất — trông y như mã không hề tải lại, và tôi suýt
+   đi sửa một đoạn vốn đã đúng. Đo lại bằng cách đặt một dấu vào `window` thì
+   thấy nó BIẾN MẤT sau khi tải lại, tức trang đã tải lại thật; Playwright chỉ
+   bắn `framenavigated`. Nay đếm bằng `addInitScript` + `sessionStorage` —
+   chạy lại ở MỌI lượt nạp tài liệu, không phụ thuộc sự kiện nào.
+   Kèm một bẫy nhỏ cùng họ: `page.goto()` tới CÙNG một URL kèm hash là điều
+   hướng trong-trang, `boot()` không chạy lại. Dùng `page.reload()`.
 
+24. **`location.reload()` với `wrangler dev` + khối `[assets]` để lại MỘT
+   TRANG TRẮNG** — tài liệu mới về nhưng thẻ `<script src="/app.js">` không
+   chạy (`typeof window.mdSafe` là `undefined`). Phép đối chứng dứt điểm:
+   `location.reload()` TRẦN, không kèm `fetch` gì, cũng trắng y hệt — nên đây
+   là giới hạn của máy chủ dev, KHÔNG phải lỗi mã (băng "Có bản mới" đã chạy
+   thật trên tên miền từ 25/8). Đúng vì vậy mà `soiBanLucMo()` được viết thành
+   **chỉ hiện băng, không tự tải lại**: thứ không kiểm được thì đừng đặt nó
+   vào đường khởi động của 146 người.
 ## Chạy `kiem-tanso.mjs`
 
 ```bash

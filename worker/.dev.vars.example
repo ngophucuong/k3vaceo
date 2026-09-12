@@ -26,3 +26,8 @@ DEEPSEEK_API_KEY=sk-khong-that-chi-de-kiem
 # `hong_o_buoc`. Cổng đóng thì lỗi nổi lên tức thì và đọc được.
 # BẢN THẬT PHẢI BỎ TRỐNG DÒNG NÀY — để trống là gọi thẳng api.deepseek.com.
 LLM_BASE_URL=http://127.0.0.1:2526/chat/completions
+
+# Số hiệu bản đang chạy. Bản thật do deploy.yml truyền vào
+# (`wrangler deploy --var COMMIT_SHA:$GITHUB_SHA`); ở máy cục bộ phải tự đặt,
+# nếu không `/api/home` trả `ban: null` và pw-banmoi.mjs không kiểm được gì.
+COMMIT_SHA=kiem-ban-aaa111

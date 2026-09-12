@@ -634,6 +634,45 @@ ngay sau đó nhận đúng mã mới — chạy được kể cả khi zone v�
 `deploy.yml` chỉ **cảnh báo** chứ không đánh hỏng job ở chỗ này: đánh đỏ mọi
 lượt deploy vì một nút bấm ngoài repo chỉ dạy người ta bỏ qua màu đỏ.
 
+### Băng chỉ hiện khi app ĐANG MỞ lúc deploy — lỗ hổng vá ngày 12/9
+
+Ngô Phú Cường nhắc rằng anh vẫn cập nhật bằng cách bấm băng "Có bản mới". Tra
+lại mã thì lộ ra băng ấy **chỉ hiện khi số hiệu bản đổi GIỮA CHỪNG**:
+`refreshHome()` so `HOME.ban` với `BAN_LUC_MO`, mà `boot()` gán thẳng
+`BAN_LUC_MO = HOME.ban` ngay lượt nạp đầu — nên mở trang mới thì hai bên không
+bao giờ lệch.
+
+Hệ quả: **"đóng app rồi mở lại" là việc DUY NHẤT không có tác dụng** — mà đó
+đúng là việc ai cũng nghĩ tới đầu tiên. app.js vẫn là bản cũ trong đệm
+(max-age=14400), máy chủ đã ở bản mới, lệch nhau suốt bốn tiếng mà không có gì
+báo.
+
+`soiBanLucMo()` vá bằng cách nhớ số hiệu bản ĐÃ CHẠY vào `localStorage`; lần mở
+sau số hiệu máy chủ khác số đã nhớ thì hiện băng. Không cần build step.
+
+**CỐ Ý CHỈ HIỆN BĂNG, KHÔNG TỰ TẢI LẠI.** Bản đầu tự gọi `location.reload()` ở
+`boot()` — rồi tôi bỏ, vì hai lý do cộng lại: đường khởi động của 146 người mà
+lỡ `location.reload()` cư xử lạ một lần là cả lớp nhìn màn hình trắng; và
+**môi trường cục bộ KHÔNG kiểm được nhánh ấy** (xem ngay dưới). Thứ không kiểm
+được thì đừng đặt vào chỗ nguy hiểm nhất. Băng thì người dùng đã quen, bấm hay
+không là quyền họ, và không có nhánh nào tự điều hướng nên không thể lặp.
+
+Sổ chỉ cập nhật ở HAI chỗ: lần đầu mở trên một máy, và lúc bấm băng. Chưa bấm
+thì lần mở sau băng vẫn hiện — đúng, vì họ vẫn đang chạy mã cũ.
+
+**Một chỗ môi trường cục bộ không kiểm được, nói thẳng:** `location.reload()`
+chạy với `wrangler dev` + khối `[assets]` để lại **một trang trắng** — tài liệu
+mới về nhưng thẻ `<script src="/app.js">` không chạy (`typeof window.mdSafe` là
+`undefined`). Phép đối chứng dứt điểm: `location.reload()` TRẦN, không kèm
+`fetch` gì, cũng trắng y hệt. Nên đây là giới hạn của máy chủ dev, không phải
+lỗi mã — băng đã chạy thật trên tên miền từ 25/8. `pw-banmoi.mjs` vì vậy chỉ
+khẳng định tới chỗ bấm được và đúng MỘT lượt điều hướng.
+
+Kèm một sửa nhỏ trong `taiLaiVoiMaMoi()` (hàm tách ra để băng và phép soi dùng
+chung): `fetch()` giải quyết khi nhận xong PHẦN ĐẦU, thân vẫn đang chảy — nên
+phải `.then(r => r.text())` đọc hết thân trước khi `location.reload()`, không
+thì lượt tải bị cắt ngang và bản đệm không kịp ghi xong.
+
 ## Lịch công khai `/lich` và tệp `.ics` — cửa trước cho người chưa tin
 
 Thêm 26/8. Trước đó muốn xem lịch phải qua **năm bước** ở `/vao` (tên → điện

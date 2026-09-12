@@ -288,29 +288,85 @@ function batTuLamMoi() {
   window.addEventListener('focus', thu);
 }
 
+// location.reload() MỘT MÌNH KHÔNG ĐỦ. Đo trên tên miền thật ngày 25/8: app.js
+// và app.css bị trả về với max-age=14400 — bốn tiếng dùng thẳng bản đệm.
+// (public/_headers đã đặt no-cache, nhưng có một lớp ghi đè ở cấp zone
+// Cloudflare.) Tải lại thường thì index.html mới về mà app.js vẫn lấy từ đệm,
+// mã không đổi — băng "Có bản mới" hiện lại ngay, bấm mãi không hết.
+//
+// fetch(cache:'reload') buộc đi mạng VÀ ghi đè bản trong đệm HTTP, nên lượt
+// tải lại ngay sau đó nhận đúng mã mới. Hỏng thì vẫn tải lại, vì cùng lắm là
+// quay về đúng tình trạng cũ chứ không tệ hơn.
+//
+// MỘT hàm dùng chung cho cả hai chỗ gọi (băng bấm tay, và phép soi lúc mở
+// trang bên dưới) — hai bản sao thì sớm muộn lệch nhau, đúng bài học đã ghi
+// nhiều lần trong CLAUDE.md.
+async function taiLaiVoiMaMoi() {
+  try {
+    // PHẢI ĐỌC HẾT THÂN (`r.text()`), không được dừng ở `fetch()`. `fetch()`
+    // giải quyết ngay khi nhận xong PHẦN ĐẦU, thân vẫn đang chảy — nên
+    // `location.reload()` ngay sau đó CẮT NGANG lượt tải, bản đệm không kịp
+    // ghi xong, và lượt nạp tiếp theo nhận `net::ERR_ABORTED` cho chính
+    // /app.js. Kết quả là MỘT TRANG TRẮNG: tài liệu về, thẻ script không chạy.
+    // Đo được ngày 12/9 bằng pw-banmoi.mjs (`typeof window.mdSafe` là
+    // undefined sau khi tải lại); bản trước chỉ `await fetch(...)` nên có lỗi
+    // này từ 25/8, chỉ là chưa ai vấp đúng lúc.
+    await Promise.all(['/app.js', '/app.css'].map(u =>
+      fetch(u, { cache: 'reload' }).then(r => r.text()).catch(() => {})));
+  } catch { /* mất mạng thì thôi */ }
+  location.reload();
+}
+
+/* ── Bản đang chạy có phải bản mới nhất không — hỏi NGAY LÚC MỞ TRANG ───────
+   Lỗ hổng có từ lúc dựng băng "Có bản mới" (25/8), chỉ lộ ra khi đọc lại mã
+   ngày 12/9: băng ấy CHỈ hiện khi số hiệu bản đổi GIỮA CHỪNG, tức app phải
+   đang mở sẵn lúc deploy. Mở trang mới thì `boot()` gán thẳng
+   `BAN_LUC_MO = HOME.ban`, lấy luôn số hiệu bản MỚI của máy chủ làm mốc — nên
+   không bao giờ lệch, không bao giờ có băng.
+
+   Hệ quả thật: "đóng app rồi mở lại" — việc ai cũng nghĩ tới đầu tiên khi
+   nghe nói có bản mới — là việc DUY NHẤT không có tác dụng. app.js vẫn là bản
+   cũ trong đệm (max-age=14400), máy chủ đã ở bản mới, hai bên lệch nhau suốt
+   bốn tiếng mà không có gì nói cho người dùng biết.
+
+   Cách vá không cần build step (mục 8 SRS): nhớ số hiệu bản ĐÃ CHẠY vào
+   localStorage. Lần mở sau, số hiệu máy chủ khác số đã nhớ nghĩa là đệm đang
+   giữ mã cũ.
+
+   CỐ Ý CHỈ HIỆN BĂNG, KHÔNG TỰ TẢI LẠI. Tự tải lại ở đường khởi động của 146
+   người là rủi ro không đáng: chỉ cần `location.reload()` cư xử lạ một lần là
+   cả lớp nhìn màn hình trắng và không ai vào được. Băng thì người dùng đã
+   quen (Ngô Phú Cường dùng đúng nó để cập nhật), bấm hay không là quyền họ,
+   và không có nhánh nào tự điều hướng nên KHÔNG THỂ lặp.
+
+   Sổ chỉ được cập nhật ở HAI chỗ: lần đầu mở trên một máy (chưa có gì để so),
+   và lúc người dùng bấm băng. Chưa bấm thì lần mở sau băng vẫn hiện — đúng,
+   vì họ vẫn đang chạy mã cũ. */
+const KHOA_BAN = 'k3_ban_da_chay';
+function soiBanLucMo(ban) {
+  if (!ban) return;
+  let cu;
+  try { cu = localStorage.getItem(KHOA_BAN); } catch { return; }   // bị chặn thì thôi
+  if (cu === null || cu === undefined) {
+    // Máy mới, hoặc duyệt riêng tư: vốn dĩ vừa tải mã mới nhất, không có gì để báo.
+    try { localStorage.setItem(KHOA_BAN, ban); } catch { /* kệ */ }
+    return;
+  }
+  if (cu !== ban) veBangCoBanMoi();
+}
+
 // Máy chủ đã lên bản mới trong lúc app nằm im. Không tự tải lại: người ta có
 // thể đang gõ dở một ô. Chỉ báo và để họ bấm.
 function veBangCoBanMoi() {
   if ($('#banmoi')) return;
   document.body.insertAdjacentHTML('beforeend',
     `<button class="banmoi" id="banmoi">Có bản mới — chạm để tải lại</button>`);
-  $('#banmoi').onclick = async () => {
-    const nut = $('#banmoi');
-    nut.textContent = 'Đang tải bản mới…';
-    // location.reload() KHÔNG đủ. Đo trên tên miền thật ngày 25/8: app.js và
-    // app.css bị trả về với max-age=14400 — bốn tiếng dùng thẳng bản đệm.
-    // (public/_headers đã đặt no-cache, nhưng có một lớp ghi đè ở cấp zone
-    // Cloudflare.) Tải lại thường thì index.html mới về mà app.js vẫn lấy từ
-    // đệm, mã không đổi, băng này hiện lại ngay — bấm mãi không hết.
-    //
-    // fetch(cache:'reload') buộc đi mạng VÀ ghi đè bản trong đệm HTTP, nên
-    // lượt tải lại ngay sau đó nhận đúng mã mới. Hỏng thì vẫn tải lại, vì
-    // cùng lắm là quay về đúng tình trạng cũ chứ không tệ hơn.
-    try {
-      await Promise.all(['/app.js', '/app.css'].map(u =>
-        fetch(u, { cache: 'reload' }).catch(() => {})));
-    } catch { /* mất mạng thì thôi */ }
-    location.reload();
+  $('#banmoi').onclick = () => {
+    $('#banmoi').textContent = 'Đang tải bản mới…';
+    // Ghi luôn số hiệu mới vào sổ, không thì phép soi lúc mở trang ở trên sẽ
+    // tải lại thêm một lần nữa ngay sau đó.
+    try { localStorage.setItem(KHOA_BAN, HOME?.ban ?? ''); } catch { /* kệ */ }
+    taiLaiVoiMaMoi();
   };
 }
 async function ensureMembers() {
@@ -4347,6 +4403,9 @@ async function boot() {
   }
   renderApp();
   batTuLamMoi();
+  // SAU renderApp(): băng gắn vào cuối body, mà renderApp() dựng lại cả màn —
+  // gọi trước thì băng vừa vẽ xong đã bị thổi bay.
+  soiBanLucMo(HOME?.ban);
 }
 
 addEventListener('hashchange', route);
