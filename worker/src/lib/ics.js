@@ -137,8 +137,23 @@ export function dungIcs(buoi, khoa, dtstamp, host) {
     d.push('END:VEVENT');
   }
 
-  // Buổi bảo vệ: cột mốc cả khoá hướng tới, để cả ngày vì chưa có giờ.
-  if (khoa?.defense_on) {
+  // Buổi bảo vệ: cột mốc cả khoá hướng tới, để CẢ NGÀY vì chưa có giờ —
+  // nhưng CHỈ khi lịch chưa có dòng nào cho đúng ngày ấy.
+  //
+  // Câu "vì chưa có giờ" đúng từ 26/8 tới 17/9, ngày migration 0040 thêm hai
+  // dòng THẬT cho 26/9 (bảo vệ 13h30–17h00, Lễ Tốt nghiệp & Gala 17h00–22h00).
+  // Từ lúc ấy chỗ này thành một bản SAO: lịch điện thoại của 146 người nhận
+  // cùng một buổi bảo vệ hai lần — một khối cả ngày không nói mấy giờ có mặt,
+  // nằm ngay cạnh khối nói đúng giờ. Không chỗ nào báo lỗi, và chỉ lộ ra khi
+  // ĐẾM sự kiện trong tệp .ics chứ không phải khi đọc mã.
+  //
+  // Lọc theo NGÀY chứ không theo tiêu đề: tên buổi do Ban cán sự lớp tự đặt
+  // và sửa được bằng nút ✎, nên so tên là có ngày lệch mà không ai hay.
+  // Dòng đã HUỶ cũng tính là "đã có": khi ấy nó mang STATUS:CANCELLED và tự
+  // kể đúng câu chuyện, còn tấm băng cả ngày vẫn ghi buổi bảo vệ diễn ra —
+  // hai thứ nói ngược nhau thì thứ CỤ THỂ HƠN phải thắng.
+  const daCoDongChoNgayBaoVe = (buoi ?? []).some(b => b.ngay === khoa?.defense_on);
+  if (khoa?.defense_on && !daCoDongChoNgayBaoVe) {
     d.push('BEGIN:VEVENT');
     d.push(`UID:baove@${host}`);
     d.push(`DTSTAMP:${dtstamp}`);

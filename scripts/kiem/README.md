@@ -117,7 +117,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Hai mươi lăm phép đối chứng đáng giữ nhất
+## Hai mươi sáu phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -366,6 +366,18 @@ Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ khôn
    biểu thức đánh số trong `public/app.js`**, để ai đổi cách đánh số ở giao
    diện thì bộ kiểm đỏ và hai bên cùng được sửa. Kèm một phép đối chứng có
    răng: công thức cũ `ord + 1` phải TRƯỢT.
+
+26. **Đếm sự kiện trong CHÍNH tệp `.ics`, đừng chỉ kiểm từng sự kiện đúng
+   khuôn.** `lib/ics.js` phát thêm một sự kiện CẢ NGÀY từ `cohorts.defense_on`
+   làm cột mốc, với lý do "chưa có giờ" — đúng cho tới khi migration 0040 thêm
+   hai dòng THẬT cho 26/9. Từ lúc ấy nó thành BẢN SAO: cùng một buổi bảo vệ
+   vào lịch điện thoại của 146 người hai lần. Mọi phép kiểm cũ vẫn xanh — UID
+   không trùng, giờ đổi múi đúng, khuôn RFC đủ — vì không phép nào hỏi "ngày
+   này có mấy sự kiện". Nay `kiem-ics.py` canh HAI CHIỀU (có dòng thì không
+   được có cột mốc; chưa có dòng nào thì phải còn) và đếm sự kiện rơi vào ngày
+   bảo vệ, phải khớp số dòng lịch. Phép đối chứng của chính bản vá: gọi thẳng
+   `dungIcs()` từ Node với ba bộ dữ liệu, trong đó ca "chỉ có dòng NGÀY KHÁC"
+   là ca mà một bản vá cẩu thả (`if (buoi.length) bỏ qua`) sẽ làm hỏng.
 
 ## Chạy `kiem-tanso.mjs`
 

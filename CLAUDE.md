@@ -1954,17 +1954,73 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
   điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn, thêm dòng `officers` với
   `group_id IS NULL` là chạy.
-- **Lịch nay có 19 DÒNG `lich_hoc`, tới hết 19/9** (28/8, 5/9, 11/9 và 18/9 mỗi
+- **Lịch nay có 21 DÒNG `lich_hoc`, ĐỦ tới hết khoá 26/9** (28/8, 5/9, 11/9 và 18/9 mỗi
   ngày chia hai-ba dòng vì nhiều chủ đề, nên "buổi" ở đây là buổi giảng chứ
   không phải ngày lịch — đừng lấy số dòng so thẳng với `cohorts.so_buoi = 13`):
   15/8, 21/8, 22/8 (migration 0016), 4/9 và 5/9 (0017), 5/9 CHỐT LẠI đè lên bản
-  tạm (0019), 11/9 kiến tập (0032), tuần 11–12/9 (0035), rồi 18–19/9 (0039) —
-  tất cả đều do Ngô Phú Cường dán lại từ thông báo Zalo của Ban tổ chức.
+  tạm (0019), 11/9 kiến tập (0032), tuần 11–12/9 (0035), 18–19/9 (0039), rồi
+  26/9 (0040) — tất cả đều do Ngô Phú Cường dán lại thông báo của Ban tổ chức.
 
-  **CHƯA CÓ DÒNG NÀO cho 26/9 — chính buổi BẢO VỆ và LỄ BẾ GIẢNG** (ngày kết
-  thúc khoá theo `cohorts`). Đã nêu với Ngô Phú Cường ngày 17/9; chờ Ban tổ
-  chức chốt giờ rồi mới thêm, không bịa. Trớ trêu là buổi họp 9h00 ngày 18/9
-  (migration 0039) lại chính là cuộc họp bàn về nó.
+  **26/9 ĐÃ ĐIỀN (migration 0040)** — buổi BẢO VỆ và LỄ TỐT NGHIỆP & GALA, tức
+  ngày kết thúc khoá theo `cohorts`. Ngô Phú Cường gửi thư mời chính thức
+  ngay chiều 17/9, vài giờ sau khi tôi nêu chỗ trống này. Xem mục riêng
+  "26/9 — hai dòng, và một bản sao trong .ics" bên dưới.
+
+  **26/9 (migration 0040) — hai dòng, và một BẢN SAO trong `.ics` phải gỡ.**
+
+  Thư mời chính thức của VCCI × Andrew School of Business, Ngô Phú Cường gửi
+  17/9. Địa điểm Dolce by Wyndham Hanoi Golden Lake, Giảng Võ.
+
+  **Giờ bắt đầu 13h30, KHÔNG phải 13h00 như thư mời in.** Thư mời ghi 13h00 ở
+  HAI chỗ (băng đầu trang và khối đầu bảng chương trình); Ngô Phú Cường đính
+  chính "26/9 là 13h30 đến 22h". Lấy theo anh vì anh là uỷ viên Ban cán sự lớp
+  liên hệ trực tiếp Ban tổ chức — nhưng đã nói rõ với anh rằng đây là chỗ DUY
+  NHẤT lệch với văn bản, và lệch về phía nguy hơn: ghi muộn 30 phút mà thật ra
+  13h00 thì cả lớp tới trễ chính buổi thi cuối khoá, còn ghi sớm thì chỉ chờ
+  thêm. Ghi chú Text cũng viết 13h30 cho khối đầu — hai cái đồng hồ nói hai
+  giờ khác nhau trong cùng một ứng dụng là lỗi tệ hơn cả lệch giờ.
+
+  **TÁCH HAI DÒNG** (13h30–17h00 bảo vệ · 17h00–22h00 lễ + gala) chứ không gộp
+  "13h30–22h00" như thư mời, vì hai nửa là hai CAM KẾT khác hẳn: buổi chiều là
+  kỳ thi bắt buộc của mọi học viên, buổi tối có phí **1.000.000đ/người** và
+  phải đăng ký **trước 21h00 ngày 19/9**. Gộp một dòng thì người đọc lướt rất
+  dễ hiểu là phải nộp tiền và đăng ký mới được bảo vệ bài — một hiểu nhầm có
+  thể làm ai đó bỏ chính buổi thi. Ranh giới 17h00 lấy thẳng từ bảng chương
+  trình của thư mời, không tự nghĩ ra. Năm khối tối (17h00/17h30/19h45/20h45/
+  21h15) KHÔNG tách tiếp thành năm dòng: `/api/home` chỉ hiện 6 buổi sắp tới
+  nên một tối sẽ chiếm sạch danh sách, và `.ics` đổ năm cuộc hẹn liên tiếp vào
+  lịch điện thoại của 146 người. Chi tiết nằm trong ghi chú Text.
+
+  **`ghi_chu` ĐI RA TRANG CÔNG KHAI `/lich`** (`docLichCongKhai` liệt kê nó
+  trong danh sách trả về), nên số tài khoản người thu, số điện thoại và mức
+  phí TUYỆT ĐỐI không được nhét vào đó — chúng nằm trong `content_md` của ghi
+  chú Text, thứ đường công khai chỉ ĐẾM chứ không trả nội dung. Đã kiểm bằng
+  cách grep từng chuỗi cấm trong phúc đáp `/api/lich/cong-khai`.
+
+  **`ghi_chu` bản đầu lại quá dài, lại chỉ ảnh chụp mới thấy.** "Dolce by
+  Wyndham Hanoi Golden Lake, Giảng Võ" (43 ký tự) thành BA dòng chữ hoa, nặng
+  hơn cả tên buổi ngay dưới — đúng cái bẫy 0032 đã vấp. Rút còn "Dolce by
+  Wyndham, Giảng Võ"; tên đầy đủ và địa chỉ nằm trong ghi chú Text.
+
+  **Và một lỗi THẬT trong `lib/ics.js`, không phải trong migration.** Hàm
+  `dungIcs()` phát thêm một sự kiện CẢ NGÀY từ `cohorts.defense_on`, với chú
+  thích "để cả ngày vì chưa có giờ" — đúng từ 26/8 tới 17/9. Migration 0040
+  làm câu ấy thành SAI: từ lúc có hai dòng thật cho 26/9, tấm băng cả ngày
+  thành bản sao, và lịch điện thoại của 146 người nhận cùng một buổi bảo vệ
+  HAI LẦN — một khối không nói mấy giờ có mặt, nằm cạnh khối nói đúng giờ.
+  Không chỗ nào báo lỗi; chỉ lộ ra khi ĐẾM sự kiện trong tệp `.ics` gửi đi.
+  Nay `dungIcs()` bỏ qua cột mốc ấy khi `buoi` đã có dòng cho đúng `defense_on`
+  — lọc theo NGÀY chứ không theo tiêu đề (tên buổi Ban cán sự lớp sửa được
+  bằng nút ✎, so tên là có ngày lệch mà không ai hay), và dòng đã HUỶ cũng
+  tính là "đã có" vì khi ấy nó mang `STATUS:CANCELLED` và tự kể đúng chuyện.
+
+  `kiem-ics.py` viết lại phần "Buổi bảo vệ" thành phép canh HAI CHIỀU: có dòng
+  thì KHÔNG được có cột mốc, chưa có dòng nào thì PHẢI còn. Kèm phép đối chứng
+  có răng nhất — đếm số sự kiện rơi vào ngày bảo vệ trong chính tệp `.ics`,
+  phải khớp số dòng lịch. Đã thử ba ca bằng cách gọi thẳng `dungIcs()` từ
+  Node: có dòng 26/9 → 2 sự kiện; không có dòng nào → 1 (giữ cột mốc, đúng
+  mục đích gốc); chỉ có dòng NGÀY KHÁC → 2 (buổi ấy + cột mốc). Ca thứ ba là
+  ca một bản vá cẩu thả (`if (buoi.length) bỏ qua`) sẽ làm hỏng.
 
   **18–19/9 (migration 0039) — sợi dây nối về một buổi từng bị xếp nhầm ngày.**
   Bản tạm 0017 ghi ĐÚNG hai chủ đề của ThS. Tuấn Hà vào 5/9; bản chốt 0019 thay

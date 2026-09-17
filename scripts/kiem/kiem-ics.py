@@ -118,12 +118,35 @@ ok('dấu hai chấm KHÔNG bị thoát trong SUMMARY',
 ok('chữ Việt có dấu còn nguyên sau khi mở gấp dòng',
    any('ế' in e.get('SUMMARY', '') or 'ị' in e.get('SUMMARY', '') for e in sk))
 
-print('── Buổi bảo vệ ──')
+print('── Buổi bảo vệ: KHÔNG được có bản sao ──')
+# Trước 17/9 lịch chưa có dòng nào cho ngày bảo vệ, nên lib/ics.js phát một sự
+# kiện CẢ NGÀY làm cột mốc ("chưa có giờ"). Migration 0040 thêm hai dòng THẬT
+# cho 26/9 — từ lúc ấy tấm băng cả ngày thành BẢN SAO: cùng một buổi bảo vệ
+# vào lịch điện thoại của 146 người hai lần, một lần không nói mấy giờ có mặt.
+# Phép kiểm này canh đúng chỗ ấy, và canh CẢ HAI chiều để còn răng khi lịch
+# thay đổi về sau.
+ngay_bv = d['khoa']['defense_on']
 bv = theoUid.get('baove')
-ok('có sự kiện buổi bảo vệ', bv is not None)
-if bv:
-    ok(f"đúng ngày {d['khoa']['defense_on']}",
-       bv.get('DTSTART;VALUE=DATE') == d['khoa']['defense_on'].replace('-', ''))
+dong_bv = [b for b in d['buoi'] if b['ngay'] == ngay_bv]
+
+if dong_bv:
+    ok(f'lịch đã có {len(dong_bv)} dòng cho ngày bảo vệ {ngay_bv} '
+       '→ KHÔNG phát thêm sự kiện cả ngày', bv is None)
+else:
+    ok(f'lịch chưa có dòng nào cho {ngay_bv} → vẫn giữ cột mốc cả ngày',
+       bv is not None)
+    if bv:
+        ok(f'đúng ngày {ngay_bv}',
+           bv.get('DTSTART;VALUE=DATE') == ngay_bv.replace('-', ''))
+
+# Phép đối chứng có răng nhất: đếm sự kiện rơi vào NGÀY bảo vệ. Chỉ đọc mã thì
+# không thấy bản sao — phải đếm trong chính tệp gửi đi.
+trong_ngay = [e for e in sk
+              if (e.get('DTSTART', '') or e.get('DTSTART;VALUE=DATE', ''))
+              .startswith(ngay_bv.replace('-', ''))]
+ok(f'số sự kiện ngày {ngay_bv} trong .ics = {len(trong_ngay)}, '
+   f'khớp đúng số dòng lịch = {len(dong_bv) if dong_bv else 1}',
+   len(trong_ngay) == (len(dong_bv) if dong_bv else 1))
 
 print('── Tải hai lần cho ra tệp y hệt (DTSTAMP không lấy giờ máy) ──')
 raw2 = urllib.request.urlopen(url).read()
