@@ -1954,12 +1954,38 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
   điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn, thêm dòng `officers` với
   `group_id IS NULL` là chạy.
-- **Bảy buổi đã học được thêm vào lịch**, tính theo DÒNG `lich_hoc` (28/8 và 5/9
-  mỗi ngày chia hai-ba dòng vì nhiều chủ đề, nên "buổi" ở đây là buổi giảng chứ
-  không phải ngày lịch): 15/8, 21/8, 22/8 (migration 0016), 4/9 và 5/9 (migration
-  0017), rồi 5/9 CHỐT LẠI đè lên bản tạm (migration 0019) — cả ba đều do Ngô Phú
-  Cường dán lại từ thông báo Zalo của Ban tổ chức. `13 - 11 = 2`: lịch còn thiếu
-  đúng 2 buổi nữa.
+- **Lịch nay có 19 DÒNG `lich_hoc`, tới hết 19/9** (28/8, 5/9, 11/9 và 18/9 mỗi
+  ngày chia hai-ba dòng vì nhiều chủ đề, nên "buổi" ở đây là buổi giảng chứ
+  không phải ngày lịch — đừng lấy số dòng so thẳng với `cohorts.so_buoi = 13`):
+  15/8, 21/8, 22/8 (migration 0016), 4/9 và 5/9 (0017), 5/9 CHỐT LẠI đè lên bản
+  tạm (0019), 11/9 kiến tập (0032), tuần 11–12/9 (0035), rồi 18–19/9 (0039) —
+  tất cả đều do Ngô Phú Cường dán lại từ thông báo Zalo của Ban tổ chức.
+
+  **CHƯA CÓ DÒNG NÀO cho 26/9 — chính buổi BẢO VỆ và LỄ BẾ GIẢNG** (ngày kết
+  thúc khoá theo `cohorts`). Đã nêu với Ngô Phú Cường ngày 17/9; chờ Ban tổ
+  chức chốt giờ rồi mới thêm, không bịa. Trớ trêu là buổi họp 9h00 ngày 18/9
+  (migration 0039) lại chính là cuộc họp bàn về nó.
+
+  **18–19/9 (migration 0039) — sợi dây nối về một buổi từng bị xếp nhầm ngày.**
+  Bản tạm 0017 ghi ĐÚNG hai chủ đề của ThS. Tuấn Hà vào 5/9; bản chốt 0019 thay
+  dòng ấy bằng ThS. Hà Thu Thanh, tức buổi Tuấn Hà bị DỜI chứ không bị huỷ —
+  nay về đúng chỗ ngày 18/9 với giờ cụ thể. Vì 0019 UPDATE tại chỗ chứ không
+  chèn thêm dòng nên không còn tồn đọng gì phải dọn.
+
+  Ba điều quyết trong 0039, mỗi điều một lý do:
+  - **"Họp lớp" 9h00–9h30 là một DÒNG RIÊNG**, không nhét vào `ghi_chu` của
+    buổi 9h30. Lý do nằm ở `.ics`: lịch nói ngày bắt đầu 9h30 thì cả lớp đến
+    muộn nửa tiếng của cuộc họp bàn về BUỔI BẢO VỆ của chính họ. Tiền lệ cho
+    một dòng không-phải-buổi-giảng: "Giao lưu, kết nối (không bắt buộc)" tối
+    11/9 (0035). `giang_vien` để TRỐNG — thông báo không nêu ai chủ trì, mà
+    `lib/ics.js` in ra "Giảng viên: …".
+  - **19/9 để TRỐNG `tu_gio`/`den_gio`** — thông báo không có một mốc giờ nào,
+    kể cả "buổi sáng"/"buổi chiều". Giao diện tự hiện "THỨ BẢY 19/9 · CẢ BUỔI"
+    và `.ics` ra sự kiện cả ngày, cả hai đều đúng; bịa giờ mới là sai.
+  - **Chốt trùng lặp của dòng 19/9 phải theo `chu_de`, không theo `tu_gio`**
+    như ba dòng kia: `tu_gio` là NULL, mà `NULL = NULL` trong SQL không bao giờ
+    đúng nên phép kiểm ấy không chặn được gì. Đã đối chứng bằng cách chạy lại
+    nguyên migration: vẫn 3 + 1 dòng, không nhân đôi.
 
   **5/9 đổi CẢ chủ đề lẫn giảng viên, không chỉ thêm giờ** — dấu vết đáng nhớ
   nhất trong đợt này. Bản tạm (migration 0017/0018) ghi GV Tuấn Hà, chủ đề
