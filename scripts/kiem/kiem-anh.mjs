@@ -13,7 +13,8 @@
 //
 // Phép số 3 dưới đây canh cái thứ nhất — cái duy nhất nằm trong mã của ta.
 
-import { doanLoaiAnh, thanMultipart, TOI_DA_BYTE } from '../../worker/src/lib/anh.js';
+import { doanLoaiAnh, thanMultipart, TOI_DA_BYTE, tenTepAnh } from '../../worker/src/lib/anh.js';
+import { boDau } from '../../worker/src/lib/ghep.js';
 
 let hong = 0;
 const ok = (t, d) => { console.log((d ? '  ✓ ' : '  ✗ ') + t); if (!d) hong++; };
@@ -107,6 +108,34 @@ ok('có khai content-type của ảnh', vb.includes('Content-Type: image/jpeg'))
 const coCha = new TextDecoder().decode(
   thanMultipart({ name: 'a.jpg', parents: ['THUMUC'] }, 'image/jpeg', doc, 'R'));
 ok('có parents thì thân mang id thư mục', coCha.includes('"parents":["THUMUC"]'));
+
+console.log('\n── Tên tệp cho Ban tổ chức đọc ──');
+const t = (hoTen, nhomSo, tienTo = 'chan-dung', duoi = 'jpg') =>
+  tenTepAnh(boDau, { tienTo, hoTen, nhomSo, duoi });
+ok(`bỏ dấu, thường hoá, nối bằng gạch ("${t('Ngô Phú Cường', 6)}")`,
+   t('Ngô Phú Cường', 6) === 'chan-dung-ngo-phu-cuong-n6.jpg');
+// 'đ' KHÔNG phải nguyên âm có dấu tổ hợp nên NFD không tách ra — boDau() thay
+// riêng, và đây là phép canh cho đúng chỗ ấy.
+ok(`chữ đ ra d ("${t('Đặng Hùng', 10)}")`, t('Đặng Hùng', 10) === 'chan-dung-dang-hung-n10.jpg');
+ok('logo dùng tiền tố riêng', t('Ngô Phú Cường', 6, 'logo', 'png') === 'logo-ngo-phu-cuong-n6.png');
+
+// PHÉP CÓ RĂNG NHẤT của hàm tên tệp, và nó dựa trên dữ liệu THẬT: roster có
+// HAI người cùng tên Phan Thị Thanh Nga, một ở Nhóm 6 một ở Nhóm 9. Bỏ số
+// nhóm ra khỏi tên là hai người ấy thành hai tệp trùng tên trong cùng thư
+// mục — mà Drive CHO PHÉP trùng tên, nên không có lỗi nào để đọc.
+ok('hai người CÙNG TÊN khác nhóm ra hai tên tệp khác nhau',
+   t('Phan Thị Thanh Nga', 6) !== t('Phan Thị Thanh Nga', 9));
+// Cùng một người thì ảnh chân dung và logo cũng không được trùng tên.
+ok('chân dung và logo của cùng một người không trùng tên',
+   t('Ngô Phú Cường', 6) !== t('Ngô Phú Cường', 6, 'logo'));
+
+ok('ký tự lạ bị gạt, không lọt vào tên tệp',
+   t('A/B\\C:*?"<>|D', 1) === 'chan-dung-a-b-c-d-n1.jpg');
+ok('tên rỗng sau khi bỏ dấu vẫn ra tên dùng được',
+   t('###', 3) === 'chan-dung-hoc-vien-n3.jpg');
+ok('không có nhóm thì bỏ hẳn phần -nN', t('Ngô Phú Cường', null) === 'chan-dung-ngo-phu-cuong.jpg');
+ok('tên rất dài bị cắt, không đẻ ra tên tệp vô hạn',
+   t('Nguyễn '.repeat(40), 2).length < 90);
 
 console.log('\n── Trần kích thước ──');
 ok(`TOI_DA_BYTE = 2MB (${TOI_DA_BYTE})`, TOI_DA_BYTE === 2 * 1024 * 1024);

@@ -1619,9 +1619,31 @@ quên được, mà triệu chứng của việc quên là `404 File not found` 
 như thư mục bị xoá, nên rất dễ đi tìm nhầm chỗ. Đặt sẵn `DRIVE_FOLDER_ID`
 trong Worker thì dùng cái đó, làm đường lui khi muốn ghim một thư mục cụ thể.
 
-**Tên tệp mang HỌ TÊN và NHÓM** (`chan-dung-Ngô Phú Cường - N6.jpg`): Ban tổ
-chức tải cả thư mục về rồi ghép chứng chỉ, nên một thư mục toàn `IMG_4821.jpg`
-là bắt họ mở từng tệp ra đoán.
+**Tên tệp: `chan-dung-ngo-phu-cuong-n6.jpg`** — không dấu, không dấu cách, do
+`tenTepAnh()` dựng bằng chính `boDau()` của `lib/ghep.js` (KHÔNG viết bản sao
+thứ ba; `vietqr.js` đã có một bản cho cú pháp chuyển khoản). Ngô Phú Cường xin
+dạng này, và nó đúng vì một lý do cụ thể: Ban tổ chức tải cả thư mục về máy
+Windows rồi giao cho người làm chứng chỉ — tên có dấu và có dấu cách thì qua
+zip/giải nén hay ra ký tự rác.
+
+Giữ THÊM hai phần so với ví dụ `ngo-phu-cuong.jpg`, mỗi phần một lý do đã đo
+được, không phải phòng xa:
+- **tiền tố loại** — không có thì ảnh chân dung và logo cùng người trùng tên
+  khi cùng đuôi, mà **Drive CHO PHÉP trùng tên**: hai tệp y hệt trong một thư
+  mục, không ai biết cái nào là cái nào.
+- **số nhóm** — roster có **hai người cùng tên `Phan Thị Thanh Nga`**, một ở
+  Nhóm 6 một ở Nhóm 9. Bỏ số nhóm là hai người ấy đè lên nhau.
+
+**GỬI LẠI thì SỬA ĐÈ lên chính tệp cũ** (`PATCH /upload/drive/v3/files/{id}`),
+không tạo tệp mới — cùng lý do trùng tên ở trên, và gửi lại là chuyện CHẮC
+CHẮN xảy ra (chọn nhầm ảnh, cắt xấu). Lượt sửa đè thì `parents` **không được**
+nằm trong thân; 404 ở nhánh này nghĩa là tệp cũ đã bị xoá tay, và route tự thử
+lại bằng đường tạo mới thay vì bắt học viên hiểu chuyện ấy.
+
+**Link thư mục hiện thẳng trên màn Ban cán sự lớp** (`drive_thu_muc_url`).
+Thư mục do chính ứng dụng tạo nên nó nằm lẫn trong "Drive của tôi" cùng vài
+trăm thứ khác — bắt người phụ trách đi lục tìm là thiết kế dở, và chia sẻ nhầm
+một thư mục khác cho Ban tổ chức còn tệ hơn không chia sẻ gì.
 
 `/api/health` trả thêm `drive: {bat}` — **một CỜ, không một mẩu nào của khoá**,
 khác hẳn khối `push` (khoá VAPID công khai in 8 ký tự đầu được). Đây là chỗ duy

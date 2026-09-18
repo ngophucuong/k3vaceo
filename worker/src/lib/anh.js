@@ -103,3 +103,30 @@ export function thanMultipart(sieuDuLieu, mime, bytes, ranh) {
   out.set(cuoi, dau.length + bytes.length);
   return out;
 }
+
+/* ── Tên tệp cho Ban tổ chức đọc, không phải cho máy chủ ─────────────────
+   Ngô Phú Cường xin dạng `ngo-phu-cuong.jpg`. Đúng, và vì một lý do cụ thể
+   chứ không phải thẩm mỹ: Ban tổ chức tải cả thư mục về máy Windows rồi giao
+   cho người làm chứng chỉ. Tên có DẤU và có DẤU CÁCH thì qua zip/giải nén
+   trên Windows hay ra ký tự rác, và đưa vào bất kỳ script nào cũng vướng.
+
+   Giữ THÊM hai phần so với ví dụ ấy, mỗi phần một lý do đã đo được:
+
+   1. TIỀN TỐ LOẠI (`chan-dung-` / `logo-`). Không có thì ảnh chân dung và
+      logo của cùng một người trùng tên khi cùng đuôi, mà Drive CHO PHÉP trùng
+      tên — kết quả là hai tệp giống hệt nhau trong thư mục và không ai biết
+      cái nào là cái nào.
+   2. SỐ NHÓM (`-n6`). Đây KHÔNG phải phòng xa: roster có HAI người cùng tên
+      `Phan Thị Thanh Nga`, một ở Nhóm 6 một ở Nhóm 9 (xem CLAUDE.md). Bỏ số
+      nhóm là hai người ấy ghi đè lên nhau trong mắt người làm chứng chỉ.
+
+   Tên rỗng sau khi bỏ dấu (hồ sơ chỉ có ký tự lạ) thì rơi về `hoc-vien` cộng
+   số nhóm — thà một tên chung còn hơn một tệp tên `.jpg`. */
+export function tenTepAnh(boDau, { tienTo, hoTen, nhomSo, duoi }) {
+  const slug = boDau(hoTen)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 60);
+  const nhom = nhomSo ? `-n${nhomSo}` : '';
+  return `${tienTo}-${slug || 'hoc-vien'}${nhom}.${duoi}`;
+}

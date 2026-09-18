@@ -7,7 +7,8 @@ import { shapeRound } from './funds.js';
 import { conQuota, ghiNhan } from '../lib/ratelimit.js';
 import { buildTransferNote, buildQrUrl } from '../lib/vietqr.js';
 import { driveCauHinh, taiLenDrive, taoThuMuc } from '../lib/drive.js';
-import { doanLoaiAnh, TOI_DA_BYTE } from '../lib/anh.js';
+import { doanLoaiAnh, TOI_DA_BYTE, tenTepAnh } from '../lib/anh.js';
+import { boDau } from '../lib/ghep.js';
 
 /* ══ Zone "Lễ tốt nghiệp" — /totnghiep ══════════════════════════════════════
    Ngô Phú Cường đưa 15 câu Ban tổ chức muốn thu để chuẩn bị Lễ tốt nghiệp
@@ -630,7 +631,18 @@ export async function getDanhSachTotNghiep(env, me) {
     };
   });
 
+  // Link thư mục Drive, hiện ngay trên màn Ban cán sự lớp. Thư mục do CHÍNH
+  // ứng dụng tạo (scope drive.file), nên nó nằm lẫn trong "Drive của tôi" của
+  // người phụ trách cùng vài trăm thứ khác — bắt họ đi lục tìm là thiết kế
+  // dở, và tìm nhầm thư mục rồi chia sẻ cho Ban tổ chức thì còn tệ hơn.
+  // Chỉ có mặt sau lượt gửi ảnh ĐẦU TIÊN, vì trước đó thư mục chưa tồn tại.
+  const thuMuc = await caiDatTn(env, 'drive_thu_muc_id');
+  const thuMucId = env.DRIVE_FOLDER_ID || thuMuc;
+
   return json({
+    drive_thu_muc_url: thuMucId ? `https://drive.google.com/drive/folders/${thuMucId}` : null,
+    so_co_anh: ds.filter(x => x.anh_url).length,
+    so_co_logo: ds.filter(x => x.logo_url).length,
     tong: ds.length,
     xong_ho_so: ds.filter(x => x.ho_so_luc).length,
     xong_gala: ds.filter(x => x.gala_luc).length,
@@ -805,24 +817,49 @@ export async function postAnhTotNghiep(request, env, me, ip) {
     return error('qua_nhieu_lan', 429);
   }
 
-  // Tên tệp mang HỌ TÊN và NHÓM: Ban tổ chức tải cả thư mục về rồi ghép chứng
-  // chỉ, nên một thư mục toàn `IMG_4821.jpg` là bắt họ mở từng tệp ra đoán.
+  // Tên tệp mang HỌ TÊN và NHÓM, dạng không dấu không dấu cách — lý lẽ đầy đủ
+  // ở tenTepAnh() trong lib/anh.js. Dùng LẠI boDau() của lib/ghep.js, không
+  // viết bản sao thứ ba (vietqr.js đã có một bản cho cú pháp chuyển khoản).
   const nhom = await env.DB.prepare(
     'SELECT g.no FROM members m LEFT JOIN groups g ON g.id = m.group_id WHERE m.id = ?'
   ).bind(me.id).first();
-  const sach = String(me.full_name || `member-${me.id}`).replace(/[\\/:*?"<>|]/g, '').trim();
-  const ten = `${loai.ma_ten}-${sach}${nhom?.no ? ` - N${nhom.no}` : ''}.${soi.duoi}`;
+  const ten = tenTepAnh(boDau, {
+    tienTo: loai.ma_ten,
+    hoTen: me.full_name || `member-${me.id}`,
+    nhomSo: nhom?.no,
+    duoi: soi.duoi,
+  });
+
+  // Gửi lại thì SỬA ĐÈ lên chính tệp cũ — Drive cho phép trùng tên, nên tạo
+  // mới sẽ để lại hai tệp giống hệt nhau và người làm chứng chỉ không biết
+  // cái nào mới. Mà gửi lại là chuyện chắc chắn xảy ra: chọn nhầm ảnh, cắt
+  // xấu, gửi bản đẹp hơn.
+  const cu = await docDangKy(env, me.id);
+  const idCu = cu?.[loai.cot_id] ?? null;
 
   let ketQua;
   try {
     ketQua = await taiLenDrive(env, {
-      ten, mime: soi.mime, bytes, thuMucId: await thuMucDich(env),
+      ten, mime: soi.mime, bytes, thuMucId: await thuMucDich(env), capNhatId: idCu,
     });
   } catch (err) {
-    // `hong_o_buoc` là đường DUY NHẤT đọc được sự thật khi log Worker câm —
-    // bài học đã trả giá ở đường gửi thư 24/8 và trả lần nữa ở trợ lý. Giao
-    // diện in thẳng tên bước vào câu báo lỗi.
-    return error('drive_hong', 502, { hong_o_buoc: err?.buoc ?? 'khong_ro', chi_tiet: String(err?.message ?? err) });
+    // Tệp cũ đã bị xoá TAY khỏi Drive thì lượt sửa đè nhận 404. Thử lại bằng
+    // đường tạo mới thay vì bắt học viên tự hiểu — họ không biết gì về việc ai
+    // đó đã dọn thư mục Drive.
+    if (idCu && err?.ma === 404) {
+      try {
+        ketQua = await taiLenDrive(env, {
+          ten, mime: soi.mime, bytes, thuMucId: await thuMucDich(env),
+        });
+      } catch (err2) {
+        return error('drive_hong', 502, { hong_o_buoc: err2?.buoc ?? 'khong_ro', chi_tiet: String(err2?.message ?? err2) });
+      }
+    } else {
+      // `hong_o_buoc` là đường DUY NHẤT đọc được sự thật khi log Worker câm —
+      // bài học đã trả giá ở đường gửi thư 24/8 và trả lần nữa ở trợ lý. Giao
+      // diện in thẳng tên bước vào câu báo lỗi.
+      return error('drive_hong', 502, { hong_o_buoc: err?.buoc ?? 'khong_ro', chi_tiet: String(err?.message ?? err) });
+    }
   }
 
   // ghiNhan đứng SAU lượt gọi: một lượt HỎNG không được ăn mất lượt của học

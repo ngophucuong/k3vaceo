@@ -159,20 +159,32 @@ export async function taoThuMuc(env, ten) {
       Thân phải nối ở mức BYTE — xem thanMultipart() trong lib/anh.js.
 
    KHÔNG gộp hai ảnh vào một request: gộp thì một ảnh hỏng kéo cả hai. */
-export async function taiLenDrive(env, { ten, mime, bytes, thuMucId }) {
+export async function taiLenDrive(env, { ten, mime, bytes, thuMucId, capNhatId }) {
   const token = await layAccessToken(env);
   const { thanMultipart } = await import('./anh.js');
 
   const ranh = `k3vaceo${crypto.randomUUID().replace(/-/g, '')}`;
-  const sieu = { name: ten, ...(thuMucId ? { parents: [thuMucId] } : {}) };
+  // GỬI LẠI thì SỬA ĐÈ lên chính tệp cũ, không tạo tệp mới. Drive CHO PHÉP
+  // hai tệp trùng tên trong một thư mục, nên gửi lần hai mà tạo mới sẽ để lại
+  // `chan-dung-ngo-phu-cuong-n6.jpg` nằm cạnh một bản y hệt — người làm chứng
+  // chỉ không biết cái nào mới. Mà gửi lại là chuyện CHẮC CHẮN xảy ra: chọn
+  // nhầm ảnh, cắt xấu, gửi bản đẹp hơn.
+  //
+  // PATCH thì `parents` KHÔNG được nằm trong thân (đổi thư mục phải qua tham
+  // số addParents/removeParents) — gửi kèm là Drive từ chối cả lượt.
+  const sua = !!capNhatId;
+  const sieu = sua ? { name: ten } : { name: ten, ...(thuMucId ? { parents: [thuMucId] } : {}) };
   const than = thanMultipart(sieu, mime, bytes, ranh);
+  const duong = sua
+    ? `/upload/drive/v3/files/${encodeURIComponent(capNhatId)}?uploadType=multipart&fields=id,name,webViewLink`
+    : '/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink';
 
   let tra;
   try {
     tra = await fetch(
-      urlApi(env, '/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink'),
+      urlApi(env, duong),
       {
-        method: 'POST',
+        method: sua ? 'PATCH' : 'POST',
         headers: {
           'content-type': `multipart/related; boundary=${ranh}`,
           authorization: `Bearer ${token}`,
@@ -191,8 +203,12 @@ export async function taiLenDrive(env, { ten, mime, bytes, thuMucId }) {
     // 404 ở ĐÂY gần như luôn là một chuyện: thư mục đích không do ứng dụng
     // tạo ra, nên với scope drive.file nó coi như không tồn tại. Câu lỗi thô
     // của Google đọc lên như thư mục bị xoá, nên nói rõ ra.
+    // 404 lúc SỬA ĐÈ có nghĩa khác hẳn 404 lúc tạo mới: tệp cũ đã bị xoá tay
+    // khỏi Drive. Chỗ gọi bắt câu này để thử lại bằng đường tạo mới.
     const goiY = tra.status === 404
-      ? ' — thư mục đích không do chính ứng dụng tạo ra; với scope drive.file thì nó coi như không tồn tại.'
+      ? (sua
+        ? ' — tệp cũ không còn trên Drive (nhiều khả năng đã bị xoá tay).'
+        : ' — thư mục đích không do chính ứng dụng tạo ra; với scope drive.file thì nó coi như không tồn tại.')
       : '';
     throw new LoiDrive('drive_tu_choi', `HTTP ${tra.status} ${text.slice(0, 300)}${goiY}`, tra.status);
   }

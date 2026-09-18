@@ -5207,7 +5207,25 @@ function veDanhSachTotNghiep() {
 
   const chuaChon = ds.chua_chon_linh_vuc ?? [];
 
+  /* Thư mục Drive chứa ảnh chứng chỉ — HIỆN THẲNG Ở ĐÂY, có lý do.
+     Thư mục do chính ứng dụng tạo nên nó nằm lẫn trong "Drive của tôi" của
+     người phụ trách cùng vài trăm thứ khác. Bắt họ đi lục tìm rồi tự đoán
+     xem thư mục nào mới đúng là thiết kế dở — và chia sẻ nhầm một thư mục
+     khác cho Ban tổ chức thì còn tệ hơn hẳn việc không chia sẻ gì.
+     Chỉ có mặt sau lượt gửi ảnh ĐẦU TIÊN: trước đó thư mục chưa tồn tại. */
+  const oDrive = ds.drive_thu_muc_url ? `
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Ảnh cho chứng chỉ</div>
+      <div class="mut" style="margin:2px 0 8px"><b class="num">${ds.so_co_anh}</b> ảnh chân dung ·
+        <b class="num">${ds.so_co_logo}</b> logo · trên ${ds.tong} người</div>
+      <a class="wide ghost" href="${esc(ds.drive_thu_muc_url)}" target="_blank" rel="noopener">Mở thư mục Drive ›</a>
+      <div class="foot" style="padding:8px 0 0">Đây là thư mục để chia sẻ cho Ban tổ chức.
+        Mở ra, bấm Chia sẻ, chọn "Bất kỳ ai có đường liên kết" rồi gửi họ link ấy.
+        Tên tệp đã mang sẵn họ tên và nhóm, không dấu.</div>
+    </div></div>` : '';
+
   openSheet(`<h3>Đăng ký Lễ tốt nghiệp — cả lớp</h3>
+    ${oDrive}
     <div class="fl cuon" style="margin-bottom:12px">
       ${chip('linhvuc', 'Theo lĩnh vực')}${chip('nguoi', 'Theo người')}
     </div>
