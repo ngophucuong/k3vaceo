@@ -38,18 +38,19 @@ jobs:
       - run: npm ci
 
       # ── BƯỚC TẠM (18/9) — xoá ngay sau khi đọc xong ──────────────────────
-      # Nghiệm thu migration 0041 trên D1 THẬT. Một câu duy nhất quyết định:
-      # collector_member_id của đợt thu phí Gala có trỏ đúng Vũ Thị Ngân
-      # không. Nó được tính bằng một truy vấn con lồng hai tầng
-      # (members.roster_id → roster.seq = 136); trượt là đợt thu có NGƯỜI THU
-      # RỖNG — ai cũng khai được mà KHÔNG AI XÁC NHẬN ĐƯỢC, vì postVerify đòi
-      # đúng người thu. Không chỗ nào báo lỗi, chỉ có tiền nằm mãi ở "đã tự
-      # khai". Đây là đợt thu cấp lớp đầu tiên của dự án nên không có tiền lệ
-      # để so.
+      # Ngô Phú Cường hỏi "có cách nào phát link mời thuận tiện nhất không".
+      # Câu trả lời phụ thuộc đúng một con số chưa ai đo: trong 77 người chưa
+      # nhận hồ sơ, bao nhiêu người CÓ SỐ ĐIỆN THOẠI ĐÚNG KHUÔN trong danh
+      # sách gốc. Nhóm ấy KHÔNG cần ai phát gì — họ tự vào được ở /dangnhap
+      # (gõ tên, gõ số), vì soHopLeTuHoSo() nhận roster.phone làm bí mật mở
+      # cửa cho hồ sơ chưa ai nhận. Chỉ nhóm KHÔNG có số mới thật sự cần anh
+      # bấm "Tạo link mời" từng người.
       #
-      # Hàm soi() chép NGUYÊN vào đây: mỗi `run:` là một shell riêng (lần 6),
-      # và dùng --json | jq chứ không --command | tail (lần 3 và lần 9).
-      - name: TẠM — nghiệm thu migration 0041 trên D1 thật
+      # Điều kiện "số đúng khuôn" phải TRÙNG KHÍT với isValidVnPhone /
+      # soHopLeTuHoSo, không thì con số này nói một đằng mà cửa /dangnhap làm
+      # một nẻo: 10 chữ số, bắt đầu bằng 0, KHÔNG lẫn ký tự nào khác (GLOB
+      # toàn chuỗi — bài học "lần: 7", số 03845375x8 lọt qua cách soi cũ).
+      - name: TẠM — ai tự vào được, ai cần phát link
         run: |
           soi() {
             echo "════ $1 ════"
@@ -61,32 +62,25 @@ jobs:
             echo
           }
 
-          soi "1. Đợt thu phí Gala — NGƯỜI THU có trỏ đúng ai không" \
-            "SELECT fr.id, fr.title, fr.amount, fr.status, fr.account_no,
-                    COALESCE(fr.collector_member_id, -1) AS nguoi_thu_id,
-                    COALESCE(m.full_name, '*** RỖNG — KHÔNG AI XÁC NHẬN ĐƯỢC ***') AS nguoi_thu,
-                    fr.syntax_template, fr.closes_on
-               FROM fund_rounds fr LEFT JOIN members m ON m.id = fr.collector_member_id
-              WHERE fr.scope = 'class' ORDER BY fr.id"
+          CHUA_NHAN="NOT EXISTS (SELECT 1 FROM members m WHERE m.roster_id = r.id AND m.claimed_at IS NOT NULL)"
+          SO_DUNG="(r.phone IS NOT NULL AND LENGTH(r.phone) = 10 AND r.phone GLOB '0*' AND r.phone NOT GLOB '*[^0-9]*')"
 
-          soi "2. Bảng dang_ky_tot_nghiep đã có chưa, và ai đã điền" \
-            "SELECT COUNT(*) AS so_don,
-                    SUM(CASE WHEN ho_so_luc IS NOT NULL THEN 1 ELSE 0 END) AS xong_ho_so,
-                    SUM(CASE WHEN gala_luc IS NOT NULL THEN 1 ELSE 0 END) AS xong_gala,
-                    SUM(CASE WHEN du_le = 'co' THEN 1 ELSE 0 END) AS du_le
-               FROM dang_ky_tot_nghiep"
+          soi "1. Chia 77 người chưa vào được làm hai nhóm" \
+            "SELECT COUNT(*) AS chua_vao_duoc,
+                    SUM(CASE WHEN $SO_DUNG THEN 1 ELSE 0 END) AS tu_vao_duoc_o_dangnhap,
+                    SUM(CASE WHEN $SO_DUNG THEN 0 ELSE 1 END) AS can_phat_link_tay
+               FROM roster r WHERE $CHUA_NHAN"
 
-          soi "3. Ba cột ban_nop_* trên groups, và nhóm nào đã nộp" \
-            "SELECT g.no AS nhom,
-                    COALESCE(g.ban_nop_url, '(chưa nộp)') AS link,
-                    COALESCE(g.ban_nop_luc, '') AS luc
-               FROM groups g ORDER BY g.no"
+          soi "2. Số người CẦN PHÁT LINK, chia theo nhóm" \
+            "SELECT r.group_label AS nhom, COUNT(*) AS can_phat_link
+               FROM roster r WHERE $CHUA_NHAN AND NOT $SO_DUNG
+              GROUP BY r.group_label ORDER BY can_phat_link DESC"
 
-          soi "4. Ai đã tự khai phí Gala" \
-            "SELECT COUNT(*) AS so_nguoi_khai,
-                    SUM(CASE WHEN fd.verified_at IS NOT NULL THEN 1 ELSE 0 END) AS nguoi_thu_da_nhan
-               FROM fund_declarations fd JOIN fund_rounds fr ON fr.id = fd.round_id
-              WHERE fr.scope = 'class' AND fr.amount = 1000000"
+          soi "3. Tên từng người CẦN PHÁT LINK" \
+            "SELECT r.group_label AS nhom, r.full_name AS ho_ten,
+                    COALESCE(r.phone, '(không có số)') AS so_trong_danh_sach
+               FROM roster r WHERE $CHUA_NHAN AND NOT $SO_DUNG
+              ORDER BY r.group_label, r.full_name COLLATE NOCASE"
       # ── HẾT BƯỚC TẠM ─────────────────────────────────────────────────────
 
       # Phần này KHÔNG hỏi về một người, mà hỏi về CẢ LỚP — thêm 5/9 khi Ngô Phú

@@ -41,3 +41,9 @@ collector_member_id của đợt thu phí Gala có trỏ đúng Vũ Thị Ngân 
 tính bằng truy vấn con lồng hai tầng; trượt là đợt thu có người thu RỖNG — ai
 cũng khai được mà KHÔNG AI XÁC NHẬN ĐƯỢC, và không chỗ nào báo lỗi. Đây là
 đợt thu cấp lớp đầu tiên của dự án nên không có tiền lệ để so.
+
+lần: 12 — Ngô Phú Cường hỏi "có cách nào phát link mời thuận tiện nhất
+không". Đo con số quyết định câu trả lời: trong 77 người chưa nhận hồ sơ,
+bao nhiêu người CÓ SỐ đúng khuôn trong danh sách gốc (tự vào được ở
+/dangnhap, không cần ai phát gì) và bao nhiêu người thật sự cần phát link
+tay. Kèm danh sách tên nhóm sau để chia việc.
