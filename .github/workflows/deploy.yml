@@ -145,6 +145,7 @@ jobs:
 
         run: |
           da=
+          thieu=
           # Duyệt hết rồi bỏ qua cái nào chưa đặt, thay vì dừng sớm khi thiếu
           # SMTP_HOST: bản cũ làm thế, nên ai chỉ đặt khoá VAPID mà chưa đặt
           # SMTP sẽ không bao giờ được đồng bộ khoá đẩy — thông báo im lặng
@@ -158,12 +159,22 @@ jobs:
                       VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
             # Bỏ qua cái không đặt: đẩy chuỗi rỗng lên là tạo ra một bí mật rỗng,
             # trông như "đã có" mà thực ra không dùng được.
-            [ -z "${!name}" ] && continue
+            if [ -z "${!name}" ]; then thieu="$thieu $name"; continue; fi
             printf '%s' "${!name}" | npx wrangler secret put "$name" >/dev/null
             da="$da $name"
           done
           [ -n "$da" ] && echo "✓ đã đồng bộ:$da" \
-            || echo "Không có bí mật nào trong GitHub — giữ nguyên bí mật đã đặt trên Cloudflare." 
+            || echo "Không có bí mật nào trong GitHub — giữ nguyên bí mật đã đặt trên Cloudflare."
+          # In CẢ danh sách CÒN THIẾU, không chỉ danh sách đã làm. Bản cũ chỉ in
+          # cái đã đồng bộ, nên khi một bí mật không sang được thì log trông vẫn
+          # bình thường — muốn biết thiếu gì phải tự nhớ danh sách mong đợi rồi
+          # trừ ra. Đã mất một lượt deploy vì đúng chuyện đó với ba khoá Google.
+          #
+          # Thiếu KHÔNG phải lỗi: phần lớn tên SMTP_* cố ý để trống vì đang đi
+          # đường Resend. Đây là thông tin để đối chiếu, không phải cảnh báo.
+          [ -n "$thieu" ] && echo "· chưa đặt trong GitHub Secrets (bỏ qua):$thieu" || true
+          echo "· Tên phải khớp TỪNG KÝ TỰ, và phải là Repository secret —"
+          echo "  secret đặt trong một Environment thì job này KHÔNG đọc được." 
 
       # Chứng chỉ SSL của custom domain mất vài phút mới cấp xong, nên thử lại
       # vài lượt chứ đừng kết luận vội. Và phân biệt cho rõ: trả về JSON là
