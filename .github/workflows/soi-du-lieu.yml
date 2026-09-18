@@ -37,6 +37,58 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # ── BƯỚC TẠM (18/9) — xoá ngay sau khi đọc xong ──────────────────────
+      # Nghiệm thu migration 0041 trên D1 THẬT. Một câu duy nhất quyết định:
+      # collector_member_id của đợt thu phí Gala có trỏ đúng Vũ Thị Ngân
+      # không. Nó được tính bằng một truy vấn con lồng hai tầng
+      # (members.roster_id → roster.seq = 136); trượt là đợt thu có NGƯỜI THU
+      # RỖNG — ai cũng khai được mà KHÔNG AI XÁC NHẬN ĐƯỢC, vì postVerify đòi
+      # đúng người thu. Không chỗ nào báo lỗi, chỉ có tiền nằm mãi ở "đã tự
+      # khai". Đây là đợt thu cấp lớp đầu tiên của dự án nên không có tiền lệ
+      # để so.
+      #
+      # Hàm soi() chép NGUYÊN vào đây: mỗi `run:` là một shell riêng (lần 6),
+      # và dùng --json | jq chứ không --command | tail (lần 3 và lần 9).
+      - name: TẠM — nghiệm thu migration 0041 trên D1 thật
+        run: |
+          soi() {
+            echo "════ $1 ════"
+            npx wrangler d1 execute k3vaceo --remote --yes --json \
+              --config worker/wrangler.toml --command "$2" 2>/dev/null \
+              | sed -n '/^\[/,$p' \
+              | jq -r '.[0].results[] | to_entries | map("\(.key)=\(.value)") | join("  ·  ")' \
+              || echo "  (không đọc được kết quả)"
+            echo
+          }
+
+          soi "1. Đợt thu phí Gala — NGƯỜI THU có trỏ đúng ai không" \
+            "SELECT fr.id, fr.title, fr.amount, fr.status, fr.account_no,
+                    COALESCE(fr.collector_member_id, -1) AS nguoi_thu_id,
+                    COALESCE(m.full_name, '*** RỖNG — KHÔNG AI XÁC NHẬN ĐƯỢC ***') AS nguoi_thu,
+                    fr.syntax_template, fr.closes_on
+               FROM fund_rounds fr LEFT JOIN members m ON m.id = fr.collector_member_id
+              WHERE fr.scope = 'class' ORDER BY fr.id"
+
+          soi "2. Bảng dang_ky_tot_nghiep đã có chưa, và ai đã điền" \
+            "SELECT COUNT(*) AS so_don,
+                    SUM(CASE WHEN ho_so_luc IS NOT NULL THEN 1 ELSE 0 END) AS xong_ho_so,
+                    SUM(CASE WHEN gala_luc IS NOT NULL THEN 1 ELSE 0 END) AS xong_gala,
+                    SUM(CASE WHEN du_le = 'co' THEN 1 ELSE 0 END) AS du_le
+               FROM dang_ky_tot_nghiep"
+
+          soi "3. Ba cột ban_nop_* trên groups, và nhóm nào đã nộp" \
+            "SELECT g.no AS nhom,
+                    COALESCE(g.ban_nop_url, '(chưa nộp)') AS link,
+                    COALESCE(g.ban_nop_luc, '') AS luc
+               FROM groups g ORDER BY g.no"
+
+          soi "4. Ai đã tự khai phí Gala" \
+            "SELECT COUNT(*) AS so_nguoi_khai,
+                    SUM(CASE WHEN fd.verified_at IS NOT NULL THEN 1 ELSE 0 END) AS nguoi_thu_da_nhan
+               FROM fund_declarations fd JOIN fund_rounds fr ON fr.id = fd.round_id
+              WHERE fr.scope = 'class' AND fr.amount = 1000000"
+      # ── HẾT BƯỚC TẠM ─────────────────────────────────────────────────────
+
       # Phần này KHÔNG hỏi về một người, mà hỏi về CẢ LỚP — thêm 5/9 khi Ngô Phú
       # Cường báo "nhiều học viên không nhận được email OTP". Soi từng địa chỉ
       # một thì không bao giờ trả lời được câu "nhiều" là bao nhiêu, và tệ hơn:

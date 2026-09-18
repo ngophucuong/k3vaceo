@@ -35,3 +35,9 @@ KHÔNG tạo members cho Vũ Thị Ngân, để phan-vai.yml làm — chưa bi�
 chưa); đã có đợt thu 1.000.000đ nào chưa; roster.dob định dạng ra sao (cột
 này chưa code nào từng đọc mà form sắp in ra cho học viên xác nhận); và
 nhóm nào đã có dòng plans để gắn ban_nop_url.
+
+lần: 11 — nghiệm thu migration 0041 (zone Lễ tốt nghiệp). Một câu quyết định:
+collector_member_id của đợt thu phí Gala có trỏ đúng Vũ Thị Ngân không. Nó
+tính bằng truy vấn con lồng hai tầng; trượt là đợt thu có người thu RỖNG — ai
+cũng khai được mà KHÔNG AI XÁC NHẬN ĐƯỢC, và không chỗ nào báo lỗi. Đây là
+đợt thu cấp lớp đầu tiên của dự án nên không có tiền lệ để so.
