@@ -86,6 +86,74 @@ async function docDangKy(env, memberId) {
   ).bind(memberId).first();
 }
 
+/* ══ PHẦN A KHÔNG CÒN LƯU DỞ ĐƯỢC — Ngô Phú Cường yêu cầu 18/9 ═══════════════
+   Nguyên văn: *"Khai đủ thông tin về doanh nghiệp và nhu cầu giao thương, 'ép'
+   khai đủ những thông tin doanh nghiệp mới được submit."*
+
+   Trước đó mọi ô đều để trống được, và hệ quả đo được chính là lý do có yêu
+   cầu này: soi D1 thật 18/9 cho `co_ho_so = 46` mà `da_chon_nganh = 0` — 46
+   người đã điền hồ sơ Giao thương, KHÔNG MỘT AI từng bấm một chip ngành nào.
+   Ô nào bỏ qua được thì phần lớn người ta bỏ qua, và Ban tổ chức nhận về một
+   bảng chứng chỉ thiếu chỗ này chỗ kia mà không ai biết thiếu ai.
+
+   BA ĐIỀU CỐ Ý, mỗi điều một lý do:
+
+   1. RÀNG BUỘC CHỈ ÁP CHO PHẦN A. Phần C (Lễ & Gala, hạn 21h00 NGÀY 19/9) và
+      phần B (đề tài, không bắt buộc) KHÔNG đụng tới. Đây là cả lý do zone này
+      tách ba nút Lưu ngay từ đầu: buộc xong hồ sơ mới cho đăng ký Gala là mất
+      đúng cái hạn gấp nhất, đúng cái bẫy migration 0041 sinh ra để tránh.
+   2. TRẢ VỀ TÊN Ô CÒN THIẾU, không phải một câu "thiếu thông tin". Người dùng
+      gõ trên điện thoại, form dài hơn một màn — không nói rõ thiếu ô nào thì
+      họ cuộn lên cuộn xuống rồi bỏ cuộc. `thieu_ten` đi thẳng ra câu báo lỗi
+      của cả hai form.
+   3. CHIP "NGÀNH KHÁC" MÀ KHÔNG GÕ CHỮ CŨNG LÀ THIẾU. Chọn "Ngành khác" rồi
+      để trống thì bản xuất CSV in đúng hai chữ "Ngành khác" — không hơn gì
+      việc không chọn gì, mà lại trông như đã khai xong. */
+const BAT_BUOC = [
+  ['ho_ten', 'Họ và tên'],
+  ['ngay_sinh', 'Ngày sinh'],
+  ['dien_thoai', 'Số điện thoại'],
+  ['doanh_nghiep', 'Doanh nghiệp'],
+  ['chuc_vu', 'Chức vụ'],
+  ['linh_vuc', 'Lĩnh vực hoạt động'],
+  ['nhu_cau_ket_noi', 'Nhu cầu kết nối'],
+];
+
+function thieuGi(dat) {
+  const thieu = BAT_BUOC.filter(([k]) => !dat[k]).map(([, ten]) => ten);
+  if (String(dat.linh_vuc ?? '').split(',').includes('khac') && !dat.linh_vuc_khac) {
+    thieu.push('Ngành khác — gõ rõ ngành của bạn');
+  }
+  return thieu;
+}
+
+/* Chép `linh_vuc` sang `member_profile.nganh` — CÙNG một sự thật, cùng bộ mã,
+   cùng hàm chuẩn hoá `nganhRaChuoi()`, chỉ khác chỗ ngồi.
+
+   Trước 18/9 putHoSo cố ý KHÔNG ghi ngược, vì bản trong `dang_ky_tot_nghiep`
+   là bản ĐÃ XÁC NHẬN cho chứng chỉ. Nay ràng buộc ở trên bắt cả lớp phải chọn
+   ngành, nên để hai bên rời nhau là tự tay dựng hai nguồn sự thật: `co_ho_so
+   = 46 · da_chon_nganh = 0` nghĩa là bộ lọc ngành ở tab Giao thương đang đứng
+   trên dữ liệu rỗng, và nó sẽ RỖNG MÃI trong khi bảng bên này đầy dần.
+
+   CHỈ ĐỤNG ĐÚNG MỘT CỘT. Không chép `nhu_cau_ket_noi` sang `needs`: ô ấy chỉ
+   80 ký tự còn đây 500, mà `needs` đang hiện trong thẻ gọn ở Danh bạ lẫn Giao
+   thương — cắt cụt là vỡ bố cục hai màn khác, và cắt cụt trong im lặng thì
+   người viết không bao giờ biết câu của mình bị mất đuôi.
+
+   N5 nguyên vẹn: đây là dữ liệu của CHÍNH người đang bấm Lưu, không ai ghi hộ
+   ai — route không nhận member_id trong thân. */
+async function chepNganhSangHoSo(env, memberId, linhVuc) {
+  if (!linhVuc) return;
+  await env.DB.prepare(
+    `INSERT INTO member_profile (member_id, nganh, updated_at, updated_by)
+     VALUES (?, ?, datetime('now'), ?)
+     ON CONFLICT(member_id) DO UPDATE SET
+       nganh = excluded.nganh, updated_at = excluded.updated_at,
+       updated_by = excluded.updated_by`
+  ).bind(memberId, linhVuc, memberId).run();
+}
+
 /* ── Màn hình chỉ gọi MỘT lượt ────────────────────────────────────────────
    Gộp sẵn mọi thứ: hồ sơ điền sẵn, danh mục ngành, đề tài + link của nhóm,
    danh sách thành viên, đợt thu phí kèm QR, và bản đăng ký đã lưu nếu có. */
@@ -196,6 +264,12 @@ export async function putHoSo(request, env, me) {
   };
   dat.linh_vuc_khac = docLinhVucKhac(dat.linh_vuc, body.linh_vuc_khac);
 
+  // "Ép khai đủ mới được submit" — xem BAT_BUOC ở đầu tệp. Kiểm Ở MÁY CHỦ chứ
+  // không chỉ ở giao diện (quy ước 6): giao diện chặn trước để khỏi tốn một
+  // lượt gọi cho lỗi hiển nhiên, nhưng nó không phải chốt chặn.
+  const thieu = thieuGi(dat);
+  if (thieu.length) return error('thieu_thong_tin', 422, { thieu_ten: thieu });
+
   await env.DB.prepare(
     `INSERT INTO dang_ky_tot_nghiep
        (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc,
@@ -212,6 +286,8 @@ export async function putHoSo(request, env, me) {
     me.id, dat.ho_ten, dat.ngay_sinh, dat.dien_thoai, dat.doanh_nghiep,
     dat.linh_vuc, dat.linh_vuc_khac, dat.chuc_vu, dat.nhu_cau_ket_noi
   ).run();
+
+  await chepNganhSangHoSo(env, me.id, dat.linh_vuc);
 
   // Chỉ ghi hoạt động LẦN ĐẦU. Sửa lại một chữ mà đẩy thêm một dòng vào feed
   // "Đang diễn ra" của cả nhóm thì feed thành sổ nháp của một người.
@@ -357,6 +433,22 @@ export async function getTotNghiepCongKhai(env) {
     ngay_le: NGAY_LE,
     nganh_list: NGANH,
     linh_vuc_khkd_list: LINH_VUC_KHKD,
+    // Một CỜ, không một mẩu nào của khoá — giống hệt khối `drive` của
+    // /api/health. Giao diện ẩn HẲN ô chọn ảnh khi tắt, không bày ra một nút
+    // bấm vào là 503.
+    drive_bat: !!driveCauHinh(env),
+    /* CỐ Ý KHÔNG trả danh sách ô bắt buộc ra đây, dù giao diện có dùng tới.
+       Phúc đáp này có một phép canh thô mà đắt giá: bộ kiểm GREP CHUỖI tên
+       các trường cấm (`dien_thoai`, `ngay_sinh`, `email`) trong nguyên văn
+       JSON, vì cả lý do đường công khai tồn tại là "form để TRỐNG, không điền
+       sẵn" — điền sẵn ngày sinh hay điện thoại ở đây là phát tán danh bạ cả
+       lớp cho bất kỳ ai mở link.
+
+       Gửi kèm một danh sách SCHEMA mang đúng những tên ấy làm phép canh đỏ
+       lên, và cách chữa sai là nới phép canh. Phép canh ấy đáng giá hơn hẳn
+       việc giao diện khỏi phải giữ một danh sách của riêng nó — nhất là khi
+       chỗ lệch, nếu có, nổ ra RẤT TO: máy chủ trả 422 kèm `thieu_ten` đúng
+       tên ô, chứ không im lặng. Xem TN_BAT_BUOC trong public/app.js. */
     phi: r ? {
       amount: r.amount,
       bank_name: r.bank_name || r.bank_bin,
@@ -367,29 +459,31 @@ export async function getTotNghiepCongKhai(env) {
   });
 }
 
-export async function postTotNghiepCongKhai(request, env, ip) {
-  if (!(await conQuota(env, 'totnghiep_ck', ip, CONG_KHAI_MOI_GIO))) {
-    return error('rate_limited', 429, { retry_after_minutes: 60 });
-  }
-  await ghiNhan(env, 'totnghiep_ck', ip);
+/* Từ một `roster_id` ra đúng một dòng `members`, tạo nếu chưa có.
+   Tách ra vì HAI đường công khai cùng cần (khai hồ sơ và gửi ảnh) — hai bản
+   sao của đoạn này thì sớm muộn một bên tạo hồ sơ khác nhóm bên kia, mà không
+   chỗ nào báo lỗi.
 
-  const body = await readJson(request);
-  const rosterId = Number(body.roster_id);
-  if (!Number.isInteger(rosterId) || rosterId <= 0) return error('roster_invalid', 422);
+   KHÔNG đổi khoá của bảng đăng ký: cách hiển nhiên là thêm cột `roster_id` rồi
+   cho `member_id` NULL, nhưng thế là bảng có HAI khoá và sinh ra một lỗi mất
+   dữ liệu có thật — người điền hôm nay, mai được phát link mời và đăng nhập,
+   thì lượt đọc theo `member_id` không thấy bản cũ nên họ điền lại, và bảng có
+   HAI dòng cho một người. Tự tạo dòng `members` (đúng khuôn postDanhBaMoi) thì
+   `claimed_at` vẫn TRỐNG: cửa /vao không đóng lại với họ, số điện thoại của họ
+   trong Danh bạ vẫn bị che, và khi họ đăng nhập thật thì vẫn là CÙNG MỘT dòng.
+
+   Nhóm lấy từ `roster.group_label` của CHÍNH NGƯỜI NHẬN — không có tham số
+   nhóm nào trong thân request để mà giả mạo. */
+async function nguoiTuRoster(env, rosterIdTho) {
+  const rosterId = Number(rosterIdTho);
+  if (!Number.isInteger(rosterId) || rosterId <= 0) return { loi: error('roster_invalid', 422) };
 
   const nguoi = await env.DB.prepare(
     `SELECT r.id, r.cohort_id, r.full_name, r.group_label
        FROM roster r WHERE r.id = ?`
   ).bind(rosterId).first();
-  if (!nguoi) return error('not_found', 404);
+  if (!nguoi) return { loi: error('not_found', 404) };
 
-  // Tự tạo dòng members nếu chưa có — đúng khuôn postDanhBaMoi (danh-ba.js).
-  // `claimed_at` để TRỐNG: cửa /vao không đóng lại với họ, số điện thoại của
-  // họ trong Danh bạ vẫn bị che, và khi họ đăng nhập thật thì vẫn là CÙNG
-  // MỘT dòng nên thấy ngay bản mình đã điền ở đây.
-  //
-  // Nhóm lấy từ `roster.group_label` của CHÍNH NGƯỜI NHẬN, không phải của ai
-  // khác — không có tham số nhóm nào trong thân request để mà giả mạo.
   let mem = await env.DB.prepare(
     'SELECT id FROM members WHERE roster_id = ? AND is_active = 1'
   ).bind(rosterId).first();
@@ -404,8 +498,28 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     mem = await env.DB.prepare(
       'SELECT id FROM members WHERE roster_id = ? AND is_active = 1'
     ).bind(rosterId).first();
-    if (!mem) return error('khong_tao_duoc_ho_so', 500);
+    if (!mem) return { loi: error('khong_tao_duoc_ho_so', 500) };
   }
+  return { nguoi, mem };
+}
+
+/* `nguon` là SỔ TAY của Ban cán sự lớp, không phải một cờ nội bộ: nới luật ghi
+   đè ngày 18/9 thì phải đổi lấy việc NHÌN THẤY ĐƯỢC ai đã đi đường nào. Giá
+   trị thứ ba `ca_hai` xuất hiện đúng khi một bản do chính chủ điền trong tài
+   khoản về sau được bổ sung qua đường công khai — thứ trước 18/9 không xảy ra
+   được vì bị chặn 409. Dùng chung cho cả hai đường công khai (chữ và ảnh). */
+const nguonSauCongKhai = cu => (!cu ? 'cong_khai'
+  : cu.nguon === 'cong_khai' ? 'cong_khai' : 'ca_hai');
+
+export async function postTotNghiepCongKhai(request, env, ip) {
+  if (!(await conQuota(env, 'totnghiep_ck', ip, CONG_KHAI_MOI_GIO))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+  await ghiNhan(env, 'totnghiep_ck', ip);
+
+  const body = await readJson(request);
+  const { nguoi, mem, loi } = await nguoiTuRoster(env, body.roster_id);
+  if (loi) return loi;
 
   // ══ KHAI BỔ SUNG, KHÔNG PHẢI GHI ĐÈ ═════════════════════════════════════
   // Bản đầu (migration 0042) chặn cứng: bản nào do người đã đăng nhập tự điền
@@ -488,19 +602,26 @@ export async function postTotNghiepCongKhai(request, env, ip) {
   // 0 ở mọi lượt, nên coi 0 là một câu trả lời thì lượt nào cũng đóng dấu.
   const coGala = !!(duLe || taiTro || taiTroMo || vanNgheMo || gianHang || vanNghe);
 
+  // "Ép khai đủ" (xem BAT_BUOC ở đầu tệp) — hỏi trên bản ĐÃ TRỘN, và CHỈ khi
+  // lượt này có động tới phần A.
+  //
+  // Hai vế đều cần thiết. Hỏi bản thô thì người đã khai đủ từ trước, nay quay
+  // lại bổ sung mỗi ngày sinh, bị chặn vì "thiếu Doanh nghiệp" — trong khi ô
+  // ấy đang có chữ hẳn hoi trong D1. Còn bỏ điều kiện `coHoSo` thì một lượt
+  // gửi CHỈ để đăng ký Gala cũng bị chặn, tức buộc xong hồ sơ mới cho đăng ký
+  // — mất đúng cái hạn 21h00 ngày 19/9 mà cả thiết kế ba phần sinh ra để giữ.
+  if (coHoSo) {
+    const thieu = thieuGi({ ...dat, ho_ten: dat.ho_ten });
+    if (thieu.length) return error('thieu_thong_tin', 422, { thieu_ten: thieu });
+  }
+
   // Giá trị du_le SAU KHI TRỘN, dùng cho CẢ lượt ghi lẫn khối phí bên dưới.
   // Nếu khối phí đọc bản THÔ thì một người đã khai "có dự" từ trước, nay chỉ
   // quay lại bổ sung ngày sinh, sẽ nhận lại màn "không có khoản phí nào" —
   // đúng lúc họ cần mã QR nhất.
   const duLeLuu = giuCu(duLe, 'du_le');
 
-  // `nguon` là SỔ TAY của Ban cán sự lớp, không phải một cờ nội bộ: nới luật
-  // ghi đè thì phải đổi lấy việc nhìn thấy được ai đã đi đường nào. Giá trị
-  // thứ ba `ca_hai` xuất hiện đúng khi một bản do chính chủ điền trong tài
-  // khoản về sau được bổ sung qua đường công khai — thứ trước 18/9 không xảy
-  // ra được vì bị chặn 409.
-  const nguonMoi = !cu ? 'cong_khai'
-    : cu.nguon === 'cong_khai' ? 'cong_khai' : 'ca_hai';
+  const nguonMoi = nguonSauCongKhai(cu);
 
   await env.DB.prepare(
     `INSERT INTO dang_ky_tot_nghiep
@@ -547,6 +668,10 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     coHoSo ? 1 : 0, cu?.ho_so_luc ?? null,
     coGala ? 1 : 0, cu?.gala_luc ?? null
   ).run();
+
+  // Cùng đường ghi ngược như putHoSo — người đi lối công khai cũng là chủ
+  // doanh nghiệp trong lớp, gian hàng Giao thương của họ cũng cần đúng ngành.
+  await chepNganhSangHoSo(env, mem.id, dat.linh_vuc);
 
   // Cú pháp chuyển khoản phải do MÁY CHỦ dựng: buildTransferNote() bỏ dấu rồi
   // viết hoa, chép logic ấy sang giao diện là có ngày hai bên ra hai chuỗi
@@ -783,7 +908,14 @@ async function thuMucDich(env) {
   return (await caiDatTn(env, 'drive_thu_muc_id')) ?? id;
 }
 
-export async function postAnhTotNghiep(request, env, me, ip) {
+/* Ruột chung của CẢ HAI đường gửi ảnh — có phiên và công khai.
+   Hai bản sao của đoạn này thì sớm muộn một bên quên một chốt chặn, mà chốt
+   dễ quên nhất lại là chốt magic bytes: bên quên nó nhận thẳng một tệp .exe
+   mang tên một học viên vào Drive của Ban tổ chức.
+
+   Chỗ KHÁC nhau giữa hai đường nằm hết ở tham số: ai gửi (memberId/hoTen),
+   thùng hạn mức nào, và có đóng dấu `nguon` không. */
+async function nhanAnh(request, env, ip, { maNguoi, khoaNguoi, tranNguoi, khoaIp, tranIp, layNguoi, danhDauNguon }) {
   const loai = LOAI_ANH[new URL(request.url).searchParams.get('loai') ?? ''];
   if (!loai) return error('loai_khong_hop_le', 422);
 
@@ -809,23 +941,33 @@ export async function postAnhTotNghiep(request, env, me, ip) {
   const soi = doanLoaiAnh(bytes);
   if (!soi.ok) return error('anh_sai_dinh_dang', 422, { la: soi.la, goi_y: soi.goi_y });
 
-  // Chốt 5 — hạn mức.
-  if (!(await conQuota(env, 'tn_anh_nguoi', `m${me.id}`, ANH_MOI_NGUOI_MOI_NGAY, '-1 day'))) {
-    return error('qua_nhieu_lan', 429, { toi_da: ANH_MOI_NGUOI_MOI_NGAY });
+  // Chốt 5 — hạn mức. Khoá theo NGƯỜI (member_id có phiên, roster_id không),
+  // không theo IP: cả lớp ngồi chung WiFi hội trường là chuyện thường xuyên ở
+  // đây (bài học 27/8), khoá theo IP thì người thứ hai trong phòng đã hết lượt.
+  if (!(await conQuota(env, khoaNguoi, maNguoi, tranNguoi, '-1 day'))) {
+    return error('qua_nhieu_lan', 429, { toi_da: tranNguoi });
   }
-  if (!(await conQuota(env, 'tn_anh_ip', ip, ANH_MOI_IP_MOI_GIO))) {
+  if (!(await conQuota(env, khoaIp, ip, tranIp))) {
     return error('qua_nhieu_lan', 429);
   }
+
+  /* Chốt 6 — tra ra dòng `members`, và CHỈ Ở ĐÂY.
+     Đây là lời GHI đầu tiên của cả hàm (đường công khai tự tạo hồ sơ nếu người
+     ấy chưa có), nên nó phải đứng SAU mọi phép kiểm rẻ hơn: đặt lên trước thì
+     ai gõ một URL cũng để lại một dòng `members` mà chưa cần gửi nổi một byte
+     ảnh hợp lệ nào. Cùng lý lẽ đã xếp năm chốt trên theo GIÁ. */
+  const { memberId, hoTen, loi } = await layNguoi();
+  if (loi) return loi;
 
   // Tên tệp mang HỌ TÊN và NHÓM, dạng không dấu không dấu cách — lý lẽ đầy đủ
   // ở tenTepAnh() trong lib/anh.js. Dùng LẠI boDau() của lib/ghep.js, không
   // viết bản sao thứ ba (vietqr.js đã có một bản cho cú pháp chuyển khoản).
   const nhom = await env.DB.prepare(
     'SELECT g.no FROM members m LEFT JOIN groups g ON g.id = m.group_id WHERE m.id = ?'
-  ).bind(me.id).first();
+  ).bind(memberId).first();
   const ten = tenTepAnh(boDau, {
     tienTo: loai.ma_ten,
-    hoTen: me.full_name || `member-${me.id}`,
+    hoTen: hoTen || `member-${memberId}`,
     nhomSo: nhom?.no,
     duoi: soi.duoi,
   });
@@ -834,7 +976,7 @@ export async function postAnhTotNghiep(request, env, me, ip) {
   // mới sẽ để lại hai tệp giống hệt nhau và người làm chứng chỉ không biết
   // cái nào mới. Mà gửi lại là chuyện chắc chắn xảy ra: chọn nhầm ảnh, cắt
   // xấu, gửi bản đẹp hơn.
-  const cu = await docDangKy(env, me.id);
+  const cu = await docDangKy(env, memberId);
   const idCu = cu?.[loai.cot_id] ?? null;
 
   let ketQua;
@@ -864,17 +1006,88 @@ export async function postAnhTotNghiep(request, env, me, ip) {
 
   // ghiNhan đứng SAU lượt gọi: một lượt HỎNG không được ăn mất lượt của học
   // viên. Cùng lý lẽ đã ghi cho trợ lý.
-  await ghiNhan(env, 'tn_anh_nguoi', `m${me.id}`);
-  await ghiNhan(env, 'tn_anh_ip', ip);
+  await ghiNhan(env, khoaNguoi, maNguoi);
+  await ghiNhan(env, khoaIp, ip);
+
+  // `nguon` chỉ đụng tới ở đường CÔNG KHAI, và chỉ theo một chiều: một bản
+  // `phien` được gửi ảnh qua link công khai thành `ca_hai`, không bao giờ
+  // ngược lại. Đường có phiên KHÔNG ghi cột này — gửi ảnh trong tài khoản
+  // không làm một bản đang là `cong_khai` biến thành `ca_hai`.
+  const datNguon = danhDauNguon ? nguonSauCongKhai(cu) : null;
 
   await env.DB.prepare(
-    `INSERT INTO dang_ky_tot_nghiep (member_id, ${loai.cot_url}, ${loai.cot_id}, updated_at)
-     VALUES (?, ?, ?, datetime('now'))
+    `INSERT INTO dang_ky_tot_nghiep (member_id, ${loai.cot_url}, ${loai.cot_id}, nguon, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'))
      ON CONFLICT(member_id) DO UPDATE SET
        ${loai.cot_url} = excluded.${loai.cot_url},
        ${loai.cot_id} = excluded.${loai.cot_id},
+       nguon = COALESCE(excluded.nguon, dang_ky_tot_nghiep.nguon),
        updated_at = excluded.updated_at`
-  ).bind(me.id, ketQua.url, ketQua.id).run();
+  ).bind(memberId, ketQua.url, ketQua.id, datNguon).run();
 
   return json({ ok: true, loai: loai.nhan, url: ketQua.url, ten: ketQua.ten });
+}
+
+export async function postAnhTotNghiep(request, env, me, ip) {
+  return nhanAnh(request, env, ip, {
+    maNguoi: `m${me.id}`,
+    khoaNguoi: 'tn_anh_nguoi', tranNguoi: ANH_MOI_NGUOI_MOI_NGAY,
+    khoaIp: 'tn_anh_ip', tranIp: ANH_MOI_IP_MOI_GIO,
+    layNguoi: async () => ({ memberId: me.id, hoTen: me.full_name }),
+  });
+}
+
+/* ══ GỬI ẢNH QUA ĐƯỜNG CÔNG KHAI — quyết định 18/9 ═══════════════════════════
+   Ngô Phú Cường: *"Làm nốt phần logo doanh nghiệp và ảnh chân dung."*
+   Phần có phiên xong từ sáng; thứ còn thiếu đúng là vế này, và tôi đã nêu nó
+   ra như một quyết định treo: **38 người không đăng nhập được thì không nộp
+   được ảnh**, mà ảnh là thứ in lên chứng chỉ.
+
+   Nhận tệp từ người KHÔNG CÓ PHIÊN là mức lộ cao nhất zone này từng mở, nên
+   ghi thẳng cái được và cái mất:
+
+   ĐƯỢC: 38 người ấy có ảnh trên chứng chỉ. Không có đường này thì họ phải chờ
+   ai đó phát link đăng nhập tay cho từng người, tức lại đúng cái rào mà
+   migration 0042 vừa gỡ.
+
+   MẤT: ai cầm link `/totnghiep` cũng đổ được tệp vào Drive của Ban tổ chức,
+   và đổi được ảnh của người khác. Bốn thứ giữ cho mức ấy chịu được:
+
+     1. CHỈ NHẬN ẢNH THẬT — magic bytes, không tin phần mở rộng, không tin
+        content-type (chốt 4, dùng chung `nhanAnh`). Tệp .exe đổi tên không
+        lọt, và 2MB là trần cứng.
+     2. HẠN MỨC CHẶT HƠN hẳn đường có phiên: 6 lượt/người/ngày (so với 20) và
+        thùng IP 200/giờ (so với 400). Con số IP vẫn TRÊN sĩ số lớp — dưới đó
+        thì cả lớp ngồi chung WiFi hội trường là khoá oan nhau, bài học 27/8.
+     3. SỬA ĐÈ ĐÚNG TỆP CŨ, không đẻ tệp mới. Một kẻ phá chỉ thay được ảnh,
+        không làm đầy được Drive bằng hàng trăm tệp rác.
+     4. NHÌN THẤY ĐƯỢC — cột `nguon` chuyển sang `ca_hai` khi ảnh của một bản
+        `phien` bị gửi đè qua link công khai, và cột ấy in ra CSV. Không chặn
+        được người phá, nhưng Ban cán sự lớp soi lại được.
+
+   VÌ SAO KHÔNG CHẶN HẲN việc gửi đè bản đã có: đó là ngõ cụt của chính người
+   dùng thật — gửi nhầm một tấm rồi không sửa lại được nữa. Đúng bài học "fail
+   closed không phải lúc nào cũng đúng" đã trả giá ngày 5/9 với xacNhanLaiSo().
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ANH_CK_MOI_NGUOI_MOI_NGAY = 6;
+const ANH_CK_MOI_IP_MOI_GIO = 200;
+
+export async function postAnhCongKhai(request, env, ip) {
+  const rosterId = Number(new URL(request.url).searchParams.get('roster_id'));
+  if (!Number.isInteger(rosterId) || rosterId <= 0) return error('roster_invalid', 422);
+
+  return nhanAnh(request, env, ip, {
+    // Khoá hạn mức theo ROSTER_ID, không theo member_id: đọc được ngay từ URL
+    // nên hạn mức chặn được TRƯỚC khi có bất kỳ lời ghi nào vào D1. Khoá theo
+    // member_id thì phải tạo hồ sơ ra rồi mới đếm được — tức đúng thứ hạn mức
+    // sinh ra để chặn lại là thứ nó bắt phải làm trước.
+    maNguoi: `r${rosterId}`,
+    khoaNguoi: 'tn_anh_ck_nguoi', tranNguoi: ANH_CK_MOI_NGUOI_MOI_NGAY,
+    khoaIp: 'tn_anh_ck_ip', tranIp: ANH_CK_MOI_IP_MOI_GIO,
+    layNguoi: async () => {
+      const { nguoi, mem, loi } = await nguoiTuRoster(env, rosterId);
+      return loi ? { loi } : { memberId: mem.id, hoTen: nguoi.full_name };
+    },
+    danhDauNguon: true,
+  });
 }

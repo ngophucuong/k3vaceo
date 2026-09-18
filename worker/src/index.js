@@ -32,7 +32,8 @@ import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getTotNghiep, putHoSo, putGala, putDeTai,
          getDanhSachTotNghiep, getXuatCsv,
-         getTotNghiepCongKhai, postTotNghiepCongKhai, postAnhTotNghiep
+         getTotNghiepCongKhai, postTotNghiepCongKhai, postAnhTotNghiep,
+         postAnhCongKhai
 } from './routes/tot-nghiep.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
@@ -164,20 +165,30 @@ export default {
         return postJoinRequest(request, env);
       }
 
-      // Lễ tốt nghiệp — HAI route công khai DUY NHẤT của zone ấy, và chúng cố
+      // Lễ tốt nghiệp — BA route công khai DUY NHẤT của zone ấy, và chúng cố
       // ý nằm ở nửa TRÊN này. Đo trên D1 thật 18/9: 38/146 người không có số
       // điện thoại trong danh sách gốc nên cửa /dangnhap đóng với họ; Ngô Phú
       // Cường chọn mở riêng form tốt nghiệp thay vì nới cửa đăng nhập (lý lẽ
       // và phương án bị loại ghi ở migrations/0042_totnghiep_cong_khai.sql).
       //
-      // Hai đường này CHỈ GHI được một bản đăng ký. Không cấp phiên, không trả
-      // dữ liệu cá nhân của ai — bốn route totnghiep CÒN LẠI vẫn nằm dưới
-      // getCurrentMember và vẫn phải trả 401 khi không có cookie.
+      // Ba đường này CHỈ GHI được bản đăng ký của chính người được chọn.
+      // Không cấp phiên, không trả dữ liệu cá nhân của ai — bốn route
+      // totnghiep CÒN LẠI vẫn nằm dưới getCurrentMember và vẫn phải trả 401
+      // khi không có cookie.
       if (pathname === '/api/totnghiep/cong-khai' && method === 'GET') {
         return getTotNghiepCongKhai(env);
       }
       if (pathname === '/api/totnghiep/cong-khai' && method === 'POST') {
         return postTotNghiepCongKhai(request, env, clientIp(request));
+      }
+      // Đường thứ ba, thêm 18/9: NHẬN TỆP từ người không có phiên — mức lộ cao
+      // nhất zone này từng mở, và cái được/cái mất ghi đầy đủ ở
+      // postAnhCongKhai() trong routes/tot-nghiep.js. Lý do nó phải ở đây chứ
+      // không nới cửa đăng nhập: 38 người ấy không có ảnh thì không có chứng
+      // chỉ, mà mục tiêu vẫn là ĐIỀN ĐƯỢC THÔNG TIN chứ không phải ĐĂNG NHẬP
+      // ĐƯỢC (phân định của migration 0042).
+      if (pathname === '/api/totnghiep/anh-cong-khai' && method === 'POST') {
+        return postAnhCongKhai(request, env, clientIp(request));
       }
 
       // ── Cần phiên đăng nhập hợp lệ ───────────────────────────────────────

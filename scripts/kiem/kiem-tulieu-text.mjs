@@ -37,11 +37,22 @@ console.log('── Máy chủ có thật sự chạy không ──');
 const health = await get('/api/health').then(r => r.json()).catch(() => ({}));
 ok(`/api/health trả roster_total = ${health.roster_total} (≥ 134)`, health.roster_total >= 134);
 
-// 11/9 — Tham quan kiến tập. Phải là buổi CHƯA QUA (server "hôm nay" —
-// date('now','+7 hours') — mới là mốc /api/home dùng để lọc "6 buổi sắp tới";
-// một buổi đã học rồi như 4/9 sẽ không có trong /api/home dù /api/lich vẫn
-// thấy đủ, nên phép đối chứng 2 sẽ đỏ oan nếu chọn nhầm buổi đã qua).
-const BUOI_ID = 5;
+/* Buổi để gắn ghi chú PHẢI là buổi CHƯA QUA: /api/home chỉ trả 6 buổi SẮP
+   TỚI (mốc là "hôm nay" của MÁY CHỦ, date('now','+7 hours')), nên đối chứng 2
+   sẽ đỏ oan nếu chọn nhầm một buổi đã học rồi — /api/lich vẫn thấy nó, còn
+   /api/home thì không.
+
+   Bản đầu GHI CỨNG `BUOI_ID = 5` (buổi kiến tập 11/9) kèm đúng lời cảnh báo
+   trên — rồi tự vấp vào nó: sang 12/9 buổi ấy thành quá khứ và hai phép đối
+   chứng 2 đỏ mỗi ngày kể từ đó, ở một chỗ chẳng liên quan gì tới thứ chúng
+   đang canh. Một id ghi cứng là một cái hẹn giờ.
+
+   Nay HỎI MÁY CHỦ: lấy buổi đầu tiên trong /api/home, tức luôn là buổi sắp
+   tới gần nhất tính theo đúng cái đồng hồ mà route ấy dùng để lọc. */
+const buoiSapToi = (await get('/api/home', CK).then(r => r.json()).catch(() => ({}))).lich_hoc ?? [];
+ok(`còn ít nhất một buổi sắp tới để gắn ghi chú (thấy ${buoiSapToi.length})`, buoiSapToi.length >= 1);
+const BUOI_ID = buoiSapToi[0]?.id;
+const BUOI_NGAY = buoiSapToi[0]?.ngay ?? '?';
 
 console.log('── Tạo TEXT: không cần url, nhưng bắt buộc content_md ──');
 const rThieu = await post('/api/links', { kind: 'TEXT', title: 'KIEMTULIEU_thieu', tag: 'buoi', scope: 'class' });
@@ -59,7 +70,7 @@ const id1 = bTao.id;
 
 console.log('── ĐỐI CHỨNG 1: con số công khai đếm cả ghi chú Text ──');
 const truoc = (await get('/api/lich/cong-khai').then(r => r.json())).buoi.find(b => b.id === BUOI_ID);
-ok('buổi 11/9 đã tính ghi chú Text vừa tạo (≥ 1)', truoc && truoc.so_tu_lieu >= 1);
+ok(`buổi ${BUOI_NGAY} đã tính ghi chú Text vừa tạo (≥ 1)`, truoc && truoc.so_tu_lieu >= 1);
 await del(`/api/links/${id1}`);
 const sau = (await get('/api/lich/cong-khai').then(r => r.json())).buoi.find(b => b.id === BUOI_ID);
 ok(`xoá ghi chú thì con số giảm đúng 1 (${truoc.so_tu_lieu} → ${sau.so_tu_lieu})`,
@@ -72,7 +83,7 @@ const rTao2 = await post('/api/links', {
 const id2 = (await rTao2.json()).id;
 const home = await get('/api/home', CK).then(r => r.json());
 const rTrongHome = home.lich_hoc.find(b => b.id === BUOI_ID)?.tu_lieu.find(r => r.id === id2);
-ok('buổi 11/9 hiện đúng ghi chú vừa tạo trong /api/home', !!rTrongHome);
+ok(`buổi ${BUOI_NGAY} hiện đúng ghi chú vừa tạo trong /api/home`, !!rTrongHome);
 ok('content_md có mặt trong /api/home (không chỉ url/title/kind)', rTrongHome?.content_md === NOI_DUNG);
 
 const lich = await get('/api/lich', CK).then(r => r.json());

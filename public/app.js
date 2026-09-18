@@ -206,8 +206,25 @@ const ERR_TEXT = {
   phien_qua_dai: 'Phiên này dài quá rồi. Mở phiên mới để trợ lý tập trung vào việc còn lại.',
   phien_khong_gan_phan: 'Phiên này không gắn vào phần bài nào nên chưa chép bản thảo được.',
   noi_dung_required: 'Chưa gõ gì để gửi.',
+
+  // Lễ tốt nghiệp (routes/tot-nghiep.js)
+  thieu_thong_tin: 'Còn thiếu thông tin bắt buộc.',
+  roster_invalid: 'Chưa chọn được bạn là ai trong danh sách lớp.',
+  anh_qua_lon: 'Ảnh nặng quá 2MB. Chụp lại nhỏ hơn hoặc gửi ảnh đã thu nhỏ.',
+  anh_rong: 'Tệp rỗng — chọn lại giúp.',
+  anh_sai_dinh_dang: 'Tệp này không phải ảnh JPG hay PNG.',
+  drive_chua_cau_hinh: 'Máy chủ chưa được cấu hình để nhận ảnh.',
+  drive_hong: 'Chưa gửi được ảnh lên Drive.',
+  qua_nhieu_lan: 'Gửi hơi nhiều lần rồi — thử lại sau một lát.',
 };
-const errText = e => ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
+/* `thieu_ten` là danh sách ô còn trống do MÁY CHỦ liệt kê. In thẳng tên ô ra,
+   vì form dài hơn một màn điện thoại: "Còn thiếu thông tin bắt buộc" suông thì
+   người ta cuộn lên cuộn xuống đoán xem thiếu ô nào rồi bỏ cuộc. */
+const errText = e => {
+  const cau = ERR_TEXT[e?.data?.error] || 'Không xong — thử lại.';
+  const thieu = e?.data?.thieu_ten;
+  return Array.isArray(thieu) && thieu.length ? `${cau} Còn trống: ${thieu.join(' · ')}.` : cau;
+};
 
 /* Riêng lỗi trợ lý thì KÈM TÊN BƯỚC HỎNG vào câu báo. Sandbox không gọi được
    ra internet và `wrangler tail` đã từng im lặng cả ngày (CLAUDE.md), nên khi
@@ -4408,18 +4425,40 @@ function renderApp() {
    hạn gấp nhất là 21h00 ngày 19/9 (đăng ký Gala). Gộp một form 15 câu thì
    người muốn đăng ký Gala tối nay bị chặn vì chưa có ảnh chân dung. */
 let TN = null;
-// Khối nào đang mở, giữ NGOÀI hàm vẽ.
-//
-// Lưu xong một phần là gọi lại renderTotNghiep() (vẽ từ máy chủ, không vá tại
-// chỗ). Bản đầu quyết mở/gập thuần theo "đã xong chưa", và nó sai ngay ở ca
-// quan trọng nhất: bấm "Có, tôi dự" rồi Lưu → khối Gala thành "đã xong" → tự
-// gập → MÃ QR VÀ NÚT CHUYỂN KHOẢN BIẾN MẤT, đúng giây người ta cần chúng
-// nhất. Bộ kiểm giao diện bắt được, phép kiểm chuỗi thì không.
-//
-// Cùng bài học với bộ lọc Sổ thu và thẻ Danh bạ: trạng thái người dùng đang ở
-// phải sống LÂU HƠN một lượt vẽ lại. `null` nghĩa là chưa ai chạm tới — lúc
-// ấy mới dùng luật mặc định "chưa xong thì mở".
-let TN_MO = null;
+/* MỖI LÚC CHỈ MỘT KHỐI MỞ — Ngô Phú Cường yêu cầu 18/9 ("3 phần này nên gập
+   vào và chỉ hiển thị một phần, 2 phần còn lại thu gọn cho gọn gàng"). Vì vậy
+   biến này giữ TÊN khối đang mở (`'gala' | 'hoso' | 'detai' | null`), không
+   phải ba cờ độc lập — ba cờ thì "mở cái này đóng hai cái kia" phải viết bằng
+   ba phép gán và sớm muộn sót một nhánh.
+
+   Nó phải sống NGOÀI hàm vẽ, cùng bài học với bộ lọc Sổ thu (`SOTHU`) và thẻ
+   Danh bạ (`DANHBA_THE`): lưu xong một phần là gọi lại renderTotNghiep() (vẽ
+   từ máy chủ, không vá tại chỗ), nên trạng thái người dùng đang ở phải sống
+   lâu hơn một lượt vẽ.
+
+   Bản đầu quyết mở/gập thuần theo "đã xong chưa", và nó sai ngay ở ca quan
+   trọng nhất: bấm "Có, tôi dự" rồi Lưu → khối Gala thành "đã xong" → tự gập →
+   MÃ QR VÀ NÚT CHUYỂN KHOẢN BIẾN MẤT, đúng giây người ta cần chúng nhất. Bộ
+   kiểm giao diện bắt được, phép kiểm chuỗi thì không.
+
+   `null` nghĩa là chưa ai chạm tới — lúc ấy mới dùng luật mặc định ở
+   tnKhoiMoDau(). Cố ý dùng `undefined` ở đây thay vì `null` vì null LÀ một giá
+   trị hợp lệ (đã chạm, và đang gập hết). */
+let TN_MO;
+
+/* Khối nào mở sẵn ở lượt xem đầu tiên. Thứ tự xếp theo MỨC GẤP, không theo thứ
+   tự trên màn hình:
+     1. còn phải chuyển phí  → Gala, vì mã QR phải nhìn thấy ngay (yêu cầu 18/9)
+     2. chưa trả lời Gala    → Gala, hạn 21h00 NGÀY 19/9 là hạn gấp nhất
+     3. chưa xong hồ sơ      → Hồ sơ, hạn 26/9
+     4. chưa khai đề tài     → Đề tài, không bắt buộc
+     5. xong hết             → gập hết, màn hình sạch, ba dấu ✓ nói đủ chuyện */
+function tnKhoiMoDau(d, conPhaiTra) {
+  if (conPhaiTra || !d.gala_luc) return 'gala';
+  if (!d.ho_so_luc) return 'hoso';
+  if (!d.khkd_luc) return 'detai';
+  return null;
+}
 
 async function renderTotNghiep() {
   document.body.classList.add('noapp');
@@ -4526,7 +4565,10 @@ async function tnckForm() {
   TNCK.cauHinh = cf;
 
   tnckShell(esc(p.full_name),
-    `${esc(p.group_label)} · điền xong bấm Gửi một lần là xong — lối này không quay lại sửa được.`, `
+    `${esc(p.group_label)} · điền xong bấm Gửi. Cần bổ sung hay sửa gì thì mở lại
+     trang này, tìm tên mình và gửi thêm lần nữa — ô để trống vẫn giữ nguyên
+     nội dung cũ.`, `
+    ${tnNhanBatBuoc()}
     <label class="f">Họ và tên <i>in trên chứng chỉ</i></label>
     <input id="ckTen" maxlength="120" value="${esc(p.full_name)}">
     <label class="f">Ngày sinh</label>
@@ -4547,6 +4589,20 @@ async function tnckForm() {
     <label class="f">Nhu cầu kết nối — càng cụ thể càng dễ ghép</label>
     <textarea id="ckKN" maxlength="500" rows="3"
       placeholder="Ví dụ: muốn kết nối tới ban quản lý khu công nghiệp phía Bắc."></textarea>
+    <div class="hintline">Nói rõ NGÀNH và VÙNG thì mới ghép được với ai — viết
+      chung chung ("mở rộng thị trường") thì khớp với tất cả mọi người, tức là
+      không khớp với ai.</div>
+
+    ${cf.drive_bat ? `
+    <label class="f">Ảnh chân dung và logo doanh nghiệp</label>
+    <div class="tnanh">
+      ${oAnh('anh', 'Ảnh chân dung', null)}
+      ${oAnh('logo', 'Logo doanh nghiệp', null)}
+    </div>
+    <div class="foot" style="padding:2px 0 10px">Ảnh gửi lên là lưu ngay, không
+      phải chờ bấm Gửi ở cuối trang. Nhận JPG và PNG; ảnh gốc của iPhone là định
+      dạng HEIC — mở ảnh lên, bấm Chia sẻ rồi chọn <b>Sao chép ảnh</b> là ra JPG.</div>
+    ` : ''}
 
     <label class="f">Lĩnh vực làm Kế hoạch kinh doanh (không bắt buộc)</label>
     <div class="fl cuon" id="ckLv">${(cf.linh_vuc_khkd_list ?? []).map(x =>
@@ -4594,6 +4650,11 @@ async function tnckForm() {
   motLua('#ckDuLe', 'dule');
   motLua('#ckTaiTro', 'tt');
   motLua('#ckLv', 'lv');
+  /* Ô chọn ảnh dùng CHUNG hàm với form có phiên, chỉ khác đường gọi — đường
+     công khai phải mang theo `roster_id` vì không có phiên để suy ra là ai.
+     KHÔNG truyền `sauKhiGui`: vẽ lại màn này là xoá trắng mọi ô người ta đang
+     gõ dở, mà ảnh xem trước đã đủ nói rằng tệp đã đi. */
+  tnGanChonAnh(loai => `/api/totnghiep/anh-cong-khai?loai=${loai}&roster_id=${p.roster_id}`, null);
   document.querySelectorAll('#ckNg [data-ma]').forEach(b => {
     b.onclick = () => {
       if (!b.classList.contains('on') && document.querySelectorAll('#ckNg .fc.on').length >= 3) {
@@ -4606,33 +4667,54 @@ async function tnckForm() {
 
   $('#ckGui').onclick = async () => {
     const nut = $('#ckGui');
+    const than = {
+      roster_id: p.roster_id,
+      ho_ten: $('#ckTen').value,
+      ngay_sinh: $('#ckDob').value,
+      dien_thoai: $('#ckSdt').value,
+      doanh_nghiep: $('#ckDN').value,
+      chuc_vu: $('#ckCV').value,
+      linh_vuc: [...document.querySelectorAll('#ckNg .fc.on')].map(x => x.dataset.ma),
+      linh_vuc_khac: $('#ckNgKhac').value,
+      nhu_cau_ket_noi: $('#ckKN').value,
+      khkd_linh_vuc: document.querySelector('#ckLv .fc.on')?.dataset.lv ?? null,
+      khkd_de_tai: $('#ckDeTai').value,
+      khkd_url: $('#ckKhkdUrl').value.trim() || null,
+      du_le: document.querySelector('#ckDuLe .fc.on')?.dataset.dule ?? null,
+      tai_tro: document.querySelector('#ckTaiTro .fc.on')?.dataset.tt ?? null,
+      tai_tro_mo_ta: $('#ckTTMo').value,
+      gian_hang: $('#ckGH').checked ? 1 : 0,
+      van_nghe: $('#ckVN').checked ? 1 : 0,
+      van_nghe_mo_ta: $('#ckVNMo').value,
+    };
+    /* CỐ Ý KHÔNG chặn trước ở form này, khác hẳn form có phiên — và đây là
+       chỗ hai yêu cầu của cùng một ngày suýt cắn nhau.
+
+       Form này CỐ Ý không biết gì về người đang điền (không điền sẵn ngày sinh
+       hay điện thoại của ai — xem getTotNghiepCongKhai). Nên nó cũng không
+       biết những ô ấy ĐÃ CÓ trong D1 hay chưa. Chặn trước ở đây là bắt người
+       quay lại KHAI BỔ SUNG gõ lại cả ngày sinh lẫn điện thoại chỉ để thêm
+       một dòng — tức bóp chết đúng cái luồng vừa nới ra ngày 18/9.
+
+       Máy chủ thì biết: nó hỏi trên bản ĐÃ TRỘN (xem postTotNghiepCongKhai),
+       nên một lượt bổ sung để trống ô đã có chữ vẫn đi lọt. Để máy chủ quyết,
+       và in nguyên `thieu_ten` nó trả về.
+
+       Không mất gì cho người dùng: nhánh catch bên dưới CHỈ hiện dòng lỗi,
+       không vẽ lại màn — mọi ô vừa gõ còn nguyên. Câu nhắc phải điền đủ đã
+       nằm sẵn ở đầu form (tnNhanBatBuoc). */
     nut.disabled = true; nut.textContent = 'Đang gửi…';
     $('#ckErr').style.display = 'none';
     try {
-      const kq = await apiPost('/api/totnghiep/cong-khai', {
-        roster_id: p.roster_id,
-        ho_ten: $('#ckTen').value,
-        ngay_sinh: $('#ckDob').value,
-        dien_thoai: $('#ckSdt').value,
-        doanh_nghiep: $('#ckDN').value,
-        chuc_vu: $('#ckCV').value,
-        linh_vuc: [...document.querySelectorAll('#ckNg .fc.on')].map(x => x.dataset.ma),
-        linh_vuc_khac: $('#ckNgKhac').value,
-        nhu_cau_ket_noi: $('#ckKN').value,
-        khkd_linh_vuc: document.querySelector('#ckLv .fc.on')?.dataset.lv ?? null,
-        khkd_de_tai: $('#ckDeTai').value,
-        khkd_url: $('#ckKhkdUrl').value.trim() || null,
-        du_le: document.querySelector('#ckDuLe .fc.on')?.dataset.dule ?? null,
-        tai_tro: document.querySelector('#ckTaiTro .fc.on')?.dataset.tt ?? null,
-        tai_tro_mo_ta: $('#ckTTMo').value,
-        gian_hang: $('#ckGH').checked ? 1 : 0,
-        van_nghe: $('#ckVN').checked ? 1 : 0,
-        van_nghe_mo_ta: $('#ckVNMo').value,
-      });
+      const kq = await apiPost('/api/totnghiep/cong-khai', than);
       tnckXong(kq);
     } catch (e) {
       $('#ckErr').textContent = errText(e);
       $('#ckErr').style.display = 'block';
+      // Cuộn tới dòng lỗi: form này dài hơn một màn điện thoại, mà nút Gửi ở
+      // tận đáy — dòng lỗi hiện ở đâu đó phía trên thì người ta chỉ thấy nút
+      // sáng trở lại và tưởng bấm hụt.
+      $('#ckErr').scrollIntoView({ block: 'center', behavior: 'smooth' });
       nut.disabled = false; nut.textContent = 'Gửi cho Ban tổ chức';
     }
   };
@@ -4692,6 +4774,48 @@ function tnMocXong(luc) {
   return luc ? '<span class="xongchip">✓ xong</span>' : '<span class="tg">chưa điền</span>';
 }
 
+/* ══ "ÉP" KHAI ĐỦ PHẦN HỒ SƠ ═══════════════════════════════════════════════
+   Ngô Phú Cường yêu cầu 18/9. Lý lẽ đầy đủ ở BAT_BUOC trong
+   worker/src/routes/tot-nghiep.js — ĐỌC Ở ĐÓ, đừng đọc ở đây.
+
+   Danh sách này là BẢN SAO của BAT_BUOC, và đó là một lệch có chủ ý. Cách gọn
+   hơn — máy chủ đưa danh sách xuống trong phúc đáp — vướng đúng một chỗ:
+   `/api/totnghiep/cong-khai` có một phép canh thô mà đắt giá, GREP CHUỖI tên
+   các trường cấm (`dien_thoai`, `ngay_sinh`, `email`) trong nguyên văn JSON,
+   vì cả lý do đường ấy tồn tại là "form để TRỐNG, không điền sẵn". Gửi kèm một
+   danh sách schema mang đúng những tên ấy làm phép canh đỏ lên, mà nới phép
+   canh thì mất một chốt bảo vệ danh bạ cả lớp để đổi lấy một tiện nghi.
+
+   Bản sao này CHỊU ĐƯỢC vì chỗ lệch, nếu có, nổ ra RẤT TO chứ không im lặng:
+   máy chủ trả 422 kèm `thieu_ten` đúng tên ô còn trống, và errText() in thẳng
+   ra. Hai hàm dưới đây chỉ để khỏi tốn một lượt gọi cho một lỗi hiển nhiên —
+   CHÚNG KHÔNG PHẢI CHỐT CHẶN (quy ước 6). */
+const TN_BAT_BUOC = [
+  ['ho_ten', 'Họ và tên'],
+  ['ngay_sinh', 'Ngày sinh'],
+  ['dien_thoai', 'Số điện thoại'],
+  ['doanh_nghiep', 'Doanh nghiệp'],
+  ['chuc_vu', 'Chức vụ'],
+  ['linh_vuc', 'Lĩnh vực hoạt động'],
+  ['nhu_cau_ket_noi', 'Nhu cầu kết nối'],
+];
+
+function tnConThieu(gt) {
+  const lv = Array.isArray(gt.linh_vuc) ? gt.linh_vuc.join(',') : String(gt.linh_vuc ?? '');
+  const thieu = TN_BAT_BUOC
+    .filter(([k]) => !String(k === 'linh_vuc' ? lv : (gt[k] ?? '')).trim())
+    .map(([, ten]) => ten);
+  if (lv.split(',').includes('khac') && !String(gt.linh_vuc_khac ?? '').trim()) {
+    thieu.push('Ngành khác — gõ rõ ngành của bạn');
+  }
+  return thieu;
+}
+
+const tnNhanBatBuoc = () => `<div class="hintline">Phần hồ sơ phải điền đủ mới
+  lưu được: <b>${esc(TN_BAT_BUOC.map(x => x[1]).join(' · '))}</b>. Ban tổ chức cần
+  đủ từng ấy ô để làm chứng chỉ, và ô "Lĩnh vực" cũng là thứ dựng nên gian hàng
+  của bạn ở tab Giao thương.</div>`;
+
 function veTotNghiep() {
   const d = TN.dang_ky ?? {};
   const g = TN.goi_y ?? {};
@@ -4705,17 +4829,26 @@ function veTotNghiep() {
     .split(',').map(x => x.trim()).filter(Boolean));
   const r = TN.dot_phi;
 
-  // Mặc định chỉ áp dụng cho lượt mở ĐẦU TIÊN: hai phần còn việc thì mở sẵn,
-  // Đề tài (việc chung của nhóm, phần lớn là đọc) thì gập. Sau đó đi theo
-  // đúng thứ người dùng đang để.
-  if (!TN_MO) TN_MO = { gala: !d.gala_luc, hoso: !d.ho_so_luc, detai: false };
-  const mo = k => (TN_MO[k] ? 'open' : '');
+  /* CÒN PHẢI CHUYỂN PHÍ THÌ MỞ SẴN KHỐI GALA — Ngô Phú Cường yêu cầu 18/9:
+     "nếu chưa [chuyển khoản] thì sẽ tự động expand hình ảnh QR code".
+
+     Đây là một lỗ thật chứ không phải tinh chỉnh. Lưu phần Gala xong là
+     `gala_luc` có giá trị, nên LẦN MỞ TRANG SAU khối ấy gập lại và mã QR nằm
+     khuất sau một cú chạm — đúng với người đã nói "có, tôi dự" mà chưa kịp
+     chuyển tiền, tức đúng người cần thấy mã nhất. "Đã trả lời xong" và "đã
+     xong việc" là hai chuyện khác nhau, mà bản đầu chỉ hỏi câu thứ nhất. */
+  const conPhaiTra = !!(r && d.du_le === 'co' && !r.i_declared && !r.i_am_verified);
+
+  // Mặc định chỉ áp dụng cho lượt xem ĐẦU TIÊN. Sau đó đi theo đúng thứ người
+  // dùng đang mở — họ gập hết thì lượt vẽ sau vẫn gập hết.
+  if (TN_MO === undefined) TN_MO = tnKhoiMoDau(d, conPhaiTra);
+  const mo = k => (TN_MO === k ? 'open' : '');
 
   $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
     <div class="lb">k3vaceo · Khoá K03</div>
     <h1>Lễ tốt nghiệp 26/9</h1>
-    <p class="sub">Ba phần, lưu riêng từng phần — làm được phần nào lưu phần ấy,
-      không phải xong hết mới bấm được.</p>
+    <p class="sub">Ba phần, lưu riêng từng phần — chạm vào tên phần để mở, làm
+      được phần nào lưu phần ấy, không phải xong hết mới bấm được.</p>
 
     <div class="tnprog">
       <span>Hồ sơ ${tnMocXong(d.ho_so_luc)}</span>
@@ -4725,7 +4858,13 @@ function veTotNghiep() {
 
     <details class="tnsec" data-sec="gala" ${mo('gala')}>
       <summary><b>Lễ tốt nghiệp &amp; Gala</b>
-        <i>Hạn đăng ký 21h00 ngày 19/9</i>${tnMocXong(d.gala_luc)}</summary>
+        <i>${conPhaiTra
+          // Ba khối nay chỉ mở một, nên khi người dùng mở khối khác thì khối
+          // này gập lại và trạng thái tiền biến mất khỏi màn hình. Dòng này là
+          // thứ duy nhất còn nhìn thấy được lúc ấy — nói đúng việc còn lại,
+          // không dùng chip màu (✓ xanh chỉ có MỘT nghĩa: người thu đã nhận).
+          ? `Còn phải chuyển ${vnMoney(r.amount)} đ`
+          : 'Hạn đăng ký 21h00 ngày 19/9'}</i>${tnMocXong(d.gala_luc)}</summary>
       <div class="tnbody">
         <label class="f">Bạn có dự Lễ Tốt nghiệp &amp; Gala 17h00–22h00 không?</label>
         <div class="fl" id="tnDuLe">
@@ -4767,6 +4906,7 @@ function veTotNghiep() {
       <div class="tnbody">
         <p class="mut" style="margin:0 0 16px">Phần lớn đã điền sẵn từ dữ liệu Ban tổ
           chức — bạn chỉ cần soi lại rồi bấm Lưu.</p>
+        ${tnNhanBatBuoc()}
 
         <label class="f">Họ và tên <i>in trên chứng chỉ</i></label>
         <input id="tnTen" maxlength="120" value="${esc(v('ho_ten'))}">
@@ -4797,6 +4937,9 @@ function veTotNghiep() {
         <label class="f">Nhu cầu kết nối — càng cụ thể càng dễ ghép</label>
         <textarea id="tnKN" maxlength="500" rows="3"
           placeholder="Ví dụ: muốn kết nối tới ban quản lý khu công nghiệp phía Bắc, và nhà phân phối ngành thực phẩm ở miền Trung.">${esc(v('nhu_cau_ket_noi'))}</textarea>
+        <div class="hintline">Viết một câu là đủ, nhưng viết chung chung ("mở rộng
+          thị trường") thì không ghép được với ai — nói rõ NGÀNH và VÙNG thì Ban tổ
+          chức và cả lớp mới nối được bạn với đúng người.</div>
 
         ${TN.drive_bat ? `
         <label class="f">Ảnh chân dung và logo doanh nghiệp</label>
@@ -4946,7 +5089,25 @@ async function thuNhoAnh(file) {
   }
 }
 
-async function tnGuiAnh(loai, file) {
+/* Gắn ô chọn ảnh, dùng CHUNG cho cả hai form — có phiên và công khai.
+   `duong(loai)` dựng đường gọi (đường công khai còn phải mang roster_id),
+   `sauKhiGui` chỉ có ở form có phiên: nó đọc lại /api/totnghiep rồi vẽ lại cả
+   màn. Form CÔNG KHAI tuyệt đối KHÔNG vẽ lại — vẽ lại là xoá trắng mọi ô người
+   ta đang gõ dở, và ảnh xem trước đã đủ nói rằng tệp đã đi. */
+function tnGanChonAnh(duong, sauKhiGui) {
+  document.querySelectorAll('[data-anhfile]').forEach(o => {
+    o.onchange = () => {
+      const f = o.files && o.files[0];
+      // Xoá value NGAY: không xoá thì chọn lại đúng tệp vừa chọn sẽ không bắn
+      // sự kiện change, và người vừa gửi hỏng bấm lại thấy không có gì xảy ra.
+      const loai = o.dataset.anhfile;
+      o.value = '';
+      if (f) tnGuiAnh(loai, f, duong(loai), sauKhiGui);
+    };
+  });
+}
+
+async function tnGuiAnh(loai, file, duong, sauKhiGui) {
   const oLoi = $('#loi-' + loai);
   const oXem = $('#xem-' + loai);
   oLoi.style.display = 'none';
@@ -4965,7 +5126,7 @@ async function tnGuiAnh(loai, file) {
 
   try {
     const than = await thuNhoAnh(file);
-    const tra = await fetch(`/api/totnghiep/anh?loai=${loai}`, {
+    const tra = await fetch(duong, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'content-type': than.type || 'application/octet-stream' },
@@ -4977,10 +5138,9 @@ async function tnGuiAnh(loai, file) {
       // hong_o_buoc nói hỏng ở đâu khi log Worker câm — in cả hai ra, vì
       // "Không xong, thử lại" thì học viên không nói lại được gì cho tôi.
       const cau = kq.goi_y || (kq.hong_o_buoc ? `Chưa gửi được (hỏng ở bước: ${kq.hong_o_buoc}).` : null);
-      throw new Error(cau || errText({ error: kq.error }) || 'Chưa gửi được ảnh.');
+      throw new Error(cau || errText({ data: kq }) || 'Chưa gửi được ảnh.');
     }
-    TN = await api('/api/totnghiep');
-    veTotNghiep();
+    if (sauKhiGui) await sauKhiGui();
     toast('Đã gửi ' + (loai === 'anh' ? 'ảnh chân dung' : 'logo'));
   } catch (e) {
     // Gửi hỏng thì BỎ ảnh xem trước đi. Để lại một tấm ảnh nằm đó bên cạnh
@@ -5023,34 +5183,48 @@ function tnVePhi(r) {
         mã QR và số tài khoản sẽ hiện lại.</div>
     </div>`;
   }
+  // Hỏi thẳng bằng CON SỐ, không hỏi trống không: "Bạn đã chuyển khoản chưa?"
+  // trên một màn có nhiều khoản thì người ta phải tự đoán là khoản nào, bao
+  // nhiêu. Và mã QR nằm NGAY DƯỚI câu hỏi — nó chính là câu trả lời cho người
+  // chưa chuyển.
   return `<div class="tnphi">
     <div class="eb">Phí ${vnMoney(r.amount)} đ · ${esc(r.collector_name || 'người thu')}</div>
+    <label class="f">Bạn đã chuyển khoản ${vnMoney(r.amount)} đ chưa?</label>
     <div class="qrw">
       <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
       <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
       <button class="copy" data-tncopy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
     </div>
-    <button class="wide" data-tndeclare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Tôi đã chuyển khoản</button>
+    <button class="wide" data-tndeclare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Rồi, tôi đã chuyển ${vnMoney(r.amount)} đ</button>
     <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>
   </div>`;
 }
 
 function tnGanSuKien() {
-  document.querySelectorAll('[data-anhfile]').forEach(o => {
-    o.onchange = () => {
-      const f = o.files && o.files[0];
-      // Xoá value NGAY: không xoá thì chọn lại đúng tệp vừa chọn sẽ không bắn
-      // sự kiện change, và người vừa gửi hỏng bấm lại thấy không có gì xảy ra.
-      const loai = o.dataset.anhfile;
-      o.value = '';
-      if (f) tnGuiAnh(loai, f);
-    };
+  tnGanChonAnh(loai => `/api/totnghiep/anh?loai=${loai}`, async () => {
+    TN = await api('/api/totnghiep');
+    veTotNghiep();
   });
-  // Người dùng gập/mở tay thì nhớ lại, để lượt vẽ sau (sau khi Lưu) giữ đúng
-  // thứ họ đang mở. `toggle` là sự kiện riêng của <details>, không phải click
-  // — bắt click thì hụt cả bàn phím lẫn cú chạm vào mũi tên.
+  /* MỘT KHỐI MỞ, HAI KHỐI GẬP. `toggle` là sự kiện riêng của <details>, không
+     phải click — bắt click thì hụt cả bàn phím lẫn cú chạm vào mũi tên.
+
+     CỐ Ý KHÔNG dùng thuộc tính `name` của <details>` (accordion sẵn có của
+     trình duyệt): nó mới có từ Safari 17.2 và Chrome 120, mà lớp này 146 người
+     với đủ loại máy — ai máy cũ sẽ thấy cả ba khối mở cùng lúc, đúng thứ vừa
+     được yêu cầu bỏ đi, và không có gì báo cho họ biết.
+
+     Gán `x.open = false` bắn tiếp một sự kiện `toggle` trên chính x, nhưng
+     nhánh else-if bên dưới không chạm tới vì TN_MO vừa được gán tên của el —
+     nên không có vòng lặp. */
   document.querySelectorAll('.tnsec[data-sec]').forEach(el => {
-    el.addEventListener('toggle', () => { TN_MO[el.dataset.sec] = el.open; });
+    el.addEventListener('toggle', () => {
+      if (el.open) {
+        TN_MO = el.dataset.sec;
+        document.querySelectorAll('.tnsec[data-sec]').forEach(x => { if (x !== el) x.open = false; });
+      } else if (TN_MO === el.dataset.sec) {
+        TN_MO = null;   // gập hết là một trạng thái hợp lệ, không phải "chưa chạm"
+      }
+    });
   });
 
   // Ba nhóm nút "chọn một": bấm là bật cái mình, tắt các cái còn lại. Giữ
@@ -5085,16 +5259,27 @@ function tnGanSuKien() {
     van_nghe_mo_ta: $('#tnVNMo').value,
   }, 'Đã lưu phần Lễ & Gala');
 
-  $('#tnLuuHoSo').onclick = () => tnLuu('#tnLuuHoSo', '#tnHoSoErr', '/api/totnghiep/ho-so', {
-    ho_ten: $('#tnTen').value,
-    ngay_sinh: $('#tnDob').value,
-    dien_thoai: $('#tnSdt').value,
-    doanh_nghiep: $('#tnDN').value,
-    chuc_vu: $('#tnCV').value,
-    linh_vuc: [...document.querySelectorAll('#tnNg .fc.on')].map(x => x.dataset.ma),
-    linh_vuc_khac: $('#tnNgKhac').value,
-    nhu_cau_ket_noi: $('#tnKN').value,
-  }, 'Đã lưu hồ sơ');
+  $('#tnLuuHoSo').onclick = () => {
+    const than = {
+      ho_ten: $('#tnTen').value,
+      ngay_sinh: $('#tnDob').value,
+      dien_thoai: $('#tnSdt').value,
+      doanh_nghiep: $('#tnDN').value,
+      chuc_vu: $('#tnCV').value,
+      linh_vuc: [...document.querySelectorAll('#tnNg .fc.on')].map(x => x.dataset.ma),
+      linh_vuc_khac: $('#tnNgKhac').value,
+      nhu_cau_ket_noi: $('#tnKN').value,
+    };
+    // Chặn TRƯỚC khi gọi, để không ai mất đoạn vừa gõ vì một lượt gọi hỏng —
+    // giá trị vẫn nằm nguyên trong các ô. Máy chủ vẫn kiểm lại (quy ước 6).
+    const thieu = tnConThieu(than);
+    if (thieu.length) {
+      $('#tnHoSoErr').textContent = `Còn trống: ${thieu.join(' · ')}.`;
+      $('#tnHoSoErr').style.display = 'block';
+      return;
+    }
+    return tnLuu('#tnLuuHoSo', '#tnHoSoErr', '/api/totnghiep/ho-so', than, 'Đã lưu hồ sơ');
+  };
 
   // Đề tài: chọn MỘT lĩnh vực (khác chip ngành ở phần A cho tối đa 3). Chạm
   // lại để bỏ chọn — người đổi ý phải gỡ được, không thì họ kẹt với một lựa

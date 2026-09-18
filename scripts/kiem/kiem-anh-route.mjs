@@ -101,6 +101,75 @@ if (rThat.status === 503) {
      !/GOCSPX|1\/\/0|refresh_token=/.test(JSON.stringify(bThat)));
 }
 
+/* ══ ĐƯỜNG CÔNG KHAI: /api/totnghiep/anh-cong-khai (18/9) ═══════════════════
+   Ngô Phú Cường: "Làm nốt phần logo doanh nghiệp và ảnh chân dung." Vế còn
+   thiếu là 38 người không đăng nhập được — họ không nộp được ảnh, mà ảnh là
+   thứ in lên chứng chỉ.
+
+   Đây là đường DUY NHẤT của cả ứng dụng nhận TỆP từ người không có phiên, nên
+   phép kiểm ở đây không chỉ hỏi "có chạy không" mà hỏi "hỏng thì hỏng về phía
+   nào". Lý lẽ đầy đủ ở postAnhCongKhai() trong routes/tot-nghiep.js. */
+console.log('\n── Đường công khai nhận ảnh: mở đúng mức, không hơn ──');
+const guiCk = (bytes, qs) =>
+  fetch(`${B}/api/totnghiep/anh-cong-khai?${qs}`, {
+    method: 'POST', headers: { 'content-type': 'image/jpeg', ...IP }, body: bytes,
+  });
+
+/* Chiều NGƯỢC với chốt 1 ở trên: đường này PHẢI mở được khi không có cookie.
+   Đẩy nhầm nó xuống nửa dưới index.js thì 38 người ấy lại không nộp được ảnh,
+   và triệu chứng là một câu 401 chẳng ai hiểu vì sao.
+
+   Chứng minh bằng lượt gọi THIẾU roster_id, cố ý: nó dừng ở phép kiểm đầu
+   tiên nên không đụng vào D1. Dùng một roster_id có thật để thử "không phải
+   401" thì chính phép kiểm ấy tạo ra một dòng members và để lại cho lượt chạy
+   sau — đúng bài học "bộ kiểm nào đổi trạng thái thì reset phải dọn". */
+const rThieuRid = await guiCk(JPEG, 'loai=anh');
+ok(`không cookie mà KHÔNG phải 401 — nằm đúng nửa trên (nhận ${rThieuRid.status})`,
+   rThieuRid.status !== 401);
+ok(`thiếu roster_id → 422 (nhận ${rThieuRid.status})`, rThieuRid.status === 422);
+const rRidLa = await guiCk(JPEG, 'loai=anh&roster_id=999999');
+ok(`roster_id bịa → 404 (nhận ${rRidLa.status})`, rRidLa.status === 404);
+
+/* PHÉP CÓ RĂNG NHẤT của cả đường này, và nó canh THỨ TỰ chứ không canh kết
+   quả: lời GHI đầu tiên (tự tạo dòng `members` cho người chưa có hồ sơ) phải
+   đứng SAU mọi phép kiểm rẻ hơn. Đặt lên trước thì ai gõ một URL cũng để lại
+   một dòng `members` trong D1 mà chưa cần gửi nổi một byte ảnh hợp lệ nào —
+   không lỗi, không cảnh báo, chỉ có một bảng phình dần. */
+const demNguoi = async () => (await fetch(B + '/api/totnghiep/danh-sach',
+  { headers: { cookie: ckCuong } }).then(r => r.json()).catch(() => ({ nguoi: [] }))).nguoi.length;
+
+const chuaCo = await fetch(B + '/api/wizard/roster/search?q=' + encodeURIComponent('Đinh Khánh Toàn'),
+  { headers: IP }).then(r => r.json()).catch(() => ({ people: [] }));
+const rid = (chuaCo.people ?? [])[0]?.roster_id;
+ok(`tìm được một người chưa có hồ sơ để thử (roster_id ${rid ?? 'KHÔNG THẤY'})`, !!rid);
+
+if (rid) {
+  const truoc = await demNguoi();
+  const rExeCk = await guiCk(exe, `loai=anh&roster_id=${rid}`);
+  ok(`tệp .exe qua đường công khai → 422 (nhận ${rExeCk.status})`, rExeCk.status === 422);
+  const sau = await demNguoi();
+  ok(`lượt bị chặn KHÔNG đẻ ra dòng members nào (${truoc} → ${sau})`, truoc === sau);
+
+  // Ảnh HỢP LỆ thì đi hết các chốt và chết ở lượt gọi Drive (cổng đóng 2527).
+  const rThatCk = await guiCk(JPEG, `loai=anh&roster_id=${rid}`);
+  const bThatCk = await rThatCk.json().catch(() => ({}));
+  if (rThatCk.status === 503) {
+    ok('CHƯA cấu hình khoá Drive → 503, không phải 500', bThatCk.error === 'drive_chua_cau_hinh');
+  } else {
+    ok(`ảnh hợp lệ → 502 ở bước gọi Drive (nhận ${rThatCk.status})`, rThatCk.status === 502);
+    ok(`hỏng đúng ở bước lấy token (nhận "${bThatCk.hong_o_buoc}")`,
+       bThatCk.hong_o_buoc === 'lay_token' || bThatCk.hong_o_buoc === 'qua_lau');
+    ok('KHÔNG lộ một mẩu nào của khoá trong phúc đáp',
+       !/GOCSPX|1\/\/0|refresh_token=/.test(JSON.stringify(bThatCk)));
+  }
+}
+
+/* KHÔNG kiểm được ở đây, nói thẳng: cột `nguon` chỉ đổi sang `ca_hai` sau một
+   lượt tải lên THÀNH CÔNG, mà sandbox không ra được internet nên không lượt
+   nào thành công. Đó là dấu duy nhất cho Ban cán sự lớp thấy ảnh của một bản
+   `phien` bị gửi đè qua link công khai — phải soi bằng bản xuất CSV trên tên
+   miền thật sau lượt gửi ảnh đầu tiên. */
+
 /* Cấu hình bản THẬT phải để trống GOOGLE_BASE_URL. Đặt nhầm nó vào
    wrangler.toml là mọi lượt tải lên trên tên miền đi về một cổng loopback
    không tồn tại — và triệu chứng là "ảnh nào gửi cũng hỏng" mà không ai nghĩ

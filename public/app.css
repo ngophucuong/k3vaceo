@@ -164,6 +164,15 @@ main{padding-top:18px}
    được. Cho xuống dòng thay vì cuộn — bốn con số phải nhìn thấy cùng lúc thì
    người thu mới biết còn bao nhiêu người chưa khai. */
 .fl.cuon{flex-wrap:wrap;overflow:visible;margin:0;padding-left:0;padding-right:0;row-gap:7px}
+/* Và chip trong hàng XUỐNG DÒNG được phép tự xuống dòng BÊN TRONG nó.
+   .fc có white-space:nowrap, đúng cho hàng CUỘN NGANG — ở đó chip dài thì kéo
+   tới được. Hàng .cuon thì không cuộn, nên nowrap chỉ đẩy chữ ra ngoài mép
+   màn hình: nhãn lĩnh vực KHKD dài nhất ("Nông nghiệp - Lâm nghiệp - Thuỷ sản
+   (trồng trọt & chăn nuôi)") đo được 416px ở khổ 390px, tức TRÀN NGANG cả
+   trang và kéo theo mọi thứ khác lệch đi 42px.
+   Không phép kiểm chuỗi nào thấy, và ngay cả phép đo tràn ngang cũng không
+   thấy nếu nó đo lúc khối chứa hàng chip đang GẬP — đúng chỗ đã sót. */
+.fl.cuon .fc{white-space:normal;max-width:100%;text-align:left;line-height:1.35}
 
 /* ─── Biểu đồ tiến độ thu ───
    Cột chồng ba trạng thái. Ba điều KHÔNG phải trang trí:

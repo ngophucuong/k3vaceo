@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Ba mươi sáu phép đối chứng đáng giữ nhất
+## Bốn mươi phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -515,6 +515,43 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    Cùng tinh thần ấy cho `kiem-anh-route.mjs`: nó khai `content-type:
    image/jpeg` cho một tệp chạy Windows (`MZ`) và đòi 422 — đổi tên tệp và
    sửa header là chuyện một dòng, chỉ magic bytes chặn được.
+
+37. **Một BACKTICK trong chú thích SQL giết cả lượt reset, và nó giết trong
+   im lặng.** `reset-totnghiep.sh` bọc khối SQL bằng một chuỗi NHÁY KÉP, mà
+   trong nháy kép backtick là THAY THẾ LỆNH. Hai dòng chú thích viết theo nếp
+   Markdown của repo — trong đó có đúng dòng đang mô tả cái bẫy nháy kép —
+   khiến shell thật sự chạy `Unknown arguments: …` và `node -e`, rồi nhét kết
+   quả rỗng vào giữa câu SQL. Lần ấy SQL sống sót vì hai dòng đó là chú thích
+   `--`; cùng dòng chữ ấy nằm trong một câu INSERT thì nó sửa thầm dữ liệu
+   seed và bộ kiểm đỏ ở một chỗ chẳng liên quan.
+
+   `kiem-deploy-yml.mjs` nay quét cả `reset-*.sh`/`gieo-*.sh`. Cùng họ với luật
+   "không một nháy đơn nào trong khối `node -e`", chỉ khác ký tự.
+
+38. **Bộ kiểm nào ĐỔI một bảng thì reset phải trả CHÍNH bảng ấy về gốc —
+   kể cả bảng của tính năng khác.** Từ 18/9 `putHoSo` ghi ngược `linh_vuc`
+   sang `member_profile.nganh`. Reset không dọn cột ấy, nên lượt chạy sau mở
+   form ra đã thấy chip "Ngành khác" BẬT SẴN (do lượt trước để lại
+   `nganh = khac,van-tai`) và hai phép kiểm ô chữ đỏ lên — ở một chỗ không
+   liên quan gì tới thứ chúng đang canh.
+
+   Câu hỏi phải tự hỏi mỗi khi thêm một lời GHI: bảng vừa động tới có nằm
+   trong phần dọn của reset chưa? Cùng bài học `reset-doi-nhom.sh`, lần này
+   cho một bảng thuộc tính năng khác hẳn.
+
+39. **Một id GHI CỨNG là một cái hẹn giờ.** `kiem-tulieu-text.mjs` ghi cứng
+   `BUOI_ID = 5` (buổi 11/9) kèm nguyên một đoạn chú thích cảnh báo rằng buổi
+   ấy phải CHƯA QUA, vì `/api/home` chỉ trả 6 buổi SẮP TỚI. Sang 12/9 buổi ấy
+   thành quá khứ và hai phép đối chứng đỏ mỗi ngày kể từ đó. Nay hỏi máy chủ:
+   lấy buổi đầu tiên trong `/api/home`, tức luôn đúng theo chính cái đồng hồ
+   mà route ấy dùng để lọc.
+
+40. **Đo TRÀN NGANG phải đo đúng lúc khối đang MỞ.** Nhãn lĩnh vực KHKD dài
+   nhất rộng 416px ở khổ 390px — tràn cả trang — nhưng phép đo cũ chạy lúc
+   khối chứa hàng chip đang GẬP nên báo 0px suốt. Chỉ khi thêm một phép đo
+   trên chính trang form công khai (nơi hàng chip ấy luôn hiện) mới lộ ra 42px.
+   `.fc` có `white-space:nowrap` — đúng cho hàng CUỘN NGANG, sai cho hàng
+   `.cuon` (xuống dòng), vì ở đó không có gì để kéo tới.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

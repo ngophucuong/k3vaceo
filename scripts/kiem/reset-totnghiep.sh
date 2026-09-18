@@ -51,6 +51,17 @@ npx wrangler d1 execute k3vaceo --local --command "
 -- reset-thongbao.sh từng vấp (xem README mục 19).
 DELETE FROM dang_ky_tot_nghiep;
 DELETE FROM fund_declarations;
+-- Từ 18/9 putHoSo GHI NGƯỢC linh_vuc sang member_profile.nganh, để ngành khai
+-- ở form tốt nghiệp tới được bộ lọc ngành của tab Giao thương. Nghĩa là bộ
+-- kiểm này nay ĐỔI member_profile — nên reset phải trả chính cột ấy về gốc.
+--
+-- Bỏ bước này là một lỗi IM LẶNG và đã trả giá ngay: lượt chạy trước để lại
+-- nganh = khac,van-tai, nên lượt sau mở form ra đã thấy chip Ngành khác BẬT
+-- SẴN và ô chữ hiện sẵn — hai phép kiểm ô chữ đỏ lên ở một chỗ chẳng liên
+-- quan gì tới thứ chúng đang canh. Đúng bài học của reset-doi-nhom.sh.
+UPDATE member_profile SET nganh = NULL
+ WHERE member_id IN (SELECT id FROM members WHERE full_name IN
+   ('Ngô Phú Cường', 'Kiểm TN Thường', 'Kiểm TN Nhóm Bảy', 'Đinh Khánh Toàn'));
 DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy');
 -- Đường CÔNG KHAI (migration 0042) TỰ TẠO dòng members cho người chưa có hồ
 -- sơ. Không dọn thì lượt chạy sau mở đầu với người ấy ĐÃ có members — phép
@@ -62,9 +73,9 @@ DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm 
 -- thích: cả khối nằm trong một chuỗi shell bọc bằng nháy kép, nên một dấu
 -- nháy kép thứ hai là đóng chuỗi ngay tại đó. Đã trả giá: wrangler nhận
 -- nguyên phần còn lại làm THAM SỐ DÒNG LỆNH và chết bằng
--- `Unknown arguments: tự, tạo, hồ, sơ …`, còn reset thì lặng lẽ không chạy
+-- 'Unknown arguments: tự, tạo, hồ, sơ …', còn reset thì lặng lẽ không chạy
 -- SQL nào — triệu chứng là bộ kiểm báo 401 cho một phiên vừa mới dựng. Cùng
--- họ với bẫy nháy đơn trong khối `node -e` của deploy.yml (CLAUDE.md).
+-- họ với bẫy nháy đơn trong khối 'node -e' của deploy.yml (CLAUDE.md).
 DELETE FROM members
  WHERE claimed_at IS NULL
    AND roster_id IN (SELECT id FROM roster WHERE full_name = 'Đinh Khánh Toàn');
@@ -93,16 +104,22 @@ SELECT c.id, (SELECT id FROM groups WHERE no = 7 AND cohort_id = c.id),
        'Kiểm TN Nhóm Bảy', '0900000071', 'Chủ tịch', 'Công ty Bảy', 1, datetime('now')
   FROM cohorts c WHERE c.code = 'K03';
 
-DELETE FROM sessions WHERE member_id IN
-  (SELECT id FROM members WHERE full_name IN
-     ('Ngô Phú Cường', 'Kiểm TN Thường', 'Kiểm TN Nhóm Bảy'));
-INSERT INTO sessions (member_id, token_hash, expires_at)
+-- Dọn phiên theo TOKEN_HASH, không theo member_id.
+-- token_hash mới là khoá UNIQUE, nên nó là thứ duy nhất chắc chắn dọn hết.
+-- Dọn theo member_id thì hụt hai ca có thật: phiên MỒ CÔI (dòng members đã bị
+-- xoá ở trên mà phiên còn lại), và lượt reset trước chạy DỞ DANG. Cả hai đều
+-- lộ ra bằng đúng một câu SQLITE_CONSTRAINT: UNIQUE constraint failed:
+-- sessions.token_hash — đọc lên như lỗi mã sản phẩm chứ không như rác của
+-- lượt chạy trước. Đã trả giá 18/9.
+DELETE FROM sessions WHERE token_hash IN ('$H_CUONG', '$H_THUONG', '$H_N7');
+DELETE FROM sessions WHERE member_id NOT IN (SELECT id FROM members);
+INSERT OR REPLACE INTO sessions (member_id, token_hash, expires_at)
   SELECT id, '$H_CUONG', datetime('now', '+1 day') FROM members
    WHERE full_name = 'Ngô Phú Cường' AND is_active = 1;
-INSERT INTO sessions (member_id, token_hash, expires_at)
+INSERT OR REPLACE INTO sessions (member_id, token_hash, expires_at)
   SELECT id, '$H_THUONG', datetime('now', '+1 day') FROM members
    WHERE full_name = 'Kiểm TN Thường';
-INSERT INTO sessions (member_id, token_hash, expires_at)
+INSERT OR REPLACE INTO sessions (member_id, token_hash, expires_at)
   SELECT id, '$H_N7', datetime('now', '+1 day') FROM members
    WHERE full_name = 'Kiểm TN Nhóm Bảy';
 " >/dev/null
@@ -117,12 +134,18 @@ INSERT INTO sessions (member_id, token_hash, expires_at)
 #
 # Ba phiên là điều kiện tối thiểu để bộ kiểm có nghĩa; thiếu là dừng ngay ở
 # đây, đừng để nó đỏ ở một chỗ chẳng liên quan.
+#
+# ĐẾM ĐÚNG BA PHIÊN CỦA RIÊNG SCRIPT NÀY, không đếm cả bảng. Đếm cả bảng thì
+# một fixture của bộ kiểm KHÁC còn nằm lại (gieo-giao-thuong.sh chẳng hạn) là
+# ra 5/3 và script dừng với đúng câu "có dấu nháy kép nào lọt vào không?" —
+# một câu trỏ sai hoàn toàn chỗ hỏng. Câu hỏi đúng là "seed CỦA TÔI đã chạy
+# chưa", không phải "bảng có sạch không". Đã trả giá 18/9.
 so_phien=$(npx wrangler d1 execute k3vaceo --local --json --command \
-  'SELECT COUNT(*) AS n FROM sessions' 2>/dev/null \
+  "SELECT COUNT(*) AS n FROM sessions WHERE token_hash IN ('$H_CUONG', '$H_THUONG', '$H_N7')" 2>/dev/null \
   | sed -n '/^\[/,$p' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s)[0].results[0].n))')
 if [ "$so_phien" != "3" ]; then
-  echo "LỖI: seed không chạy — chỉ có ${so_phien:-0}/3 phiên trong D1." >&2
-  echo "     Xem lại khối SQL ở trên: có dấu nháy kép nào lọt vào không?" >&2
+  echo "LỖI: seed không chạy — chỉ có ${so_phien:-0}/3 phiên của script này trong D1." >&2
+  echo "     Xem lại khối SQL ở trên: có dấu nháy kép hay backtick nào lọt vào không?" >&2
   exit 1
 fi
 

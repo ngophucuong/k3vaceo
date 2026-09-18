@@ -476,6 +476,26 @@ jobs:
               echo "  ✗ RÒ: đường công khai có chứa \"$cam\""; loi=1
             fi
           done
+
+          # Đường công khai thứ ba (18/9): NHẬN TỆP từ người không có phiên —
+          # mức lộ cao nhất zone này từng mở, cho 38 người không đăng nhập
+          # được nộp ảnh chứng chỉ. Canh CẢ HAI chiều ở đây:
+          #   · phải KHÁC 401  — đẩy nhầm xuống nửa dưới index.js là 38 người
+          #     ấy lại không nộp được ảnh, mà triệu chứng chỉ là một câu 401
+          #     chẳng ai hiểu vì sao;
+          #   · phải KHÁC 200  — gửi một thân RỖNG mà nhận 200 nghĩa là chốt
+          #     magic bytes đã biến mất, tức Drive của Ban tổ chức nhận được
+          #     bất cứ thứ gì ai đó gửi lên.
+          ckAnh=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'content-type: image/jpeg' --data-binary '' \
+            'https://k3vaceo.cuongngo.app/api/totnghiep/anh-cong-khai?loai=anh&roster_id=1' || true)
+          if [ "$ckAnh" = "401" ]; then
+            echo "  ✗ /api/totnghiep/anh-cong-khai → 401: đã lọt xuống nửa CẦN PHIÊN"; loi=1
+          elif [ "$ckAnh" = "200" ]; then
+            echo "  ✗ /api/totnghiep/anh-cong-khai nhận thân RỖNG → 200: mất chốt soi ảnh"; loi=1
+          else
+            echo "  ✓ /api/totnghiep/anh-cong-khai mở không cookie, và từ chối thân rỗng (HTTP $ckAnh)"
+          fi
           # Ba bí mật Google đã sang tới Worker chưa — trả lời được mà KHÔNG
           # phải thử gửi một tệp. /api/health chỉ in một CỜ, không in một mẩu
           # nào của client_id hay refresh token (khác khối push, nơi khoá VAPID

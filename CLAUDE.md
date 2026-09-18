@@ -47,6 +47,16 @@ tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
    phải kho**. Đọc mục "Ảnh chứng chỉ qua Google Drive" TRƯỚC khi đụng vào
    `worker/src/lib/drive.js` hay `lib/anh.js` — ba chỗ sai được trong đó
    **Drive vẫn trả HTTP 200**.
+
+   **Và ba yêu cầu nữa cùng tối 18/9**, mỗi cái một mục riêng bên dưới:
+   (a) *"ép khai đủ những thông tin doanh nghiệp mới được submit"* — phần hồ
+   sơ nay đòi đủ bảy ô, và `linh_vuc` khai ở đây ghi ngược sang
+   `member_profile.nganh` để tab Giao thương thôi đứng trên dữ liệu rỗng;
+   (b) *"làm nốt phần logo doanh nghiệp và ảnh chân dung"* — mở đường nộp ảnh
+   cho cả 38 người KHÔNG đăng nhập được, tức đường đầu tiên trong dự án nhận
+   TỆP từ người không có phiên; (c) *"3 phần này nên gập vào và chỉ hiển thị
+   một phần"* cộng *"chưa chuyển khoản thì tự động expand mã QR"* — hai yêu
+   cầu suýt cắn nhau, hoà bằng `tnKhoiMoDau()`.
 2. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
    này, và là lần đầu tiên nó **tốn tiền theo lượt dùng** cùng lần đầu **bỏ
    HAI nguyên tắc gốc cùng lúc (N1 và N2)**. Ngô Phú Cường đưa hai tài liệu
@@ -161,12 +171,12 @@ cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trướ
    Drive từ chối). Lượt gửi ĐẦU TIÊN tự tạo thư mục **"k3vaceo — ảnh chứng
    chỉ CEO K03"**; link của nó hiện thẳng trên màn Ban cán sự lớp, đó là thư
    mục để chia sẻ cho Ban tổ chức.
-4. **QUYẾT: đường CÔNG KHAI có nhận ảnh không.** Hiện KHÔNG, nên **38 người
-   không đăng nhập được thì không nộp được ảnh chân dung** — mà ảnh là thứ
-   đi vào chứng chỉ. Nhận tệp từ người không có phiên là một quyết định KHÁC
-   (ai cầm link cũng đổ được tệp vào Drive của Ban tổ chức) và chưa ai hỏi.
-   Phải quyết trước 26/9. Đường lui rẻ nhất: phát link đăng nhập cho đúng 38
-   người ấy qua Danh bạ → Cả lớp, họ vào được là nộp ảnh được ngay.
+4. **Gửi thử một ảnh qua ĐƯỜNG CÔNG KHAI nữa** (`/totnghiep` → "Tôi không
+   đăng nhập được" → tìm tên → chọn ảnh). Đường này mở chiều 18/9 cho 38 người
+   không đăng nhập được, và nó là đường DUY NHẤT của cả ứng dụng nhận tệp từ
+   người không có phiên — xem mục riêng cho cái được và cái mất. Sau lượt gửi
+   thật đầu tiên, mở bản xuất CSV soi cột "Điền qua": ảnh gửi đè lên bản của
+   một người đã đăng nhập phải hiện thành "Tài khoản + link công khai".
 5. **Mở một phiên Trợ lý KHKD THẬT trên tên miền** — đây là phép nghiệm thu
    duy nhất cho tính năng lớn nhất vừa thêm, và sandbox không làm được (xem
    mục riêng). Hỏng thì `hong_o_buoc` trong phúc đáp 502 nói ngay hỏng ở bước
@@ -1553,6 +1563,124 @@ bấm chip "Ngành khác" ở cả hai form. Ba điều cố ý:
    cả lý do tệp CSV tồn tại là để người khác đọc. Chữ tự do nối ngay sau nhãn
    ("Ngành khác: Logistics chuỗi lạnh").
 
+### "Ép" khai đủ phần hồ sơ — và ngành khai ở đây đi thẳng sang Giao thương
+
+Ngô Phú Cường 18/9: *"Khai đủ thông tin về doanh nghiệp và nhu cầu giao thương,
+'ép' khai đủ những thông tin doanh nghiệp mới được submit."*
+
+Lý do có yêu cầu này **đo được, không phải cảm tính**: soi D1 thật cùng ngày cho
+`co_ho_so = 46` mà `da_chon_nganh = 0` — 46 người đã điền hồ sơ Giao thương,
+**không một ai từng bấm một chip ngành nào**. Ô nào bỏ qua được thì phần lớn
+người ta bỏ qua, và Ban tổ chức nhận về một bảng chứng chỉ thiếu chỗ này chỗ
+kia mà không ai biết thiếu ai.
+
+Bảy ô bắt buộc (`BAT_BUOC` trong `routes/tot-nghiep.js`): họ tên · ngày sinh ·
+điện thoại · doanh nghiệp · chức vụ · lĩnh vực hoạt động · nhu cầu kết nối.
+Chọn chip "Ngành khác" mà để trống ô chữ cũng tính là thiếu — bản xuất CSV in
+ra đúng hai chữ "Ngành khác", không hơn gì việc không chọn gì, mà lại trông như
+đã khai xong.
+
+**RÀNG BUỘC CHỈ ÁP CHO PHẦN A, và đây là phần quan trọng nhất của cả quyết
+định.** Phần C (Lễ & Gala, hạn **21h00 ngày 19/9**) và phần B (đề tài, lớp đã
+chốt "không bắt buộc ai cũng phải nộp") không đụng tới. Buộc xong hồ sơ mới cho
+đăng ký Gala là mất đúng cái hạn gấp nhất — chính cái bẫy mà thiết kế "ba phần,
+ba nút Lưu" sinh ra để tránh. `kiem-totnghiep.mjs` có phép đối chứng riêng cho
+đúng chiều này, vì phép "thiếu ô → 422" một mình vẫn xanh với một bản vá làm
+hỏng nó.
+
+Trên **đường công khai** thì hỏi thêm một câu nữa: chỉ đòi đủ khi lượt gửi có
+động tới phần A (`coHoSo`). Bỏ điều kiện ấy thì một lượt gửi CHỈ để đăng ký
+Gala cũng bị chặn.
+
+#### `linh_vuc` nay GHI NGƯỢC sang `member_profile.nganh`
+
+Trước 18/9 `putHoSo` **cố ý không** ghi ngược (bản trong `dang_ky_tot_nghiep` là
+bản ĐÃ XÁC NHẬN cho chứng chỉ). Ràng buộc ở trên đổi bài toán: từ nay cả lớp
+phải chọn ngành, nên để hai bên rời nhau là tự tay dựng hai nguồn sự thật —
+`da_chon_nganh = 0` nghĩa là bộ lọc ngành ở tab Giao thương đang đứng trên dữ
+liệu RỖNG, và nó sẽ rỗng mãi trong khi bảng bên này đầy dần.
+
+Chỉ đụng **đúng một cột**, và chỉ vì nó là CÙNG một sự thật, cùng bộ mã, cùng
+hàm `nganhRaChuoi()`. **KHÔNG chép `nhu_cau_ket_noi` sang `needs`**: ô ấy 80 ký
+tự còn đây 500, mà `needs` đang hiện trong thẻ gọn ở Danh bạ lẫn Giao thương —
+cắt cụt là vỡ bố cục hai màn khác, và cắt cụt trong im lặng thì người viết
+không bao giờ biết câu của mình mất đuôi. N5 nguyên vẹn: dữ liệu của chính
+người đang bấm Lưu, route không nhận `member_id` trong thân.
+
+**Hệ quả với bộ kiểm, đã trả giá ngay:** `reset-totnghiep.sh` phải dọn thêm
+`member_profile.nganh`. Không dọn thì lượt chạy sau mở form ra đã thấy chip
+"Ngành khác" bật sẵn (do lượt trước để lại `nganh = khac,van-tai`) và hai phép
+kiểm ô chữ đỏ ở một chỗ chẳng liên quan.
+
+#### Giao diện: chặn trước ở form CÓ PHIÊN, KHÔNG chặn trước ở form CÔNG KHAI
+
+Khác nhau có lý do, không phải quên. Form có phiên được điền sẵn từ chính bản
+đã lưu, nên giá trị trên màn hình = giá trị máy chủ sẽ thấy → chặn trước là
+đúng và tiết kiệm một lượt gọi. Form công khai thì **cố ý không biết gì về
+người đang điền** (không điền sẵn ngày sinh hay điện thoại của ai), nên nó cũng
+không biết những ô ấy ĐÃ CÓ trong D1 hay chưa — chặn trước ở đó là bắt người
+quay lại **khai bổ sung** gõ lại cả ngày sinh lẫn điện thoại chỉ để thêm một
+dòng, tức bóp chết đúng luồng vừa nới ra cùng ngày. Máy chủ hỏi trên bản ĐÃ
+TRỘN nên nó biết; để nó quyết.
+
+Không mất gì cho người dùng: nhánh `catch` chỉ hiện dòng lỗi, **không vẽ lại
+màn**, nên mọi ô vừa gõ còn nguyên. `pw-totnghiep.mjs` canh đúng chỗ ấy.
+
+Máy chủ trả `thieu_ten` — **tên ô còn trống**, không phải một câu "thiếu thông
+tin". Form dài hơn một màn điện thoại; không nói rõ thiếu ô nào thì người ta
+cuộn lên cuộn xuống rồi bỏ cuộc.
+
+`TN_BAT_BUOC` trong `public/app.js` là **bản sao có chủ ý** của `BAT_BUOC`. Cách
+gọn hơn (máy chủ đưa danh sách xuống) vướng đúng một chỗ: phúc đáp
+`/api/totnghiep/cong-khai` có phép canh thô mà đắt giá — grep chuỗi `dien_thoai`
+/ `ngay_sinh` / `email` trong nguyên văn JSON — và một danh sách schema mang
+đúng những tên ấy làm nó đỏ. Nới phép canh thì mất một chốt bảo vệ danh bạ cả
+lớp để đổi lấy một tiện nghi. Bản sao chịu được vì chỗ lệch nổ ra RẤT TO: 422
+kèm `thieu_ten` đúng tên ô.
+
+### Ba khối gập còn MỘT, và mã QR tự mở khi chưa chuyển phí
+
+Hai yêu cầu của Ngô Phú Cường cùng ngày, và chúng **suýt cắn nhau**:
+
+1. *"3 phần này nên gập vào và chỉ hiển thị một phần (2 phần còn lại thu gọn)
+   cho gọn gàng."*
+2. *"Câu hỏi đã chuyển khoản 1.000.000 chưa, nếu chưa thì sẽ tự động expand
+   hình ảnh QR code."*
+
+Gập cho gọn mà gập nhầm khối đang giữ mã QR thì người đã đăng ký dự Lễ nhưng
+chưa chuyển tiền mở trang ra không thấy mã đâu — đúng người cần thấy nhất. Hoà
+bằng `tnKhoiMoDau()`: thứ tự ưu tiên theo MỨC GẤP, không theo thứ tự trên màn
+hình — còn phải chuyển phí → Gala; chưa trả lời Gala → Gala (hạn 21h 19/9);
+chưa xong hồ sơ → Hồ sơ; chưa khai đề tài → Đề tài; xong hết → gập hết.
+
+**Đây là một lỗ thật, không phải tinh chỉnh.** Lưu phần Gala xong là `gala_luc`
+có giá trị, nên LẦN MỞ TRANG SAU khối ấy gập lại và mã QR nằm khuất. "Đã trả
+lời xong" và "đã xong việc" là hai chuyện khác nhau, mà bản đầu chỉ hỏi câu thứ
+nhất.
+
+`TN_MO` đổi từ ba cờ độc lập thành **tên khối đang mở** (`'gala' | 'hoso' |
+'detai' | null`) — ba cờ thì "mở cái này đóng hai cái kia" phải viết bằng ba
+phép gán và sớm muộn sót một nhánh. Dùng `undefined` cho "chưa ai chạm tới", vì
+`null` LÀ một giá trị hợp lệ (đã chạm, và đang gập hết).
+
+**CỐ Ý KHÔNG dùng thuộc tính `name` của `<details>`** (accordion sẵn có của
+trình duyệt): nó mới có từ Safari 17.2 và Chrome 120, mà lớp này 146 người đủ
+loại máy — ai máy cũ sẽ thấy cả ba khối mở cùng lúc, đúng thứ vừa được yêu cầu
+bỏ đi, và không có gì báo cho họ biết.
+
+Kèm hai chi tiết câu chữ: câu hỏi nêu thẳng **con số** ("Bạn đã chuyển khoản
+1.000.000 đ chưa?") thay vì hỏi trống không, và khi khối gập thì dòng phụ của
+nó đổi thành "Còn phải chuyển 1.000.000 đ" — dòng duy nhất còn nhìn thấy được
+lúc ấy. Không dùng chip màu: ✓ xanh trong sản phẩm này chỉ có MỘT nghĩa, người
+thu đã nhận tiền.
+
+**Một lỗi bố cục có thật lộ ra nhờ việc này**, và nó có từ trước: `.fc` có
+`white-space:nowrap` — đúng cho hàng CUỘN NGANG, sai cho hàng `.fl.cuon` (xuống
+dòng, không cuộn được). Nhãn lĩnh vực KHKD dài nhất đo được **416px ở khổ
+390px**, tức tràn ngang cả trang và kéo mọi thứ lệch 42px. Phép đo tràn ngang
+cũ không thấy vì nó đo lúc khối chứa hàng chip đang GẬP. Nay `.fl.cuon .fc` cho
+`white-space:normal`.
+
 ### Chưa kiểm chứng được, và những việc còn lại
 
 - **Chưa ai dùng zone này với dữ liệu thật.** Mọi phép kiểm chạy trên D1 cục
@@ -1563,10 +1691,10 @@ bấm chip "Ngành khác" ở cả hai form. Ba điều cố ý:
   chữa). Cả lớp khai lại trong ứng dụng, lần này mỗi phiếu có tên.
 - ~~**Ảnh chân dung và logo (câu 7, 8) CHƯA làm**~~ → **ĐÃ LÀM 18/9**, qua
   Google Drive; cột `anh_url`/`logo_url` có sẵn trong bảng từ 0041 nên chỉ là
-  cộng thêm, không đổi lược đồ. Xem mục riêng ngay dưới. **Vẫn còn nguyên một
-  vế chưa quyết:** đường công khai KHÔNG nhận ảnh, nên 38 người không đăng
-  nhập được vẫn chưa nộp được ảnh — nhận tệp từ người không có phiên là một
-  quyết định KHÁC, chưa ai hỏi.
+  cộng thêm, không đổi lược đồ. Xem mục riêng ngay dưới. **Vế còn treo lúc
+  sáng — đường công khai không nhận ảnh — cũng đã xong chiều cùng ngày:** Ngô
+  Phú Cường nói "làm nốt", nên 38 người không đăng nhập được nay nộp được ảnh
+  ngay trong form công khai.
 - ~~**Người đi đường công khai không sửa lại được**~~ → **đã nới 18/9**: mở
   lại trang, tìm tên, gửi thêm lần nữa là bổ sung được, và ô để trống giữ
   nguyên nội dung cũ. Xem mục "Nới … thành KHAI BỔ SUNG" ở trên. Thứ vẫn
@@ -1712,10 +1840,57 @@ chính nó: `.dev.vars` trỏ `GOOGLE_BASE_URL` vào **cổng đóng 2527** nên
 hỏng ngay và đọc được `hong_o_buoc = lay_token`. Bằng chứng duy nhất đáng tin
 là **mở thư mục Drive và thấy ảnh ở đó** — đúng bài học đường gửi thư 24/8.
 
-**Đường CÔNG KHAI hiện KHÔNG nhận ảnh.** 38 người không đăng nhập được vì vậy
-chưa nộp được ảnh chân dung. Nhận tệp từ người không có phiên là một quyết
-định KHÁC — ai cũng đổ được tệp vào Drive của Ban tổ chức — và chưa ai hỏi.
-Đây là chỗ phải quyết trước 26/9 nếu muốn cả lớp có ảnh trên chứng chỉ.
+### Đường CÔNG KHAI nay CŨNG nhận ảnh — quyết chiều 18/9
+
+Tôi nêu chỗ này ra như một quyết định treo ("38 người không đăng nhập được thì
+không nộp được ảnh, mà ảnh là thứ in lên chứng chỉ"). Ngô Phú Cường trả lời
+bằng một câu: *"Làm nốt phần logo doanh nghiệp và ảnh chân dung."*
+
+`POST /api/totnghiep/anh-cong-khai?loai=…&roster_id=…` — **đường DUY NHẤT của
+cả ứng dụng nhận TỆP từ người không có phiên**, tức mức lộ cao nhất zone này
+từng mở. Ghi thẳng cả hai vế:
+
+**ĐƯỢC:** 38 người ấy có ảnh trên chứng chỉ. Không có đường này thì phải phát
+link đăng nhập tay cho từng người — đúng cái rào mà migration 0042 vừa gỡ.
+
+**MẤT:** ai cầm link `/totnghiep` cũng đổ được tệp vào Drive của Ban tổ chức,
+và đổi được ảnh của người khác. Bốn thứ giữ cho mức ấy chịu được:
+
+1. **Chỉ nhận ảnh THẬT** — magic bytes, không tin phần mở rộng, không tin
+   content-type; trần 2MB cứng. Dùng CHUNG hàm `nhanAnh()` với đường có phiên,
+   không viết bản sao: bản quên một chốt thì chốt dễ quên nhất lại là magic
+   bytes, và bên quên nó nhận thẳng một tệp `.exe` mang tên một học viên.
+2. **Hạn mức chặt hơn hẳn**: 6 lượt/người/ngày (đường có phiên là 20) và thùng
+   IP 200/giờ (400). Con số IP vẫn TRÊN sĩ số lớp — dưới đó thì cả lớp ngồi
+   chung WiFi hội trường là khoá oan nhau (bài học 27/8). Khoá theo
+   **`roster_id`** chứ không theo `member_id`: đọc được ngay từ URL nên hạn mức
+   chặn được TRƯỚC khi có bất kỳ lời ghi nào vào D1.
+3. **Sửa đè đúng tệp cũ**, không đẻ tệp mới — một kẻ phá chỉ thay được ảnh,
+   không làm đầy được Drive bằng hàng trăm tệp rác.
+4. **Nhìn thấy được** — cột `nguon` chuyển sang `ca_hai` khi ảnh của một bản
+   `phien` bị gửi đè qua link công khai, và cột ấy in ra CSV.
+
+**Thứ tự các chốt là một bất biến, không phải sở thích.** Lời GHI đầu tiên (tự
+tạo dòng `members` cho người chưa có hồ sơ) phải đứng SAU mọi phép kiểm rẻ hơn:
+đặt lên trước thì ai gõ một URL cũng để lại một dòng `members` mà chưa cần gửi
+nổi một byte ảnh hợp lệ nào — không lỗi, không cảnh báo, chỉ có một bảng phình
+dần. `kiem-anh-route.mjs` đếm số dòng trước/sau một lượt gửi `.exe` để canh
+đúng chỗ ấy.
+
+**VÌ SAO KHÔNG chặn hẳn việc gửi đè bản đã có:** đó là ngõ cụt của chính người
+dùng thật — gửi nhầm một tấm rồi không sửa lại được nữa. Đúng bài học "fail
+closed không phải lúc nào cũng đúng" đã trả giá ngày 5/9 với `xacNhanLaiSo()`.
+
+Giao diện: ô chọn ảnh trong `tnckForm()` dùng CHUNG `tnGanChonAnh()` với form
+có phiên, chỉ khác đường gọi. **KHÔNG vẽ lại màn sau khi gửi** (form có phiên
+thì có) — vẽ lại là xoá trắng mọi ô người ta đang gõ dở, mà ảnh xem trước đã đủ
+nói rằng tệp đã đi. Và ô ảnh ở đây **không hé lộ người được chọn đã gửi ảnh hay
+chưa**: hiện "✓ đã gửi" là trả lời một câu hỏi về người khác cho bất kỳ ai mở
+link.
+
+**Chưa kiểm chứng được:** cột `nguon` chỉ đổi sang `ca_hai` sau một lượt tải
+lên THÀNH CÔNG, mà sandbox không ra được internet nên không lượt nào thành
+công. Phải soi bằng bản xuất CSV trên tên miền thật sau lượt gửi ảnh đầu tiên.
 
 **Mười hai bước Ngô Phú Cường ĐÃ tự làm trên Google Cloud Console 18/9**, thứ
 tự quan trọng (bước 9 làm sau bước 10 thì token chết sau 7 ngày): tạo dự án →
@@ -3620,7 +3795,7 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "ba mươi mốt phép đối chứng đáng giữ nhất" và hai
+  trước khi chạy — có mục "bốn mươi phép đối chứng đáng giữ nhất" và hai
   chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày

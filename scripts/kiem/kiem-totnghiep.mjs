@@ -125,6 +125,72 @@ const dongCuong = dsSauHaiLan.nguoi.filter(x => x.full_name === 'Ngô Phú Cư�
 ok(`Ngô Phú Cường chỉ có ĐÚNG MỘT dòng (đếm ${dongCuong.length})`, dongCuong.length === 1);
 ok('xong_ho_so đếm được 1', dsSauHaiLan.xong_ho_so === 1);
 
+/* ══ "ÉP" KHAI ĐỦ — Ngô Phú Cường yêu cầu 18/9 ══════════════════════════════
+   "Khai đủ thông tin về doanh nghiệp và nhu cầu giao thương, 'ép' khai đủ
+   những thông tin doanh nghiệp mới được submit."
+
+   Lý do có yêu cầu này đo được, không phải cảm tính: soi D1 thật 18/9 cho
+   `co_ho_so = 46` mà `da_chon_nganh = 0` — 46 người đã điền hồ sơ Giao thương,
+   KHÔNG MỘT AI từng bấm một chip ngành nào. Ô nào bỏ qua được thì phần lớn
+   người ta bỏ qua.
+
+   Kiểm TỪNG Ô một chứ không chỉ kiểm "thiếu hết thì chặn": sót một khoá trong
+   BAT_BUOC là ô ấy lặng lẽ thành không bắt buộc, và không có gì báo. */
+console.log('\n── Phần hồ sơ: thiếu một ô là KHÔNG lưu được ──');
+for (const [khoa, nhan] of [
+  ['ngay_sinh', 'Ngày sinh'], ['dien_thoai', 'Số điện thoại'],
+  ['doanh_nghiep', 'Doanh nghiệp'], ['chuc_vu', 'Chức vụ'],
+  ['nhu_cau_ket_noi', 'Nhu cầu kết nối'],
+]) {
+  const r = await put('/api/totnghiep/ho-so', ckCuong, { ...hoSo1, [khoa]: '' });
+  const b = await r.json().catch(() => ({}));
+  ok(`bỏ trống "${nhan}" → 422 và gọi đúng tên ô (nhận ${r.status})`,
+     r.status === 422 && b.error === 'thieu_thong_tin' && (b.thieu_ten ?? []).includes(nhan));
+}
+const rKhongNganh = await put('/api/totnghiep/ho-so', ckCuong, { ...hoSo1, linh_vuc: [] });
+const bKhongNganh = await rKhongNganh.json().catch(() => ({}));
+ok(`không chọn lĩnh vực nào → 422 (nhận ${rKhongNganh.status})`, rKhongNganh.status === 422);
+ok('gọi đúng tên "Lĩnh vực hoạt động"',
+   (bKhongNganh.thieu_ten ?? []).includes('Lĩnh vực hoạt động'));
+
+// Chọn chip "Ngành khác" mà không gõ chữ cũng là thiếu: bản xuất CSV in ra
+// đúng hai chữ "Ngành khác", không hơn gì việc không chọn gì — mà lại trông
+// như đã khai xong.
+const rKhacRong = await put('/api/totnghiep/ho-so', ckCuong, {
+  ...hoSo1, linh_vuc: ['khac'], linh_vuc_khac: '   ',
+});
+ok(`chip "Ngành khác" mà ô chữ trống → 422 (nhận ${rKhacRong.status})`, rKhacRong.status === 422);
+
+// ĐỐI CHỨNG: đủ cả bảy ô thì vẫn lưu được như thường — phép trên không được
+// chặt tới mức chặn luôn người điền đủ.
+const rDu = await put('/api/totnghiep/ho-so', ckCuong, hoSo1);
+ok(`điền đủ → 200 (nhận ${rDu.status})`, rDu.status === 200);
+
+/* ĐỐI CHỨNG QUAN TRỌNG NHẤT của ràng buộc này: nó KHÔNG được lan sang phần
+   Gala. Hạn Gala là 21h00 NGÀY 19/9, sớm hơn hạn hồ sơ (26/9) cả tuần — buộc
+   xong hồ sơ mới cho đăng ký Gala là mất đúng cái hạn gấp nhất, và đó chính
+   là cái bẫy mà thiết kế "ba phần, ba nút Lưu" sinh ra để tránh. */
+const rGalaTuDo = await put('/api/totnghiep/gala', ckCuong, { du_le: 'co' });
+ok(`lưu Gala KHÔNG bị ràng buộc hồ sơ → 200 (nhận ${rGalaTuDo.status})`,
+   rGalaTuDo.status === 200);
+
+/* Ghi ngược `linh_vuc` sang `member_profile.nganh`. Không có bước này thì cả
+   lớp khai ngành ở đây trong khi bộ lọc ngành ở tab Giao thương vẫn đứng trên
+   dữ liệu RỖNG (`da_chon_nganh = 0`) — hai nguồn sự thật cho cùng một việc,
+   và bên có dữ liệu lại không phải bên cần dùng. */
+console.log('\n── Ngành khai ở đây phải tới được tab Giao thương ──');
+// `nhu_cau_ket_noi: 'lần hai'` là để TRẢ LẠI trạng thái cho mục "Ba phần lưu
+// độc lập" ngay bên dưới — nó đọc đúng chuỗi ấy để chứng minh lưu Gala không
+// xoá mất phần A. Khối này chen vào giữa nên phải dọn theo mình.
+await put('/api/totnghiep/ho-so', ckCuong, {
+  ...hoSo1, linh_vuc: ['van-tai', 'thuong-mai'], nhu_cau_ket_noi: 'lần hai',
+});
+const gt = await get('/api/giao-thuong', ckCuong).then(r => r.json()).catch(() => ({}));
+// `toi.nganh` đã qua tachNganh() nên là MẢNG MÃ, không phải chuỗi.
+const nganhGt = (gt.toi?.nganh ?? []).map(x => x.ma ?? x);
+ok(`member_profile.nganh nhận được ngành vừa khai (${nganhGt.join(',') || 'RỖNG'})`,
+   nganhGt.includes('van-tai') && nganhGt.includes('thuong-mai'));
+
 // ── 5. Ba phần lưu ĐỘC LẬP ───────────────────────────────────────────────
 console.log('\n── Ba phần lưu độc lập, không đè lên nhau ──');
 const rGala = await put('/api/totnghiep/gala', ckCuong, {
@@ -369,14 +435,59 @@ const timNguoi = await fetch(B + '/api/wizard/roster/search?q=' + encodeURICompo
 const ai = (timNguoi.people ?? [])[0];
 ok(`tìm được một người chưa có hồ sơ để thử (${ai?.full_name ?? 'KHÔNG THẤY'})`, !!ai);
 
+const guiCk = than => fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify(than),
+});
+
 if (ai) {
-  const rGui = await fetch(B + '/api/totnghiep/cong-khai', {
-    method: 'POST', headers: { 'content-type': 'application/json', ...IP },
-    body: JSON.stringify({
-      roster_id: ai.roster_id, ho_ten: ai.full_name, ngay_sinh: '05/05/1975',
-      dien_thoai: '0912345678', du_le: 'co', linh_vuc: ['cong-nghe'],
-      nhu_cau_ket_noi: 'kiểm đường công khai',
-    }),
+  /* ══ "ÉP KHAI ĐỦ" TRÊN ĐƯỜNG CÔNG KHAI — hai chiều, và chiều thứ hai mới là
+     chiều dễ làm hỏng ═══════════════════════════════════════════════════════
+     Ngô Phú Cường 18/9: "ép khai đủ những thông tin doanh nghiệp mới được
+     submit". Ràng buộc chỉ áp cho PHẦN HỒ SƠ, và chỉ khi lượt gửi có động tới
+     phần ấy — xem `coHoSo` trong postTotNghiepCongKhai.
+
+     Vì sao điều kiện `coHoSo` đáng có một phép kiểm riêng: bỏ nó đi thì một
+     lượt gửi CHỈ để đăng ký Gala cũng bị chặn, tức buộc xong hồ sơ mới cho
+     đăng ký — mất đúng hạn 21h00 NGÀY 19/9, cái hạn gấp nhất của cả zone và
+     là cả lý do thiết kế ba phần ba nút Lưu. Phép "thiếu ô → 422" một mình
+     thì xanh cả với bản vá làm hỏng đúng chỗ ấy. */
+  const rThieu = await guiCk({
+    roster_id: ai.roster_id, ho_ten: ai.full_name, doanh_nghiep: 'Công ty X',
+    linh_vuc: ['cong-nghe'],   // thiếu ngay_sinh, dien_thoai, chuc_vu, nhu_cau
+  });
+  const bThieu = await rThieu.json().catch(() => ({}));
+  ok(`khai hồ sơ mà thiếu ô → 422 (nhận ${rThieu.status})`, rThieu.status === 422);
+  ok('mã lỗi là thieu_thong_tin', bThieu.error === 'thieu_thong_tin');
+  ok(`nói rõ ô nào còn trống (${(bThieu.thieu_ten ?? []).join(' · ')})`,
+     (bThieu.thieu_ten ?? []).includes('Ngày sinh')
+     && bThieu.thieu_ten.includes('Chức vụ')
+     && bThieu.thieu_ten.includes('Nhu cầu kết nối'));
+
+  const dsChan = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
+  ok('lượt bị chặn KHÔNG để lại dòng đăng ký nào',
+     !dsChan.nguoi.find(x => x.full_name === ai.full_name)?.ho_so_luc);
+
+  // ĐỐI CHỨNG: chỉ trả lời Gala, không động tới phần hồ sơ → KHÔNG bị chặn.
+  const rChiGala = await guiCk({ roster_id: ai.roster_id, du_le: 'khong' });
+  ok(`chỉ đăng ký Gala, bỏ trống cả phần hồ sơ → 200 (nhận ${rChiGala.status})`,
+     rChiGala.status === 200);
+
+  // Chip "Ngành khác" mà không gõ chữ cũng là thiếu — bản xuất CSV in ra đúng
+  // hai chữ "Ngành khác" thì không hơn gì việc không chọn gì.
+  const rKhacRong = await guiCk({
+    roster_id: ai.roster_id, ho_ten: ai.full_name, ngay_sinh: '05/05/1975',
+    dien_thoai: '0912345678', doanh_nghiep: 'Công ty X', chuc_vu: 'Giám đốc',
+    linh_vuc: ['khac'], linh_vuc_khac: '   ', nhu_cau_ket_noi: 'abc',
+  });
+  ok(`chọn "Ngành khác" mà để trống ô chữ → 422 (nhận ${rKhacRong.status})`,
+     rKhacRong.status === 422);
+
+  const rGui = await guiCk({
+    roster_id: ai.roster_id, ho_ten: ai.full_name, ngay_sinh: '05/05/1975',
+    dien_thoai: '0912345678', doanh_nghiep: 'Công ty X', chuc_vu: 'Giám đốc',
+    du_le: 'co', linh_vuc: ['cong-nghe'],
+    nhu_cau_ket_noi: 'kiểm đường công khai',
   });
   const bGui = await rGui.json().catch(() => ({}));
   ok(`gửi KHÔNG cookie → 200 (nhận ${rGui.status} ${bGui.error ?? ''})`, rGui.status === 200);
@@ -390,10 +501,7 @@ if (ai) {
   ok('dòng ấy gắn nhãn nguon = cong_khai', dong?.nguon === 'cong_khai');
 
   // Gửi lại lần hai vẫn được (họ gõ nhầm thì sửa lại), KHÔNG đẻ dòng thứ hai.
-  const rLai = await fetch(B + '/api/totnghiep/cong-khai', {
-    method: 'POST', headers: { 'content-type': 'application/json', ...IP },
-    body: JSON.stringify({ roster_id: ai.roster_id, ho_ten: ai.full_name, du_le: 'khong' }),
-  });
+  const rLai = await guiCk({ roster_id: ai.roster_id, ho_ten: ai.full_name, du_le: 'khong' });
   ok(`gửi lại → 200 (nhận ${rLai.status})`, rLai.status === 200);
   const dsLai = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
   ok('vẫn ĐÚNG MỘT dòng cho người ấy',

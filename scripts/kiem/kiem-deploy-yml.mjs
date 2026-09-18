@@ -26,7 +26,7 @@
 //
 // Chạy:  node scripts/kiem/kiem-deploy-yml.mjs        (không cần máy chủ)
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 
 const TEP = new URL('../../.github/workflows/deploy.yml', import.meta.url);
 const src = readFileSync(TEP, 'utf8');
@@ -64,6 +64,37 @@ for (const k of khoi) {
   const ban = k.than.filter(l => l.chu.includes("'"));
   ok(`khối dòng ${k.tu}–${k.den} (${k.than.length} dòng)`, ban.length === 0);
   for (const l of ban) console.log(`      dòng ${l.so}: ${l.chu.trim().slice(0, 110)}`);
+}
+
+/* ══ CÙNG HỌ, CHỖ KHÁC: BACKTICK trong khối SQL của các script reset ═══════
+   Trả giá 18/9. `reset-totnghiep.sh` bọc cả khối SQL trong một chuỗi NHÁY KÉP,
+   mà trong nháy kép thì backtick là THAY THẾ LỆNH — shell chạy thứ nằm giữa
+   hai backtick rồi nhét kết quả vào chỗ ấy. Hai dòng CHÚ THÍCH viết đúng theo
+   nếp Markdown của repo này:
+
+     -- `Unknown arguments: tự, tạo, hồ, sơ …`, còn reset thì lặng lẽ không chạy
+     -- họ với bẫy nháy đơn trong khối `node -e` của deploy.yml (CLAUDE.md).
+
+   khiến shell thật sự thử chạy hai lệnh ấy: `Unknown: command not found` và
+   `node: -e requires an argument` in ra giữa lượt reset. Lần này SQL sống sót
+   vì hai dòng đó là chú thích `--` nên mất chữ cũng vẫn là chú thích — nhưng
+   đúng cùng một dòng chữ nằm trong một câu INSERT thì nó sửa thầm dữ liệu
+   seed, và bộ kiểm sẽ đỏ ở một chỗ chẳng liên quan.
+
+   Trớ trêu nhất: chính hai dòng chú thích ấy đang mô tả cái bẫy nháy kép mà
+   script này vừa vấp bằng một cơ chế khác. Vì vậy có phép canh riêng. */
+console.log('\n── Backtick trong khối SQL nháy kép của script reset ──');
+const scripts = readdirSync(new URL('.', import.meta.url))
+  .filter(f => /^(reset|gieo)-.*\.sh$/.test(f)).sort();
+ok(`tìm thấy ${scripts.length} script reset/gieo (phải ≥ 5)`, scripts.length >= 5);
+for (const f of scripts) {
+  const s = readFileSync(new URL(f, import.meta.url), 'utf8');
+  const xau = [];
+  for (const m of s.matchAll(/--command "([\s\S]*?)"\s*(?:>|\n|$)/g)) {
+    if (m[1].includes('`')) xau.push(s.slice(0, m.index).split('\n').length);
+  }
+  ok(`${f}`, xau.length === 0);
+  for (const n of xau) console.log(`      khối --command mở ở dòng ${n} có backtick bên trong`);
 }
 
 console.log(hong ? `\n${hong} phép HỎNG` : '\nTất cả phép đối chứng đều xanh');

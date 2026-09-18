@@ -9,8 +9,10 @@
 //    thì tất nhiên không có lỗi JS).
 // 2. KHÔNG có chữ "đã đóng" ở bất kỳ đâu trên màn hình (mục 6.4 SRS). Phép
 //    kiểm chuỗi ở máy chủ không thấy được chữ do GIAO DIỆN tự viết ra.
-// 3. Ba khối gập có thật, và khối Gala mở sẵn — hạn của nó là 21h00 ngày 19/9,
-//    gấp nhất trong ba phần.
+// 3. Ba khối gập có thật, và MỖI LÚC ĐÚNG MỘT khối mở (yêu cầu 18/9: "chỉ
+//    hiển thị một phần, 2 phần còn lại thu gọn cho gọn gàng"). Khối mở sẵn là
+//    Gala khi còn phải chuyển phí — mã QR không được nằm sau một cú chạm với
+//    đúng người chưa trả tiền.
 // 4. Ô ngày sinh điền sẵn NGUYÊN VĂN từ roster, và khi chuỗi không đủ
 //    dd/mm/yyyy thì có lời nhắc kiểm lại. Đây là chỗ 28/146 người trên D1 thật
 //    chỉ có năm sinh — in thẳng '1966' lên chứng chỉ là hỏng thật.
@@ -20,6 +22,11 @@
 //    màu hai nghĩa, và xanh trong ứng dụng này chỉ có một nghĩa: người thu đã
 //    nhận tiền.
 // 7. Chọn quá 3 lĩnh vực thì chặn ở nút thứ tư, đúng NGANH_TOI_DA.
+// 8. "Ép khai đủ" (18/9): thiếu ô thì bị chặn, câu báo GỌI ĐÚNG TÊN ô còn
+//    trống, và đoạn vừa gõ KHÔNG mất — form dài hơn một màn điện thoại, gõ
+//    lại lần hai thì phần lớn bỏ cuộc.
+// 9. Form CÔNG KHAI có ô chọn ảnh chân dung/logo, và ô ấy KHÔNG hé lộ người
+//    được chọn đã gửi ảnh hay chưa.
 //
 // Kèm phép đo bố cục ở khổ 390px (iPhone 12–15): không tràn ngang. Lỗi bố cục
 // chỉ ảnh chụp mới thấy — phép kiểm chuỗi không thấy.
@@ -70,20 +77,55 @@ ok('KHÔNG có chữ "đã đóng" ở bất kỳ đâu trên màn hình', !/đ�
 ok('KHÔNG có chữ viết tắt "BCS" (N7)', !/\bBCS\b/.test(chuTrenMan));
 ok('có nói "tự khai" hoặc "đã chuyển khoản"', /tự khai|chuyển khoản/i.test(chuTrenMan));
 
-// ── 3. Ba khối gập, Gala mở sẵn ──────────────────────────────────────────
-console.log('\n── Ba khối gập, khối gấp nhất mở sẵn ──');
+/* ── 3. MỖI LÚC ĐÚNG MỘT KHỐI MỞ ─────────────────────────────────────────
+   Ngô Phú Cường 18/9: "3 phần này nên gập vào và chỉ hiển thị một phần, 2
+   phần còn lại thu gọn cho gọn gàng."
+
+   Phép kiểm phải hỏi CẢ HAI chiều, vì mỗi chiều bắt một bản vá hỏng khác
+   nhau: "đúng một khối mở lúc đầu" một mình vẫn xanh với bản quên đóng các
+   khối kia khi mở một khối mới, còn "mở cái này thì cái kia đóng" một mình
+   vẫn xanh với bản mở sẵn cả ba. */
+console.log('\n── Ba khối gập, mỗi lúc đúng MỘT khối mở ──');
 ok('có đúng 3 khối .tnsec', await p.locator('.tnsec').count() === 3);
 const tieuDe = await p.locator('.tnsec > summary b').allInnerTexts();
 ok(`thứ tự: Lễ & Gala trước (${tieuDe[0]})`, tieuDe[0].includes('Gala'));
-ok('khối Gala đang MỞ (hạn 21h 19/9, gấp nhất)',
-   await p.locator('.tnsec').first().evaluate(el => el.hasAttribute('open')));
-// Hai khối có việc phải làm đều mở sẵn; chỉ Đề tài (việc chung của nhóm, phần
-// lớn là đọc) thì gập lại — người mở trang lần đầu thấy ngay thứ cần điền chứ
-// không phải đi bấm ra từng khối.
-const trangThaiMo = await p.locator('.tnsec').evaluateAll(els => els.map(e => e.hasAttribute('open')));
-ok(`Gala mở · Hồ sơ mở · Đề tài gập (${trangThaiMo.join(', ')})`,
-   trangThaiMo[0] === true && trangThaiMo[1] === true && trangThaiMo[2] === false);
+const dangMo = async () =>
+  (await p.locator('.tnsec').evaluateAll(els => els.map(e => e.hasAttribute('open'))));
+const mo1 = await dangMo();
+ok(`ĐÚNG MỘT khối đang mở (${mo1.join(', ')})`, mo1.filter(Boolean).length === 1);
+ok('và đó là Gala — hạn 21h00 ngày 19/9, gấp nhất trong ba', mo1[0] === true);
+
+// Mở khối thứ hai thì khối thứ nhất phải TỰ ĐÓNG. Chỉ cách này mới phân biệt
+// được accordion thật với ba <details> độc lập cùng mở sẵn một cái.
+await p.locator('.tnsec').nth(1).locator('summary').click();
+await p.waitForTimeout(400);
+const mo2 = await dangMo();
+ok(`mở Hồ sơ thì Gala tự gập (${mo2.join(', ')})`,
+   mo2[1] === true && mo2[0] === false && mo2.filter(Boolean).length === 1);
+
+// Gập chính nó lại thì được phép không còn khối nào mở — đó là một trạng thái
+// hợp lệ, không phải lỗi.
+await p.locator('.tnsec').nth(1).locator('summary').click();
+await p.waitForTimeout(400);
+ok('gập hết cũng được', (await dangMo()).filter(Boolean).length === 0);
+
+// Trả lại khối Gala cho các phép bên dưới.
+await p.locator('.tnsec').first().locator('summary').click();
+await p.waitForTimeout(400);
 ok('có ba chip tiến độ', await p.locator('.tnprog > span').count() === 3);
+
+/* ── Mã QR phải NHÌN THẤY ĐƯỢC khi chưa chuyển phí ───────────────────────
+   Ngô Phú Cường 18/9: "Câu hỏi đã chuyển khoản 1.000.000 chưa, nếu chưa thì
+   sẽ tự động expand hình ảnh QR code."
+
+   Đây là chỗ hai yêu cầu suýt đánh nhau: gập hai khối cho gọn (yêu cầu ở
+   trên) mà gập nhầm khối đang giữ mã QR thì người đã đăng ký dự Lễ nhưng chưa
+   chuyển tiền mở trang ra không thấy mã đâu — đúng người cần thấy nhất. */
+console.log('\n── Chưa chuyển phí thì khối Gala mở sẵn, mã QR ở trong ──');
+ok('câu hỏi nêu rõ SỐ TIỀN, không hỏi trống không',
+   /đã chuyển khoản .*1\.000\.000.*chưa/i.test(await p.locator('.tnphi').innerText()));
+ok('có ô mã QR (hoặc nhánh dự phòng khi mã không tải được)',
+   (await p.locator('.tnphi img.qr').count()) + (await p.locator('.tnphi .ph').count()) > 0);
 
 /* ── Đề tài KHKD: cá nhân, theo lĩnh vực (migration 0043) ────────────────
    Thay cho lượt bình chọn Zalo đã khoá. Ba điều phải chứng minh bằng trình
@@ -330,12 +372,52 @@ ok('ô Họ tên có sẵn tên vừa chọn (thứ chính họ vừa bấm, kh�
 const chuCk = await p3.locator('body').innerText();
 ok('KHÔNG có chữ "đã đóng" trên màn công khai', !/đã đóng/i.test(chuCk));
 
+/* ── "ÉP KHAI ĐỦ" nhìn từ phía người dùng ────────────────────────────────
+   Ngô Phú Cường 18/9. Phép kiểm ở tầng API đã có (kiem-totnghiep.mjs); phép
+   này hỏi một câu khác hẳn mà API không trả lời được: người bị chặn có BIẾT
+   mình thiếu ô nào không, và họ có MẤT đoạn vừa gõ không.
+
+   Vế thứ hai mới là vế đáng giá. Form này dài hơn một màn điện thoại và người
+   đi lối công khai KHÔNG có bản cũ trên máy chủ để rơi về — chặn mà vẽ lại
+   màn là họ gõ lại từ đầu, và lần thứ hai thì phần lớn bỏ cuộc. */
+ok('có nói trước phải điền đủ những ô nào', /phải điền đủ/i.test(chuCk));
 await p3.fill('#ckDob', '05/05/1975');
 await p3.fill('#ckSdt', '0912345678');
 await p3.locator('#ckDuLe [data-dule="co"]').click(); await p3.waitForTimeout(150);
+await p3.click('#ckGui'); await p3.waitForTimeout(1500);
+ok('thiếu ô thì BỊ CHẶN, không nhảy sang màn "đã gửi"',
+   await p3.locator('#ckGui').count() === 1);
+const loiCk = await p3.locator('#ckErr').innerText();
+ok(`câu báo gọi ĐÚNG TÊN ô còn trống ("${loiCk.slice(0, 70)}")`,
+   /Nhu cầu kết nối/.test(loiCk) && /Lĩnh vực/.test(loiCk));
+// Chặn mà vẽ lại màn là người ta gõ lại từ đầu, và lần thứ hai thì phần lớn
+// bỏ cuộc. Ở form này nó nặng hơn hẳn form có phiên: không có bản cũ trên máy
+// chủ để rơi về.
+ok('ngày sinh vừa gõ VẪN CÒN trong ô, không bị vẽ lại mất',
+   (await p3.inputValue('#ckDob')) === '05/05/1975');
+
+// Ô chọn ảnh phải có mặt ở ĐÂY — đó là cả việc "làm nốt phần logo doanh
+// nghiệp và ảnh chân dung" cho 38 người không đăng nhập được.
+ok('form công khai có ô chọn ảnh chân dung và logo',
+   await p3.locator('.tnanh [data-anhfile]').count() === 2);
+ok('ô ảnh KHÔNG hé lộ người ấy đã gửi ảnh chưa (không có "đã gửi")',
+   !/đã gửi/i.test(await p3.locator('.tnanh').innerText()));
+
+// Đo tràn ngang trên CHÍNH TRANG FORM, không chỉ trên màn cuối: form mới dài
+// thêm hai thẻ ảnh nằm cạnh nhau và một dòng nhắc liệt kê bảy tên ô. Lỗi bố
+// cục chỉ ảnh chụp mới thấy — phép kiểm chuỗi không thấy.
+const tranForm = await p3.evaluate(() =>
+  document.documentElement.scrollWidth - document.documentElement.clientWidth);
+ok(`form công khai không tràn ngang ở 390px (thừa ${tranForm}px)`, tranForm <= 1);
+await p3.screenshot({ path: '/tmp/tn-ck-form.png', fullPage: true });
+
+await p3.fill('#ckDN', 'Công ty Kiểm Tra');
+await p3.fill('#ckCV', 'Giám đốc');
+await p3.fill('#ckKN', 'cần nhà phân phối ngành thực phẩm ở miền Trung');
+await p3.locator('#ckNg .fc').first().click(); await p3.waitForTimeout(150);
 await p3.click('#ckGui'); await p3.waitForTimeout(2000);
 
-ok('gửi xong ra màn "Đã gửi xong"',
+ok('điền đủ thì gửi được, ra màn "Đã gửi xong"',
    (await p3.locator('.tncard > h1').innerText()).includes('Đã gửi'));
 // Mã QR chỉ hiện SAU khi chọn "có dự" — chưa nói là đi thì chưa có gì để
 // chuyển tiền, mà bày sẵn mã là mời chuyển nhầm.
