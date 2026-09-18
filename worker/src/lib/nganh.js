@@ -23,7 +23,12 @@ export const NGANH = [
   { ma: 'nong-nghiep',  ten: 'Nông nghiệp · Thực phẩm' },
   { ma: 'am-thuc',      ten: 'Nhà hàng · Cà phê' },
   { ma: 'du-lich',      ten: 'Du lịch · Khách sạn' },
-  { ma: 'van-tai',      ten: 'Vận tải · Kho vận' },
+  // "Logistics" thêm vào nhãn ngày 18/9: Ngô Phú Cường báo "thiếu Logistics
+  // của tôi" dù mã này vốn đã bao đúng ngành ấy. Người trong nghề gọi nó bằng
+  // từ tiếng Anh, "Kho vận" không gợi ra. Đổi NHÃN nên không dòng D1 nào phải
+  // đụng tới — đúng luật đã ghi ở đầu tệp. Bài học chung: một mục có mặt mà
+  // không ai nhận ra thì cũng bằng không có.
+  { ma: 'van-tai',      ten: 'Vận tải · Logistics · Kho vận' },
   { ma: 'cong-nghe',    ten: 'Công nghệ · Phần mềm' },
   { ma: 'truyen-thong', ten: 'Marketing · Truyền thông' },
   { ma: 'giao-duc',     ten: 'Giáo dục · Đào tạo' },

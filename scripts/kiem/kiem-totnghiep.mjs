@@ -154,6 +154,36 @@ const maDaLuu = String(bNg.dang_ky?.linh_vuc ?? '').split(',').filter(Boolean);
 ok(`cắt còn 3 mã (nhận ${maDaLuu.length}: ${maDaLuu.join(',')})`, maDaLuu.length === 3);
 ok('mã lạ bị bỏ', !maDaLuu.includes('ma-khong-co-that'));
 
+/* Ô chữ tự do đi kèm chip "Ngành khác" — migration 0044.
+   Ngô Phú Cường 18/9: "Khác có thể điền free text không?" Soi D1 thật trước
+   khi làm cho con số quyết định: 46 người có member_profile mà da_chon_nganh
+   = 0 — KHÔNG MỘT AI từng bấm một chip ngành nào. Nên danh mục 19 mã không
+   được sửa theo phỏng đoán; thứ đáng làm là mở đường cho người không thấy
+   mình trong danh sách tự nói ra. */
+console.log('\n── "Ngành khác": ô chữ chỉ sống cùng chip ──');
+const rKhac = await put('/api/totnghiep/ho-so', ckCuong, {
+  ...hoSo1, linh_vuc: ['khac', 'van-tai'], linh_vuc_khac: 'Logistics chuỗi lạnh',
+});
+const bKhac = await rKhac.json().catch(() => ({}));
+ok('có chip khac thì giữ nguyên chữ',
+   bKhac.dang_ky?.linh_vuc_khac === 'Logistics chuỗi lạnh');
+
+// PHÉP CÓ RĂNG của cả tính năng. Giao diện ẩn ô chữ khi chip tắt, nhưng ẩn
+// KHÔNG phải là chốt chặn (quy ước 6: kiểm ở máy chủ, không tin giao diện) —
+// và ở đây cái giá rất cụ thể: bản xuất CSV sẽ in ra một ngành mà người ấy đã
+// thôi khai, còn họ thì không thấy ô nào để sửa vì nó đang bị ẩn.
+const rBo = await put('/api/totnghiep/ho-so', ckCuong, {
+  ...hoSo1, linh_vuc: ['van-tai'], linh_vuc_khac: 'Logistics chuỗi lạnh',
+});
+const bBo = await rBo.json().catch(() => ({}));
+ok('bỏ chip khac thì chữ bị gỡ theo, dù máy khách vẫn gửi lên',
+   bBo.dang_ky?.linh_vuc_khac === null);
+
+// Trả lại trạng thái có chữ, để phép kiểm CSV bên dưới có cái mà đọc.
+await put('/api/totnghiep/ho-so', ckCuong, {
+  ...hoSo1, linh_vuc: ['khac', 'van-tai'], linh_vuc_khac: 'Logistics chuỗi lạnh',
+});
+
 // ── 7. du_le / tai_tro chỉ nhận giá trị trong danh sách ──────────────────
 console.log('\n── Giá trị lạ → null (chưa trả lời), không phải 422 ──');
 const rLa = await put('/api/totnghiep/gala', ckCuong, { du_le: 'co le', tai_tro: 'vang' });
@@ -292,6 +322,14 @@ ok('xuống dòng bằng CRLF', csv.includes('\r\n'));
 ok('có ba cột KHKD cá nhân',
    csv.includes('Lĩnh vực KHKD') && csv.includes('Đề tài KHKD') && csv.includes('Link bài KHKD'));
 ok('CSV in TÊN lĩnh vực chứ không in mã thô', csv.includes('Y tế, Giáo dục') && !csv.includes('lv-y-te-giao-duc'));
+// Cột "Lĩnh vực hoạt động" trước đây in thẳng chuỗi mã 'van-tai,khac' — đúng
+// dữ liệu nhưng không ai ngoài người viết mã đọc được, mà cả lý do tệp CSV
+// tồn tại là để người khác đọc. Nay in nhãn, và ô "Ngành khác" nối ngay sau
+// chính nhãn ấy nên đọc một dòng là biết người ta tự gọi ngành mình là gì.
+ok('cột Lĩnh vực hoạt động cũng in NHÃN, không in mã',
+   csv.includes('Vận tải · Logistics · Kho vận') && !/,van-tai[,"]/.test(csv));
+ok('chữ tự do của "Ngành khác" đi kèm ngay trong cùng ô',
+   /Ngành khác: Logistics chuỗi lạnh/.test(csv));
 ok('dòng của Ngô Phú Cường ghi "Đã tự khai"', /Đã tự khai/.test(csv));
 // Phép có RĂNG nhất của cả mục này: mục 6.4 SRS cấm tuyệt đối chữ ấy, và tệp
 // này đi ra ngoài cho Ban tổ chức đọc nên sai một chữ là sai chỗ dễ thấy nhất.

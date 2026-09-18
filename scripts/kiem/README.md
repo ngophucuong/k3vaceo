@@ -109,8 +109,8 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
-| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai KHÔNG ghi đè bản của người đã đăng nhập** |
-| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **không mục lĩnh vực nào bị cắt chữ**, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
+| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **chữ "Ngành khác" bị gỡ theo khi bỏ chip**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai KHÔNG ghi đè bản của người đã đăng nhập** |
+| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **khai xong là mã QR biến mất**, **không mục lĩnh vực nào bị cắt chữ**, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
 | `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
 | `pw-banmoi.mjs` | băng "Có bản mới" + phép soi bản lúc mở trang — **đếm số lượt nạp tài liệu**, vì hàm này gọi `location.reload()` trên đường khởi động của mọi người dùng |
@@ -120,7 +120,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Ba mươi ba phép đối chứng đáng giữ nhất
+## Ba mươi bốn phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -466,6 +466,21 @@ bash scripts/kiem/reset-tanso.sh && node scripts/kiem/kiem-tanso.mjs
 Nó giả lập địa chỉ IP bằng header `cf-connecting-ip` — đúng thứ `clientIp()`
 đọc trên bản thật — nên một tiến trình đóng được cả vai "cả lớp chung một
 WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài liệu RFC 5737.
+
+34. **Cất mã QR đi thì phải kiểm CẢ HAI hình dạng của nó, không thì phép kiểm
+   đậu suông.** Ngô Phú Cường yêu cầu 18/9: khai "đã chuyển khoản" xong là ẩn
+   mã QR, vì để nguyên là mời chuyển tiền thêm một lần nữa cho đúng người vừa
+   nói mình đã chuyển. Phép kiểm hiển nhiên là đếm `img.qr` phải bằng 0 —
+   **và nó xanh kể cả khi bản vá không tồn tại**, bởi sandbox không ra được
+   internet nên `img.vietqr.io` KHÔNG BAO GIỜ tải được: `img.onerror` đã thay
+   thẻ ảnh bằng ô dự phòng `.ph` từ trước, nên `img.qr` vốn đã là 0 ở mọi lượt
+   chạy. Phải đếm cả `.ph` (và cả nút `[data-tncopy]`).
+
+   Cùng lượt còn kiểm ĐƯỜNG LUI, vì cất một thứ đi mà không lấy lại được là
+   một lỗi khác: bỏ khai thì ô dự phòng phải quay lại thật, và câu chữ phải
+   nói ra điều đó. Bài học chung: khi nhánh dự phòng luôn chạy trong sandbox,
+   mọi phép kiểm nhắm vào nhánh CHÍNH đều mù — hỏi đúng thứ người dùng nhìn
+   thấy, đừng hỏi thứ lẽ ra phải hiện.
 
 ## Chạy bộ kiểm zone Lễ tốt nghiệp
 

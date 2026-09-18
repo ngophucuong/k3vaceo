@@ -1,0 +1,39 @@
+-- Ô chữ tự do đi kèm chip "Ngành khác" ở phần Hồ sơ & chứng chỉ.
+--
+-- ══ VÌ SAO THÊM ═══════════════════════════════════════════════════════════
+-- Ngô Phú Cường (18/9): "Trong phần khai Lĩnh vực hoạt động thiếu Logistics
+-- của tôi, có thể rà soát những học viên đã khai báo để rà soát được không?
+-- Khác có thể điền free text không?"
+--
+-- Vế Logistics KHÔNG cần cột nào: mã `van-tai` vốn đã bao đúng ngành ấy, chỉ
+-- mang nhãn "Vận tải · Kho vận" nên người trong nghề không nhận ra. Đã đổi
+-- nhãn thành "Vận tải · Logistics · Kho vận" — đổi NHÃN, không đụng mã, không
+-- dòng D1 nào phải sửa (luật ghi ở đầu worker/src/lib/nganh.js).
+--
+-- ══ SOI D1 THẬT TRƯỚC KHI LÀM, VÀ CON SỐ LÀM ĐỔI CẢ CÂU TRẢ LỜI ═══════════
+-- Lượt soi 13 (soi-du-lieu.yml, 14h51 ngày 18/9) hỏi "những học viên đã khai
+-- báo chọn ngành gì". Kết quả:
+--
+--     co_ho_so=46  ·  da_chon_nganh=0  ·  chon_nganh_khac=0
+--     cả 19 ngành đều = 0
+--
+-- KHÔNG MỘT AI trong lớp từng bấm một chip ngành nào — kể cả 46 người đã có
+-- dòng member_profile. Nên:
+--   · "rà soát người đã khai" hoá ra không có gì để rà; danh mục 19 mã chưa
+--     bao giờ được dùng thật, và không có bằng chứng nào nói nó thiếu hay đủ;
+--   · vì thế KHÔNG thêm/bớt mã nào theo phỏng đoán. Thứ đáng làm là mở đường
+--     cho người không thấy mình trong danh sách TỰ NÓI ra — đó đúng là ô free
+--     text này, và nó còn là cách duy nhất để lần sau có dữ liệu mà rà;
+--   · dang_ky_tot_nghiep lúc này RỖNG (so_dong=0), nên thêm cột không đụng
+--     dòng nào của ai.
+--
+-- ══ VÌ SAO ĐẶT Ở `dang_ky_tot_nghiep`, KHÔNG ĐẶT Ở `member_profile` ═══════
+-- Cột này đi theo `linh_vuc` — bản ĐÃ XÁC NHẬN cho chứng chỉ, chứ không phải
+-- hồ sơ giao thương. putHoSo cố ý KHÔNG ghi ngược vào member_profile (mục
+-- "màn XÁC NHẬN" trong CLAUDE.md), nên đặt cột ở member_profile thì ô này
+-- không bao giờ được điền từ chính màn hình vừa sinh ra nó.
+--
+-- Giao thương giữ nguyên: chip "Ngành khác" ở đó vẫn không có ô chữ. Bao giờ
+-- có người hỏi thì đó là một quyết định KHÁC — nó chạm vào bộ lọc, trang công
+-- khai và thuật toán ghép nối, ba thứ ô này không chạm tới.
+ALTER TABLE dang_ky_tot_nghiep ADD COLUMN linh_vuc_khac TEXT;

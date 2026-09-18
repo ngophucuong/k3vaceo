@@ -34,8 +34,9 @@ tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
    là màn XÁC NHẬN chứ không phải biểu mẫu 15 câu. Kèm **đợt thu cấp lớp ĐẦU
    TIÊN** của dự án (0041), **đường CÔNG KHAI cho 38 người không đăng nhập
    được** (0042), rồi **bỏ hẳn đường nộp theo NHÓM, chuyển sang LĨNH VỰC +
-   cá nhân** (0043) vì lớp đổi cách nộp bài ngay chiều hôm ấy. Xem ba mục
-   riêng bên dưới trước khi đụng vào `worker/src/routes/tot-nghiep.js`.
+   cá nhân** (0043) vì lớp đổi cách nộp bài ngay chiều hôm ấy, cộng ô chữ
+   "Ngành khác" (0044). Xem các mục riêng bên dưới trước khi đụng vào
+   `worker/src/routes/tot-nghiep.js`.
 2. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
    này, và là lần đầu tiên nó **tốn tiền theo lượt dùng** cùng lần đầu **bỏ
    HAI nguyên tắc gốc cùng lúc (N1 và N2)**. Ngô Phú Cường đưa hai tài liệu
@@ -344,7 +345,7 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
   SRS viết trước khi có tính năng này, và chính nó là chỗ lệch N1/N2 lớn nhất
   (xem mục riêng). `cai_dat` là bảng cấu hình chạy-thời-gian ĐẦU TIÊN của dự
   án: mọi tính năng trước đều miễn phí nên không cần công tắc tắt gấp.
-- `dang_ky_tot_nghiep` (migration 0041, mở rộng 0042 và 0043) — zone Lễ tốt
+- `dang_ky_tot_nghiep` (migration 0041, mở rộng 0042, 0043 và 0044) — zone Lễ tốt
   nghiệp 26/9. SRS viết trước khi Ban tổ chức gửi 15 câu này. Ba cột
   `groups.ban_nop_*` của 0041 **đã GỠ ở 0043** khi lớp bỏ nộp bài theo nhóm;
   đề tài nay là `dang_ky_tot_nghiep.khkd_*`, xem mục riêng bên dưới.
@@ -1397,6 +1398,82 @@ họ trong Danh bạ VẪN bị che, và khi họ đăng nhập thật thì vẫ
 2. **Thứ tự xoá trong reset là bắt buộc**: `dang_ky_tot_nghiep` và
    `fund_declarations` đều trỏ vào `members(id)`, xoá `members` trước là vỡ
    FOREIGN KEY và cả khối SQL không chạy dòng nào.
+
+### Khai "đã chuyển khoản" là CẤT mã QR đi (18/9)
+
+Ngô Phú Cường: *"Nếu khai đã chuyển tiền 1.000.000 thì ẩn phần mã QR đi."*
+`tnVePhi()` nay có ba nhánh chứ không phải hai: chưa khai → mã QR + số tài
+khoản + nút chép; **đã tự khai → cất cả ba**; người thu đã nhận → như cũ.
+
+Đây là nguyên tắc "xong thì phải CẤT BỚT chứ không chỉ thêm dấu" đã ghi cho
+tab Quỹ, nay áp **sớm hơn một nấc**: ở tab Quỹ mã chỉ biến mất khi người thu
+xác nhận, ở đây biến mất ngay khi chính chủ tự khai. Lý do mạnh hơn ở đây vì
+sandbox đã cho thấy đúng cảnh người dùng gặp lúc mạng yếu: mã không tải được
+thì nhánh dự phòng hiện một khối CAM đọc lên y như cảnh báo — nằm ngay dưới
+dòng người ta vừa nói mình đã chuyển tiền xong.
+
+**Câu chữ mục 6.4 SRS KHÔNG đổi**: vẫn "đã tự khai", vẫn chip CAM, vẫn nói
+người thu còn phải đối chiếu sao kê. Cất mã QR là bớt một lời mời trả tiền,
+không phải tuyên bố đã thu xong. Và **đường lui phải nói ra**: chạm lại nút
+là bỏ khai, mã hiện lại ngay — cất một thứ đi mà không nói cách lấy lại là
+làm người ta sợ, nhất là người bấm nhầm.
+
+**Tab Quỹ giữ NGUYÊN**, không sửa theo: ở đó người ta còn đang đi chuyển tiền
+thật cho nhiều đợt, và quy ước hai mức của nó đã chạy từ Đợt 3.
+
+### Thiếu "Logistics", và con số nói rằng danh mục ngành chưa ai từng dùng
+
+Ngô Phú Cường 18/9: *"Trong phần khai Lĩnh vực hoạt động thiếu Logistics của
+tôi, có thể rà soát những học viên đã khai báo để rà soát được không? Khác có
+thể điền free text không?"*
+
+**Vế Logistics không cần cột nào, cũng không cần thêm mã:** `van-tai` vốn đã
+bao đúng ngành ấy, chỉ mang nhãn *"Vận tải · Kho vận"* nên người trong nghề
+không nhận ra — họ gọi nó bằng từ tiếng Anh. Đổi nhãn thành **"Vận tải ·
+Logistics · Kho vận"**, đúng luật ghi ở đầu `lib/nganh.js` (mã vào D1 thì
+không đổi được, nhãn thì thoải mái). Bài học chung: **một mục có mặt mà không
+ai nhận ra thì cũng bằng không có.**
+
+**Vế "rà soát" cho một con số làm đổi hẳn câu trả lời** (soi D1 thật lượt 13,
+14h51 ngày 18/9):
+
+```
+co_ho_so = 46  ·  da_chon_nganh = 0  ·  chon_nganh_khac = 0
+cả 19 ngành đều = 0
+```
+
+**KHÔNG MỘT AI trong lớp từng bấm một chip ngành nào** — kể cả 46 người đã có
+dòng `member_profile` (họ điền "bán gì / cần gì", không điền ngành). Nghĩa là
+bộ lọc theo ngành ở tab Giao thương đang đứng trên dữ liệu rỗng, và danh mục
+19 mã **chưa bao giờ được dùng thật**, nên không có bằng chứng nào nói nó
+thiếu hay đủ. Vì vậy **không thêm/bớt mã nào theo phỏng đoán** — thứ đáng làm
+là mở đường cho người không thấy mình trong danh sách TỰ NÓI ra, và đó cũng là
+cách duy nhất để lần sau có dữ liệu mà rà.
+
+`dang_ky_tot_nghiep` lúc ấy cũng RỖNG (`so_dong = 0`) — chưa ai mở form tốt
+nghiệp. Cả hai con số cộng lại làm migration 0044 thành thứ rẻ nhất có thể:
+thêm cột mà không đụng dòng nào của ai.
+
+#### Ô chữ "Ngành khác": chốt chặn ở MÁY CHỦ, không ở chỗ ẩn ô đi
+
+`dang_ky_tot_nghiep.linh_vuc_khac` (120 ký tự, migration 0044), hiện ra khi
+bấm chip "Ngành khác" ở cả hai form. Ba điều cố ý:
+
+1. **Đặt ở `dang_ky_tot_nghiep`, KHÔNG ở `member_profile`.** Cột này đi theo
+   `linh_vuc` — bản ĐÃ XÁC NHẬN cho chứng chỉ. `putHoSo` cố ý không ghi ngược
+   vào `member_profile`, nên đặt ở đó thì ô này không bao giờ được điền từ
+   chính màn hình vừa sinh ra nó. **Giao thương giữ nguyên**, chip "Ngành
+   khác" ở đó vẫn không có ô chữ: mở ra là chạm vào bộ lọc, trang công khai
+   và thuật toán ghép nối — một quyết định KHÁC, chưa ai hỏi.
+2. **`docLinhVucKhac()` trả `null` khi chip `khac` không còn được chọn.** Giao
+   diện ẩn ô chữ, nhưng ẩn không phải chốt chặn (quy ước 6) — và cái giá rất
+   cụ thể: bản xuất CSV sẽ in một ngành người ấy đã thôi khai, còn họ không
+   thấy ô nào để sửa vì nó đang bị ẩn. Ẩn ô thì **không xoá chữ trong đó**,
+   để bấm nhầm rồi bấm lại không mất đoạn vừa gõ.
+3. **Cột "Lĩnh vực hoạt động" trong CSV nay in NHÃN**, không in chuỗi mã thô
+   `van-tai,khac` — đúng dữ liệu mà không ai ngoài người viết mã đọc được, mà
+   cả lý do tệp CSV tồn tại là để người khác đọc. Chữ tự do nối ngay sau nhãn
+   ("Ngành khác: Logistics chuỗi lạnh").
 
 ### Chưa kiểm chứng được, và những việc còn lại
 

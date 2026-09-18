@@ -130,6 +130,28 @@ console.log('\n── Lĩnh vực: chặn ở nút thứ tư ──');
 for (let i = 0; i < 4; i++) { await p.locator('#tnNg .fc').nth(i).click(); await p.waitForTimeout(120); }
 ok('bấm 4 chip mà chỉ 3 cái sáng', await p.locator('#tnNg .fc.on').count() === 3);
 
+/* Ô chữ tự do của chip "Ngành khác" — migration 0044, Ngô Phú Cường hỏi
+   "Khác có thể điền free text không?". Ô phải ẨN khi chưa bấm chip: bày sẵn
+   một ô trống không ai biết để làm gì, ngay dưới hàng chip, chỉ làm form dài
+   thêm cho 146 người mà phần lớn không cần tới nó. */
+console.log('\n── "Ngành khác" mới mở ô chữ ──');
+ok('chưa bấm "Ngành khác" thì ô chữ ẩn', !(await p.locator('#tnNgKhac').isVisible()));
+await p.locator('#tnNg .fc.on').first().click();     // nhả một chip cho đủ chỗ
+await p.waitForTimeout(120);
+await p.locator('#tnNg [data-ma="khac"]').click();
+await p.waitForTimeout(200);
+ok('bấm "Ngành khác" thì ô chữ hiện ra', await p.locator('#tnNgKhac').isVisible());
+await p.fill('#tnNgKhac', 'Logistics chuỗi lạnh');
+await p.locator('#tnNg [data-ma="khac"]').click();   // bỏ chip
+await p.waitForTimeout(200);
+ok('bỏ chip thì ô chữ ẩn lại', !(await p.locator('#tnNgKhac').isVisible()));
+// Ẩn KHÔNG được xoá chữ: bấm nhầm rồi bấm lại mà mất đoạn vừa gõ là một lỗi
+// mất dữ liệu nhỏ nhưng có thật, nhất là trên điện thoại.
+await p.locator('#tnNg [data-ma="khac"]').click();
+await p.waitForTimeout(200);
+ok('bấm lại thì chữ vừa gõ VẪN CÒN, không bị ẩn rồi xoá',
+   (await p.inputValue('#tnNgKhac')) === 'Logistics chuỗi lạnh');
+
 // ── 5. Lưu từng phần RIÊNG ───────────────────────────────────────────────
 console.log('\n── Ba phần lưu riêng: chip tiến độ đổi đúng một cái ──');
 const chipTruoc = await p.locator('.tnprog > span').allInnerTexts();
@@ -176,6 +198,27 @@ ok('khối phí KHÔNG có .xongchip xanh khi người thu chưa xác nhận',
    await khoiPhi.locator('.xongchip').count() === 0);
 ok('chữ trên nút nói "tự khai", không nói "đã đóng"',
    /tự khai/i.test(await khoiPhi.innerText()) && !/đã đóng/i.test(await khoiPhi.innerText()));
+
+// Ngô Phú Cường yêu cầu 18/9: khai xong là CẤT mã QR đi. Để nguyên là mời
+// chuyển tiền thêm lần nữa cho đúng người vừa nói mình đã chuyển — và ở đây
+// (sandbox không ra được internet) thứ còn lại là ô dự phòng CAM đọc lên y
+// như một cảnh báo trên một việc đã xong. Kiểm cả ô dự phòng lẫn thẻ img, vì
+// mạng tốt thì hiện thẻ img còn mạng yếu thì hiện ô — cất là phải cất cả hai.
+ok('khai xong thì KHÔNG còn mã QR (cả thẻ img lẫn ô dự phòng)',
+   await khoiPhi.locator('img.qr').count() === 0 && await khoiPhi.locator('.ph').count() === 0);
+ok('cũng cất luôn nút chép cú pháp chuyển khoản',
+   await khoiPhi.locator('[data-tncopy]').count() === 0);
+// Cất một thứ đi mà không nói cách lấy lại là làm người ta sợ — nhất là khi
+// họ bấm nhầm. Đường lui có thật (chạm lại nút là bỏ khai), nên câu chữ phải
+// nói ra, và đây là phép canh cho chính câu ấy.
+ok('nói rõ đường lui: khai nhầm thì chạm lại, mã QR hiện lại',
+   /chạm lại/i.test(await khoiPhi.innerText()) && /hiện lại/i.test(await khoiPhi.innerText()));
+await nutKhai.click();          // bỏ khai
+await p.waitForTimeout(1600);
+ok('bỏ khai thì mã QR (ở đây là ô dự phòng) quay lại thật',
+   await p.locator('.tnphi .ph').count() === 1);
+await p.locator('[data-tndeclare]').click();   // khai lại, để các phép sau đứng nguyên chỗ cũ
+await p.waitForTimeout(1600);
 
 // ── Bố cục 390px: không tràn ngang ───────────────────────────────────────
 console.log('\n── Bố cục ở khổ 390px (iPhone 12–15) ──');

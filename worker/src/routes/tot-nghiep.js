@@ -47,6 +47,36 @@ const TAI_TRO = ['tien', 'hien_vat', 'khong'];
 const motTrong = (v, ds) => (ds.includes(String(v ?? '')) ? String(v) : null);
 const coKhong = v => (v === 1 || v === true || v === '1' ? 1 : 0);
 
+/* Ô chữ tự do đi kèm chip "Ngành khác" (migration 0044). Lý do có nó, và con
+   số soi được trước khi làm, nằm trong chính migration ấy.
+
+   CHỈ GIỮ KHI CHIP `khac` CÒN ĐƯỢC CHỌN — bỏ chip mà vẫn giữ chữ thì bản xuất
+   CSV in ra một ngành mà người ấy đã thôi khai, và không màn nào lộ ra để họ
+   sửa: giao diện ẩn luôn ô chữ khi chip tắt. Ràng buộc "chữ chỉ sống cùng
+   chip" phải đặt ở MÁY CHỦ chứ không ở giao diện (quy ước 6), vì đây là chỗ
+   duy nhất cả hai đường ghi — có phiên và công khai — cùng đi qua. */
+function docLinhVucKhac(chuoiNganh, giaTri) {
+  const coChipKhac = String(chuoiNganh ?? '').split(',').includes('khac');
+  return coChipKhac ? cleanText(giaTri, 120) : null;
+}
+
+/* Mã ngành → NHÃN, cho bản xuất CSV mà Ban tổ chức mở bằng Excel.
+   Cột này vốn in thẳng chuỗi thô 'van-tai,thuong-mai' — đúng dữ liệu nhưng
+   không ai ngoài người viết mã đọc được, mà cả lý do tệp CSV tồn tại là để
+   người khác đọc. Ô "Ngành khác" nối vào ngay sau chính nhãn ấy, nên đọc một
+   dòng là biết người ta tự gọi ngành mình là gì. */
+function tenNganhDoc(chuoi, khac) {
+  const ten = String(chuoi ?? '').split(',').filter(Boolean)
+    .map(ma => NGANH.find(n => n.ma === ma)?.ten ?? ma);
+  const chuKhac = cleanText(khac, 120);
+  if (chuKhac) {
+    const i = ten.findIndex(t => t === 'Ngành khác');
+    if (i >= 0) ten[i] = `Ngành khác: ${chuKhac}`;
+    else ten.push(`Ngành khác: ${chuKhac}`);
+  }
+  return ten.join(' · ');
+}
+
 async function docDangKy(env, memberId) {
   return env.DB.prepare(
     'SELECT * FROM dang_ky_tot_nghiep WHERE member_id = ?'
@@ -157,21 +187,23 @@ export async function putHoSo(request, env, me) {
     chuc_vu: cleanText(body.chuc_vu, 120),
     nhu_cau_ket_noi: cleanText(body.nhu_cau_ket_noi, 500),
   };
+  dat.linh_vuc_khac = docLinhVucKhac(dat.linh_vuc, body.linh_vuc_khac);
 
   await env.DB.prepare(
     `INSERT INTO dang_ky_tot_nghiep
        (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc,
-        chuc_vu, nhu_cau_ket_noi, ho_so_luc, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        linh_vuc_khac, chuc_vu, nhu_cau_ket_noi, ho_so_luc, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
      ON CONFLICT(member_id) DO UPDATE SET
        ho_ten = excluded.ho_ten, ngay_sinh = excluded.ngay_sinh,
        dien_thoai = excluded.dien_thoai, doanh_nghiep = excluded.doanh_nghiep,
-       linh_vuc = excluded.linh_vuc, chuc_vu = excluded.chuc_vu,
+       linh_vuc = excluded.linh_vuc, linh_vuc_khac = excluded.linh_vuc_khac,
+       chuc_vu = excluded.chuc_vu,
        nhu_cau_ket_noi = excluded.nhu_cau_ket_noi,
        ho_so_luc = excluded.ho_so_luc, updated_at = excluded.updated_at`
   ).bind(
     me.id, dat.ho_ten, dat.ngay_sinh, dat.dien_thoai, dat.doanh_nghiep,
-    dat.linh_vuc, dat.chuc_vu, dat.nhu_cau_ket_noi
+    dat.linh_vuc, dat.linh_vuc_khac, dat.chuc_vu, dat.nhu_cau_ket_noi
   ).run();
 
   // Chỉ ghi hoạt động LẦN ĐẦU. Sửa lại một chữ mà đẩy thêm một dòng vào feed
@@ -395,23 +427,26 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     chuc_vu: cleanText(body.chuc_vu, 120),
     nhu_cau_ket_noi: cleanText(body.nhu_cau_ket_noi, 500),
   };
+  dat.linh_vuc_khac = docLinhVucKhac(dat.linh_vuc, body.linh_vuc_khac);
 
   // Một lượt ghi CẢ HAI phần: người đi đường này gõ một mạch rồi bấm Gửi, chứ
   // không có màn ba khối lưu riêng (họ không quay lại sửa được — không có
   // phiên). Vì vậy đóng dấu cả hai mốc cùng lúc.
   await env.DB.prepare(
     `INSERT INTO dang_ky_tot_nghiep
-       (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc, chuc_vu,
+       (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc,
+        linh_vuc_khac, chuc_vu,
         nhu_cau_ket_noi, du_le, tai_tro, tai_tro_mo_ta, gian_hang, van_nghe,
         van_nghe_mo_ta, khkd_linh_vuc, khkd_de_tai, khkd_url, khkd_luc,
         nguon, ho_so_luc, gala_luc, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
              CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, 'cong_khai',
              datetime('now'), datetime('now'), datetime('now'))
      ON CONFLICT(member_id) DO UPDATE SET
        ho_ten = excluded.ho_ten, ngay_sinh = excluded.ngay_sinh,
        dien_thoai = excluded.dien_thoai, doanh_nghiep = excluded.doanh_nghiep,
-       linh_vuc = excluded.linh_vuc, chuc_vu = excluded.chuc_vu,
+       linh_vuc = excluded.linh_vuc, linh_vuc_khac = excluded.linh_vuc_khac,
+       chuc_vu = excluded.chuc_vu,
        nhu_cau_ket_noi = excluded.nhu_cau_ket_noi, du_le = excluded.du_le,
        tai_tro = excluded.tai_tro, tai_tro_mo_ta = excluded.tai_tro_mo_ta,
        gian_hang = excluded.gian_hang, van_nghe = excluded.van_nghe,
@@ -423,7 +458,7 @@ export async function postTotNghiepCongKhai(request, env, ip) {
        updated_at = excluded.updated_at`
   ).bind(
     mem.id, dat.ho_ten, dat.ngay_sinh, dat.dien_thoai, dat.doanh_nghiep,
-    dat.linh_vuc, dat.chuc_vu, dat.nhu_cau_ket_noi, duLe,
+    dat.linh_vuc, dat.linh_vuc_khac, dat.chuc_vu, dat.nhu_cau_ket_noi, duLe,
     motTrong(body.tai_tro, TAI_TRO), cleanText(body.tai_tro_mo_ta, 500),
     coKhong(body.gian_hang), coKhong(body.van_nghe), cleanText(body.van_nghe_mo_ta, 500),
     khkdLinhVuc, khkdDeTai, khkdUrl, coKhkd ? 1 : 0
@@ -467,7 +502,7 @@ async function docDanhSach(env, me) {
             g.no AS group_no, g.label AS group_label, r.dob AS dob_goc,
             d.khkd_linh_vuc, d.khkd_de_tai, d.khkd_url, d.khkd_luc,
             d.ho_ten, d.ngay_sinh, d.dien_thoai, d.doanh_nghiep, d.linh_vuc,
-            d.chuc_vu, d.nhu_cau_ket_noi, d.anh_url, d.logo_url, d.ho_so_luc,
+            d.linh_vuc_khac, d.chuc_vu, d.nhu_cau_ket_noi, d.anh_url, d.logo_url, d.ho_so_luc,
             d.du_le, d.tai_tro, d.tai_tro_mo_ta, d.gian_hang, d.van_nghe,
             d.van_nghe_mo_ta, d.gala_luc, d.nguon,
             (SELECT CASE WHEN fd.verified_at IS NOT NULL THEN 'nguoi_thu_da_nhan'
@@ -543,7 +578,7 @@ export async function getXuatCsv(env, me) {
     ['Email', x => x.email],
     ['Doanh nghiệp', x => x.doanh_nghiep],
     ['Chức vụ', x => x.chuc_vu],
-    ['Lĩnh vực', x => x.linh_vuc],
+    ['Lĩnh vực', x => tenNganhDoc(x.linh_vuc, x.linh_vuc_khac)],
     ['Nhu cầu kết nối', x => x.nhu_cau_ket_noi],
     ['Ảnh chân dung', x => x.anh_url],
     ['Logo doanh nghiệp', x => x.logo_url],

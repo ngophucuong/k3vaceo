@@ -4540,6 +4540,8 @@ async function tnckForm() {
     <label class="f">Lĩnh vực hoạt động (tối đa 3)</label>
     <div class="fl cuon" id="ckNg">${(cf.nganh_list ?? []).map(x =>
       `<button type="button" class="fc" data-ma="${esc(x.ma)}">${esc(x.ten)}</button>`).join('')}</div>
+    <input id="ckNgKhac" maxlength="120" style="display:none"
+      placeholder="Ngành của bạn là gì? Ví dụ: Logistics chuỗi lạnh">
 
     <label class="f">Nhu cầu kết nối — càng cụ thể càng dễ ghép</label>
     <textarea id="ckKN" maxlength="500" rows="3"
@@ -4597,6 +4599,7 @@ async function tnckForm() {
         toast('Tối đa 3 lĩnh vực'); return;
       }
       b.classList.toggle('on');
+      oNganhKhac('#ckNg', '#ckNgKhac');
     };
   });
 
@@ -4613,6 +4616,7 @@ async function tnckForm() {
         doanh_nghiep: $('#ckDN').value,
         chuc_vu: $('#ckCV').value,
         linh_vuc: [...document.querySelectorAll('#ckNg .fc.on')].map(x => x.dataset.ma),
+        linh_vuc_khac: $('#ckNgKhac').value,
         nhu_cau_ket_noi: $('#ckKN').value,
         khkd_linh_vuc: document.querySelector('#ckLv .fc.on')?.dataset.lv ?? null,
         khkd_de_tai: $('#ckDeTai').value,
@@ -4778,6 +4782,8 @@ function veTotNghiep() {
         <label class="f">Lĩnh vực hoạt động (tối đa 3)</label>
         <div class="fl cuon" id="tnNg">${(TN.nganh_list ?? []).map(x =>
           `<button type="button" class="fc ${nganhDangChon.has(x.ma) ? 'on' : ''}" data-ma="${esc(x.ma)}">${esc(x.ten)}</button>`).join('')}</div>
+        <input id="tnNgKhac" maxlength="120" placeholder="Ngành của bạn là gì? Ví dụ: Logistics chuỗi lạnh"
+          style="display:${nganhDangChon.has('khac') ? 'block' : 'none'}" value="${esc(d.linh_vuc_khac ?? '')}">
 
         <label class="f">Nhu cầu kết nối — càng cụ thể càng dễ ghép</label>
         <textarea id="tnKN" maxlength="500" rows="3"
@@ -4839,11 +4845,48 @@ function veTotNghiep() {
    Mục 6.4 SRS: trạng thái LUÔN là "đã tự khai" cho tới khi người thu đối
    chiếu sao kê. Màu đi theo nghĩa, không đi theo "đã xong bước nào": ✓ XANH
    chỉ khi người thu đã nhận, CAM khi mới tự khai. */
+/* Ô chữ "Ngành khác" hiện/ẩn theo chính chip `khac` (migration 0044).
+   Dùng CHUNG cho cả hai form — có phiên và công khai — vì hai bản sao của
+   cùng một luật hiển thị thì sớm muộn lệch nhau, và chỗ lệch ở đây là "ô hiện
+   ra mà không ai gửi giá trị đi".
+
+   Ẩn ô đi KHÔNG tự xoá chữ trong đó: bấm nhầm rồi bấm lại thì đoạn vừa gõ còn
+   nguyên. Chốt chặn thật nằm ở máy chủ — docLinhVucKhac() trả null khi chip
+   `khac` không còn được chọn, nên chữ bị ẩn không bao giờ lọt vào D1. */
+function oNganhKhac(wrap, o) {
+  const on = !!document.querySelector(`${wrap} .fc.on[data-ma="khac"]`);
+  const el = document.querySelector(o);
+  if (el) el.style.display = on ? 'block' : 'none';
+}
+
 function tnVePhi(r) {
   if (r.i_am_verified) {
     return `<div class="tnphi">
       <div class="wide ok" style="cursor:default">✓ Người thu đã nhận phí của bạn</div>
       <div class="foot" style="padding:9px 0 0">Xác nhận của ${esc(r.collector_name || 'người thu')} sau khi soi sao kê.</div>
+    </div>`;
+  }
+  // ĐÃ TỰ KHAI thì CẤT mã QR, số tài khoản và nút chép nội dung (Ngô Phú
+  // Cường yêu cầu 18/9) — cùng cách đã làm ở tab Quỹ cho mức "người thu đã
+  // nhận", nay áp sớm hơn một nấc cho mức "đã tự khai". Để nguyên là mời
+  // chuyển tiền thêm một lần nữa cho đúng người vừa nói mình đã chuyển; và
+  // khi mạng yếu mã không tải được thì nhánh dự phòng hiện một khối cam đọc
+  // lên y như cảnh báo trên một việc đã xong.
+  //
+  // Đường lui không cần dựng thêm gì: chạm lại nút là bỏ khai, và mã QR hiện
+  // lại ngay ở lượt vẽ sau — nên bấm nhầm không kẹt ai. Câu chữ nói thẳng
+  // điều đó, vì cất một thứ đi mà không nói cách lấy lại là làm người ta sợ.
+  //
+  // Câu chữ mục 6.4 SRS KHÔNG đổi: vẫn "đã tự khai", vẫn chip CAM, vẫn nói
+  // người thu còn phải đối chiếu sao kê. Cất mã QR là bớt một lời mời trả
+  // tiền, không phải tuyên bố đã thu xong.
+  if (r.i_declared) {
+    return `<div class="tnphi">
+      <div class="eb">Phí ${vnMoney(r.amount)} đ · ${esc(r.collector_name || 'người thu')}</div>
+      <button class="wide ok" data-tndeclare="${r.id}" data-on="1">✓ Bạn đã tự khai là đã chuyển</button>
+      <div class="foot" style="padding:9px 0 0">Người thu sẽ đối chiếu sao kê.
+        <span class="khaichip">đã tự khai</span> Khai nhầm thì chạm lại để bỏ —
+        mã QR và số tài khoản sẽ hiện lại.</div>
     </div>`;
   }
   return `<div class="tnphi">
@@ -4853,12 +4896,8 @@ function tnVePhi(r) {
       <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
       <button class="copy" data-tncopy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
     </div>
-    ${r.i_declared
-      ? `<button class="wide ok" data-tndeclare="${r.id}" data-on="1">✓ Bạn đã tự khai là đã chuyển</button>
-         <div class="foot" style="padding:9px 0 0">Người thu sẽ đối chiếu sao kê.
-           <span class="khaichip">đã tự khai</span> Khai nhầm thì chạm lại để bỏ.</div>`
-      : `<button class="wide" data-tndeclare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Tôi đã chuyển khoản</button>
-         <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>`}
+    <button class="wide" data-tndeclare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Tôi đã chuyển khoản</button>
+    <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>
   </div>`;
 }
 
@@ -4889,6 +4928,7 @@ function tnGanSuKien() {
       const dangCo = document.querySelectorAll('#tnNg .fc.on').length;
       if (!b.classList.contains('on') && dangCo >= 3) { toast('Tối đa 3 lĩnh vực'); return; }
       b.classList.toggle('on');
+      oNganhKhac('#tnNg', '#tnNgKhac');
     };
   });
 
@@ -4908,6 +4948,7 @@ function tnGanSuKien() {
     doanh_nghiep: $('#tnDN').value,
     chuc_vu: $('#tnCV').value,
     linh_vuc: [...document.querySelectorAll('#tnNg .fc.on')].map(x => x.dataset.ma),
+    linh_vuc_khac: $('#tnNgKhac').value,
     nhu_cau_ket_noi: $('#tnKN').value,
   }, 'Đã lưu hồ sơ');
 
