@@ -1355,11 +1355,11 @@ không phải ĐĂNG NHẬP ĐƯỢC.** Hai thứ ấy nới ra thì hậu quả
    là phép kiểm có răng nhất của `pw-totnghiep.mjs` (ô Ngày sinh và ô Điện
    thoại phải RỖNG). Bước tìm tên dùng LẠI `/api/wizard/roster/search`, đường
    vốn đã công khai và cố ý không bao giờ trả số điện thoại hay email.
-3. **KHÔNG ghi đè bản của người đã đăng nhập.** Cột `nguon` (`phien` |
-   `cong_khai`) giữ đúng phân định ấy, và `postTotNghiepCongKhai` trả 409
-   `da_dien_tu_tai_khoan` khi gặp `phien`. Thiếu chốt này thì bất kỳ ai cầm
-   link cũng phá được bản khai của 69 người đã đăng nhập — **đó mới là thiệt
-   hại thật**, chứ không phải một dòng rác thêm vào.
+3. **KHÔNG XOÁ ĐƯỢC gì của ai.** Bản đầu chặn bằng 409 `da_dien_tu_tai_khoan`
+   khi gặp một dòng `nguon='phien'`; **đã nới ngày 18/9** thành ngữ nghĩa
+   "khai bổ sung" — xem mục riêng ngay dưới. Điều phải giữ là chiều gốc: bất
+   kỳ ai cầm link cũng KHÔNG được phá bản khai của 69 người đã đăng nhập —
+   **đó mới là thiệt hại thật**, chứ không phải một dòng rác thêm vào.
 4. **Hạn mức 400/IP/giờ**, trên sĩ số lớp (bài học 27/8).
 
 **Một ngoại lệ có chủ ý cho điểm 2, Ngô Phú Cường yêu cầu ngày 18/9:** dòng
@@ -1398,6 +1398,53 @@ họ trong Danh bạ VẪN bị che, và khi họ đăng nhập thật thì vẫ
 2. **Thứ tự xoá trong reset là bắt buộc**: `dang_ky_tot_nghiep` và
    `fund_declarations` đều trỏ vào `members(id)`, xoá `members` trước là vỡ
    FOREIGN KEY và cả khối SQL không chạy dòng nào.
+
+### Nới "tìm tên → điền → gửi" thành KHAI BỔ SUNG (18/9)
+
+Ngô Phú Cường: *"Nới luật 'tìm tên → điền → gửi' khai báo bổ sung như phát
+link riêng."* Tức đường công khai phải dùng được để **khai thêm phần còn
+thiếu**, ngang với việc được phát một link riêng — chứ không phải chỉ dùng
+được đúng một lần.
+
+**Nới bằng cách đổi NGỮ NGHĨA, không phải bỏ chốt.** Chốt 409 sinh ra để chống
+đúng một việc: ai cầm link cũng xoá được bản khai của người khác. Bỏ thẳng nó
+là mở lại đúng lỗ ấy. Thay vào đó `postTotNghiepCongKhai` nay theo luật
+**"lượt gửi công khai KHÔNG BAO GIỜ xoá trắng một ô đã có chữ"** — ô nào người
+gửi để trống thì giữ nguyên giá trị cũ (`giuCu()`). Cùng một request rỗng vừa
+là hình dạng của một lượt bổ sung thật vừa là hình dạng của một lượt phá hoại,
+nên đáp án đúng cho cả hai là *không ô nào mất*.
+
+Bốn chi tiết mà thiếu một cái là hỏng ngầm:
+
+1. **`giuCu()` phải phủ CẢ BA phần.** Sót một ô là ô ấy bị xoá ở mọi lượt bổ
+   sung — đúng cái vừa chống. Phần C và phần B dễ quên nhất vì mắt đổ dồn vào
+   phần A.
+2. **Hai ô đánh dấu (`gian_hang`, `van_nghe`) CỐ Ý không qua `giuCu`.** Hộp
+   không tích gửi lên `0`, không phân biệt được với "không trả lời". Cho chúng
+   ghi đè theo đúng thứ người gửi để lại, đổi lại người lỡ tích nhầm vẫn rút
+   được — chặn luôn chiều ấy thì không còn đường nào bỏ đăng ký gian hàng.
+3. **Ba mốc thời gian hỏi bản THÔ, không hỏi bản đã trộn.** Hỏi sau khi trộn
+   thì một lượt chỉ điền Gala cũng đóng dấu `ho_so_luc`, và màn Ban cán sự lớp
+   đếm nhầm người ấy vào cột đã xong — con số ấy là cả lý do màn ấy tồn tại.
+   `ho_ten` không tính vào phép hỏi ấy: nó luôn có giá trị (rơi về tên trong
+   danh sách gốc) nên tính vào là mốc nào cũng đóng ở mọi lượt.
+4. **Khối phí đọc `du_le` ĐÃ TRỘN.** Đọc bản thô thì người đã khai "có dự" từ
+   trước, nay quay lại bổ sung ngày sinh, nhận lại màn "không có khoản phí
+   nào" — đúng lúc họ cần mã QR nhất.
+
+**Cái giá của việc nới là phải NHÌN THẤY ĐƯỢC ai đi đường nào**, nên `nguon`
+có giá trị thứ ba: `ca_hai`, xuất hiện đúng khi một bản do chính chủ điền
+trong tài khoản về sau được bổ sung qua link công khai. Không cần migration —
+cột `nguon` là TEXT không ràng buộc (0042). Và nó **đi vào CSV** thành cột
+"Điền qua" (Tài khoản · Link công khai · Tài khoản + link công khai): nới luật
+mà không cho Ban cán sự lớp chỗ soi lại thì mới là liều.
+
+Câu chữ cũng phải đổi theo, và đây không phải trang trí: màn cuối nói "Đã cập
+nhật" kèm *"những ô bạn để trống vẫn giữ nguyên nội dung cũ"* thay vì "Đã gửi
+xong". Nói suông thì người quay lại lần hai tưởng mình vừa ghi đè sạch bản
+khai của chính mình. Dòng "không sửa lại được, nhắn trưởng nhóm xin link đăng
+nhập" ở màn cuối cũng **đã sai từ lúc này** — nay nói đúng: cứ mở lại trang,
+tìm tên, gửi thêm lần nữa.
 
 ### Khai "đã chuyển khoản" là CẤT mã QR đi (18/9)
 
@@ -1488,9 +1535,10 @@ bấm chip "Ngành khác" ở cả hai form. Ba điều cố ý:
   không phải đổi lược đồ. Xem mục riêng ngay dưới. Đường công khai hiện KHÔNG
   nhận ảnh: nhận tệp từ người không đăng nhập là một quyết định khác, chưa ai
   hỏi.
-- **Người đi đường công khai không sửa lại được** (không có phiên để quay
-  lại). Màn cuối nói thẳng điều đó và chỉ họ nhắn trưởng nhóm xin link đăng
-  nhập. Bao giờ có người vấp thật thì đó là chỗ sửa.
+- ~~**Người đi đường công khai không sửa lại được**~~ → **đã nới 18/9**: mở
+  lại trang, tìm tên, gửi thêm lần nữa là bổ sung được, và ô để trống giữ
+  nguyên nội dung cũ. Xem mục "Nới … thành KHAI BỔ SUNG" ở trên. Thứ vẫn
+  KHÔNG làm được: xoá trắng một ô đã có chữ — cố ý, và đó là chốt chặn.
 
 ## Ảnh chứng chỉ qua Google Drive — Đợt 2, CHƯA làm
 

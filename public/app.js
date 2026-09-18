@@ -4457,7 +4457,8 @@ function tnChuaDangNhap() {
     <button class="wide ghost" id="tnckBatDau">Tôi không đăng nhập được — điền thẳng ở đây</button>
     <div class="foot" style="padding:11px 0 0">Lối này chỉ để gửi thông tin cho Ban
       tổ chức, không mở được ứng dụng. Dành cho ai không có số điện thoại trong
-      danh sách gốc của Ban tổ chức.</div>
+      danh sách gốc — và cho cả ai đã khai rồi mà muốn bổ sung thêm: gửi lại
+      qua đây không xoá mất phần đã khai.</div>
   </div></div>`;
   $('#tnckBatDau').onclick = tnckTimTen;
 }
@@ -4641,7 +4642,13 @@ async function tnckForm() {
 // là đi thì chưa có gì để chuyển tiền, mà bày sẵn mã là mời chuyển nhầm.
 function tnckXong(kq) {
   const r = kq.phi;
-  tnckShell('Đã gửi xong', `Cảm ơn ${esc(kq.ho_ten)}. Ban tổ chức đã nhận được thông tin của bạn.`, `
+  // Người quay lại lần hai phải nghe đúng chuyện. Nói "đã gửi" suông thì họ
+  // tưởng vừa ghi đè sạch bản khai cũ của chính mình — mà máy chủ làm ngược
+  // lại: ô nào để trống thì giữ nguyên giá trị cũ (xem postTotNghiepCongKhai).
+  tnckShell(kq.bo_sung ? 'Đã cập nhật' : 'Đã gửi xong',
+    kq.bo_sung
+      ? `Cảm ơn ${esc(kq.ho_ten)}. Đã bổ sung vào bản đăng ký sẵn có của bạn — những ô bạn để trống vẫn giữ nguyên nội dung cũ.`
+      : `Cảm ơn ${esc(kq.ho_ten)}. Ban tổ chức đã nhận được thông tin của bạn.`, `
     ${r ? `<div class="tnphi">
       <div class="eb">Phí dự Lễ ${vnMoney(r.amount)} đ</div>
       <div class="qrw">
@@ -4654,8 +4661,10 @@ function tnckXong(kq) {
         đó là cách người thu biết tiền của ai.</div>
     </div>` : `<div class="mut" style="margin-bottom:18px">Bạn chọn không dự buổi tối,
       nên không có khoản phí nào. Buổi bảo vệ chiều 26/9 vẫn bắt buộc và không thu phí.</div>`}
-    <div class="tnsoon">Muốn sửa lại thông tin, hoặc muốn dùng cả ứng dụng (lịch học,
-      bài, quỹ, danh bạ lớp) thì nhắn trưởng nhóm phát cho bạn một link đăng nhập.</div>
+    <div class="tnsoon">Cần bổ sung hay sửa gì thì cứ mở lại trang này, tìm tên
+      mình và gửi thêm một lần nữa — ô nào bạn để trống sẽ giữ nguyên nội dung đã
+      có. Muốn dùng cả ứng dụng (lịch học, bài, quỹ, danh bạ lớp) thì nhắn trưởng
+      nhóm phát cho bạn một link đăng nhập.</div>
     <a class="tnback" href="/totnghiep">← Về trang đăng ký</a>`);
 
   // Cùng nhánh dự phòng của tab Quỹ: mã hỏng thì thay bằng ô giải thích, đừng

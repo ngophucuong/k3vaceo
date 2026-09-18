@@ -400,26 +400,59 @@ if (ai) {
      dsLai.nguoi.filter(x => x.full_name === ai.full_name).length === 1);
 }
 
-// ── CHỐT CHẶN THẬT SỰ: không ghi đè bản của người ĐÃ ĐĂNG NHẬP ──────────
-// Ngô Phú Cường đã điền từ tài khoản của anh ở các phép trên (nguon='phien').
-// Ai cầm link công khai mà ghi đè được bản ấy thì phá được bản khai của cả 69
-// người đã đăng nhập — đó mới là thiệt hại thật, chứ không phải một dòng rác.
-console.log('\n── Chốt chặn: công khai KHÔNG ghi đè bản của người đã đăng nhập ──');
+/* ── KHAI BỔ SUNG, KHÔNG PHẢI GHI ĐÈ ────────────────────────────────────
+   Bản đầu (0042) chặn cứng bằng 409 da_dien_tu_tai_khoan. Ngô Phú Cường nới
+   ra 18/9: "tìm tên → điền → gửi" phải dùng được để khai bổ sung, ngang với
+   được phát một link riêng.
+
+   Nới bằng cách đổi NGỮ NGHĨA, nên phép kiểm cũng đổi theo — và phần ĐÁNG GIỮ
+   NHẤT vẫn là chiều cũ: chốt 409 sinh ra để chống việc ai cầm link cũng XOÁ
+   được bản khai của người khác, và điều ấy vẫn phải không làm được. */
+console.log('\n── Công khai khai BỔ SUNG được, nhưng không xoá được gì ──');
 const timCuong = await fetch(B + '/api/wizard/roster/search?q=' + encodeURIComponent('Ngô Phú Cường'),
   { headers: IP }).then(r => r.json()).catch(() => ({ people: [] }));
 const rsCuong = (timCuong.people ?? [])[0];
 ok('tìm được roster_id của Ngô Phú Cường', !!rsCuong);
-const rDe = await fetch(B + '/api/totnghiep/cong-khai', {
+
+const truocBS = await get('/api/totnghiep', ckCuong).then(r => r.json());
+ok('trước khi bổ sung: bản của anh là nguon = phien', truocBS.dang_ky?.nguon === 'phien');
+
+// Lượt gửi CỐ Ý để trống gần hết: đây đúng hình dạng của một lượt bổ sung
+// thật (người ta chỉ điền phần còn thiếu), và cũng đúng hình dạng của một
+// lượt phá hoại (gửi form rỗng để xoá sạch). Cùng một request, hai ý đồ —
+// nên đáp án đúng là "không ô nào bị xoá".
+const rBS = await fetch(B + '/api/totnghiep/cong-khai', {
   method: 'POST', headers: { 'content-type': 'application/json', ...IP },
-  body: JSON.stringify({ roster_id: rsCuong?.roster_id, ho_ten: 'KẺ PHÁ HOẠI', du_le: 'khong' }),
+  body: JSON.stringify({ roster_id: rsCuong?.roster_id, nhu_cau_ket_noi: 'bổ sung qua link công khai' }),
 });
-const bDe = await rDe.json().catch(() => ({}));
-ok(`→ 409 da_dien_tu_tai_khoan (nhận ${rDe.status} ${bDe.error ?? ''})`,
-   rDe.status === 409 && bDe.error === 'da_dien_tu_tai_khoan');
+const bBS = await rBS.json().catch(() => ({}));
+ok(`lượt bổ sung → 200, không còn 409 (nhận ${rBS.status})`, rBS.status === 200);
+ok('phúc đáp nói rõ đây là lượt BỔ SUNG', bBS.bo_sung === true);
+
 const sauDe = await get('/api/totnghiep', ckCuong).then(r => r.json());
-ok('bản của Ngô Phú Cường CÒN NGUYÊN (họ tên không bị đổi)',
-   sauDe.dang_ky?.ho_ten === 'Ngô Phú Cường');
-ok('và du_le vẫn là "co"', sauDe.dang_ky?.du_le === 'co');
+ok('ô vừa gửi ĐÃ vào', sauDe.dang_ky?.nhu_cau_ket_noi === 'bổ sung qua link công khai');
+// Bốn ô dưới đây KHÔNG có trong lượt gửi. Đây là phép có RĂNG của cả bản nới:
+// gỡ giuCu() ra khỏi route thì cả bốn thành null và bốn dòng này đỏ.
+ok('họ tên KHÔNG bị xoá', sauDe.dang_ky?.ho_ten === 'Ngô Phú Cường');
+ok('du_le KHÔNG bị xoá (vẫn "co")', sauDe.dang_ky?.du_le === 'co');
+ok('lĩnh vực KHKD KHÔNG bị xoá', !!sauDe.dang_ky?.khkd_linh_vuc);
+ok('mốc gala_luc KHÔNG bị xoá', !!sauDe.dang_ky?.gala_luc);
+// Mốc của phần KHÔNG khai ở lượt này phải ĐỨNG YÊN, không được đóng lại:
+// đóng bừa thì màn Ban cán sự lớp đếm nhầm người ta vào cột đã xong.
+ok('mốc gala_luc giữ nguyên giá trị cũ, không đóng lại',
+   sauDe.dang_ky?.gala_luc === truocBS.dang_ky?.gala_luc);
+// `nguon` là sổ tay của Ban cán sự lớp — nới luật thì phải nhìn thấy được.
+ok('nguon thành "ca_hai" để Ban cán sự lớp soi lại được',
+   sauDe.dang_ky?.nguon === 'ca_hai');
+
+// Và chiều PHÁ HOẠI: gửi một ô rỗng cho một ô đang có chữ thì ô ấy phải còn.
+await fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify({ roster_id: rsCuong?.roster_id, ho_ten: '', du_le: '', khkd_de_tai: '' }),
+});
+const sauPha = await get('/api/totnghiep', ckCuong).then(r => r.json());
+ok('gửi ô RỖNG không xoá được ô đang có chữ',
+   sauPha.dang_ky?.ho_ten === 'Ngô Phú Cường' && sauPha.dang_ky?.du_le === 'co');
 
 // roster_id bịa → 404, không phải 500
 const rBia = await fetch(B + '/api/totnghiep/cong-khai', {

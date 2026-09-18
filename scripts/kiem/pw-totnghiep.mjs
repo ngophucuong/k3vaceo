@@ -346,6 +346,31 @@ ok('mã QR hỏng thì có ô dự phòng, không để ô vỡ ảnh',
    await p3.locator('.tnphi .ph').count() === 1);
 ok('không lỗi JS ở đường công khai: ' + (loi3.join(' | ') || 'sạch'), loi3.length === 0);
 
+/* Lượt GỬI LẠI — "khai bổ sung" mà Ngô Phú Cường nới ra ngày 18/9.
+   Màn cuối phải nói ĐÚNG chuyện: người quay lại lần hai nghe "đã gửi xong"
+   suông sẽ tưởng mình vừa ghi đè sạch bản khai cũ, trong khi máy chủ làm
+   ngược lại (ô để trống thì giữ nguyên). Câu chữ ở đây không phải trang trí:
+   nó là thứ duy nhất nói cho họ biết dữ liệu cũ còn hay mất. */
+console.log('\n── Gửi lại lần hai: khai BỔ SUNG, không phải ghi đè ──');
+await p3.goto(B + '/totnghiep', { waitUntil: 'networkidle' });
+await p3.click('#tnckBatDau'); await p3.waitForTimeout(400);
+await p3.fill('#tnckTen', 'khanh toan'); await p3.waitForTimeout(1400);
+await p3.locator('#tnckDs [data-rid]').first().click(); await p3.waitForTimeout(1200);
+ok('mở lại được form cho cùng một người', await p3.locator('#ckGui').count() === 1);
+// CỐ Ý chỉ điền MỘT ô rồi gửi — đúng hình dạng của một lượt bổ sung thật.
+await p3.fill('#ckKN', 'bổ sung nhu cầu kết nối');
+await p3.click('#ckGui'); await p3.waitForTimeout(2000);
+const tieuDe2 = await p3.locator('.tncard > h1').innerText();
+ok(`màn cuối đổi thành "Đã cập nhật" (đang là "${tieuDe2}")`, /cập nhật/i.test(tieuDe2));
+const than2 = await p3.locator('.tncard').innerText();
+ok('nói rõ ô để trống vẫn giữ nguyên nội dung cũ',
+   /giữ nguyên/i.test(than2) && /để trống/i.test(than2));
+// Và khối phí vẫn còn, dù lượt này KHÔNG chọn lại "có dự": du_le cũ được
+// giữ, nên người quay lại bổ sung không bị mất mã QR đúng lúc cần nó.
+ok('khối phí vẫn còn dù lượt này không chọn lại "có dự"',
+   await p3.locator('.tnphi').count() === 1);
+ok('không lỗi JS ở lượt bổ sung: ' + (loi3.join(' | ') || 'sạch'), loi3.length === 0);
+
 const tran3 = await p3.evaluate(() =>
   document.documentElement.scrollWidth - document.documentElement.clientWidth);
 ok(`không tràn ngang ở 390px (thừa ${tran3}px)`, tran3 <= 1);

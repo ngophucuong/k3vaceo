@@ -109,7 +109,7 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
-| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **chữ "Ngành khác" bị gỡ theo khi bỏ chip**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai KHÔNG ghi đè bản của người đã đăng nhập** |
+| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **chữ "Ngành khác" bị gỡ theo khi bỏ chip**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai khai BỔ SUNG được mà không xoá được ô nào đang có chữ** |
 | `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **khai xong là mã QR biến mất**, **không mục lĩnh vực nào bị cắt chữ**, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
 | `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
@@ -120,7 +120,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Ba mươi bốn phép đối chứng đáng giữ nhất
+## Ba mươi lăm phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -481,6 +481,22 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    nói ra điều đó. Bài học chung: khi nhánh dự phòng luôn chạy trong sandbox,
    mọi phép kiểm nhắm vào nhánh CHÍNH đều mù — hỏi đúng thứ người dùng nhìn
    thấy, đừng hỏi thứ lẽ ra phải hiện.
+
+35. **Nới một chốt chặn thì phép kiểm phải xoay sang canh CHIỀU CÒN LẠI, chứ
+   không phải xoá đi.** Đường công khai của zone Lễ tốt nghiệp ban đầu trả 409
+   khi gặp bản do người đã đăng nhập tự điền; ngày 18/9 Ngô Phú Cường nới ra
+   để khai bổ sung được. Cách làm SAI là xoá phép kiểm 409 rồi thay bằng "gửi
+   lại → 200" — nó xanh với cả một bản vá xoá sạch dữ liệu người khác, tức
+   chính cái mà chốt cũ sinh ra để chống.
+
+   Phép kiểm đúng gửi một request **CỐ Ý gần như rỗng** — đúng hình dạng của
+   một lượt bổ sung thật, và cũng đúng hình dạng của một lượt phá hoại — rồi
+   đòi: ô vừa gửi ĐÃ vào, và bốn ô KHÔNG có trong lượt gửi (họ tên, du_le,
+   lĩnh vực KHKD, mốc gala_luc) vẫn còn nguyên. Đã đối chứng bằng cách gỡ
+   `giuCu()` khỏi route: **ba phép đỏ ngay**. Kèm một phép cho mốc thời gian
+   (phần không khai ở lượt này thì mốc phải ĐỨNG YÊN, không đóng lại) và một
+   phép cho `nguon = 'ca_hai'` — dấu duy nhất cho Ban cán sự lớp biết dòng nào
+   đã đi cả hai đường.
 
 ## Chạy bộ kiểm zone Lễ tốt nghiệp
 

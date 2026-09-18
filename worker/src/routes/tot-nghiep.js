@@ -400,12 +400,27 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     if (!mem) return error('khong_tao_duoc_ho_so', 500);
   }
 
-  // ══ CHỐT CHẶN THẬT SỰ CỦA CẢ TÍNH NĂNG ══════════════════════════════════
-  // Đường công khai KHÔNG ĐƯỢC GHI ĐÈ bản do người đã đăng nhập tự điền.
-  // Thiếu chốt này thì bất kỳ ai cầm link cũng phá được bản khai của 69 người
-  // đã đăng nhập — đó mới là thiệt hại thật, chứ không phải một dòng rác thêm.
+  // ══ KHAI BỔ SUNG, KHÔNG PHẢI GHI ĐÈ ═════════════════════════════════════
+  // Bản đầu (migration 0042) chặn cứng: bản nào do người đã đăng nhập tự điền
+  // thì đường công khai trả 409 da_dien_tu_tai_khoan. Ngô Phú Cường nới ra
+  // ngày 18/9 — "tìm tên → điền → gửi" phải dùng được để KHAI BỔ SUNG, ngang
+  // với việc được phát một link riêng.
+  //
+  // Nới bằng cách đổi NGỮ NGHĨA chứ không phải bỏ chốt: lượt gửi công khai
+  // nay KHÔNG BAO GIỜ XOÁ TRẮNG một ô đã có chữ. Ô nào người gửi bỏ trống thì
+  // giữ nguyên giá trị cũ (`giuCu` bên dưới). Nhờ vậy cái mà chốt 409 sinh ra
+  // để chống — ai cầm link cũng xoá sạch bản khai của người khác — vẫn không
+  // làm được, trong khi người thật quay lại điền thêm phần còn thiếu thì
+  // không bị chặn.
+  //
+  // Hai ô đánh dấu (gian_hang, van_nghe) là ngoại lệ có ý thức: hộp không
+  // tích gửi lên giá trị 0, không phân biệt được với "không trả lời", nên
+  // chúng ghi đè theo đúng thứ người gửi để lại. Đổi lại người thật vẫn BỎ
+  // được đăng ký gian hàng qua đường này — chặn luôn chiều ấy thì một người
+  // lỡ tích nhầm không có cách nào rút.
   const cu = await docDangKy(env, mem.id);
-  if (cu && cu.nguon === 'phien') return error('da_dien_tu_tai_khoan', 409);
+  const giuCu = (moi, ten) => (moi === null || moi === undefined || moi === ''
+    ? (cu?.[ten] ?? null) : moi);
 
   const duLe = motTrong(body.du_le, DU_LE);
   // Đề tài KHKD đi CÙNG đường công khai này, không dựng đường thứ hai: 38
@@ -418,8 +433,12 @@ export async function postTotNghiepCongKhai(request, env, ip) {
   const khkdDeTai = cleanText(body.khkd_de_tai, 300);
   const coKhkd = !!(khkdLinhVuc || khkdDeTai || khkdUrl);
 
-  const dat = {
-    ho_ten: cleanText(body.ho_ten, 120) ?? nguoi.full_name,
+  // Thô = đúng những gì người gửi vừa gõ. Phải giữ riêng khỏi bản đã trộn vì
+  // BA MỐC THỜI GIAN bên dưới hỏi "lượt này có khai gì cho phần đó không",
+  // chứ không hỏi "sau khi trộn thì phần đó có chữ chưa" — trộn xong rồi mới
+  // hỏi thì một lượt gửi chỉ điền Gala cũng đóng dấu ho_so_luc, và màn Ban
+  // cán sự lớp đếm nhầm người ấy vào cột đã xong.
+  const tho = {
     ngay_sinh: cleanText(body.ngay_sinh, 20),
     dien_thoai: cleanText(body.dien_thoai, 20),
     doanh_nghiep: cleanText(body.doanh_nghiep, 200),
@@ -427,11 +446,55 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     chuc_vu: cleanText(body.chuc_vu, 120),
     nhu_cau_ket_noi: cleanText(body.nhu_cau_ket_noi, 500),
   };
-  dat.linh_vuc_khac = docLinhVucKhac(dat.linh_vuc, body.linh_vuc_khac);
+  tho.linh_vuc_khac = docLinhVucKhac(tho.linh_vuc, body.linh_vuc_khac);
 
-  // Một lượt ghi CẢ HAI phần: người đi đường này gõ một mạch rồi bấm Gửi, chứ
-  // không có màn ba khối lưu riêng (họ không quay lại sửa được — không có
-  // phiên). Vì vậy đóng dấu cả hai mốc cùng lúc.
+  const dat = {
+    ho_ten: cleanText(body.ho_ten, 120) ?? cu?.ho_ten ?? nguoi.full_name,
+    ngay_sinh: giuCu(tho.ngay_sinh, 'ngay_sinh'),
+    dien_thoai: giuCu(tho.dien_thoai, 'dien_thoai'),
+    doanh_nghiep: giuCu(tho.doanh_nghiep, 'doanh_nghiep'),
+    linh_vuc: giuCu(tho.linh_vuc, 'linh_vuc'),
+    chuc_vu: giuCu(tho.chuc_vu, 'chuc_vu'),
+    nhu_cau_ket_noi: giuCu(tho.nhu_cau_ket_noi, 'nhu_cau_ket_noi'),
+  };
+  // linh_vuc_khac đi theo linh_vuc ĐÃ TRỘN, không theo bản thô: bỏ trống hàng
+  // chip ở lượt bổ sung thì chip cũ được giữ, nên chữ "Ngành khác" cũ cũng
+  // phải còn — docLinhVucKhac() chỉ gỡ chữ khi chip `khac` thật sự đã thôi.
+  dat.linh_vuc_khac = docLinhVucKhac(dat.linh_vuc, giuCu(tho.linh_vuc_khac, 'linh_vuc_khac'));
+
+  const taiTro = motTrong(body.tai_tro, TAI_TRO);
+  const taiTroMo = cleanText(body.tai_tro_mo_ta, 500);
+  const vanNgheMo = cleanText(body.van_nghe_mo_ta, 500);
+  const gianHang = coKhong(body.gian_hang);
+  const vanNghe = coKhong(body.van_nghe);
+
+  // BA MỐC, ba câu hỏi riêng: "lượt này có khai gì cho phần ĐÓ không". Đóng
+  // dấu cho một phần người ta để trống thì màn Ban cán sự lớp đếm nhầm họ vào
+  // cột đã xong — và con số ấy là cả lý do màn ấy tồn tại. Đã đóng rồi thì
+  // giữ, vì bổ sung phần khác không làm phần cũ chưa xong trở lại.
+  //
+  // ho_ten KHÔNG tính: nó luôn có giá trị (rơi về tên trong danh sách gốc),
+  // nên tính vào là mốc nào cũng đóng ở mọi lượt gửi.
+  const coHoSo = !!(tho.ngay_sinh || tho.dien_thoai || tho.doanh_nghiep
+    || tho.linh_vuc || tho.chuc_vu || tho.nhu_cau_ket_noi);
+  // Hai ô đánh dấu tính là CÓ trả lời chỉ khi được tích: hộp bỏ trống gửi lên
+  // 0 ở mọi lượt, nên coi 0 là một câu trả lời thì lượt nào cũng đóng dấu.
+  const coGala = !!(duLe || taiTro || taiTroMo || vanNgheMo || gianHang || vanNghe);
+
+  // Giá trị du_le SAU KHI TRỘN, dùng cho CẢ lượt ghi lẫn khối phí bên dưới.
+  // Nếu khối phí đọc bản THÔ thì một người đã khai "có dự" từ trước, nay chỉ
+  // quay lại bổ sung ngày sinh, sẽ nhận lại màn "không có khoản phí nào" —
+  // đúng lúc họ cần mã QR nhất.
+  const duLeLuu = giuCu(duLe, 'du_le');
+
+  // `nguon` là SỔ TAY của Ban cán sự lớp, không phải một cờ nội bộ: nới luật
+  // ghi đè thì phải đổi lấy việc nhìn thấy được ai đã đi đường nào. Giá trị
+  // thứ ba `ca_hai` xuất hiện đúng khi một bản do chính chủ điền trong tài
+  // khoản về sau được bổ sung qua đường công khai — thứ trước 18/9 không xảy
+  // ra được vì bị chặn 409.
+  const nguonMoi = !cu ? 'cong_khai'
+    : cu.nguon === 'cong_khai' ? 'cong_khai' : 'ca_hai';
+
   await env.DB.prepare(
     `INSERT INTO dang_ky_tot_nghiep
        (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc,
@@ -440,8 +503,10 @@ export async function postTotNghiepCongKhai(request, env, ip) {
         van_nghe_mo_ta, khkd_linh_vuc, khkd_de_tai, khkd_url, khkd_luc,
         nguon, ho_so_luc, gala_luc, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, 'cong_khai',
-             datetime('now'), datetime('now'), datetime('now'))
+             CASE WHEN ? = 1 THEN datetime('now') ELSE ? END, ?,
+             CASE WHEN ? = 1 THEN datetime('now') ELSE ? END,
+             CASE WHEN ? = 1 THEN datetime('now') ELSE ? END,
+             datetime('now'))
      ON CONFLICT(member_id) DO UPDATE SET
        ho_ten = excluded.ho_ten, ngay_sinh = excluded.ngay_sinh,
        dien_thoai = excluded.dien_thoai, doanh_nghiep = excluded.doanh_nghiep,
@@ -453,15 +518,27 @@ export async function postTotNghiepCongKhai(request, env, ip) {
        van_nghe_mo_ta = excluded.van_nghe_mo_ta,
        khkd_linh_vuc = excluded.khkd_linh_vuc, khkd_de_tai = excluded.khkd_de_tai,
        khkd_url = excluded.khkd_url, khkd_luc = excluded.khkd_luc,
-       nguon = 'cong_khai',
+       nguon = excluded.nguon,
        ho_so_luc = excluded.ho_so_luc, gala_luc = excluded.gala_luc,
        updated_at = excluded.updated_at`
   ).bind(
     mem.id, dat.ho_ten, dat.ngay_sinh, dat.dien_thoai, dat.doanh_nghiep,
-    dat.linh_vuc, dat.linh_vuc_khac, dat.chuc_vu, dat.nhu_cau_ket_noi, duLe,
-    motTrong(body.tai_tro, TAI_TRO), cleanText(body.tai_tro_mo_ta, 500),
-    coKhong(body.gian_hang), coKhong(body.van_nghe), cleanText(body.van_nghe_mo_ta, 500),
-    khkdLinhVuc, khkdDeTai, khkdUrl, coKhkd ? 1 : 0
+    dat.linh_vuc, dat.linh_vuc_khac, dat.chuc_vu, dat.nhu_cau_ket_noi,
+    // Phần C và phần B cũng đi qua giuCu — sót một ô ở đây là ô ấy bị xoá
+    // trắng ở mọi lượt bổ sung, đúng cái mà chốt 409 cũ sinh ra để chống.
+    // Hai ô đánh dấu KHÔNG qua giuCu, xem chú thích ở đầu hàm.
+    duLeLuu, giuCu(taiTro, 'tai_tro'), giuCu(taiTroMo, 'tai_tro_mo_ta'),
+    gianHang, vanNghe, giuCu(vanNgheMo, 'van_nghe_mo_ta'),
+    giuCu(khkdLinhVuc, 'khkd_linh_vuc'), giuCu(khkdDeTai, 'khkd_de_tai'),
+    giuCu(khkdUrl, 'khkd_url'),
+    // MỐC MỚI do SQLite sinh (quy ước 1 CLAUDE.md — tuyệt đối không dùng
+    // Date của JS để ghi thời gian), còn nhánh "giữ nguyên" chỉ chuyền lại
+    // đúng chuỗi SQLite đã sinh ở lượt trước. Vì vậy mỗi mốc tốn HAI bind:
+    // một cờ có-khai-không, một giá trị cũ.
+    coKhkd ? 1 : 0, cu?.khkd_luc ?? null,
+    nguonMoi,
+    coHoSo ? 1 : 0, cu?.ho_so_luc ?? null,
+    coGala ? 1 : 0, cu?.gala_luc ?? null
   ).run();
 
   // Cú pháp chuyển khoản phải do MÁY CHỦ dựng: buildTransferNote() bỏ dấu rồi
@@ -472,7 +549,7 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     `SELECT * FROM fund_rounds WHERE cohort_id = ? AND scope = 'class'
         AND amount = 1000000 AND account_no = '0975587586' LIMIT 1`
   ).bind(nguoi.cohort_id).first();
-  if (round && duLe === 'co') {
+  if (round && duLeLuu === 'co') {
     const nhomSo = await env.DB.prepare(
       'SELECT g.no FROM members m JOIN groups g ON g.id = m.group_id WHERE m.id = ?'
     ).bind(mem.id).first();
@@ -489,7 +566,10 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     };
   }
 
-  return json({ ok: true, ho_ten: dat.ho_ten, du_le: duLe, phi });
+  // `bo_sung` để màn cuối nói đúng chuyện: người quay lại lần hai cần nghe
+  // "đã cập nhật, phần bỏ trống giữ nguyên bản cũ" chứ không phải "đã gửi" —
+  // không nói ra thì họ tưởng vừa ghi đè sạch bản khai của chính mình.
+  return json({ ok: true, ho_ten: dat.ho_ten, du_le: duLeLuu, bo_sung: !!cu, phi });
 }
 
 /* ── Ban cán sự lớp: xem cả lớp ───────────────────────────────────────────
@@ -599,6 +679,13 @@ export async function getXuatCsv(env, me) {
     ['Văn nghệ — chi tiết', x => x.van_nghe_mo_ta],
     ['Xong hồ sơ lúc', x => x.ho_so_luc],
     ['Xong đăng ký Lễ lúc', x => x.gala_luc],
+    // Cột này là cái giá của việc nới luật ghi đè ngày 18/9: đường công khai
+    // nay bổ sung được vào bản của người đã đăng nhập, nên Ban cán sự lớp
+    // phải NHÌN THẤY được dòng nào đi đường nào. "Cả hai" là dấu duy nhất nói
+    // rằng một bản do chính chủ điền trong tài khoản về sau có người điền
+    // thêm qua link công khai — chỗ đáng soi lại nếu có gì trông lạ.
+    ['Điền qua', x => (x.nguon === 'cong_khai' ? 'Link công khai'
+      : x.nguon === 'ca_hai' ? 'Tài khoản + link công khai' : 'Tài khoản')],
   ];
 
   const dong = [cot.map(c => oCsv(c[0])).join(',')];
