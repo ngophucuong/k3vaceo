@@ -109,6 +109,9 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
+| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, N6 ở link bản nộp, và **CSV không bao giờ có chữ "đã đóng"** |
+| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được |
+| `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, và **trả `groups.ban_nop_url` + bảng đăng ký về gốc** |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
 | `pw-banmoi.mjs` | băng "Có bản mới" + phép soi bản lúc mở trang — **đếm số lượt nạp tài liệu**, vì hàm này gọi `location.reload()` trên đường khởi động của mọi người dùng |
 
@@ -117,7 +120,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Hai mươi sáu phép đối chứng đáng giữ nhất
+## Hai mươi chín phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -378,6 +381,33 @@ Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ khôn
    bảo vệ, phải khớp số dòng lịch. Phép đối chứng của chính bản vá: gọi thẳng
    `dungIcs()` từ Node với ba bộ dữ liệu, trong đó ca "chỉ có dòng NGÀY KHÁC"
    là ca mà một bản vá cẩu thả (`if (buoi.length) bỏ qua`) sẽ làm hỏng.
+
+27. **BOM UTF-8 phải kiểm ở tầng BYTE — `Response.text()` nuốt mất nó.** Tệp
+   CSV của zone Lễ tốt nghiệp bắt đầu bằng `﻿` để Excel trên Windows đọc
+   đúng dấu tiếng Việt; thiếu nó thì cả tệp thành ký tự rác, mà đó lại là cả
+   công dụng của tệp. Phép kiểm bản đầu viết `csv.charCodeAt(0) === 0xFEFF`
+   và **ĐỎ dù BOM có thật** (`od -tx1` cho ra `ef bb bf` ở ba byte đầu): bộ
+   giải mã UTF-8 theo chuẩn WHATWG bỏ BOM ở đầu dòng, nên mọi phép kiểm ở tầng
+   chuỗi đều mù với đúng cái nó định canh. Phải đọc `arrayBuffer()`. Cùng họ
+   với bẫy `TextDecoder` ở phép số 1.
+
+28. **Bấm `<summary>` là TOGGLE, không phải "mở" — và lưu xong không được gập
+   mất khối đang cần.** `pw-totnghiep.mjs` lượt đầu chết với "element is not
+   visible" trên một chip vẫn nằm nguyên trong DOM: hai khối mở SẴN, cú bấm
+   của bộ kiểm đóng chúng lại. Nhưng lúc sửa thì lộ ra một lỗi THẬT sau nó:
+   bản đầu quyết mở/gập thuần theo "đã xong chưa", nên bấm "Có, tôi dự" rồi
+   Lưu → khối thành "đã xong" → tự gập → **mã QR và nút chuyển khoản biến
+   mất**, đúng giây người ta cần chúng nhất. Trạng thái người dùng đang ở phải
+   sống lâu hơn một lượt vẽ lại (`TN_MO` ngoài hàm vẽ), cùng bài học với bộ
+   lọc Sổ thu và thẻ Danh bạ.
+
+29. **Ảnh chụp bắt được nhánh dự phòng BỊ QUÊN, phép kiểm chuỗi thì không.**
+   Tab Quỹ có `img.onerror` thay mã QR hỏng bằng một ô giải thích (Đợt 3);
+   màn `/totnghiep` chép markup QR sang mà quên chép nhánh ấy. Không lỗi JS,
+   không phép kiểm nào đỏ — chỉ có một ô vỡ ảnh nằm giữa màn hình tiền nong.
+   Sandbox không ra được internet nên `img.vietqr.io` KHÔNG BAO GIỜ tải được,
+   tức nhánh dự phòng luôn chạy ở đây: đó đúng bằng cảnh người dùng gặp lúc
+   mạng yếu, nên hãy canh nó chứ đừng coi là nhiễu.
 
 ## Chạy `kiem-tanso.mjs`
 

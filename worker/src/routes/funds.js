@@ -55,7 +55,14 @@ async function canSeeLedger(env, me, round) {
   return (await mucXemSo(env, me, round)) !== null;
 }
 
-async function shapeRound(env, round, me) {
+// Export để zone Lễ tốt nghiệp (routes/tot-nghiep.js) hiện được mã QR và
+// trạng thái phí Gala NGAY TRONG FORM, thay vì bắt người ta nhảy sang tab Quỹ
+// giữa chừng. Dùng lại đúng hàm này chứ KHÔNG chép các trường sang một hình
+// dạng thứ hai: nhãn trạng thái ("đã tự khai" / "người thu đã nhận", mục 6.4
+// SRS), cú pháp chuyển khoản và đường dựng QR phải chỉ có một nguồn.
+// Đường GHI vẫn là POST /api/funds/:id/declare có sẵn — zone kia không có
+// route tiền nào của riêng nó.
+export async function shapeRound(env, round, me) {
   const [mine, counts, collector] = await Promise.all([
     env.DB.prepare('SELECT declared_at, verified_at, note FROM fund_declarations WHERE round_id = ? AND member_id = ?')
       .bind(round.id, me.id).first(),

@@ -644,3 +644,74 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    có gì nhấp nháy ở đây thì màn hình đứng im và người ta bấm Gửi lần nữa. */
 .tlbb.dangcho{color:var(--ink3);font-style:italic;animation:tlnhay 1.5s ease-in-out infinite}
 @keyframes tlnhay{0%,100%{opacity:1}50%{opacity:.45}}
+
+/* ═══════════ LỄ TỐT NGHIỆP 26/9 — /totnghiep ═══════════
+   Màn riêng trong chính ứng dụng (không phải thư mục rời như /lich hay
+   /giao-thuong — lý do ghi ở đầu khối renderTotNghiep trong app.js).
+
+   .claimwrap có `align-items:center`, đúng cho một thẻ đăng nhập cao vài trăm
+   pixel và SAI hẳn cho một biểu mẫu dài: canh giữa theo chiều dọc thì đầu
+   trang bị đẩy lên khỏi màn hình và không cuộn ngược lên được. Vì vậy .tnwrap
+   canh flex-start và tự cuộn. */
+.tnwrap{min-height:100vh;min-height:100dvh;padding:calc(env(safe-area-inset-top) + 22px) 16px
+  calc(env(safe-area-inset-bottom) + 40px);background:var(--bg)}
+.tncard{max-width:var(--wrap);margin:0 auto}
+.tncard>.lb{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--ink3);margin-bottom:8px}
+.tncard>h1{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0 0 8px}
+.tncard>p.sub{font-size:13.5px;color:var(--ink2);margin:0 0 18px;line-height:1.55}
+
+/* Ba chip tiến độ. Xuống dòng chứ không cuộn ngang — cùng bài học với hàng
+   chip lọc của Sổ thu: lề âm của .fl bị mép vùng cuộn cắt mất chip cuối, và
+   ba mốc phải nhìn thấy CÙNG LÚC thì mới biết còn thiếu phần nào. */
+.tnprog{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}
+.tnprog>span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);
+  background:var(--surf);box-shadow:var(--sh);border-radius:99px;padding:6px 12px}
+
+/* <details> thay vì tự viết accordion bằng JS: mở/đóng chạy sẵn, bàn phím và
+   trình đọc màn hình hiểu sẵn, và không có trạng thái nào để lệch. */
+.tnsec{background:var(--surf);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:12px;
+  overflow:hidden}
+.tnsec>summary{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:15px 16px;
+  cursor:pointer;list-style:none;user-select:none}
+.tnsec>summary::-webkit-details-marker{display:none}
+.tnsec>summary::after{content:'▾';margin-left:auto;color:var(--ink3);font-size:13px;
+  transition:transform .18s}
+.tnsec[open]>summary::after{transform:rotate(180deg)}
+.tnsec>summary b{font-size:15px;font-weight:600}
+.tnsec>summary i{font-style:normal;font-size:11.5px;color:var(--ink3)}
+.tnbody{padding:4px 16px 18px;border-top:1px solid var(--line)}
+.tnbody>.wide{margin-top:4px}
+
+/* Công tắc gian hàng / văn nghệ — cùng khuôn .gtsw của Giao thương. Không
+   dùng lại chính .gtsw vì lề dọc ở đây khác (nằm giữa các ô nhập, không nằm
+   trong một khối riêng cuối sheet). */
+.tnsw{display:flex;gap:11px;align-items:flex-start;cursor:pointer;margin:2px 0 14px}
+.tnsw input{flex:0 0 auto;width:20px;height:20px;margin:1px 0 0;accent-color:var(--go)}
+.tnsw b{display:block;font-size:14px;font-weight:600;line-height:1.35}
+.tnsw i{display:block;font-style:normal;font-size:12px;color:var(--ink2);
+  line-height:1.5;margin-top:3px}
+
+/* Khối phí: .qrw vốn dựng cho thẻ đợt thu ở tab Quỹ (tràn hết bề ngang thẻ),
+   ở đây nằm giữa một biểu mẫu nên phải bo góc lại cho khỏi cắt ngang. */
+.tnphi{margin:2px 0 20px}
+.tnphi .qrw{border-radius:12px;border:1px solid var(--line);margin-bottom:12px}
+.tnphi .eb{margin-bottom:10px}
+
+.tnsoon{font-size:12px;color:var(--ink2);line-height:1.55;background:var(--surf2);
+  border-radius:12px;padding:12px 14px;margin:4px 0 16px}
+.tnback{display:block;text-align:center;margin-top:22px;font-size:13px;color:var(--ink2);
+  text-decoration:none;padding:10px}
+
+/* Thẻ dẫn sang zone, đặt đầu tab Hôm nay. Không thêm tab thứ bảy: pw-nav.mjs
+   đã đo rằng nhãn "Giao thương" cần 75px mà nút rộng nhất chỉ 69px ở khổ
+   430px, nên thêm một tab nữa là mọi tab hẹp thêm — cho một việc hết hạn 26/9. */
+.tnthe{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--surf);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;
+  margin-bottom:12px;text-decoration:none;color:inherit}
+.tnthe .ic{flex:0 0 auto;width:38px;height:38px;border-radius:11px;display:grid;
+  place-items:center;background:var(--go-bg);font-size:19px}
+.tnthe .tx{flex:1;min-width:0}
+.tnthe .tx b{display:block;font-size:14.5px;font-weight:600;line-height:1.3}
+.tnthe .tx span{display:block;font-size:12px;color:var(--ink2);margin-top:2px;line-height:1.45}
+.tnthe .go{flex:0 0 auto;color:var(--ink3);font-size:15px}

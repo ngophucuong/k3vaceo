@@ -357,6 +357,37 @@ jobs:
           fi
           [ "$loi" = "0" ] || { echo "::error::Sổ tay ở /sotay chưa chạy đúng trên tên miền."; exit 1; }
 
+          # ── Zone Lễ tốt nghiệp (/totnghiep, migration 0041) ────────────────
+          # Chốt chặn quan trọng nhất của cả zone: danh sách cả lớp KÈM ĐIỆN
+          # THOẠI và tệp CSV phải đòi phiên. Ranh giới công khai/cần-phiên
+          # trong worker/src/index.js là VỊ TRÍ DÒNG chứ không phải một cờ nào
+          # (dòng 163-164 là getCurrentMember → 401): một lần sửa về sau đẩy
+          # nhầm route lên nửa trên là cả lớp thành công khai, mà không có gì
+          # kêu lên. Đây là con mắt duy nhất nhìn được chuyện ấy trên tên miền
+          # thật — sandbox không gọi vào được.
+          echo "--- zone Lễ tốt nghiệp tại /totnghiep ---"
+          loi=0
+          tn=$(curl -sL -o /tmp/tn.html -w '%{http_code}' https://k3vaceo.cuongngo.app/totnghiep || true)
+          echo "  HTTP $tn ($(cat /tmp/tn.html 2>/dev/null | wc -c) byte)"
+          [ "$tn" = "200" ] || { echo "  ✗ /totnghiep không mở được (mã $tn)"; loi=1; }
+          # Zone này CỐ Ý nằm trong chính ứng dụng (không phải thư mục rời như
+          # /lich, /sotay, /giao-thuong) vì nó chỉ dành cho người đã đăng nhập.
+          # Nên ở đây luật vét /* NUỐT ĐƯỢC là ĐÚNG — ngược hẳn hai phép trên.
+          if grep -q 'src="/app\.js"' /tmp/tn.html; then
+            echo "  ✓ phục vụ chính ứng dụng (đúng thiết kế, không phải trang rời)"
+          else
+            echo "  ✗ /totnghiep không trả về ứng dụng"; loi=1
+          fi
+          for duong in /api/totnghiep /api/totnghiep/danh-sach /api/totnghiep/xuat.csv; do
+            m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app$duong" || true)
+            if [ "$m" = "401" ]; then
+              echo "  ✓ $duong KHÔNG cookie → 401"
+            else
+              echo "  ✗ $duong KHÔNG cookie → HTTP $m (phải là 401)"; loi=1
+            fi
+          done
+          [ "$loi" = "0" ] || { echo "::error::Zone /totnghiep chưa chạy đúng, hoặc một đường đã lọt ra công khai."; exit 1; }
+
           echo "--- lịch công khai tại /lich (KHÔNG đăng nhập) ---"
           loi=0
           st=$(curl -sL -o /tmp/lich.html -w '%{http_code}' https://k3vaceo.cuongngo.app/lich || true)

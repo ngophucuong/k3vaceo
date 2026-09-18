@@ -3,9 +3,19 @@ import { canManageGroup, canUpdateSection, logAudit, logActivity } from '../perm
 import { cleanText, clampPct } from '../lib/validate.js';
 import { suggestOwners } from '../lib/suggest.js';
 
+// Kèm luôn link bản nộp KHKD của nhóm (migration 0041). Cột ấy nằm trên
+// `groups` chứ không trên `plans` — chín trên mười nhóm chưa có dòng `plans`
+// nào (đo trên D1 thật 18/9), nên đặt ở `plans` là chín nhóm không có chỗ để
+// nộp. Đường GHI nằm ở routes/tot-nghiep.js; ở đây chỉ ĐỌC, để link hiện ngay
+// tab Bài — nơi nhóm thật sự làm việc — chứ không chỉ trong form tốt nghiệp.
 async function loadPlan(env, groupId) {
   return env.DB.prepare(
-    'SELECT id, topic_product, topic_customers FROM plans WHERE group_id = ?'
+    `SELECT p.id, p.topic_product, p.topic_customers,
+            g.ban_nop_url, g.ban_nop_luc, m.full_name AS ban_nop_boi_ten
+       FROM plans p
+       JOIN groups g ON g.id = p.group_id
+       LEFT JOIN members m ON m.id = g.ban_nop_boi
+      WHERE p.group_id = ?`
   ).bind(groupId).first();
 }
 
@@ -62,7 +72,12 @@ export async function getPlan(env, me) {
   const sectionsVoiTuLieu = sections.map(s => ({ ...s, tu_lieu: tuLieuTheoPhan.get(s.id) ?? [] }));
 
   return json({
-    plan: { topic_product: plan.topic_product, topic_customers: plan.topic_customers },
+    plan: {
+      topic_product: plan.topic_product, topic_customers: plan.topic_customers,
+      ban_nop_url: plan.ban_nop_url ?? null,
+      ban_nop_luc: plan.ban_nop_luc ?? null,
+      ban_nop_boi_ten: plan.ban_nop_boi_ten ?? null,
+    },
     sections: sectionsVoiTuLieu,
     members,
     suggestions: suggestOwners(members, sections),

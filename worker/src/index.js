@@ -29,6 +29,8 @@ import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, 
          postThongBaoDaXem, patchThongBao, deleteThongBao } from './routes/lich.js';
 import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
+import { getTotNghiep, putHoSo, putGala, patchBanNop,
+         getDanhSachTotNghiep, getXuatCsv } from './routes/tot-nghiep.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
 import { llmCauHinh } from './lib/llm.js';
@@ -245,6 +247,21 @@ export default {
       // chỉ chính chủ, không có bản sửa hộ.
       if (pathname === '/api/giao-thuong' && method === 'GET') return getGiaoThuong(env, me);
       if (pathname === '/api/me/giao-thuong' && method === 'PUT') return putGianHang(request, env, me, ip);
+
+      // Lễ tốt nghiệp 26/9 — CẢ SÁU route đều ở nửa DƯỚI, cần phiên. Ranh giới
+      // công khai/cần-phiên của router này là VỊ TRÍ DÒNG chứ không phải một
+      // cờ nào: đẩy nhầm một dòng lên trên `getCurrentMember` là nó thành công
+      // khai mà không phép kiểm nào kêu. kiem-totnghiep.mjs gọi
+      // /api/totnghiep/danh-sach KHÔNG kèm cookie và đòi đúng 401 để canh chỗ
+      // này. Lý lẽ đầy đủ ở migrations/0041_dang_ky_tot_nghiep.sql.
+      if (pathname === '/api/totnghiep' && method === 'GET') return getTotNghiep(env, me);
+      if (pathname === '/api/totnghiep/ho-so' && method === 'PUT') return putHoSo(request, env, me);
+      if (pathname === '/api/totnghiep/gala' && method === 'PUT') return putGala(request, env, me);
+      if (pathname === '/api/totnghiep/ban-nop' && method === 'PATCH') {
+        return patchBanNop(request, env, me, ip);
+      }
+      if (pathname === '/api/totnghiep/danh-sach' && method === 'GET') return getDanhSachTotNghiep(env, me);
+      if (pathname === '/api/totnghiep/xuat.csv' && method === 'GET') return getXuatCsv(env, me);
 
       if (pathname === '/api/officers' && method === 'GET') return getOfficers(env, me);
       if (pathname === '/api/officers' && method === 'PUT') return putOfficers(request, env, me, ip);

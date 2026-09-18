@@ -1156,6 +1156,7 @@ function drawNay() {
     <h2>${esc(a.h)}</h2><p>${esc(a.p)}</p>
     <button class="cta ${a.done ? 'done' : ''}" id="heroCta">${esc(a.c)} <span>→</span></button>
   </div>
+  ${veTheTotNghiep()}
   ${veThongBao()}
   ${veLichHoc()}
   <div class="sect">
@@ -1227,6 +1228,27 @@ const THU = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm',
 // 'YYYY-MM-DD' → 'Thứ Năm 27/8'. Cắt chuỗi rồi dựng Date theo giờ địa phương;
 // new Date('2026-08-27') bị hiểu là UTC nên ở múi giờ Việt Nam vẫn ra đúng
 // ngày, nhưng ở múi âm thì lùi một ngày — không đáng để dính bẫy ấy.
+/* Thẻ dẫn sang zone Lễ tốt nghiệp, đầu tab Hôm nay.
+
+   Dùng HOME.hom_nay CỦA MÁY CHỦ chứ không phải ngày của máy người dùng — bài
+   học 26/8 ("đếm ngược tới buổi bảo vệ lệch một ngày"): điện thoại đặt lệch
+   múi giờ thì hai màn nói hai con số, mà ở đây hậu quả nặng hơn — thẻ có thể
+   biến mất sớm một ngày với đúng người chưa kịp đăng ký. Thiếu trường ấy thì
+   ngày của máy chỉ là đường lui.
+
+   Tự ẩn SAU 26/9: đây là việc có hạn, để lại thì tab Hôm nay mang một thẻ
+   chết suốt phần đời còn lại của ứng dụng. */
+function veTheTotNghiep() {
+  const homNay = HOME.hom_nay || new Date().toISOString().slice(0, 10);
+  if (homNay > '2026-09-26') return '';
+  return `<a class="tnthe" href="/totnghiep">
+    <span class="ic">🎓</span>
+    <span class="tx"><b>Đăng ký Lễ tốt nghiệp 26/9</b>
+      <span>Hồ sơ làm chứng chỉ, link bản Kế hoạch kinh doanh, và dự Lễ &amp; Gala buổi tối
+        — hạn đăng ký Gala 21h00 ngày 19/9.</span></span>
+    <span class="go">›</span></a>`;
+}
+
 function ngayVN(iso) {
   if (!iso) return '';
   const [y, m, d] = String(iso).split('-').map(Number);
@@ -1674,6 +1696,17 @@ async function drawBai() {
          <div class="mut">Chưa có sản phẩm và khách hàng mục tiêu thì bảy phần sau đều treo.</div>`}
     ${can_assign ? `<button class="wide ghost" id="topicBtn" style="margin-top:13px;padding:11px;font-size:14px">
         ${topicDone ? 'Sửa đề tài' : 'Chốt đề tài'}</button>` : ''}
+    <div class="fi" style="margin:14px 0 0;padding-top:13px;border-top:1px solid var(--line)">
+      <div class="k">Link bản nộp cho hội đồng</div>
+      ${plan.ban_nop_url
+        ? `<div class="v"><a href="${esc(plan.ban_nop_url)}" target="_blank" rel="noopener"
+             style="overflow-wrap:anywhere">${esc(plan.ban_nop_url)}</a></div>
+           <div class="was">${plan.ban_nop_boi_ten ? esc(plan.ban_nop_boi_ten) + ' nộp ' : 'Nộp '}lúc ${esc(plan.ban_nop_luc)}</div>`
+        : `<div class="v blank">Nhóm chưa nộp link bản Kế hoạch kinh doanh.</div>`}
+      <a class="wide ghost" href="/totnghiep"
+         style="margin-top:11px;padding:11px;font-size:14px;display:block;text-align:center;text-decoration:none">
+        ${plan.ban_nop_url ? 'Sửa link bản nộp' : 'Nộp link bản nộp'}</a>
+    </div>
   </div></div>
 
   ${TROLY?.bat ? `
@@ -4367,6 +4400,409 @@ function renderApp() {
   dangKySw();
 }
 
+/* ═══════════ LỄ TỐT NGHIỆP 26/9 — /totnghiep ═══════════
+   Ngô Phú Cường (18/9) đưa 15 câu Ban tổ chức muốn thu. Lý lẽ đầy đủ ở
+   migrations/0041_dang_ky_tot_nghiep.sql.
+
+   VÌ SAO NẰM TRONG app.js CHỨ KHÔNG PHẢI MỘT THƯ MỤC RỜI như /lich, /sotay,
+   /giao-thuong: ba trang ấy rời vì chúng PHẢI chạy được khi không có phiên.
+   Zone này thì ngược lại — chỉ học viên đã đăng nhập (Ngô Phú Cường chọn,
+   không mở cho khách ngoài lớp). Nằm trong ứng dụng thì nó thừa hưởng sẵn
+   phiên, esc(), api(), khuôn sheet, lề thanh trạng thái, khoá zoom, và băng
+   "Có bản mới"; dựng lại từng thứ đó trong một tệp rời là chép lại bốn tháng
+   bài học. Kèm theo: _redirects đã là một luật vét `/* /index.html 200` nên
+   /totnghiep ĐÃ phục vụ ứng dụng — không phải sửa _redirects, và app.js/
+   app.css đã có Cache-Control: no-cache trong _headers nên bẫy /lich/lich.js
+   (bị quên nên dính max-age=14400) không áp dụng ở đây.
+
+   BA PHẦN GẬP RIÊNG, BA NÚT LƯU RIÊNG — vì ba cụm có BA HẠN khác nhau, và
+   hạn gấp nhất là 21h00 ngày 19/9 (đăng ký Gala). Gộp một form 15 câu thì
+   người muốn đăng ký Gala tối nay bị chặn vì chưa có ảnh chân dung. */
+let TN = null;
+// Khối nào đang mở, giữ NGOÀI hàm vẽ.
+//
+// Lưu xong một phần là gọi lại renderTotNghiep() (vẽ từ máy chủ, không vá tại
+// chỗ). Bản đầu quyết mở/gập thuần theo "đã xong chưa", và nó sai ngay ở ca
+// quan trọng nhất: bấm "Có, tôi dự" rồi Lưu → khối Gala thành "đã xong" → tự
+// gập → MÃ QR VÀ NÚT CHUYỂN KHOẢN BIẾN MẤT, đúng giây người ta cần chúng
+// nhất. Bộ kiểm giao diện bắt được, phép kiểm chuỗi thì không.
+//
+// Cùng bài học với bộ lọc Sổ thu và thẻ Danh bạ: trạng thái người dùng đang ở
+// phải sống LÂU HƠN một lượt vẽ lại. `null` nghĩa là chưa ai chạm tới — lúc
+// ấy mới dùng luật mặc định "chưa xong thì mở".
+let TN_MO = null;
+
+async function renderTotNghiep() {
+  document.body.classList.add('noapp');
+  try {
+    TN = await apiGet('/api/totnghiep');
+  } catch (e) {
+    if (e.status === 401) {
+      $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+        <div class="lb">k3vaceo · Khoá K03</div>
+        <h1>Đăng ký Lễ tốt nghiệp 26/9</h1>
+        <p class="sub">Trang này dành cho học viên lớp CEO K03. Đăng nhập rồi
+          quay lại đúng đường dẫn này.</p>
+        <a class="wide" href="/dangnhap" style="display:block;text-align:center;text-decoration:none">Đăng nhập</a>
+      </div></div>`;
+      return;
+    }
+    $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+      <h1>Không tải được</h1><p class="sub">Có lỗi khi kết nối máy chủ — thử tải lại trang.</p>
+    </div></div>`;
+    return;
+  }
+  veTotNghiep();
+}
+
+// Ngày sinh trong roster KHÔNG đồng nhất — đo trên D1 thật 18/9: 107 dòng
+// dạng dd/mm/yyyy, 28 dòng CHỈ CÓ NĂM ('1966'), 11 dòng trống. Cột ấy chưa
+// code nào từng đọc nên chưa ai phát hiện. Không đoán hộ ngày tháng: điền sẵn
+// nguyên văn rồi nói thẳng là phải kiểm lại.
+const NGAY_DU = /^\d{2}\/\d{2}\/\d{4}$/;
+
+function tnMocXong(luc) {
+  return luc ? '<span class="xongchip">✓ xong</span>' : '<span class="tg">chưa điền</span>';
+}
+
+function veTotNghiep() {
+  const d = TN.dang_ky ?? {};
+  const g = TN.goi_y ?? {};
+  const n = TN.nhom;
+  // Đã lưu rồi thì đọc bản ĐÃ LƯU, chưa lưu thì mới điền sẵn từ hồ sơ cũ.
+  // Trộn hai nguồn mỗi ô một kiểu là có ngày bản người ta vừa sửa bị ghi đè
+  // bằng bản gốc — đúng lỗi mất dữ liệu của Đợt 1 (quy ước 3 CLAUDE.md).
+  const v = k => (d.ho_so_luc ? d[k] : d[k] ?? g[k]) ?? '';
+  const ngaySinh = String(v('ngay_sinh') || '');
+  const nganhDangChon = new Set(String(d.ho_so_luc ? d.linh_vuc : (d.linh_vuc ?? g.linh_vuc) ?? '')
+    .split(',').map(x => x.trim()).filter(Boolean));
+  const r = TN.dot_phi;
+
+  // Mặc định chỉ áp dụng cho lượt mở ĐẦU TIÊN: hai phần còn việc thì mở sẵn,
+  // Đề tài (việc chung của nhóm, phần lớn là đọc) thì gập. Sau đó đi theo
+  // đúng thứ người dùng đang để.
+  if (!TN_MO) TN_MO = { gala: !d.gala_luc, hoso: !d.ho_so_luc, detai: false };
+  const mo = k => (TN_MO[k] ? 'open' : '');
+
+  $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
+    <div class="lb">k3vaceo · Khoá K03</div>
+    <h1>Lễ tốt nghiệp 26/9</h1>
+    <p class="sub">Ba phần, lưu riêng từng phần — làm được phần nào lưu phần ấy,
+      không phải xong hết mới bấm được.</p>
+
+    <div class="tnprog">
+      <span>Hồ sơ ${tnMocXong(d.ho_so_luc)}</span>
+      <span>Đề tài ${tnMocXong(n?.ban_nop_luc)}</span>
+      <span>Dự Lễ ${tnMocXong(d.gala_luc)}</span>
+    </div>
+
+    <details class="tnsec" data-sec="gala" ${mo('gala')}>
+      <summary><b>Lễ tốt nghiệp &amp; Gala</b>
+        <i>Hạn đăng ký 21h00 ngày 19/9</i>${tnMocXong(d.gala_luc)}</summary>
+      <div class="tnbody">
+        <label class="f">Bạn có dự Lễ Tốt nghiệp &amp; Gala 17h00–22h00 không?</label>
+        <div class="fl" id="tnDuLe">
+          <button type="button" class="fc ${d.du_le === 'co' ? 'on' : ''}" data-dule="co">Có, tôi dự</button>
+          <button type="button" class="fc ${d.du_le === 'khong' ? 'on' : ''}" data-dule="khong">Không</button>
+        </div>
+        <div class="hintline">Buổi bảo vệ Kế hoạch kinh doanh 13h30–17h00 cùng ngày là
+          bắt buộc với mọi học viên và KHÔNG thu phí — câu hỏi này chỉ hỏi buổi tối.</div>
+
+        ${r ? tnVePhi(r) : `<div class="mut" style="margin:6px 0 16px">Chưa mở đợt thu phí.</div>`}
+
+        <label class="f">Tài trợ cho chương trình</label>
+        <div class="fl" id="tnTaiTro">
+          ${[['tien', 'Tiền'], ['hien_vat', 'Hiện vật'], ['khong', 'Không']].map(([k, t]) =>
+            `<button type="button" class="fc ${d.tai_tro === k ? 'on' : ''}" data-tt="${k}">${t}</button>`).join('')}
+        </div>
+        <textarea id="tnTTMo" maxlength="500" rows="2"
+          placeholder="Nếu có: tài trợ gì, bao nhiêu, liên hệ ai.">${esc(d.tai_tro_mo_ta)}</textarea>
+
+        <label class="tnsw"><input type="checkbox" id="tnGH" ${d.gian_hang ? 'checked' : ''}>
+          <span><b>Tôi muốn gian hàng hoặc standee miễn phí</b>
+          <i>Ban tổ chức bố trí miễn phí. Liên hệ trực tiếp anh Chử Minh Châu, học viên K3.</i></span></label>
+
+        <label class="tnsw"><input type="checkbox" id="tnVN" ${d.van_nghe ? 'checked' : ''}>
+          <span><b>Tôi đăng ký một tiết mục văn nghệ</b>
+          <i>Ghi rõ tiết mục gì, mấy người, cần nhạc hay micro gì ở ô dưới.</i></span></label>
+        <textarea id="tnVNMo" maxlength="500" rows="2"
+          placeholder="Ví dụ: song ca 2 người, cần nhạc beat gửi trước.">${esc(d.van_nghe_mo_ta)}</textarea>
+
+        <div class="errline" id="tnGalaErr" style="display:none"></div>
+        <button class="wide" id="tnLuuGala">Lưu phần Lễ &amp; Gala</button>
+      </div>
+    </details>
+
+    <details class="tnsec" data-sec="hoso" ${mo('hoso')}>
+      <summary><b>Hồ sơ làm chứng chỉ</b>
+        <i>Hạn 26/9</i>${tnMocXong(d.ho_so_luc)}</summary>
+      <div class="tnbody">
+        <p class="mut" style="margin:0 0 16px">Phần lớn đã điền sẵn từ dữ liệu Ban tổ
+          chức — bạn chỉ cần soi lại rồi bấm Lưu.</p>
+
+        <label class="f">Họ và tên <i>in trên chứng chỉ</i></label>
+        <input id="tnTen" maxlength="120" value="${esc(v('ho_ten'))}">
+
+        <label class="f">Ngày sinh</label>
+        <input id="tnDob" maxlength="20" value="${esc(ngaySinh)}" placeholder="dd/mm/yyyy">
+        ${ngaySinh && !NGAY_DU.test(ngaySinh)
+          ? `<div class="hintline" style="color:var(--due)">Danh sách gốc chỉ có
+             "${esc(ngaySinh)}" — bổ sung đủ ngày/tháng/năm giúp nhé.</div>`
+          : !ngaySinh
+            ? `<div class="hintline">Danh sách gốc chưa có ngày sinh của bạn.</div>` : ''}
+
+        <label class="f">Số điện thoại</label>
+        <input id="tnSdt" maxlength="20" value="${esc(v('dien_thoai'))}" inputmode="tel">
+
+        <label class="f">Doanh nghiệp</label>
+        <input id="tnDN" maxlength="200" value="${esc(v('doanh_nghiep'))}">
+
+        <label class="f">Chức vụ</label>
+        <input id="tnCV" maxlength="120" value="${esc(v('chuc_vu'))}">
+
+        <label class="f">Lĩnh vực hoạt động (tối đa 3)</label>
+        <div class="fl cuon" id="tnNg">${(TN.nganh_list ?? []).map(x =>
+          `<button type="button" class="fc ${nganhDangChon.has(x.ma) ? 'on' : ''}" data-ma="${esc(x.ma)}">${esc(x.ten)}</button>`).join('')}</div>
+
+        <label class="f">Nhu cầu kết nối — càng cụ thể càng dễ ghép</label>
+        <textarea id="tnKN" maxlength="500" rows="3"
+          placeholder="Ví dụ: muốn kết nối tới ban quản lý khu công nghiệp phía Bắc, và nhà phân phối ngành thực phẩm ở miền Trung.">${esc(v('nhu_cau_ket_noi'))}</textarea>
+
+        <div class="tnsoon">Ảnh chân dung và logo doanh nghiệp sẽ mở ở bước tiếp theo.
+          Chuẩn bị sẵn tệp <b>JPG dưới 2MB</b> giúp nhé — ảnh gốc của iPhone là
+          định dạng HEIC, mở ảnh lên rồi chọn Sao chép sẽ ra JPG.</div>
+
+        <div class="errline" id="tnHoSoErr" style="display:none"></div>
+        <button class="wide" id="tnLuuHoSo">Lưu hồ sơ</button>
+      </div>
+    </details>
+
+    <details class="tnsec" data-sec="detai" ${mo('detai')}>
+      <summary><b>Đề tài Kế hoạch kinh doanh</b>
+        <i>Việc của cả nhóm</i>${tnMocXong(n?.ban_nop_luc)}</summary>
+      <div class="tnbody">
+        ${n ? `
+          <div class="fi"><div class="k">Nhóm</div><div class="v">${esc(n.label)}</div></div>
+          <div class="fi"><div class="k">Trưởng nhóm</div><div class="v">${esc(n.truong_nhom || '— chưa có ai nhận —')}</div></div>
+          <div class="fi"><div class="k">Đề tài</div><div class="v">${esc(n.topic_product || '— nhóm chưa chốt đề tài —')}</div></div>
+          ${n.topic_customers ? `<div class="fi"><div class="k">Khách hàng mục tiêu</div><div class="v">${esc(n.topic_customers)}</div></div>` : ''}
+          <div class="fi"><div class="k">Thành viên (${n.thanh_vien.length})</div>
+            <div class="v">${esc(n.thanh_vien.join(', '))}</div></div>
+
+          <label class="f" style="margin-top:18px">Link bản Kế hoạch kinh doanh</label>
+          <input id="tnLink" maxlength="500" value="${esc(n.ban_nop_url)}" placeholder="https://drive.google.com/…">
+          <div class="hintline">Dán đường dẫn Google Drive, Docs hoặc bất kỳ chỗ nào
+            mở được. Nhớ đặt quyền <b>"ai có đường dẫn đều xem được"</b> — để mặc định
+            thì hội đồng bấm vào chỉ thấy "Yêu cầu quyền truy cập".</div>
+          ${n.ban_nop_luc ? `<div class="hintline" style="color:var(--go)">Đã nộp
+            ${n.ban_nop_boi_ten ? 'bởi ' + esc(n.ban_nop_boi_ten) + ' ' : ''}lúc ${esc(n.ban_nop_luc)}.</div>` : ''}
+          <div class="errline" id="tnLinkErr" style="display:none"></div>
+          <button class="wide" id="tnLuuLink">Lưu link bản nộp</button>
+          <div class="foot" style="padding:9px 0 0">Ai trong nhóm cũng nộp được, và
+            tên người nộp lần cuối hiện ngay đây để cả nhóm cùng thấy. Đề tài thì sửa
+            ở tab Bài, không sửa ở đây.</div>
+        ` : `<div class="mut">Bạn chưa thuộc nhóm nào.</div>`}
+      </div>
+    </details>
+
+    ${TN.la_ban_can_su ? `<button class="wide ghost" id="tnDanhSach" style="margin-top:6px">
+      Ban cán sự lớp — xem cả lớp</button>` : ''}
+    <a class="tnback" href="/">← Về ứng dụng</a>
+  </div></div>`;
+
+  tnGanSuKien();
+}
+
+/* Phí Gala: dùng LẠI nguyên dữ liệu shapeRound() của funds.js và đường ghi
+   POST /api/funds/:id/declare có sẵn — không có route tiền nào riêng cho zone
+   này, và không có trường nào tên "đã đóng phí" trong bảng đăng ký.
+   Mục 6.4 SRS: trạng thái LUÔN là "đã tự khai" cho tới khi người thu đối
+   chiếu sao kê. Màu đi theo nghĩa, không đi theo "đã xong bước nào": ✓ XANH
+   chỉ khi người thu đã nhận, CAM khi mới tự khai. */
+function tnVePhi(r) {
+  if (r.i_am_verified) {
+    return `<div class="tnphi">
+      <div class="wide ok" style="cursor:default">✓ Người thu đã nhận phí của bạn</div>
+      <div class="foot" style="padding:9px 0 0">Xác nhận của ${esc(r.collector_name || 'người thu')} sau khi soi sao kê.</div>
+    </div>`;
+  }
+  return `<div class="tnphi">
+    <div class="eb">Phí ${vnMoney(r.amount)} đ · ${esc(r.collector_name || 'người thu')}</div>
+    <div class="qrw">
+      <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
+      <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
+      <button class="copy" data-tncopy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
+    </div>
+    ${r.i_declared
+      ? `<button class="wide ok" data-tndeclare="${r.id}" data-on="1">✓ Bạn đã tự khai là đã chuyển</button>
+         <div class="foot" style="padding:9px 0 0">Người thu sẽ đối chiếu sao kê.
+           <span class="khaichip">đã tự khai</span> Khai nhầm thì chạm lại để bỏ.</div>`
+      : `<button class="wide" data-tndeclare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Tôi đã chuyển khoản</button>
+         <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>`}
+  </div>`;
+}
+
+function tnGanSuKien() {
+  // Người dùng gập/mở tay thì nhớ lại, để lượt vẽ sau (sau khi Lưu) giữ đúng
+  // thứ họ đang mở. `toggle` là sự kiện riêng của <details>, không phải click
+  // — bắt click thì hụt cả bàn phím lẫn cú chạm vào mũi tên.
+  document.querySelectorAll('.tnsec[data-sec]').forEach(el => {
+    el.addEventListener('toggle', () => { TN_MO[el.dataset.sec] = el.open; });
+  });
+
+  // Ba nhóm nút "chọn một": bấm là bật cái mình, tắt các cái còn lại. Giữ
+  // trạng thái trên chính DOM (lớp .on) chứ không trong một biến song song —
+  // một nguồn sự thật, và lúc Lưu thì đọc thẳng từ đó.
+  const motLua = (wrap, key) => document.querySelectorAll(`${wrap} [data-${key}]`).forEach(b => {
+    b.onclick = () => {
+      const dangBat = b.classList.contains('on');
+      document.querySelectorAll(`${wrap} [data-${key}]`).forEach(x => x.classList.remove('on'));
+      if (!dangBat) b.classList.add('on');   // chạm lại để bỏ chọn
+    };
+  });
+  motLua('#tnDuLe', 'dule');
+  motLua('#tnTaiTro', 'tt');
+
+  // Ngành: nhiều lựa, tối đa 3 — đúng NGANH_TOI_DA của lib/nganh.js.
+  document.querySelectorAll('#tnNg [data-ma]').forEach(b => {
+    b.onclick = () => {
+      const dangCo = document.querySelectorAll('#tnNg .fc.on').length;
+      if (!b.classList.contains('on') && dangCo >= 3) { toast('Tối đa 3 lĩnh vực'); return; }
+      b.classList.toggle('on');
+    };
+  });
+
+  $('#tnLuuGala').onclick = () => tnLuu('#tnLuuGala', '#tnGalaErr', '/api/totnghiep/gala', {
+    du_le: document.querySelector('#tnDuLe .fc.on')?.dataset.dule ?? null,
+    tai_tro: document.querySelector('#tnTaiTro .fc.on')?.dataset.tt ?? null,
+    tai_tro_mo_ta: $('#tnTTMo').value,
+    gian_hang: $('#tnGH').checked ? 1 : 0,
+    van_nghe: $('#tnVN').checked ? 1 : 0,
+    van_nghe_mo_ta: $('#tnVNMo').value,
+  }, 'Đã lưu phần Lễ & Gala');
+
+  $('#tnLuuHoSo').onclick = () => tnLuu('#tnLuuHoSo', '#tnHoSoErr', '/api/totnghiep/ho-so', {
+    ho_ten: $('#tnTen').value,
+    ngay_sinh: $('#tnDob').value,
+    dien_thoai: $('#tnSdt').value,
+    doanh_nghiep: $('#tnDN').value,
+    chuc_vu: $('#tnCV').value,
+    linh_vuc: [...document.querySelectorAll('#tnNg .fc.on')].map(x => x.dataset.ma),
+    nhu_cau_ket_noi: $('#tnKN').value,
+  }, 'Đã lưu hồ sơ');
+
+  const nutLink = $('#tnLuuLink');
+  if (nutLink) {
+    nutLink.onclick = async () => {
+      const u = $('#tnLink').value.trim();
+      // Chặn ngay trên giao diện cho lỗi hiển nhiên, khỏi tốn một lượt gọi.
+      // Máy chủ VẪN kiểm lại (quy ước 6 — không tin giao diện).
+      if (u && !/^https:\/\/[^\s/]+\./i.test(u)) {
+        $('#tnLinkErr').textContent = 'Đường dẫn phải bắt đầu bằng https://';
+        $('#tnLinkErr').style.display = 'block';
+        return;
+      }
+      nutLink.disabled = true;
+      try {
+        await apiPatch('/api/totnghiep/ban-nop', { ban_nop_url: u || null });
+        toast(u ? 'Đã lưu link bản nộp' : 'Đã gỡ link bản nộp');
+        await renderTotNghiep();
+      } catch (e) {
+        $('#tnLinkErr').textContent = errText(e);
+        $('#tnLinkErr').style.display = 'block';
+        nutLink.disabled = false;
+      }
+    };
+  }
+
+  // Ảnh QR nạp từ img.vietqr.io — hỏng thì thay bằng ô giải thích, đừng để
+  // một ô vỡ ảnh nằm giữa màn hình tiền nong. Nhánh này CÓ SẴN ở tab Quỹ từ
+  // Đợt 3 và ban đầu tôi quên chép sang đây; ảnh chụp 390px bắt được ngay (ở
+  // sandbox thì img.vietqr.io không bao giờ tải được, nên nó hiện đúng cảnh
+  // người dùng gặp lúc mạng yếu).
+  document.querySelectorAll('.tnphi img.qr').forEach(img => {
+    img.onerror = () => {
+      img.outerHTML = `<div class="ph">Chưa hiện được mã. Chuyển khoản tay theo số tài khoản bên dưới cũng được — nhớ giữ đúng nội dung chuyển khoản.</div>`;
+    };
+  });
+
+  document.querySelectorAll('[data-tncopy]').forEach(b => {
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.dataset.tncopy); toast('Đã chép nội dung chuyển khoản'); }
+      catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
+    };
+  });
+  document.querySelectorAll('[data-tndeclare]').forEach(b => {
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        const id = b.dataset.tndeclare;
+        if (b.dataset.on === '1') await apiDelete(`/api/funds/${id}/declare`);
+        else await apiPost(`/api/funds/${id}/declare`);
+        await renderTotNghiep();
+      } catch (e) { toast(errText(e)); b.disabled = false; }
+    };
+  });
+
+  const nutDs = $('#tnDanhSach');
+  if (nutDs) nutDs.onclick = openDanhSachTotNghiep;
+}
+
+async function tnLuu(nutSel, errSel, duong, than, okMsg) {
+  const nut = $(nutSel);
+  const nhan = nut.textContent;
+  nut.disabled = true; nut.textContent = 'Đang lưu…';
+  $(errSel).style.display = 'none';
+  try {
+    await apiPut(duong, than);
+    toast(okMsg);
+    // Vẽ lại từ MÁY CHỦ chứ không vá tại chỗ: chip tiến độ, mốc thời gian và
+    // trạng thái phí đều do máy chủ tính, đoán lại ở giao diện là có ngày hai
+    // bên nói hai chuyện.
+    await renderTotNghiep();
+  } catch (e) {
+    $(errSel).textContent = errText(e);
+    $(errSel).style.display = 'block';
+    nut.disabled = false; nut.textContent = nhan;
+  }
+}
+
+/* Ban cán sự lớp xem cả lớp. isClassCommittee gồm cả uy_vien, nên Ngô Phú
+   Cường xem được ngay mà không phải nâng vai. Máy chủ vẫn kiểm lại — nút này
+   chỉ để khỏi bày ra một chỗ bấm vào là 403. */
+async function openDanhSachTotNghiep() {
+  let ds;
+  try { ds = await apiGet('/api/totnghiep/danh-sach'); }
+  catch (e) { toast(errText(e)); return; }
+
+  const dong = ds.nguoi.map(p => {
+    const phi = p.trang_thai_phi === 'nguoi_thu_da_nhan'
+      ? '<span class="xongchip">✓ người thu đã nhận</span>'
+      : p.trang_thai_phi === 'da_tu_khai' ? '<span class="khaichip">đã tự khai</span>' : '';
+    return `<div class="fd">
+      <div class="x"><b>${esc(p.full_name)}</b>
+        <span class="mut"> · ${esc(p.group_label || '—')}</span>
+        <div class="tagrow" style="margin-top:4px">
+          ${p.ho_so_luc ? '<span class="tg go">hồ sơ ✓</span>' : '<span class="tg">hồ sơ —</span>'}
+          ${p.gala_luc ? `<span class="tg ${p.du_le === 'co' ? 'go' : ''}">${p.du_le === 'co' ? 'dự Lễ' : 'không dự'}</span>` : '<span class="tg">chưa trả lời</span>'}
+          ${phi}
+        </div></div></div>`;
+  }).join('');
+
+  openSheet(`<h3>Đăng ký Lễ tốt nghiệp — cả lớp</h3>
+    <p class="sub"><b class="num">${ds.xong_ho_so}</b>/${ds.tong} xong hồ sơ ·
+       <b class="num">${ds.xong_gala}</b>/${ds.tong} đã trả lời dự Lễ ·
+       <b class="num">${ds.du_le}</b> người dự Lễ.</p>
+    <a class="wide" href="/api/totnghiep/xuat.csv" download
+       style="display:block;text-align:center;text-decoration:none;margin-bottom:14px">Tải tệp CSV cho Ban tổ chức</a>
+    <div class="card"><div class="cb" style="padding:4px 16px;max-height:52vh;overflow:auto">${dong}</div></div>
+    <div class="foot" style="padding:10px 0 0">Tệp CSV mở bằng Excel đọc đúng dấu
+      tiếng Việt. Cột phí ghi "đã tự khai" cho tới khi người thu đối chiếu sao kê,
+      rồi mới thành "người thu đã nhận".</div>
+    <div class="sa"><button class="big c" id="dsDong">Đóng</button></div>`);
+  $('#dsDong').onclick = closeSheet;
+}
+
 // Đăng ký service worker. Nó KHÔNG cache gì — chỉ để nhận thông báo đẩy và
 // để iPhone chịu cài ứng dụng lên màn hình chính. Hỏng thì bỏ qua, ứng dụng
 // vẫn chạy y nguyên.
@@ -4390,6 +4826,9 @@ async function boot() {
     return renderVao();
   }
   if (location.pathname.replace(/\/$/, '') === '/start') return renderStart();
+  // Zone Lễ tốt nghiệp. Cần phiên — renderTotNghiep() tự xử nhánh 401 bằng một
+  // màn một lối dẫn sang /dangnhap, nên không cần kiểm gì ở đây.
+  if (location.pathname.replace(/\/$/, '') === '/totnghiep') return renderTotNghiep();
 
   try {
     HOME = await apiGet('/api/home');

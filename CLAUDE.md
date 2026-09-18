@@ -24,9 +24,16 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 `claude/content-deployment-continuation-m2inni` — mọi thay đổi phải tới ĐÓ thì
 tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
 
-**Mười một việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
+**Mười hai việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
+1. **Zone Lễ tốt nghiệp `/totnghiep`** (18/9, migration 0041) — Ngô Phú Cường
+   đưa 15 câu Ban tổ chức muốn thu để chuẩn bị Lễ 26/9 rồi hỏi *"bạn xem cái
+   gì có rồi cái gì chưa và đề xuất cho tôi một zone riêng cho việc này"*.
+   Phát hiện quyết định cả hình dạng việc này: **6/15 câu D1 ĐÃ CÓ SẴN dữ
+   liệu, 2 câu nữa có sẵn cả cỗ máy** — nên nó là màn XÁC NHẬN chứ không phải
+   biểu mẫu 15 câu. Kèm **đợt thu cấp lớp ĐẦU TIÊN** của dự án. Xem mục riêng
+   bên dưới trước khi đụng vào `worker/src/routes/tot-nghiep.js`.
+2. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
    này, và là lần đầu tiên nó **tốn tiền theo lượt dùng** cùng lần đầu **bỏ
    HAI nguyên tắc gốc cùng lúc (N1 và N2)**. Ngô Phú Cường đưa hai tài liệu
    của giảng viên rồi nói thẳng: *"Loại bỏ các rào cản N1, N2 bạn khảo sát và
@@ -34,7 +41,7 @@ tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
    sẽ phỏng vấn và dẫn dắt TỪ Ý TƯỞNG đến việc đặt các câu hỏi và (gợi ý) trả
    lời cho học viên khi xây dựng KHKD"*. Xem mục riêng bên dưới — đọc TRƯỚC
    khi đụng vào bất cứ thứ gì trong `worker/src/tro-ly/`.
-2. **Xin đổi nhóm — tự phục vụ** (9/9, migration 0037). Ngay sau khi chuyển
+3. **Xin đổi nhóm — tự phục vụ** (9/9, migration 0037). Ngay sau khi chuyển
    tay Trương Thị Ngọc Anh sang Nhóm 6 bằng migration 0036, Ngô Phú Cường hỏi
    thẳng "có thể thêm chức năng xin đổi nhóm không, ai là phê duyệt thì phù
    hợp" — muốn việc lặp lại tự chạy được, không phải chờ tôi viết migration
@@ -42,46 +49,46 @@ tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
    không phải Ban cán sự lớp, không phải cả hai nhóm cùng đồng ý — nhóm ĐI
    chỉ CẦN BIẾT (qua "Hoạt động gần đây"), không cần ĐỒNG Ý. Xem mục riêng
    bên dưới.
-3. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
+4. **Đính kèm Ghi chú vào thông báo** (8/9, migration 0034), kèm thanh định
    dạng B/I/gạch đầu dòng và ô xem trước gắn thêm vào sheet Sửa ghi chú/Gắn
    Tư liệu (trước đó chỉ có ở sheet soạn thông báo). Phát hiện tình cờ một
    N6 THẬT có từ trước khi làm việc này: `GET /api/lich` trả về thông báo
    nội bộ của MỌI nhóm, không lọc phạm vi — đã vá cùng lúc. Xem mục riêng
    bên dưới.
-4. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
+5. **Thư khi có thông báo mới** (6/9, migration 0031) — đăng thông báo lên ứng
    dụng xong là gửi thư cho người trong phạm vi, kèm công tắc tắt của chính
    chủ ở tab Tài khoản. Lý do làm: đo trên D1 thật thì thông báo đẩy chỉ có
    **2/146 người bật và chưa gói tin nào từng đi** — xem mục riêng bên dưới.
-5. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
+6. **Giao thương** (5/9) — tab Giao thương + trang công khai `/giao-thuong`.
    Danh mục "bán gì, bán cho ai" của cả lớp, kèm ghép nối theo nhu cầu và
    một trang ai cũng mở được (Google index được). Chỗ DUY NHẤT dữ liệu người
    dùng ra khỏi tên miền, và chỉ của ai tự bật — xem mục riêng bên dưới.
-6. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
+7. **Phát lại link mời cho người ĐÃ ĐĂNG NHẬP — vá một lỗ hổng thật** (5/9).
    Ngô Phú Cường xin mở rộng quyền "phát lại link mời trong nhóm" (có từ Đợt
    1, chưa từng chặn người đã đăng nhập) ra cả lớp cho anh và lớp trưởng. Tra
    tới nơi thì lộ ra route ĐÓ đã luôn cho phép **chiếm tài khoản người khác**:
    bước nhận (`postInviteClaim`) không đòi gì ngoài một email tự chọn. Đã vá
    trước khi mở rộng: bước nhận nay đòi đúng số điện thoại khi hồ sơ đã có
    người nhận, cùng hạn mức đoán với `/vao` — xem mục riêng bên dưới.
-7. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
+8. **Tư liệu gắn vào PHẦN BÀI** (5/9). Bài↔Tư liệu là mắt xích còn thiếu của
    bộ ba Hôm nay/Bài/Tư liệu — Ngô Phú Cường hỏi thẳng "ba tab có liên thông
    với nhau không", tra ra `links.section_id` có cột từ đầu (migration 0001)
    nhưng CHƯA từng được nối dây (luôn ghi cứng NULL). Nay nối xong, đúng khuôn
    "một dòng, hai màn" đã dùng cho buổi học — xem mục riêng bên dưới. Điểm
    khác biệt phải nhớ: mỗi nhóm giữ một bộ tám phần RIÊNG, không dùng chung
    như buổi học, nên chốt N6 phải kiểm thêm "đúng nhóm" chứ không chỉ "có thật".
-8. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
+9. **Tư liệu dạng "Nội dung Text"** (5/9, migration 0025). Bên cạnh dán đường
    dẫn, nay gõ thẳng một ghi chú Markdown vào ứng dụng — lệch có chủ ý thứ hai
    với N2, xem mục riêng bên dưới. Điểm cần nhớ nhất: `mdSafe()` trong
    `public/app.js` ESC TRƯỚC rồi mới PARSE cú pháp markdown, không được đảo
    ngược thứ tự.
-9. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
+10. **Link mời xuyên nhóm cho Ban cán sự lớp** (3/9, mở rộng 4/9 và 5/9). Ngô
    Phú Cường (uỷ viên) và Lưu Minh Tiến (lớp trưởng, migration 0022) phát được
    link mời cho BẤT KỲ ai ở bất kỳ nhóm nào, không chỉ nhóm của mình, kể cả
-   người đã đăng nhập (mục #6 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
+   người đã đăng nhập (mục #7 ở trên) — `POST /api/danh-ba/:roster_id/moi`,
    xem mục riêng bên dưới.
-10. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
-11. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
+11. Tư liệu gắn vào buổi học — một dòng dữ liệu, hiện ở cả tab Lịch lẫn Tư liệu.
+12. Bỏ OTP ở lần đăng nhập đầu — số điện thoại vào thẳng, rồi passkey.
 
 **Một cái bẫy đã trả giá, đừng vấp lại:** `deploy.yml` ghim **tên nhánh** ở
 `on.push.branches`. Đổi nhánh làm việc mà quên sửa dòng ấy thì mọi commit đẩy
@@ -117,24 +124,34 @@ deploy là production khi `--branch` TRÙNG nhánh ấy; sửa nó theo nhánh g
 thì deploy tụt xuống hạng "xem thử", workflow vẫn xanh mà tên miền vẫn chạy bản
 cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trước.
 
-**Bốn việc cần làm tiếp, xếp theo mức chặn:**
+**Sáu việc cần làm tiếp, xếp theo mức chặn:**
 
-1. **Mở một phiên Trợ lý KHKD THẬT trên tên miền** — đây là phép nghiệm thu
+1. **PHÁT LINK `/totnghiep` CHO CẢ LỚP — hạn 21h00 NGÀY 19/9.** Gấp nhất, và
+   không phải việc lập trình. Kèm hai điều phải nói rõ khi phát: (a) buổi bảo
+   vệ chiều 26/9 là bắt buộc và KHÔNG thu phí, chỉ buổi tối mới có phí; (b)
+   **chỉ 69/146 người đã đăng nhập được** nên 77 người còn lại chưa mở được
+   link — đường chữa là phát link mời qua Danh bạ → Cả lớp, không cần chờ điền
+   số điện thoại.
+2. **Mở `/totnghiep` trên điện thoại thật và quét thử mã QR phí Gala bằng app
+   ngân hàng.** Đây là đợt thu cấp lớp ĐẦU TIÊN của dự án — chưa đồng nào từng
+   đi qua đường này, và ảnh QR chưa hiển thị thật lần nào (sandbox không có
+   mạng). Hỏng thì cả lớp chuyển tiền sai chỗ.
+3. **Mở một phiên Trợ lý KHKD THẬT trên tên miền** — đây là phép nghiệm thu
    duy nhất cho tính năng lớn nhất vừa thêm, và sandbox không làm được (xem
    mục riêng). Hỏng thì `hong_o_buoc` trong phúc đáp 502 nói ngay hỏng ở bước
    nào. Kèm theo: thêm `DEEPSEEK_API_KEY` vào **GitHub Secrets** (ngoài
    Cloudflare) để `deploy.yml` tự kiểm khoá còn sống mỗi lượt deploy.
-2. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
+4. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
    người chưa có số nào, 6 số sai hoặc trùng — đã điền được 4/44 người chưa có
    số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020; thêm một
    người mới migration 0023 vào thẳng nhóm "sai" vì số trong tệp gốc thiếu một
    chữ số). Chưa điền thì từng ấy người không tự vào được — đây là chỗ chặn số
    một, và nó không phải việc lập trình.
-3. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
+5. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
    cho những lần đăng nhập sau, mà nó CHƯA từng chạy trọn vẹn trên tên miền
    thật lần nào. Hỏng thì đường vào lại chỉ còn mã email, tức chưa thật sự bỏ
    được OTP.
-4. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
+6. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
    Existing Headers"**. Không sửa được trong repo.
 
 **Một việc nên làm ở buổi học đầu tiên có người dùng thật:** đứng cạnh xem
@@ -322,6 +339,11 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
   SRS viết trước khi có tính năng này, và chính nó là chỗ lệch N1/N2 lớn nhất
   (xem mục riêng). `cai_dat` là bảng cấu hình chạy-thời-gian ĐẦU TIÊN của dự
   án: mọi tính năng trước đều miễn phí nên không cần công tắc tắt gấp.
+- `dang_ky_tot_nghiep` + `groups.ban_nop_url`/`ban_nop_luc`/`ban_nop_boi`
+  (migration 0041) — zone Lễ tốt nghiệp 26/9. SRS viết trước khi Ban tổ chức
+  gửi 15 câu này. Ba cột `ban_nop_*` đặt trên `groups` chứ KHÔNG trên `plans`
+  — lý do đo được, không phải sở thích: chỉ Nhóm 6 có dòng `plans` (xem mục
+  riêng bên dưới).
 
 ## Cạm bẫy của D1 thật — trả giá bằng bốn lần chạy hỏng
 
@@ -1027,6 +1049,230 @@ cách chữa đã dùng ở đó.
    vài phiên thật: biết đang tốn bao nhiêu, và biết việc xếp phần TĨNH lên
    trước có thật sự ăn đệm hay không. Trần 40 lượt/người/ngày đặt theo phỏng
    đoán, chưa theo số đo — chỉnh bằng một dòng `cai_dat`, không cần deploy.
+
+## Zone Lễ tốt nghiệp `/totnghiep` — màn XÁC NHẬN, không phải biểu mẫu 15 câu
+
+Thêm 18/9 (migration 0041). Ngô Phú Cường đưa 15 câu Ban tổ chức muốn thu của
+học viên rồi hỏi thẳng: *"bạn xem cái gì có rồi cái gì chưa và đề xuất cho tôi
+một zone riêng cho việc này"*.
+
+**Phát hiện quyết định cả hình dạng việc này: 6/15 câu D1 ĐÃ CÓ SẴN dữ liệu**
+(họ tên, ngày sinh, điện thoại, doanh nghiệp, lĩnh vực, chức vụ), **và 2 câu
+nữa có sẵn cả cỗ máy** (đề tài KHKD; quỹ + VietQR cho khoản phí). Nên đây
+không phải dựng một biểu mẫu 15 câu từ đầu — mà là dựng một màn **XÁC NHẬN**
+thứ đã biết, cộng đúng 5 câu thật sự mới. Học viên gõ ít hơn hẳn, và dữ liệu
+không bị chẻ làm hai nguồn.
+
+### Ba phần, ba nút Lưu — vì ba HẠN khác nhau
+
+| | Nội dung | Hạn | Lưu vào |
+|---|---|---|---|
+| A · Hồ sơ & chứng chỉ | câu 1–9 | 26/9 | `dang_ky_tot_nghiep` |
+| B · Đề tài KHKD | câu 10 + link bản nộp | 26/9 | `groups` (của NHÓM) |
+| C · Lễ & Gala | câu 11–15 | **21h00 ngày 19/9** | `dang_ky_tot_nghiep` |
+
+Ngô Phú Cường hỏi "có nên tách các phần?" — nên, và vì lý do cụ thể chứ không
+phải cho gọn: gộp một form 15 câu thì người muốn đăng ký Gala tối nay bị chặn
+vì chưa có ảnh chân dung, tức mất đúng cái hạn gấp nhất. Mỗi phần đóng dấu một
+mốc riêng (`ho_so_luc`, `gala_luc`, `groups.ban_nop_luc`) nên câu Ban tổ chức
+thật sự cần — "còn ai chưa xong phần nào" — trả lời được bằng một truy vấn.
+
+### Hai quyết định do SOI D1 THẬT bác bỏ phương án ban đầu
+
+Kế hoạch ban đầu định đặt link bản nộp trên `plans` và gác bằng
+`canManageGroup`. Cả hai đều SAI, và lượt soi ngày 18/9
+(`.github/workflows/soi-du-lieu.yml`, bước tạm rồi xoá) cho con số:
+
+1. **CHỈ NHÓM 6 CÓ DÒNG `plans`** (plan_id=1). Chín nhóm còn lại không có.
+   `plans` chỉ sinh ra khi nhóm chạy wizard tạo kế hoạch. Đặt cột ở đó là chín
+   nhóm KHÔNG CÓ CHỖ NÀO để nộp link, tám ngày trước buổi bảo vệ. Chữa bằng
+   cách tự tạo dòng `plans` khi nộp thì tệ hơn: `getPlan()` sẽ thôi trả 404
+   nên tab Bài của chín nhóm ấy mất màn "chưa có kế hoạch — tạo ngay", thay
+   bằng một bài tám phần RỖNG. → Cột nằm trên **`groups`**, bảng luôn có đủ
+   10 dòng.
+2. **MỚI CÓ NHÓM 6 VÀ NHÓM 8 CÓ OFFICER.** Gác bằng `canManageGroup` là TÁM
+   nhóm không ai nộp được link. → **Bất kỳ thành viên nào của nhóm cũng nộp
+   được**, cố ý lệch với `patchTopic`. Đổi lại `ban_nop_boi` ghi ai nộp lần
+   cuối và giao diện in tên ấy ra, nên nhóm tự thấy và tự sửa nhau được.
+
+Bài học chung: **đừng suy ra hình dạng dữ liệu từ lược đồ.** Cột có trong DDL
+không có nghĩa là dòng có trong bảng — cùng họ với bài học ngược của
+`links.section_id` (cột nằm sẵn từ migration 0001 mà chưa từng được nối dây).
+
+N6 ở đường nộp link khoá chặt mà **không cần kiểm gì**: route không nhận
+`group_id` trong thân, nó ghi thẳng vào `me.group_id`. Không có id nào để giả
+mạo — chốt chặn tốt nhất là chốt không tồn tại.
+
+### Đợt thu cấp lớp ĐẦU TIÊN của dự án
+
+Trước 18/9 `fund_rounds` chưa có một dòng `scope='class'` nào. Nay có đúng
+một: **phí Gala 1.000.000đ/người, Vũ Thị Ngân (member 48), MB Bank
+0975587586**, cú pháp `GALA {TEN} N{NHOM}`. Ba nguồn độc lập cùng chỉ một
+người: thư mời Ban tổ chức (đã chép vào ghi chú migration 0040), số điện thoại
+của chị trong roster seq 136, và vai `thu_quy` cấp lớp còn hiệu lực trên D1.
+
+Viết bằng migration chứ không qua route vì **`postFund` đòi `isClassOfficer`,
+mà Ngô Phú Cường là `uy_vien` nên KHÔNG tạo được đợt lớp** (uy_vien cố ý không
+nằm trong `VAI_DIEU_HANH`). Chỉ Lưu Minh Tiến hoặc Vũ Thị Ngân tạo được.
+
+**KHÔNG có trường nào tên "đã đóng phí" trong `dang_ky_tot_nghiep`.** Trạng
+thái tiền đọc thẳng từ `fund_declarations`, và màn hình dùng LẠI chính
+`shapeRound()` của `funds.js` (nay export) cùng đường ghi
+`POST /api/funds/:id/declare` có sẵn — zone này **không có route tiền nào của
+riêng nó**. Chép một cờ "đã đóng" vào đây là dựng nguồn sự thật thứ hai cho
+tiền, thứ nguy hiểm nhất có thể làm. Câu 12 Ngô Phú Cường viết nguyên văn
+*"Bạn đã đóng phí chưa? Rồi – Chưa?"* — đã sửa theo mục 6.4 SRS, và cả hai bộ
+kiểm đều grep chuỗi "đã đóng" trong phúc đáp lẫn trên màn hình.
+
+### `roster.dob` có dữ liệu thật, định dạng KHÔNG đồng nhất, chưa ai từng đọc
+
+Đo trên D1 thật 18/9, **146 dòng**: 107 dạng `dd/mm/yyyy`, **28 dòng CHỈ CÓ
+NĂM** (`'1966'`), 11 dòng trống, **0 dòng dạng lạ**. `grep -rn '\bdob\b'` trong
+`worker/src/` và `public/` ra **0 kết quả** — cột này chưa code nào từng đọc,
+nên chưa ai phát hiện.
+
+In thẳng `'1966'` lên chứng chỉ là hỏng thật. Cách xử lý: điền sẵn **nguyên
+văn**, gắn nhãn "Danh sách gốc chỉ có …, bổ sung đủ ngày/tháng/năm giúp nhé"
+khi chuỗi không khớp `dd/mm/yyyy`, và lưu bản học viên xác nhận vào cột riêng
+— **không ghi đè `roster.dob`** (bản ghi lịch sử của Ban tổ chức).
+
+Cùng lý lẽ cho câu 9: `member_profile.needs` chỉ 80 ký tự mà câu hỏi đòi "cụ
+thể". Không nới `needs` (nó đang hiện trong thẻ gọn ở Danh bạ và Giao thương,
+nới ra là vỡ bố cục hai màn khác) — dùng cột riêng 500 ký tự, điền sẵn TỪ
+`needs`.
+
+### Nằm TRONG app.js, không phải thư mục rời — và không thêm tab thứ bảy
+
+`/lich`, `/sotay`, `/giao-thuong` là thư mục rời vì chúng **phải chạy được khi
+không có phiên**. Zone này thì ngược lại: chỉ học viên đã đăng nhập (Ngô Phú
+Cường chọn, không mở cho khách ngoài lớp). Nằm trong ứng dụng thì nó thừa
+hưởng sẵn phiên, `esc()`, `api()`, khuôn sheet, lề thanh trạng thái, khoá
+zoom, băng "Có bản mới" — dựng lại từng thứ đó trong một tệp rời là chép lại
+bốn tháng bài học.
+
+Và **không phải sửa gì ngoài `app.js`/`app.css`**: `public/_redirects` vốn là
+một luật vét `/*  /index.html  200` nên `/totnghiep` ĐÃ phục vụ ứng dụng, chỉ
+cần thêm một nhánh `location.pathname` cạnh `/vao` và `/dangnhap`
+(`app.js:4380-4392`). `_headers` cũng không đụng: `app.js`/`app.css` đã có
+`Cache-Control: no-cache`, nên bẫy `/lich/lich.js` (bị quên nên dính
+`max-age=14400`) không áp dụng.
+
+**KHÔNG thêm tab thứ bảy** — `pw-nav.mjs` đã đo: nhãn "Giao thương" cần 75px
+mà nút rộng nhất chỉ 69px ở khổ 430px. Thêm một tab nữa là mọi tab hẹp thêm,
+cho một việc hết hạn 26/9. Thay vào đó là một thẻ ở đầu tab Hôm nay, **tự ẩn
+sau 26/9 theo `HOME.hom_nay` của MÁY CHỦ** — không dùng ngày của máy người
+dùng (bài học "đếm ngược lệch một ngày" 26/8), vì ở đây hậu quả nặng hơn: thẻ
+có thể biến mất sớm một ngày với đúng người chưa kịp đăng ký.
+
+### Hai lỗi THẬT chỉ bộ kiểm giao diện và ảnh chụp mới bắt được
+
+1. **Lưu xong một phần thì khối tự gập, và MÃ QR BIẾN MẤT.** Bản đầu quyết
+   mở/gập thuần theo "đã xong chưa". Bấm "Có, tôi dự" rồi Lưu → khối Gala
+   thành "đã xong" → gập → mã QR và nút chuyển khoản mất, đúng giây người ta
+   cần chúng nhất. Nay `TN_MO` giữ trạng thái NGOÀI hàm vẽ, đúng khuôn bộ lọc
+   Sổ thu (`SOTHU`) và thẻ Danh bạ (`DANHBA_THE`).
+2. **Quên nhánh dự phòng của mã QR.** Tab Quỹ có `img.onerror` thay mã hỏng
+   bằng một ô giải thích (Đợt 3); màn này chép markup QR sang mà quên chép
+   nhánh ấy. Không lỗi JS, không phép kiểm chuỗi nào đỏ — chỉ có một ô vỡ ảnh
+   nằm giữa màn hình tiền nong. **Chỉ ảnh chụp 390px mới thấy.**
+
+Kèm một bẫy của chính bộ kiểm: bấm `<summary>` là **TOGGLE**, không phải
+"mở" — hai khối mở sẵn nên cú bấm của bộ kiểm ĐÓNG chúng lại, và triệu chứng
+là "element is not visible" trên một phần tử vẫn nằm nguyên trong DOM.
+
+### Xuất CSV: BOM UTF-8, và phép kiểm phải đọc BYTE
+
+Ban tổ chức mở bằng Excel để ghép chứng chỉ, nên tệp bắt đầu bằng `﻿` và
+xuống dòng CRLF — thiếu BOM thì Excel trên Windows đọc bằng bảng mã hệ thống
+và mọi dấu tiếng Việt thành ký tự rác, tức mất cả công dụng của tệp.
+
+**Phép kiểm phải đọc `arrayBuffer()`, không đọc `text()`.** Bản đầu viết
+`csv.charCodeAt(0) === 0xFEFF` và ĐỎ dù BOM có thật (`od -tx1` cho ra
+`ef bb bf`): bộ giải mã UTF-8 theo chuẩn WHATWG **nuốt BOM ở đầu dòng**, nên
+mọi phép kiểm ở tầng chuỗi đều mù với đúng cái nó định canh. Cùng họ với bẫy
+`TextDecoder` của `lib/ics.js`.
+
+### Chưa kiểm chứng được, và một con số cần nói thẳng
+
+- **Chưa ai dùng zone này với dữ liệu thật.** Mọi phép kiểm chạy trên D1 cục
+  bộ với ba phiên dựng tay.
+- **Chỉ 69/146 người đã nhận hồ sơ** (soi D1 18/9: `members` có 75 dòng,
+  `claimed_at` khác NULL ở 69). Zone này **chỉ dành cho người đã đăng nhập**,
+  nên 77 người còn lại KHÔNG điền được — Ban tổ chức muốn thông tin của cả
+  146. Đây là rủi ro sản phẩm chứ không phải rủi ro kỹ thuật, và đường chữa đã
+  có sẵn: Ngô Phú Cường hoặc Lưu Minh Tiến phát link mời qua Danh bạ → Cả lớp
+  (mục "Phát lại link mời" ở trên), không cần chờ điền số điện thoại.
+- **Ảnh chân dung và logo (câu 7, 8) CHƯA làm** — Đợt 2, qua Google Drive.
+  Cột `anh_url`/`logo_url` đã có sẵn trong bảng nên thêm vào là cộng thêm, chứ
+  không phải đổi lược đồ. Xem mục riêng ngay dưới.
+
+## Ảnh chứng chỉ qua Google Drive — Đợt 2, CHƯA làm
+
+Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu
+trữ ảnh không"*. Có, cả ba, và **cả ba đều vướng đúng chỗ CLAUDE.md đã ghi**:
+
+| | Vướng |
+|---|---|
+| **R2** | miễn phí 10GB, nhưng **bật lên vẫn phải gắn thẻ thanh toán** — đúng lý do thứ ba khiến N2 được giữ ngày 26/8 |
+| **Cloudflare Images** | **5 USD/tháng**, không có bậc miễn phí |
+| **D1 (nhét ảnh vào DB)** | biến cơ sở dữ liệu giao dịch thành kho ảnh: mọi migration, mọi sao lưu nặng thêm vài trăm MB cho dữ liệu ghi một lần đọc một lần |
+
+Và kể cả có tiền thì Drive vẫn hợp hơn cho **đúng việc này**: Ban tổ chức cần
+lấy ảnh ra **hàng loạt** đưa người làm chứng chỉ — Drive là chọn-tất-cả-tải-về,
+R2 là phải viết script. Ghi lại đây để khỏi bàn lại.
+
+**Và đây KHÔNG phải bỏ N2 — nó là cách đọc N2 đúng nhất.** Ba lý do N2 tồn
+tại: (1) *"file nằm ở Drive Ban tổ chức và sống lâu hơn ứng dụng"* — Drive
+thoả ĐÚNG điều này, R2 thì ngược lại; (2) không phát tán tài sản người khác —
+ảnh học viên tự nộp không thuộc diện ấy; (3) *"R2 đòi gắn thẻ thanh toán"* —
+Drive API miễn phí. Ứng dụng là **ống dẫn, không phải kho**.
+
+Thiết kế đã chốt, chưa viết dòng mã nào:
+
+- **Refresh token của Ban tổ chức, KHÔNG dùng service account.** Tài khoản
+  dịch vụ **không có dung lượng Drive riêng** → `403 storageQuotaExceeded` khi
+  đẩy vào thư mục Gmail thường; muốn chạy phải có Workspace + Shared Drive,
+  tức phải trả tiền. Và tệp thuộc sở hữu của tài khoản dịch vụ: xoá dự án
+  Google Cloud là ảnh cả lớp đi theo.
+- **Hai cái bẫy im lặng của đường refresh token.** (a) Token cấp khi ứng dụng
+  còn ở trạng thái "Testing" **chết sau ĐÚNG 7 NGÀY**, và xuất bản sau đó
+  KHÔNG hồi sinh nó — phải **Publish TRƯỚC, lấy token SAU**. (b) `drive.file`
+  là scope Drive DUY NHẤT không bị xếp "nhạy cảm" (nên xuất bản thẳng, không
+  phải qua vòng thẩm định hàng tuần của Google), nhưng nó chỉ đụng được tệp
+  **do chính ứng dụng tạo** → **thư mục đích phải do ứng dụng tạo**, dán id
+  thư mục tạo tay thì Drive trả `404 File not found: <id>`.
+- **Ba chỗ sai mà Drive vẫn trả HTTP 200:** thiếu tiền tố `/upload/` trong URL
+  → tên tệp đúng, **nội dung 0 byte**; thiếu `fields=id,name,webViewLink` →
+  `webViewLink` lặng lẽ `undefined`; dựng thân multipart bằng chuỗi mẫu → ảnh
+  đi qua UTF-16 và hỏng. Thân phải nối ở **mức BYTE** (`Uint8Array.set`), ranh
+  giới `\r\n`.
+- **Hai subrequest mỗi tệp**, xa trần 50. Không đệm access token, không gộp
+  hai ảnh vào một request.
+- **Soi magic bytes**, không tin phần mở rộng: JPEG `FF D8 FF`, PNG
+  `89 50 4E 47 0D 0A 1A 0A`. Nhận diện thêm HEIC/AVIF/WebP/PDF để **báo lỗi
+  cho tử tế** — "ảnh gốc của iPhone là HEIC, mở ảnh lên rồi chọn Sao chép sẽ
+  ra JPG" hữu ích hơn hẳn "tệp không hợp lệ", và iPhone là máy phần lớn lớp
+  này dùng.
+- **Phía trình duyệt, ba chỗ không dùng lại được đồ có sẵn:** KHÔNG gọi qua
+  `api()` (`public/app.js:220` ép `content-type: application/json` cho mọi
+  request có thân); xem trước phải dùng `FileReader.readAsDataURL` chứ KHÔNG
+  `URL.createObjectURL` vì CSP là `img-src 'self' data: https://img.vietqr.io`
+  — **không có `blob:`**; thu nhỏ ảnh bằng canvas thì **bỏ qua PNG** (canvas
+  vẽ nền trong suốt thành ĐEN, mà logo doanh nghiệp phần lớn là PNG nền trong
+  suốt) và phải `createImageBitmap(file, { imageOrientation: 'from-image' })`
+  không thì ảnh chụp dọc bằng iPhone quay ngang 90°.
+- `.dev.vars` trỏ đích Drive vào **cổng đóng 2527** (2525 SMTP, 2526 LLM) —
+  trỏ thẳng `googleapis.com` thì request TREO chứ không hỏng.
+- Mọi phúc đáp 502 mang `hong_o_buoc`: `chua_cau_hinh` · `lay_token` ·
+  `token_tu_choi` · `tai_len` · `qua_lau` · `drive_tu_choi` · `phuc_dap_la`.
+
+**Mười hai bước Ngô Phú Cường phải tự làm trên Google Cloud Console**, thứ tự
+quan trọng (bước 9 làm sau bước 10 thì token chết sau 7 ngày): tạo dự án → bật
+Drive API → OAuth consent screen External → điền tên/email → thêm scope
+`drive.file` (CHỈ scope này) → thêm test user → tạo OAuth client ID (Web
+application) → redirect URI `https://developers.google.com/oauthplayground` →
+**PUBLISH APP** → OAuth Playground đổi lấy refresh token → gửi tôi ba giá trị
+→ tôi chạy một lượt tạo thư mục rồi ghim `DRIVE_FOLDER_ID`.
 
 ## Xin đổi nhóm — tự phục vụ
 
@@ -1951,9 +2197,12 @@ tán. `deploy.yml` có sẵn phép kiểm `/sotay` trên tên miền thật.
 - **Danh mục 26 mã ngân hàng** trong `lib/vietqr.js` chép theo bộ BIN Napas
   nhưng chưa đối chiếu được với nguồn công bố.
 - **Passkey chưa thử trên iPhone/Android thật** — cần domain thật vì rp.id.
-- **Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu (mục 11
-  điểm #6 SRS còn để ngỏ). Quyền đã viết sẵn, thêm dòng `officers` với
-  `group_id IS NULL` là chạy.
+- ~~**Quỹ lớp chưa tạo được**: chưa ai giữ vai cấp lớp trong dữ liệu~~ →
+  **ĐÃ XONG, và đợt thu cấp lớp ĐẦU TIÊN đã có (18/9, migration 0041).** Soi
+  D1 thật ngày 18/9: ba vai cấp lớp đều có người và còn hiệu lực từ 5/9 —
+  `lop_truong` Lưu Minh Tiến (member 15), `thu_quy` Vũ Thị Ngân (member 48),
+  `uy_vien` Ngô Phú Cường (member 6). Trước 18/9 bảng `fund_rounds` chưa có
+  một dòng `scope='class'` nào; nay có đúng một: phí Gala 1.000.000đ.
 - **Lịch nay có 21 DÒNG `lich_hoc`, ĐỦ tới hết khoá 26/9** (28/8, 5/9, 11/9 và 18/9 mỗi
   ngày chia hai-ba dòng vì nhiều chủ đề, nên "buổi" ở đây là buổi giảng chứ
   không phải ngày lịch — đừng lấy số dòng so thẳng với `cohorts.so_buoi = 13`):
@@ -2824,7 +3073,7 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "hai mươi hai phép đối chứng đáng giữ nhất" và hai
+  trước khi chạy — có mục "hai mươi chín phép đối chứng đáng giữ nhất" và hai
   chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày
