@@ -251,5 +251,92 @@ ok('không có chữ "BCS" (N7 — luôn viết đủ "Ban cán sự lớp")', !
 const rCsvThuong = await get('/api/totnghiep/xuat.csv', ckThuong);
 ok(`người thường tải CSV → 403 (nhận ${rCsvThuong.status})`, rCsvThuong.status === 403);
 
+/* ══ 11. ĐƯỜNG CÔNG KHAI (migration 0042) ═══════════════════════════════════
+   Đo trên D1 thật 18/9: 38/146 người không có số điện thoại trong danh sách
+   gốc nên cửa /dangnhap đóng với họ. Ngô Phú Cường chọn mở RIÊNG form tốt
+   nghiệp thay vì nới cửa đăng nhập.
+
+   Bốn phép, và phép cuối là chốt chặn thật sự của cả tính năng. */
+console.log('\n── Đường công khai: chỉ GHI được một bản đăng ký ──');
+
+const rCk = await get('/api/totnghiep/cong-khai', null);
+ok(`GET không cookie → 200 (nhận ${rCk.status})`, rCk.status === 200);
+const bCk = await rCk.json();
+ok('trả nganh_list', (bCk.nganh_list ?? []).length === 19);
+ok('trả thông tin phí (số tiền, ngân hàng, người thu)',
+   bCk.phi?.amount === 1000000 && !!bCk.phi?.account_no);
+// KHÔNG được lộ một mẩu dữ liệu cá nhân nào: đường này ai cũng gọi được, và
+// điền sẵn ngày sinh hay điện thoại ở đây là phát tán danh bạ cả lớp.
+const thoCk = JSON.stringify(bCk);
+ok('KHÔNG có trường nào tên dien_thoai/ngay_sinh/email trong phúc đáp',
+   !/dien_thoai|ngay_sinh|"email"/.test(thoCk));
+ok('KHÔNG lộ số điện thoại của ai (không có chuỗi 10 chữ số bắt đầu bằng 0 ngoài số tài khoản)',
+   (thoCk.match(/"0\d{9}"/g) ?? []).every(x => x === '"0975587586"'));
+
+// Người CHƯA có hồ sơ members: route phải tự tạo, đúng nhóm trong danh sách gốc.
+const timNguoi = await fetch(B + '/api/wizard/roster/search?q=' + encodeURIComponent('Đinh Khánh Toàn'),
+  { headers: IP }).then(r => r.json()).catch(() => ({ people: [] }));
+const ai = (timNguoi.people ?? [])[0];
+ok(`tìm được một người chưa có hồ sơ để thử (${ai?.full_name ?? 'KHÔNG THẤY'})`, !!ai);
+
+if (ai) {
+  const rGui = await fetch(B + '/api/totnghiep/cong-khai', {
+    method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+    body: JSON.stringify({
+      roster_id: ai.roster_id, ho_ten: ai.full_name, ngay_sinh: '05/05/1975',
+      dien_thoai: '0912345678', du_le: 'co', linh_vuc: ['cong-nghe'],
+      nhu_cau_ket_noi: 'kiểm đường công khai',
+    }),
+  });
+  const bGui = await rGui.json().catch(() => ({}));
+  ok(`gửi KHÔNG cookie → 200 (nhận ${rGui.status} ${bGui.error ?? ''})`, rGui.status === 200);
+  ok('trả về mã QR và cú pháp chuyển khoản khi chọn "có dự"',
+     !!bGui.phi?.qr_url && String(bGui.phi?.transfer_note ?? '').startsWith('GALA'));
+
+  // Dòng ấy phải hiện ra trong danh sách của Ban cán sự lớp, gắn nhãn nguồn.
+  const dsCk = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
+  const dong = dsCk.nguoi.find(x => x.full_name === ai.full_name);
+  ok('Ban cán sự lớp thấy dòng vừa gửi', !!dong && dong.du_le === 'co');
+  ok('dòng ấy gắn nhãn nguon = cong_khai', dong?.nguon === 'cong_khai');
+
+  // Gửi lại lần hai vẫn được (họ gõ nhầm thì sửa lại), KHÔNG đẻ dòng thứ hai.
+  const rLai = await fetch(B + '/api/totnghiep/cong-khai', {
+    method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+    body: JSON.stringify({ roster_id: ai.roster_id, ho_ten: ai.full_name, du_le: 'khong' }),
+  });
+  ok(`gửi lại → 200 (nhận ${rLai.status})`, rLai.status === 200);
+  const dsLai = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
+  ok('vẫn ĐÚNG MỘT dòng cho người ấy',
+     dsLai.nguoi.filter(x => x.full_name === ai.full_name).length === 1);
+}
+
+// ── CHỐT CHẶN THẬT SỰ: không ghi đè bản của người ĐÃ ĐĂNG NHẬP ──────────
+// Ngô Phú Cường đã điền từ tài khoản của anh ở các phép trên (nguon='phien').
+// Ai cầm link công khai mà ghi đè được bản ấy thì phá được bản khai của cả 69
+// người đã đăng nhập — đó mới là thiệt hại thật, chứ không phải một dòng rác.
+console.log('\n── Chốt chặn: công khai KHÔNG ghi đè bản của người đã đăng nhập ──');
+const timCuong = await fetch(B + '/api/wizard/roster/search?q=' + encodeURIComponent('Ngô Phú Cường'),
+  { headers: IP }).then(r => r.json()).catch(() => ({ people: [] }));
+const rsCuong = (timCuong.people ?? [])[0];
+ok('tìm được roster_id của Ngô Phú Cường', !!rsCuong);
+const rDe = await fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify({ roster_id: rsCuong?.roster_id, ho_ten: 'KẺ PHÁ HOẠI', du_le: 'khong' }),
+});
+const bDe = await rDe.json().catch(() => ({}));
+ok(`→ 409 da_dien_tu_tai_khoan (nhận ${rDe.status} ${bDe.error ?? ''})`,
+   rDe.status === 409 && bDe.error === 'da_dien_tu_tai_khoan');
+const sauDe = await get('/api/totnghiep', ckCuong).then(r => r.json());
+ok('bản của Ngô Phú Cường CÒN NGUYÊN (họ tên không bị đổi)',
+   sauDe.dang_ky?.ho_ten === 'Ngô Phú Cường');
+ok('và du_le vẫn là "co"', sauDe.dang_ky?.du_le === 'co');
+
+// roster_id bịa → 404, không phải 500
+const rBia = await fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify({ roster_id: 999999, ho_ten: 'Không Có Thật' }),
+});
+ok(`roster_id bịa → 404 (nhận ${rBia.status})`, rBia.status === 404);
+
 console.log(hong === 0 ? '\n✅ TẤT CẢ ĐỀU XANH' : `\n❌ ${hong} phép ĐỎ`);
 process.exit(hong === 0 ? 0 : 1);

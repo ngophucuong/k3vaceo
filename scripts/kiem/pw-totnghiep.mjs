@@ -184,6 +184,64 @@ ok('có thẻ "Đăng ký Lễ tốt nghiệp" ở tab Hôm nay', await the.coun
 ok('thẻ trỏ đúng /totnghiep', (await the.getAttribute('href')) === '/totnghiep');
 ok('không thêm tab thứ bảy vào thanh nav', await p.locator('.nb').count() === 6);
 
+/* ── Đường công khai: người CHƯA đăng nhập vẫn điền được (migration 0042) ──
+   Đo trên D1 thật 18/9: 38/146 người không có số điện thoại trong danh sách
+   gốc nên cửa /dangnhap đóng với họ. Ngô Phú Cường chọn mở RIÊNG form tốt
+   nghiệp thay vì nới cửa đăng nhập.
+
+   Ba điều phải chứng minh bằng trình duyệt, và điều thứ hai là quan trọng
+   nhất: form KHÔNG được điền sẵn ngày sinh hay điện thoại của ai — điền sẵn
+   là phát tán danh bạ cả lớp cho bất kỳ ai mở link. */
+console.log('\n── Đường công khai (chưa đăng nhập) ──');
+const c3 = await b.newContext({ viewport: { width: 390, height: 1400 } });
+const p3 = await c3.newPage();          // KHÔNG có cookie
+const loi3 = []; p3.on('pageerror', e => loi3.push(e.message));
+await p3.goto(B + '/totnghiep'); await p3.waitForTimeout(1600);
+
+// Phải bày ĐỦ HAI lối: 39 người kia CÓ số nên vẫn đăng nhập được, và đăng
+// nhập thì được cả ứng dụng. Chỉ bày lối công khai là họ mất phần còn lại mà
+// không ai nói cho biết.
+ok('có lối "Đăng nhập"', await p3.locator('a[href="/dangnhap"]').count() >= 1);
+ok('có lối "điền thẳng ở đây"', await p3.locator('#tnckBatDau').count() === 1);
+
+await p3.click('#tnckBatDau'); await p3.waitForTimeout(500);
+ok('mở ra màn tìm tên', await p3.locator('#tnckTen').count() === 1);
+await p3.fill('#tnckTen', 'khanh toan'); await p3.waitForTimeout(1400);
+ok('tìm không dấu ra đúng người', (await p3.locator('#tnckDs').innerText()).includes('Đinh Khánh Toàn'));
+await p3.locator('#tnckDs [data-rid]').first().click(); await p3.waitForTimeout(1200);
+
+ok('mở ra form', await p3.locator('#ckGui').count() === 1);
+// PHÉP CÓ RĂNG NHẤT CỦA MỤC NÀY.
+ok('ô Ngày sinh để TRỐNG — không điền sẵn dữ liệu của ai',
+   (await p3.inputValue('#ckDob')) === '');
+ok('ô Số điện thoại để TRỐNG', (await p3.inputValue('#ckSdt')) === '');
+ok('ô Họ tên có sẵn tên vừa chọn (thứ chính họ vừa bấm, không phải thứ bị lộ)',
+   (await p3.inputValue('#ckTen')) === 'Đinh Khánh Toàn');
+const chuCk = await p3.locator('body').innerText();
+ok('KHÔNG có chữ "đã đóng" trên màn công khai', !/đã đóng/i.test(chuCk));
+
+await p3.fill('#ckDob', '05/05/1975');
+await p3.fill('#ckSdt', '0912345678');
+await p3.locator('#ckDuLe [data-dule="co"]').click(); await p3.waitForTimeout(150);
+await p3.click('#ckGui'); await p3.waitForTimeout(2000);
+
+ok('gửi xong ra màn "Đã gửi xong"',
+   (await p3.locator('.tncard > h1').innerText()).includes('Đã gửi'));
+// Mã QR chỉ hiện SAU khi chọn "có dự" — chưa nói là đi thì chưa có gì để
+// chuyển tiền, mà bày sẵn mã là mời chuyển nhầm.
+ok('hiện khối phí kèm cú pháp chuyển khoản', await p3.locator('.tnphi').count() === 1);
+ok('cú pháp bắt đầu bằng GALA',
+   /GALA/.test(await p3.locator('.tnphi .copy').innerText()));
+ok('mã QR hỏng thì có ô dự phòng, không để ô vỡ ảnh',
+   await p3.locator('.tnphi .ph').count() === 1);
+ok('không lỗi JS ở đường công khai: ' + (loi3.join(' | ') || 'sạch'), loi3.length === 0);
+
+const tran3 = await p3.evaluate(() =>
+  document.documentElement.scrollWidth - document.documentElement.clientWidth);
+ok(`không tràn ngang ở 390px (thừa ${tran3}px)`, tran3 <= 1);
+await p3.screenshot({ path: '/tmp/tn-congkhai.png', fullPage: true });
+console.log('  (ảnh chụp: /tmp/tn-congkhai.png)');
+
 await b.close();
 console.log(hong === 0 ? '\n✅ TẤT CẢ ĐỀU XANH' : `\n❌ ${hong} phép ĐỎ`);
 process.exit(hong === 0 ? 0 : 1);

@@ -3,6 +3,8 @@ import { isClassCommittee, logAudit, logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 import { NGANH, nganhRaChuoi } from '../lib/nganh.js';
 import { shapeRound } from './funds.js';
+import { conQuota, ghiNhan } from '../lib/ratelimit.js';
+import { buildTransferNote, buildQrUrl } from '../lib/vietqr.js';
 
 /* ══ Zone "Lễ tốt nghiệp" — /totnghiep ══════════════════════════════════════
    Ngô Phú Cường đưa 15 câu Ban tổ chức muốn thu để chuẩn bị Lễ tốt nghiệp
@@ -270,6 +272,161 @@ export async function patchBanNop(request, env, me, ip) {
   return json({ ok: true, ban_nop_url: url });
 }
 
+/* ══ ĐƯỜNG CÔNG KHAI — cho 38 người chưa đăng nhập được ═════════════════════
+   Lý lẽ đầy đủ ở migrations/0042_totnghiep_cong_khai.sql. Tóm tắt phần phải
+   nhớ khi sửa file này:
+
+   HAI ROUTE DƯỚI ĐÂY LÀ ROUTE CÔNG KHAI DUY NHẤT CỦA ZONE NÀY, và trong
+   index.js chúng phải nằm ở nửa TRÊN dòng getCurrentMember — ngược hẳn sáu
+   route kia. Ranh giới ấy là VỊ TRÍ DÒNG, không phải một cờ nào.
+
+   Chúng chỉ GHI được một bản đăng ký. Không cấp phiên, không đọc được danh
+   bạ/quỹ/bài/thông báo. Và không trả về một mẩu dữ liệu cá nhân nào của ai:
+   ô nhập để TRỐNG, người điền tự gõ. Điền sẵn ngày sinh hay điện thoại ở đây
+   là phát tán danh bạ cả lớp cho bất kỳ ai mở link.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const CONG_KHAI_MOI_GIO = 400;   // PHẢI trên sĩ số lớp — bài học 27/8
+
+// Không nhận tham số, không trả dữ liệu của ai. Chỉ những thứ giao diện cần
+// để dựng form: danh mục ngành, hạn, và thông tin đợt thu phí ở mức đã in sẵn
+// trên thư mời Ban tổ chức (số tiền, ngân hàng, số tài khoản, tên người thu).
+export async function getTotNghiepCongKhai(env) {
+  const r = await env.DB.prepare(
+    `SELECT fr.amount, fr.bank_bin, fr.bank_name, fr.account_no, fr.account_name,
+            m.full_name AS collector_name
+       FROM fund_rounds fr LEFT JOIN members m ON m.id = fr.collector_member_id
+      WHERE fr.scope = 'class' AND fr.amount = 1000000
+        AND fr.account_no = '0975587586' LIMIT 1`
+  ).first();
+
+  return json({
+    han_gala: HAN_GALA,
+    ngay_le: NGAY_LE,
+    nganh_list: NGANH,
+    phi: r ? {
+      amount: r.amount,
+      bank_name: r.bank_name || r.bank_bin,
+      account_no: r.account_no,
+      account_name: r.account_name,
+      collector_name: r.collector_name,
+    } : null,
+  });
+}
+
+export async function postTotNghiepCongKhai(request, env, ip) {
+  if (!(await conQuota(env, 'totnghiep_ck', ip, CONG_KHAI_MOI_GIO))) {
+    return error('rate_limited', 429, { retry_after_minutes: 60 });
+  }
+  await ghiNhan(env, 'totnghiep_ck', ip);
+
+  const body = await readJson(request);
+  const rosterId = Number(body.roster_id);
+  if (!Number.isInteger(rosterId) || rosterId <= 0) return error('roster_invalid', 422);
+
+  const nguoi = await env.DB.prepare(
+    `SELECT r.id, r.cohort_id, r.full_name, r.group_label
+       FROM roster r WHERE r.id = ?`
+  ).bind(rosterId).first();
+  if (!nguoi) return error('not_found', 404);
+
+  // Tự tạo dòng members nếu chưa có — đúng khuôn postDanhBaMoi (danh-ba.js).
+  // `claimed_at` để TRỐNG: cửa /vao không đóng lại với họ, số điện thoại của
+  // họ trong Danh bạ vẫn bị che, và khi họ đăng nhập thật thì vẫn là CÙNG
+  // MỘT dòng nên thấy ngay bản mình đã điền ở đây.
+  //
+  // Nhóm lấy từ `roster.group_label` của CHÍNH NGƯỜI NHẬN, không phải của ai
+  // khác — không có tham số nhóm nào trong thân request để mà giả mạo.
+  let mem = await env.DB.prepare(
+    'SELECT id FROM members WHERE roster_id = ? AND is_active = 1'
+  ).bind(rosterId).first();
+  if (!mem) {
+    await env.DB.prepare(
+      `INSERT INTO members (cohort_id, group_id, roster_id, full_name, title, company, is_active)
+       SELECT r.cohort_id,
+              (SELECT g.id FROM groups g WHERE g.cohort_id = r.cohort_id AND g.label = r.group_label),
+              r.id, r.full_name, r.title, r.company, 1
+         FROM roster r WHERE r.id = ?`
+    ).bind(rosterId).run();
+    mem = await env.DB.prepare(
+      'SELECT id FROM members WHERE roster_id = ? AND is_active = 1'
+    ).bind(rosterId).first();
+    if (!mem) return error('khong_tao_duoc_ho_so', 500);
+  }
+
+  // ══ CHỐT CHẶN THẬT SỰ CỦA CẢ TÍNH NĂNG ══════════════════════════════════
+  // Đường công khai KHÔNG ĐƯỢC GHI ĐÈ bản do người đã đăng nhập tự điền.
+  // Thiếu chốt này thì bất kỳ ai cầm link cũng phá được bản khai của 69 người
+  // đã đăng nhập — đó mới là thiệt hại thật, chứ không phải một dòng rác thêm.
+  const cu = await docDangKy(env, mem.id);
+  if (cu && cu.nguon === 'phien') return error('da_dien_tu_tai_khoan', 409);
+
+  const duLe = motTrong(body.du_le, DU_LE);
+  const dat = {
+    ho_ten: cleanText(body.ho_ten, 120) ?? nguoi.full_name,
+    ngay_sinh: cleanText(body.ngay_sinh, 20),
+    dien_thoai: cleanText(body.dien_thoai, 20),
+    doanh_nghiep: cleanText(body.doanh_nghiep, 200),
+    linh_vuc: nganhRaChuoi(body.linh_vuc),
+    chuc_vu: cleanText(body.chuc_vu, 120),
+    nhu_cau_ket_noi: cleanText(body.nhu_cau_ket_noi, 500),
+  };
+
+  // Một lượt ghi CẢ HAI phần: người đi đường này gõ một mạch rồi bấm Gửi, chứ
+  // không có màn ba khối lưu riêng (họ không quay lại sửa được — không có
+  // phiên). Vì vậy đóng dấu cả hai mốc cùng lúc.
+  await env.DB.prepare(
+    `INSERT INTO dang_ky_tot_nghiep
+       (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc, chuc_vu,
+        nhu_cau_ket_noi, du_le, tai_tro, tai_tro_mo_ta, gian_hang, van_nghe,
+        van_nghe_mo_ta, nguon, ho_so_luc, gala_luc, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cong_khai',
+             datetime('now'), datetime('now'), datetime('now'))
+     ON CONFLICT(member_id) DO UPDATE SET
+       ho_ten = excluded.ho_ten, ngay_sinh = excluded.ngay_sinh,
+       dien_thoai = excluded.dien_thoai, doanh_nghiep = excluded.doanh_nghiep,
+       linh_vuc = excluded.linh_vuc, chuc_vu = excluded.chuc_vu,
+       nhu_cau_ket_noi = excluded.nhu_cau_ket_noi, du_le = excluded.du_le,
+       tai_tro = excluded.tai_tro, tai_tro_mo_ta = excluded.tai_tro_mo_ta,
+       gian_hang = excluded.gian_hang, van_nghe = excluded.van_nghe,
+       van_nghe_mo_ta = excluded.van_nghe_mo_ta, nguon = 'cong_khai',
+       ho_so_luc = excluded.ho_so_luc, gala_luc = excluded.gala_luc,
+       updated_at = excluded.updated_at`
+  ).bind(
+    mem.id, dat.ho_ten, dat.ngay_sinh, dat.dien_thoai, dat.doanh_nghiep,
+    dat.linh_vuc, dat.chuc_vu, dat.nhu_cau_ket_noi, duLe,
+    motTrong(body.tai_tro, TAI_TRO), cleanText(body.tai_tro_mo_ta, 500),
+    coKhong(body.gian_hang), coKhong(body.van_nghe), cleanText(body.van_nghe_mo_ta, 500)
+  ).run();
+
+  // Cú pháp chuyển khoản phải do MÁY CHỦ dựng: buildTransferNote() bỏ dấu rồi
+  // viết hoa, chép logic ấy sang giao diện là có ngày hai bên ra hai chuỗi
+  // khác nhau và người thu không dò được tiền về của ai.
+  let phi = null;
+  const round = await env.DB.prepare(
+    `SELECT * FROM fund_rounds WHERE cohort_id = ? AND scope = 'class'
+        AND amount = 1000000 AND account_no = '0975587586' LIMIT 1`
+  ).bind(nguoi.cohort_id).first();
+  if (round && duLe === 'co') {
+    const nhomSo = await env.DB.prepare(
+      'SELECT g.no FROM members m JOIN groups g ON g.id = m.group_id WHERE m.id = ?'
+    ).bind(mem.id).first();
+    const note = buildTransferNote(round.syntax_template, {
+      fullName: dat.ho_ten, groupNo: nhomSo?.no ?? '',
+    });
+    phi = {
+      amount: round.amount,
+      bank_name: round.bank_name || round.bank_bin,
+      account_no: round.account_no,
+      account_name: round.account_name,
+      transfer_note: note,
+      qr_url: buildQrUrl(round, note),
+    };
+  }
+
+  return json({ ok: true, ho_ten: dat.ho_ten, du_le: duLe, phi });
+}
+
 /* ── Ban cán sự lớp: xem cả lớp ───────────────────────────────────────────
    isClassCommittee (gồm cả uy_vien) chứ không isClassOfficer: đây là quyền
    ĐỌC để báo cáo với Ban tổ chức, không đụng tiền — đúng phân định đã ghi
@@ -282,7 +439,7 @@ async function docDanhSach(env, me) {
             d.ho_ten, d.ngay_sinh, d.dien_thoai, d.doanh_nghiep, d.linh_vuc,
             d.chuc_vu, d.nhu_cau_ket_noi, d.anh_url, d.logo_url, d.ho_so_luc,
             d.du_le, d.tai_tro, d.tai_tro_mo_ta, d.gian_hang, d.van_nghe,
-            d.van_nghe_mo_ta, d.gala_luc,
+            d.van_nghe_mo_ta, d.gala_luc, d.nguon,
             (SELECT CASE WHEN fd.verified_at IS NOT NULL THEN 'nguoi_thu_da_nhan'
                          WHEN fd.declared_at IS NOT NULL THEN 'da_tu_khai'
                          ELSE NULL END

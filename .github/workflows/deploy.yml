@@ -386,6 +386,24 @@ jobs:
               echo "  ✗ $duong KHÔNG cookie → HTTP $m (phải là 401)"; loi=1
             fi
           done
+
+          # Đường CÔNG KHAI (migration 0042) — ngược lại: PHẢI mở được không
+          # cookie, vì 38/146 người không có số điện thoại trong danh sách gốc
+          # nên cửa /dangnhap đóng với họ. Nhưng nó TUYỆT ĐỐI không được mang
+          # theo dữ liệu cá nhân của ai: đường này ai cũng gọi được, và điền
+          # sẵn ngày sinh hay điện thoại là phát tán danh bạ cả lớp.
+          ck=$(curl -s -o /tmp/tnck.json -w '%{http_code}' https://k3vaceo.cuongngo.app/api/totnghiep/cong-khai || true)
+          echo "  HTTP $ck cho /api/totnghiep/cong-khai ($(cat /tmp/tnck.json 2>/dev/null | wc -c) byte)"
+          if [ "$ck" = "200" ]; then
+            echo "  ✓ đường công khai mở được không cookie"
+          else
+            echo "  ✗ đường công khai KHÔNG mở được (mã $ck)"; loi=1
+          fi
+          for cam in dien_thoai ngay_sinh full_name nhu_cau_ket_noi; do
+            if grep -q "$cam" /tmp/tnck.json 2>/dev/null; then
+              echo "  ✗ RÒ: đường công khai có chứa \"$cam\""; loi=1
+            fi
+          done
           [ "$loi" = "0" ] || { echo "::error::Zone /totnghiep chưa chạy đúng, hoặc một đường đã lọt ra công khai."; exit 1; }
 
           echo "--- lịch công khai tại /lich (KHÔNG đăng nhập) ---"

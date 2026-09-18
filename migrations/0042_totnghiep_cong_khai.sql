@@ -1,0 +1,58 @@
+-- Mở form Lễ tốt nghiệp cho người CHƯA ĐĂNG NHẬP ĐƯỢC.
+--
+-- ══ VÌ SAO ════════════════════════════════════════════════════════════════
+-- Đo trên D1 thật 18/9: 77/146 người chưa nhận hồ sơ. Soi tiếp thì con số
+-- chia đôi gần đều:
+--     39 người CÓ số điện thoại đúng khuôn trong danh sách gốc → tự vào được
+--        ở /dangnhap, không cần ai phát gì.
+--     38 người KHÔNG có số (hoặc số sai: 03845375x8, 098778525, 904580955)
+--        → cửa /dangnhap đóng với họ, phải có người phát link mời tay.
+--
+-- Ngô Phú Cường: "có thể nới rộng để đảm bảo mọi người đều có thể input đủ
+-- thông tin". Đưa ba cách nới, anh chọn: MỞ RIÊNG FORM TỐT NGHIỆP.
+--
+-- ══ NỚI ĐÚNG MỘT VIỆC, KHÔNG NỚI CỬA ĐĂNG NHẬP ═══════════════════════════
+-- Mục tiêu là ĐIỀN ĐƯỢC THÔNG TIN, không phải ĐĂNG NHẬP ĐƯỢC. Hai thứ ấy nới
+-- ra thì hậu quả cách nhau rất xa, và phương án bị loại cần ghi lại để khỏi
+-- bàn lại:
+--
+--   Nới cửa đăng nhập (cho tự nhận hồ sơ bằng tên + email) là BỎ ĐÚNG CÁI BÍ
+--   MẬT DUY NHẤT giữ cửa — tức ai cũng chiếm được tài khoản của bất kỳ ai
+--   trong 38 người, và vào được là đọc được danh bạ cả lớp kèm số điện thoại,
+--   sổ thu, bài, thông báo nội bộ. Đó đúng là lỗ hổng đã vá ngày 5/9
+--   (postInviteClaim / xacNhanLaiSo). Đạt cùng một mục tiêu nhưng mở rộng hơn
+--   hẳn mức cần.
+--
+-- Đường công khai mới CHỈ GHI được đúng một bản đăng ký tốt nghiệp. Không cấp
+-- phiên, không đọc được gì của lớp.
+--
+-- ══ KHÔNG ĐỔI KHOÁ CỦA BẢNG — TỰ TẠO DÒNG `members` THAY VÌ THÊM roster_id ═
+-- Cách hiển nhiên là thêm cột roster_id rồi cho member_id NULL. Nhưng thế là
+-- bảng có HAI khoá, và sinh ra một lỗi mất dữ liệu có thật: người điền form
+-- công khai hôm nay, mai được phát link mời và đăng nhập, thì lượt đọc theo
+-- member_id KHÔNG thấy bản cũ — họ điền lại, và bảng có HAI dòng cho một
+-- người.
+--
+-- Nên đường công khai TỰ TẠO dòng `members` (đúng nhóm ghi trong danh sách
+-- gốc, `claimed_at` để TRỐNG) rồi ghi như bình thường — đúng khuôn
+-- postDanhBaMoi (routes/danh-ba.js) đã làm từ 3/9. Hệ quả tốt: `claimed_at`
+-- vẫn trống nên cửa /vao KHÔNG đóng lại với họ, số điện thoại của họ trong
+-- Danh bạ VẪN bị che (getDanhBa che theo da_dang_nhap), và khi họ đăng nhập
+-- thật thì đó vẫn là CÙNG MỘT dòng members — thấy ngay bản mình đã điền.
+--
+-- ══ CỘT `nguon` — VÀ CHỐT CHẶN THẬT SỰ CỦA CẢ TÍNH NĂNG ══════════════════
+-- Rủi ro còn lại của một form công khai: ai cầm link cũng khai hộ/khai bậy
+-- cho một bạn cùng lớp. Trong lớp 146 người quen nhau thì thấp, và Ban cán sự
+-- lớp nhìn danh sách là thấy. Nhưng có MỘT ca phải chặn cứng:
+--
+--     Đường công khai KHÔNG ĐƯỢC GHI ĐÈ bản do người đã đăng nhập tự điền.
+--
+-- Thiếu chốt này thì bất kỳ ai cũng phá được bản khai của 69 người đã đăng
+-- nhập — đó mới là thiệt hại thật, chứ không phải một dòng rác thêm vào. Cột
+-- `nguon` giữ đúng phân biệt ấy: 'phien' (điền từ tài khoản đã đăng nhập) hay
+-- 'cong_khai'. postTotNghiepCongKhai từ chối khi gặp 'phien'.
+--
+-- Mặc định 'phien' cho mọi dòng cũ: đường công khai chưa tồn tại lúc viết
+-- dòng này (bảng đang có 0 đơn trên D1 thật), nên mọi dòng từ trước tới nay
+-- đều là của người đã đăng nhập.
+ALTER TABLE dang_ky_tot_nghiep ADD COLUMN nguon TEXT DEFAULT 'phien';

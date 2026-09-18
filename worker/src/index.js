@@ -30,7 +30,8 @@ import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, 
 import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getTotNghiep, putHoSo, putGala, patchBanNop,
-         getDanhSachTotNghiep, getXuatCsv } from './routes/tot-nghiep.js';
+         getDanhSachTotNghiep, getXuatCsv,
+         getTotNghiepCongKhai, postTotNghiepCongKhai } from './routes/tot-nghiep.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
 import { llmCauHinh } from './lib/llm.js';
@@ -159,6 +160,22 @@ export default {
       }
       if (pathname === '/api/wizard/join-request' && method === 'POST') {
         return postJoinRequest(request, env);
+      }
+
+      // Lễ tốt nghiệp — HAI route công khai DUY NHẤT của zone ấy, và chúng cố
+      // ý nằm ở nửa TRÊN này. Đo trên D1 thật 18/9: 38/146 người không có số
+      // điện thoại trong danh sách gốc nên cửa /dangnhap đóng với họ; Ngô Phú
+      // Cường chọn mở riêng form tốt nghiệp thay vì nới cửa đăng nhập (lý lẽ
+      // và phương án bị loại ghi ở migrations/0042_totnghiep_cong_khai.sql).
+      //
+      // Hai đường này CHỈ GHI được một bản đăng ký. Không cấp phiên, không trả
+      // dữ liệu cá nhân của ai — bốn route totnghiep CÒN LẠI vẫn nằm dưới
+      // getCurrentMember và vẫn phải trả 401 khi không có cookie.
+      if (pathname === '/api/totnghiep/cong-khai' && method === 'GET') {
+        return getTotNghiepCongKhai(env);
+      }
+      if (pathname === '/api/totnghiep/cong-khai' && method === 'POST') {
+        return postTotNghiepCongKhai(request, env, clientIp(request));
       }
 
       // ── Cần phiên đăng nhập hợp lệ ───────────────────────────────────────

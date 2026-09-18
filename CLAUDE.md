@@ -126,12 +126,14 @@ cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trướ
 
 **Sáu việc cần làm tiếp, xếp theo mức chặn:**
 
-1. **PHÁT LINK `/totnghiep` CHO CẢ LỚP — hạn 21h00 NGÀY 19/9.** Gấp nhất, và
-   không phải việc lập trình. Kèm hai điều phải nói rõ khi phát: (a) buổi bảo
-   vệ chiều 26/9 là bắt buộc và KHÔNG thu phí, chỉ buổi tối mới có phí; (b)
-   **chỉ 69/146 người đã đăng nhập được** nên 77 người còn lại chưa mở được
-   link — đường chữa là phát link mời qua Danh bạ → Cả lớp, không cần chờ điền
-   số điện thoại.
+1. **PHÁT LINK `k3vaceo.cuongngo.app/totnghiep` CHO CẢ LỚP — hạn 21h00 NGÀY
+   19/9.** Gấp nhất, và không phải việc lập trình. **Một link là đủ cho cả
+   146 người**, không phải phát gì thêm: ai đăng nhập được thì vào thẳng, ai
+   không thì bấm "Tôi không đăng nhập được — điền thẳng ở đây" (migration
+   0042). Khi phát nhớ nói rõ hai điều: (a) buổi bảo vệ chiều 26/9 là bắt
+   buộc và KHÔNG thu phí, chỉ buổi tối mới có phí; (b) ai muốn dùng cả ứng
+   dụng thì vào `/dangnhap` gõ tên + số điện thoại — **39 trong 77 người chưa
+   đăng nhập làm được ngay**, không cần ai phát link.
 2. **Mở `/totnghiep` trên điện thoại thật và quét thử mã QR phí Gala bằng app
    ngân hàng.** Đây là đợt thu cấp lớp ĐẦU TIÊN của dự án — chưa đồng nào từng
    đi qua đường này, và ảnh QR chưa hiển thị thật lần nào (sandbox không có
@@ -1192,19 +1194,94 @@ và mọi dấu tiếng Việt thành ký tự rác, tức mất cả công dụ
 mọi phép kiểm ở tầng chuỗi đều mù với đúng cái nó định canh. Cùng họ với bẫy
 `TextDecoder` của `lib/ics.js`.
 
-### Chưa kiểm chứng được, và một con số cần nói thẳng
+### Đường CÔNG KHAI cho 38 người không có số điện thoại (migration 0042)
+
+Ngay sau khi phát hành, Ngô Phú Cường hỏi *"có cách nào tự động lấy link mời
+không? sắp hết khoá học nên có thể nới rộng để đảm bảo mọi người đều có thể
+input đủ thông tin"*.
+
+**Soi D1 thật trước khi trả lời, và con số chia 77 người làm hai nửa gần đều:**
+
+| | |
+|---|---|
+| **39 người TỰ VÀO ĐƯỢC** | có số đúng khuôn trong roster → `/dangnhap` gõ tên + số là xong. **Một tin Zalo cho cả lớp là giải quyết xong nhóm này**, không phát gì cả. |
+| **38 người CẦN LỐI KHÁC** | roster không có số, hoặc số sai (`03845375x8`, `098778525`, `904580955`). Cửa `/dangnhap` đóng với họ. |
+
+38 người ấy rải đều: Nhóm 1 và 6 mỗi nhóm 5, Nhóm 3/5/7/8 mỗi nhóm 4, Nhóm
+2/4/9/10 mỗi nhóm 3.
+
+**Ba cách nới đã đưa ra, Ngô Phú Cường chọn cách thứ nhất:**
+
+1. **MỞ RIÊNG FORM TỐT NGHIỆP** ← đã làm. `/totnghiep` có thêm lối "Tôi không
+   đăng nhập được — điền thẳng ở đây": tìm tên mình → điền → gửi. Một link duy
+   nhất cho cả lớp, không phải phát gì.
+2. Phát link hàng loạt (giữ nguyên an ninh, nhưng vẫn phải dán 10 lần).
+3. ~~Nới cửa đăng nhập~~ — **bị loại, và ghi lại để khỏi bàn lại**: cho tự
+   nhận hồ sơ bằng tên + email là **bỏ đúng cái bí mật duy nhất giữ cửa**, tức
+   ai cũng chiếm được tài khoản của bất kỳ ai trong 38 người — mà vào được là
+   đọc được danh bạ cả lớp kèm số điện thoại, sổ thu, bài, thông báo nội bộ.
+   Đó đúng là lỗ hổng đã vá ngày 5/9. Đạt cùng một mục tiêu nhưng mở rộng hơn
+   hẳn mức cần.
+
+**Phân định đáng nhớ nhất của cả việc này: mục tiêu là ĐIỀN ĐƯỢC THÔNG TIN,
+không phải ĐĂNG NHẬP ĐƯỢC.** Hai thứ ấy nới ra thì hậu quả cách nhau rất xa.
+
+### Bốn điều làm đường công khai an toàn được
+
+1. **KHÔNG cấp phiên.** Chỉ GHI được đúng một bản đăng ký. Không đọc được danh
+   bạ/quỹ/bài/thông báo. Bốn route `totnghiep` còn lại vẫn nằm dưới dòng
+   `getCurrentMember` và vẫn trả 401 khi không cookie — `deploy.yml` canh cả
+   hai chiều trên tên miền thật.
+2. **Form để TRỐNG, không điền sẵn.** `GET /api/totnghiep/cong-khai` không
+   nhận tham số và không trả dữ liệu cá nhân của ai. Điền sẵn ngày sinh hay
+   điện thoại ở đây là phát tán danh bạ cả lớp cho bất kỳ ai mở link — và đó
+   là phép kiểm có răng nhất của `pw-totnghiep.mjs` (ô Ngày sinh và ô Điện
+   thoại phải RỖNG). Bước tìm tên dùng LẠI `/api/wizard/roster/search`, đường
+   vốn đã công khai và cố ý không bao giờ trả số điện thoại hay email.
+3. **KHÔNG ghi đè bản của người đã đăng nhập.** Cột `nguon` (`phien` |
+   `cong_khai`) giữ đúng phân định ấy, và `postTotNghiepCongKhai` trả 409
+   `da_dien_tu_tai_khoan` khi gặp `phien`. Thiếu chốt này thì bất kỳ ai cầm
+   link cũng phá được bản khai của 69 người đã đăng nhập — **đó mới là thiệt
+   hại thật**, chứ không phải một dòng rác thêm vào.
+4. **Hạn mức 400/IP/giờ**, trên sĩ số lớp (bài học 27/8).
+
+**KHÔNG đổi khoá của bảng — tự tạo dòng `members` thay vì thêm `roster_id`.**
+Cách hiển nhiên là thêm cột `roster_id` rồi cho `member_id` NULL, nhưng thế là
+bảng có HAI khoá và sinh ra một lỗi mất dữ liệu có thật: người điền form công
+khai hôm nay, mai được phát link mời và đăng nhập, thì lượt đọc theo
+`member_id` không thấy bản cũ — họ điền lại, và bảng có HAI dòng cho một
+người. Nên đường công khai tự tạo dòng `members` (đúng nhóm trong roster,
+`claimed_at` để TRỐNG), đúng khuôn `postDanhBaMoi` đã làm từ 3/9. Hệ quả tốt:
+`claimed_at` vẫn trống nên cửa `/vao` KHÔNG đóng lại với họ, số điện thoại của
+họ trong Danh bạ VẪN bị che, và khi họ đăng nhập thật thì vẫn là CÙNG MỘT dòng
+— thấy ngay bản mình đã điền.
+
+### Hai bẫy của chính bộ kiểm, cả hai đều im lặng
+
+1. **Một dấu NHÁY KÉP trong chú thích SQL của `reset-totnghiep.sh` giết cả
+   lượt reset.** Khối SQL nằm trong một chuỗi shell bọc bằng nháy kép, nên
+   nháy kép thứ hai đóng chuỗi ngay tại đó; wrangler nhận phần còn lại làm
+   THAM SỐ DÒNG LỆNH và chết bằng `Unknown arguments: tự, tạo, hồ, sơ …`.
+   Triệu chứng ở đầu kia: bộ kiểm báo **401 cho một phiên vừa mới dựng**, và
+   một tiến trình wrangler CŨ vẫn giữ cổng 8787 nên mọi thứ trông y như đã
+   reset xong. Cùng họ với bẫy nháy đơn trong khối `node -e` của `deploy.yml`.
+   Nay reset **đếm lại số phiên sau khi seed** và dừng ngay nếu thiếu.
+2. **Thứ tự xoá trong reset là bắt buộc**: `dang_ky_tot_nghiep` và
+   `fund_declarations` đều trỏ vào `members(id)`, xoá `members` trước là vỡ
+   FOREIGN KEY và cả khối SQL không chạy dòng nào.
+
+### Chưa kiểm chứng được, và những việc còn lại
 
 - **Chưa ai dùng zone này với dữ liệu thật.** Mọi phép kiểm chạy trên D1 cục
   bộ với ba phiên dựng tay.
-- **Chỉ 69/146 người đã nhận hồ sơ** (soi D1 18/9: `members` có 75 dòng,
-  `claimed_at` khác NULL ở 69). Zone này **chỉ dành cho người đã đăng nhập**,
-  nên 77 người còn lại KHÔNG điền được — Ban tổ chức muốn thông tin của cả
-  146. Đây là rủi ro sản phẩm chứ không phải rủi ro kỹ thuật, và đường chữa đã
-  có sẵn: Ngô Phú Cường hoặc Lưu Minh Tiến phát link mời qua Danh bạ → Cả lớp
-  (mục "Phát lại link mời" ở trên), không cần chờ điền số điện thoại.
 - **Ảnh chân dung và logo (câu 7, 8) CHƯA làm** — Đợt 2, qua Google Drive.
   Cột `anh_url`/`logo_url` đã có sẵn trong bảng nên thêm vào là cộng thêm, chứ
-  không phải đổi lược đồ. Xem mục riêng ngay dưới.
+  không phải đổi lược đồ. Xem mục riêng ngay dưới. Đường công khai hiện KHÔNG
+  nhận ảnh: nhận tệp từ người không đăng nhập là một quyết định khác, chưa ai
+  hỏi.
+- **Người đi đường công khai không sửa lại được** (không có phiên để quay
+  lại). Màn cuối nói thẳng điều đó và chỉ họ nhắn trưởng nhóm xin link đăng
+  nhập. Bao giờ có người vấp thật thì đó là chỗ sửa.
 
 ## Ảnh chứng chỉ qua Google Drive — Đợt 2, CHƯA làm
 
@@ -3073,7 +3150,7 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "hai mươi chín phép đối chứng đáng giữ nhất" và hai
+  trước khi chạy — có mục "ba mươi mốt phép đối chứng đáng giữ nhất" và hai
   chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày

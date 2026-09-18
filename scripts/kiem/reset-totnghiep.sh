@@ -44,9 +44,30 @@ npx wrangler d1 execute k3vaceo --local --command "
 -- (ghi dang_ky_tot_nghiep, ghi groups.ban_nop_url, khai quỹ), nên reset phải
 -- trả CẢ những thứ ấy về gốc chứ không chỉ dọn bảng phụ — đúng bài học đã trả
 -- giá ở reset-doi-nhom.sh (lượt hai mở đầu với người xin đã ở nhóm khác).
-DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy');
+-- THỨ TỰ XOÁ LÀ BẮT BUỘC: dòng con trước, dòng cha sau.
+-- dang_ky_tot_nghiep.member_id và fund_declarations.member_id đều trỏ vào
+-- members(id), nên xoá members trước là vỡ FOREIGN KEY constraint và cả khối
+-- SQL không chạy dòng nào. Đã trả giá đúng ở đây, và cùng họ với lỗi
+-- reset-thongbao.sh từng vấp (xem README mục 19).
 DELETE FROM dang_ky_tot_nghiep;
 DELETE FROM fund_declarations;
+DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy');
+-- Đường CÔNG KHAI (migration 0042) TỰ TẠO dòng members cho người chưa có hồ
+-- sơ. Không dọn thì lượt chạy sau mở đầu với người ấy ĐÃ có members — phép
+-- kiểm route-tự-tạo-hồ-sơ mất răng, và nó im lặng chứ không đỏ. Đúng bài học
+-- đã trả giá ở reset-doi-nhom.sh: bộ kiểm nào THẬT SỰ đổi trạng thái thì
+-- reset phải trả chính trạng thái ấy về gốc, không chỉ dọn bảng phụ.
+--
+-- KHÔNG ĐƯỢC CÓ MỘT DẤU NHÁY KÉP NÀO trong khối SQL này, kể cả trong chú
+-- thích: cả khối nằm trong một chuỗi shell bọc bằng nháy kép, nên một dấu
+-- nháy kép thứ hai là đóng chuỗi ngay tại đó. Đã trả giá: wrangler nhận
+-- nguyên phần còn lại làm THAM SỐ DÒNG LỆNH và chết bằng
+-- `Unknown arguments: tự, tạo, hồ, sơ …`, còn reset thì lặng lẽ không chạy
+-- SQL nào — triệu chứng là bộ kiểm báo 401 cho một phiên vừa mới dựng. Cùng
+-- họ với bẫy nháy đơn trong khối `node -e` của deploy.yml (CLAUDE.md).
+DELETE FROM members
+ WHERE claimed_at IS NULL
+   AND roster_id IN (SELECT id FROM roster WHERE full_name = 'Đinh Khánh Toàn');
 UPDATE groups SET ban_nop_url = NULL, ban_nop_luc = NULL, ban_nop_boi = NULL;
 
 -- Vũ Thị Ngân: cho giống bản thật (xem chú thích đầu tệp).
@@ -86,6 +107,25 @@ INSERT INTO sessions (member_id, token_hash, expires_at)
    WHERE full_name = 'Kiểm TN Nhóm Bảy';
 " >/dev/null
 
+# KIỂM LẠI RẰNG SEED ĐÃ CHẠY THẬT, đừng tin `set -e`.
+#
+# Đã trả giá: khối SQL ở trên chết vì một dấu nháy kép lọt vào chú thích, `set
+# -e` cho script thoát — nhưng một tiến trình wrangler CŨ vẫn đang giữ cổng
+# 8787 và trả lời bình thường, nên mọi thứ trông y như đã reset xong. Bộ kiểm
+# chạy tiếp rồi báo 401 cho một phiên vừa mới dựng, và mất một lúc mới nhìn ra
+# thủ phạm không nằm trong mã sản phẩm.
+#
+# Ba phiên là điều kiện tối thiểu để bộ kiểm có nghĩa; thiếu là dừng ngay ở
+# đây, đừng để nó đỏ ở một chỗ chẳng liên quan.
+so_phien=$(npx wrangler d1 execute k3vaceo --local --json --command \
+  'SELECT COUNT(*) AS n FROM sessions' 2>/dev/null \
+  | sed -n '/^\[/,$p' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s)[0].results[0].n))')
+if [ "$so_phien" != "3" ]; then
+  echo "LỖI: seed không chạy — chỉ có ${so_phien:-0}/3 phiên trong D1." >&2
+  echo "     Xem lại khối SQL ở trên: có dấu nháy kép nào lọt vào không?" >&2
+  exit 1
+fi
+
 nohup npx wrangler dev --port 8787 --local > /tmp/k3vaceo-dev.log 2>&1 &
 until curl -sf -o /dev/null http://127.0.0.1:8787/api/health 2>/dev/null; do sleep 1; done
-echo "đã reset và khởi động lại"
+echo "đã reset và khởi động lại (3 phiên)"

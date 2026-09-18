@@ -4437,22 +4437,234 @@ async function renderTotNghiep() {
   try {
     TN = await apiGet('/api/totnghiep');
   } catch (e) {
-    if (e.status === 401) {
-      $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
-        <div class="lb">k3vaceo · Khoá K03</div>
-        <h1>Đăng ký Lễ tốt nghiệp 26/9</h1>
-        <p class="sub">Trang này dành cho học viên lớp CEO K03. Đăng nhập rồi
-          quay lại đúng đường dẫn này.</p>
-        <a class="wide" href="/dangnhap" style="display:block;text-align:center;text-decoration:none">Đăng nhập</a>
-      </div></div>`;
-      return;
-    }
+    if (e.status === 401) return tnChuaDangNhap();
     $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
       <h1>Không tải được</h1><p class="sub">Có lỗi khi kết nối máy chủ — thử tải lại trang.</p>
     </div></div>`;
     return;
   }
   veTotNghiep();
+}
+
+/* ── Chưa đăng nhập được: hai lối ────────────────────────────────────────
+   Đo trên D1 thật 18/9: 77/146 người chưa nhận hồ sơ, và con số chia đôi gần
+   đều — 39 người CÓ số điện thoại trong danh sách gốc nên tự vào được ở
+   /dangnhap, 38 người KHÔNG có số nên cửa ấy đóng với họ.
+
+   Vì vậy phải bày ĐỦ HAI lối, và bày đúng thứ tự: đăng nhập trước (được cả
+   ứng dụng), điền thẳng sau (chỉ được đúng một việc). Chỉ bày lối thứ hai là
+   39 người kia mất luôn phần còn lại của ứng dụng mà không ai nói cho biết. */
+let TNCK = { nguoi: null, phi: null };
+
+function tnChuaDangNhap() {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
+    <div class="lb">k3vaceo · Khoá K03</div>
+    <h1>Đăng ký Lễ tốt nghiệp 26/9</h1>
+    <p class="sub">Bạn chưa đăng nhập. Chọn một trong hai lối.</p>
+    <a class="wide" href="/dangnhap" style="display:block;text-align:center;text-decoration:none">Đăng nhập</a>
+    <div class="foot" style="padding:11px 0 16px">Gõ tên và số điện thoại là vào
+      được — và vào rồi thì dùng được cả ứng dụng: lịch học, bài, quỹ, danh bạ lớp.</div>
+    <button class="wide ghost" id="tnckBatDau">Tôi không đăng nhập được — điền thẳng ở đây</button>
+    <div class="foot" style="padding:11px 0 0">Lối này chỉ để gửi thông tin cho Ban
+      tổ chức, không mở được ứng dụng. Dành cho ai không có số điện thoại trong
+      danh sách gốc của Ban tổ chức.</div>
+  </div></div>`;
+  $('#tnckBatDau').onclick = tnckTimTen;
+}
+
+function tnckShell(title, sub, body) {
+  document.body.classList.add('noapp');
+  $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
+    <div class="lb">k3vaceo · Lễ tốt nghiệp 26/9</div>
+    <h1>${esc(title)}</h1><p class="sub">${sub}</p>${body}</div></div>`;
+}
+
+// Bước 1: tìm tên. Dùng LẠI /api/wizard/roster/search — đường ấy vốn đã công
+// khai và CỐ Ý không bao giờ trả số điện thoại hay email (xem chú thích trong
+// start-wizard.js), nên không mở thêm chỗ rò nào.
+function tnckTimTen() {
+  tnckShell('Bạn là ai?', 'Gõ tên bạn — không dấu cũng tìm ra.', `
+    <label class="f">Họ tên</label>
+    <input id="tnckTen" placeholder="ví dụ: cuong" autocomplete="name" maxlength="60">
+    <div id="tnckDs" style="margin-top:10px"></div>
+    <a class="tnback" href="/totnghiep">← Quay lại</a>`);
+
+  let hen; let truoc = null;
+  const nhu = t => boDau(t).toLowerCase();
+  $('#tnckTen').oninput = () => {
+    clearTimeout(hen);
+    const q = $('#tnckTen').value.trim();
+    if (q.length < 2) { $('#tnckDs').innerHTML = ''; return; }
+    hen = setTimeout(async () => {
+      let ds = [];
+      // Cùng mẹo thu hẹp tại chỗ của /vao: chỉ giữ lại danh sách CHƯA bị cắt
+      // (dưới 12 người) — thu hẹp trên một danh sách đã cụt sẽ giấu mất người.
+      if (truoc && nhu(q).startsWith(truoc.q)) {
+        ds = truoc.ds.filter(p => nhu(p.full_name).includes(nhu(q)));
+      } else {
+        try { ds = (await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q))).people; }
+        catch (e) { truoc = null; $('#tnckDs').innerHTML = `<div class="errline" style="display:block">${esc(errText(e))}</div>`; return; }
+        truoc = ds.length < 12 ? { q: nhu(q), ds } : null;
+      }
+      if (!ds.length) {
+        $('#tnckDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp. Thử gõ ngắn hơn, hoặc nhắn trưởng nhóm.</div>`;
+        return;
+      }
+      $('#tnckDs').innerHTML = `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
+        <div class="fd"><div class="x"><b>${esc(p.full_name)}</b>
+          <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
+        </div><button class="lnk" data-rid="${p.roster_id}">là tôi</button></div>`).join('')}
+      </div></div>`;
+      document.querySelectorAll('#tnckDs [data-rid]').forEach(b => {
+        b.onclick = () => {
+          TNCK.nguoi = ds.find(x => String(x.roster_id) === b.dataset.rid);
+          tnckForm();
+        };
+      });
+    }, 350);
+  };
+}
+
+// Bước 2: form. MỌI Ô ĐỂ TRỐNG trừ họ tên — điền sẵn ngày sinh hay điện thoại
+// ở đây là phát tán danh bạ cả lớp cho bất kỳ ai mở link. Đó là cả lý do
+// /api/totnghiep/cong-khai không nhận tham số và không trả dữ liệu của ai.
+async function tnckForm() {
+  const p = TNCK.nguoi;
+  let cf = {};
+  try { cf = await apiGet('/api/totnghiep/cong-khai'); } catch { cf = {}; }
+  TNCK.cauHinh = cf;
+
+  tnckShell(esc(p.full_name),
+    `${esc(p.group_label)} · điền xong bấm Gửi một lần là xong — lối này không quay lại sửa được.`, `
+    <label class="f">Họ và tên <i>in trên chứng chỉ</i></label>
+    <input id="ckTen" maxlength="120" value="${esc(p.full_name)}">
+    <label class="f">Ngày sinh</label>
+    <input id="ckDob" maxlength="20" placeholder="dd/mm/yyyy">
+    <label class="f">Số điện thoại</label>
+    <input id="ckSdt" maxlength="20" inputmode="tel">
+    <label class="f">Doanh nghiệp</label>
+    <input id="ckDN" maxlength="200" value="${esc(p.company)}">
+    <label class="f">Chức vụ</label>
+    <input id="ckCV" maxlength="120" value="${esc(p.title)}">
+
+    <label class="f">Lĩnh vực hoạt động (tối đa 3)</label>
+    <div class="fl cuon" id="ckNg">${(cf.nganh_list ?? []).map(x =>
+      `<button type="button" class="fc" data-ma="${esc(x.ma)}">${esc(x.ten)}</button>`).join('')}</div>
+
+    <label class="f">Nhu cầu kết nối — càng cụ thể càng dễ ghép</label>
+    <textarea id="ckKN" maxlength="500" rows="3"
+      placeholder="Ví dụ: muốn kết nối tới ban quản lý khu công nghiệp phía Bắc."></textarea>
+
+    <label class="f">Dự Lễ Tốt nghiệp &amp; Gala 17h00–22h00 ngày 26/9?</label>
+    <div class="fl" id="ckDuLe">
+      <button type="button" class="fc" data-dule="co">Có, tôi dự</button>
+      <button type="button" class="fc" data-dule="khong">Không</button>
+    </div>
+    <div class="hintline">Buổi bảo vệ Kế hoạch kinh doanh 13h30–17h00 cùng ngày là
+      bắt buộc với mọi học viên và KHÔNG thu phí — câu này chỉ hỏi buổi tối.${
+      cf.phi ? ` Dự Lễ thì có phí ${vnMoney(cf.phi.amount)}đ, chuyển cho ${esc(cf.phi.collector_name || 'người thu')}; bấm Gửi xong sẽ hiện mã chuyển khoản.` : ''}</div>
+
+    <label class="f">Tài trợ cho chương trình</label>
+    <div class="fl" id="ckTaiTro">
+      ${[['tien', 'Tiền'], ['hien_vat', 'Hiện vật'], ['khong', 'Không']].map(([k, t]) =>
+        `<button type="button" class="fc" data-tt="${k}">${t}</button>`).join('')}
+    </div>
+    <textarea id="ckTTMo" maxlength="500" rows="2" placeholder="Nếu có: tài trợ gì, bao nhiêu."></textarea>
+
+    <label class="tnsw"><input type="checkbox" id="ckGH">
+      <span><b>Tôi muốn gian hàng hoặc standee miễn phí</b>
+      <i>Liên hệ trực tiếp anh Chử Minh Châu, học viên K3.</i></span></label>
+    <label class="tnsw"><input type="checkbox" id="ckVN">
+      <span><b>Tôi đăng ký một tiết mục văn nghệ</b></span></label>
+    <textarea id="ckVNMo" maxlength="500" rows="2" placeholder="Tiết mục gì, mấy người, cần nhạc hay micro gì."></textarea>
+
+    <div class="errline" id="ckErr" style="display:none"></div>
+    <button class="wide" id="ckGui">Gửi cho Ban tổ chức</button>
+    <a class="tnback" href="/totnghiep">← Quay lại</a>`);
+
+  const motLua = (wrap, key) => document.querySelectorAll(`${wrap} [data-${key}]`).forEach(b => {
+    b.onclick = () => {
+      const bat = b.classList.contains('on');
+      document.querySelectorAll(`${wrap} [data-${key}]`).forEach(x => x.classList.remove('on'));
+      if (!bat) b.classList.add('on');
+    };
+  });
+  motLua('#ckDuLe', 'dule');
+  motLua('#ckTaiTro', 'tt');
+  document.querySelectorAll('#ckNg [data-ma]').forEach(b => {
+    b.onclick = () => {
+      if (!b.classList.contains('on') && document.querySelectorAll('#ckNg .fc.on').length >= 3) {
+        toast('Tối đa 3 lĩnh vực'); return;
+      }
+      b.classList.toggle('on');
+    };
+  });
+
+  $('#ckGui').onclick = async () => {
+    const nut = $('#ckGui');
+    nut.disabled = true; nut.textContent = 'Đang gửi…';
+    $('#ckErr').style.display = 'none';
+    try {
+      const kq = await apiPost('/api/totnghiep/cong-khai', {
+        roster_id: p.roster_id,
+        ho_ten: $('#ckTen').value,
+        ngay_sinh: $('#ckDob').value,
+        dien_thoai: $('#ckSdt').value,
+        doanh_nghiep: $('#ckDN').value,
+        chuc_vu: $('#ckCV').value,
+        linh_vuc: [...document.querySelectorAll('#ckNg .fc.on')].map(x => x.dataset.ma),
+        nhu_cau_ket_noi: $('#ckKN').value,
+        du_le: document.querySelector('#ckDuLe .fc.on')?.dataset.dule ?? null,
+        tai_tro: document.querySelector('#ckTaiTro .fc.on')?.dataset.tt ?? null,
+        tai_tro_mo_ta: $('#ckTTMo').value,
+        gian_hang: $('#ckGH').checked ? 1 : 0,
+        van_nghe: $('#ckVN').checked ? 1 : 0,
+        van_nghe_mo_ta: $('#ckVNMo').value,
+      });
+      tnckXong(kq);
+    } catch (e) {
+      $('#ckErr').textContent = errText(e);
+      $('#ckErr').style.display = 'block';
+      nut.disabled = false; nut.textContent = 'Gửi cho Ban tổ chức';
+    }
+  };
+}
+
+// Bước 3: xong. Mã QR chỉ hiện Ở ĐÂY và chỉ khi chọn "Có, tôi dự" — chưa nói
+// là đi thì chưa có gì để chuyển tiền, mà bày sẵn mã là mời chuyển nhầm.
+function tnckXong(kq) {
+  const r = kq.phi;
+  tnckShell('Đã gửi xong', `Cảm ơn ${esc(kq.ho_ten)}. Ban tổ chức đã nhận được thông tin của bạn.`, `
+    ${r ? `<div class="tnphi">
+      <div class="eb">Phí dự Lễ ${vnMoney(r.amount)} đ</div>
+      <div class="qrw">
+        <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
+        <div class="cap">${esc(r.bank_name)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
+        <button class="copy" data-tncopy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
+      </div>
+      <div class="foot" style="padding:9px 0 0">Chuyển khoản xong thì thôi — người thu
+        đối chiếu sao kê rồi xác nhận. Nhớ giữ ĐÚNG nội dung chuyển khoản ở trên,
+        đó là cách người thu biết tiền của ai.</div>
+    </div>` : `<div class="mut" style="margin-bottom:18px">Bạn chọn không dự buổi tối,
+      nên không có khoản phí nào. Buổi bảo vệ chiều 26/9 vẫn bắt buộc và không thu phí.</div>`}
+    <div class="tnsoon">Muốn sửa lại thông tin, hoặc muốn dùng cả ứng dụng (lịch học,
+      bài, quỹ, danh bạ lớp) thì nhắn trưởng nhóm phát cho bạn một link đăng nhập.</div>
+    <a class="tnback" href="/totnghiep">← Về trang đăng ký</a>`);
+
+  // Cùng nhánh dự phòng của tab Quỹ: mã hỏng thì thay bằng ô giải thích, đừng
+  // để một ô vỡ ảnh nằm giữa màn hình tiền nong.
+  document.querySelectorAll('.tnphi img.qr').forEach(img => {
+    img.onerror = () => {
+      img.outerHTML = `<div class="ph">Chưa hiện được mã. Chuyển khoản tay theo số tài khoản bên dưới cũng được — nhớ giữ đúng nội dung chuyển khoản.</div>`;
+    };
+  });
+  document.querySelectorAll('[data-tncopy]').forEach(b => {
+    b.onclick = async () => {
+      try { await navigator.clipboard.writeText(b.dataset.tncopy); toast('Đã chép nội dung chuyển khoản'); }
+      catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
+    };
+  });
 }
 
 // Ngày sinh trong roster KHÔNG đồng nhất — đo trên D1 thật 18/9: 107 dòng

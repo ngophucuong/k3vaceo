@@ -109,9 +109,9 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
-| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, N6 ở link bản nộp, và **CSV không bao giờ có chữ "đã đóng"** |
-| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được |
-| `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, và **trả `groups.ban_nop_url` + bảng đăng ký về gốc** |
+| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, N6 ở link bản nộp, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai KHÔNG ghi đè bản của người đã đăng nhập** |
+| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
+| `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả `groups.ban_nop_url` + bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
 | `pw-banmoi.mjs` | băng "Có bản mới" + phép soi bản lúc mở trang — **đếm số lượt nạp tài liệu**, vì hàm này gọi `location.reload()` trên đường khởi động của mọi người dùng |
 
@@ -120,7 +120,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Hai mươi chín phép đối chứng đáng giữ nhất
+## Ba mươi mốt phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -408,6 +408,27 @@ Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ khôn
    Sandbox không ra được internet nên `img.vietqr.io` KHÔNG BAO GIỜ tải được,
    tức nhánh dự phòng luôn chạy ở đây: đó đúng bằng cảnh người dùng gặp lúc
    mạng yếu, nên hãy canh nó chứ đừng coi là nhiễu.
+
+30. **Một dấu NHÁY KÉP trong chú thích SQL giết cả lượt reset, và nó im lặng.**
+   `reset-totnghiep.sh` truyền khối SQL qua `--command "…"`, tức một chuỗi
+   shell bọc bằng nháy kép — nên một dấu nháy kép thứ hai, kể cả nằm trong
+   chú thích `--`, đóng chuỗi ngay tại đó. Wrangler nhận nguyên phần còn lại
+   làm THAM SỐ DÒNG LỆNH và chết bằng `Unknown arguments: tự, tạo, hồ, sơ …`.
+   Triệu chứng ở đầu kia không hề gợi ra chuyện đó: bộ kiểm báo **401 cho một
+   phiên vừa mới dựng**. Và nó không đỏ ngay ở reset, vì `set -e` cho script
+   thoát trong khi một tiến trình wrangler CŨ vẫn giữ cổng 8787 và trả lời
+   bình thường — mọi thứ trông y như đã reset xong. Cùng họ với bẫy nháy đơn
+   trong khối `node -e` của `deploy.yml`.
+
+   Hai việc phải giữ: khối SQL **không được có một dấu nháy kép nào**, và
+   reset **đếm lại số phiên sau khi seed** rồi dừng ngay nếu thiếu. Đừng tin
+   `set -e` — nó bảo vệ script, không bảo vệ bộ kiểm.
+
+31. **Thứ tự xoá trong reset là bắt buộc: dòng con trước, dòng cha sau.**
+   `dang_ky_tot_nghiep.member_id` và `fund_declarations.member_id` đều trỏ vào
+   `members(id)`, nên `DELETE FROM members` đứng trước là vỡ
+   `FOREIGN KEY constraint failed` và **cả khối SQL không chạy dòng nào** —
+   không phải chỉ dòng ấy hỏng. Cùng lỗi `reset-thongbao.sh` đã vấp (phép 19).
 
 ## Chạy `kiem-tanso.mjs`
 
