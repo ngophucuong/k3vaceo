@@ -28,3 +28,10 @@ lần: 9 — lượt 8 tự vấp đúng lỗi đã ghi ở lần 3: dùng `$WRA
 ... | tail -20` thay vì hàm soi() dùng jq, nên mọi khối chỉ còn "success"/
 "meta", mất sạch "results". Sửa bằng cách copy hàm soi() vào trong chính
 bước này (không gọi chéo bước khác, vẫn giữ bài học lần 6).
+
+lần: 10 — chuẩn bị migration 0041 (zone Lễ tốt nghiệp). Bốn câu chặn:
+collector_member_id của đợt thu phí Gala trỏ vào ai (migration 0027 cố ý
+KHÔNG tạo members cho Vũ Thị Ngân, để phan-vai.yml làm — chưa biết đã chạy
+chưa); đã có đợt thu 1.000.000đ nào chưa; roster.dob định dạng ra sao (cột
+này chưa code nào từng đọc mà form sắp in ra cho học viên xác nhận); và
+nhóm nào đã có dòng plans để gắn ban_nop_url.
