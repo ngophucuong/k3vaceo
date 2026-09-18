@@ -31,3 +31,16 @@ LLM_BASE_URL=http://127.0.0.1:2526/chat/completions
 # (`wrangler deploy --var COMMIT_SHA:$GITHUB_SHA`); ở máy cục bộ phải tự đặt,
 # nếu không `/api/home` trả `ban: null` và pw-banmoi.mjs không kiểm được gì.
 COMMIT_SHA=kiem-ban-aaa111
+
+# Google Drive — đường nộp ảnh chân dung và logo cho chứng chỉ.
+# CỐ Ý trỏ vào một CỔNG ĐÓNG trên máy này, y hệt lý do của SMTP_HOST và
+# LLM_BASE_URL ở trên: sandbox không ra được internet, mà `fetch` tới một host
+# bị chặn KHÔNG hỏng ngay — nó TREO tới khi workerd cắt kết nối, bộ kiểm chết
+# bằng `UND_ERR_SOCKET: other side closed`, và không phép nào đọc được
+# `hong_o_buoc`. Một cổng đóng thì lỗi nổi lên trong vài mili giây.
+# Một biến cho CẢ HAI host (oauth2.googleapis.com và www.googleapis.com).
+# BẢN THẬT PHẢI ĐỂ TRỐNG — kiem-anh-route.mjs có một phép canh wrangler.toml.
+GOOGLE_BASE_URL=http://127.0.0.1:2527
+GOOGLE_CLIENT_ID=kiem-thu
+GOOGLE_CLIENT_SECRET=kiem-thu
+GOOGLE_REFRESH_TOKEN=kiem-thu

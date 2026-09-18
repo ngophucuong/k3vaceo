@@ -112,6 +112,8 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **chữ "Ngành khác" bị gỡ theo khi bỏ chip**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai khai BỔ SUNG được mà không xoá được ô nào đang có chữ** |
 | `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **khai xong là mã QR biến mất**, **không mục lĩnh vực nào bị cắt chữ**, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
 | `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
+| `kiem-anh.mjs` | soi ảnh bằng **magic bytes** + nối thân multipart ở mức BYTE — **chạy thẳng, không cần máy chủ**; phần DUY NHẤT của đường Drive mà sandbox chứng minh được |
+| `kiem-anh-route.mjs` | `POST /api/totnghiep/anh` — **không cookie phải 401** (đường này NHẬN TỆP), magic bytes thắng content-type, trần 2MB, và `hong_o_buoc` của nhánh gọi hỏng |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
 | `pw-banmoi.mjs` | băng "Có bản mới" + phép soi bản lúc mở trang — **đếm số lượt nạp tài liệu**, vì hàm này gọi `location.reload()` trên đường khởi động của mọi người dùng |
 
@@ -120,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Ba mươi lăm phép đối chứng đáng giữ nhất
+## Ba mươi sáu phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -497,6 +499,41 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    (phần không khai ở lượt này thì mốc phải ĐỨNG YÊN, không đóng lại) và một
    phép cho `nguon = 'ca_hai'` — dấu duy nhất cho Ban cán sự lớp biết dòng nào
    đã đi cả hai đường.
+
+36. **Phép kiểm "ảnh không hỏng" phải có một ĐỐI CHỨNG chứng minh cách SAI
+   thật sự làm hỏng.** Drive nhận thân multipart dựng bằng chuỗi mẫu và vẫn
+   trả **HTTP 200** — kèm một tệp mở ra là vỡ, vì mọi byte ≥ 0x80 đã đi qua
+   UTF-16 của JavaScript và bị thay bằng ký tự thay thế. Không có lỗi nào để
+   đọc, không có mã trạng thái nào để bắt.
+
+   `kiem-anh.mjs` vì vậy làm hai việc: tìm lại đúng tám byte nhị phân trong
+   thân do `thanMultipart()` dựng (phải còn NGUYÊN), **và** dựng lại cùng thân
+   ấy bằng chuỗi mẫu rồi đòi tám byte đó KHÔNG còn. Thiếu vế thứ hai thì phép
+   đầu xanh với cả một bản vá cẩu thả, và ta chỉ biết mình sai khi Ban tổ chức
+   mở thư mục Drive ra xem.
+
+   Cùng tinh thần ấy cho `kiem-anh-route.mjs`: nó khai `content-type:
+   image/jpeg` cho một tệp chạy Windows (`MZ`) và đòi 422 — đổi tên tệp và
+   sửa header là chuyện một dòng, chỉ magic bytes chặn được.
+
+## Chạy bộ kiểm đường nộp ảnh (Google Drive)
+
+```bash
+node scripts/kiem/kiem-anh.mjs          # chạy thẳng, không cần máy chủ
+bash scripts/kiem/reset-totnghiep.sh && node scripts/kiem/kiem-anh-route.mjs
+```
+
+**`.dev.vars` phải có `GOOGLE_BASE_URL=http://127.0.0.1:2527`** — một CỔNG
+ĐÓNG, cùng lý do `SMTP_HOST` và `LLM_BASE_URL` trỏ về loopback. `fetch` tới
+`googleapis.com` trong sandbox không hỏng, nó **TREO** tới khi workerd cắt, bộ
+kiểm chết bằng `UND_ERR_SOCKET: other side closed`, và không phép nào đọc được
+`hong_o_buoc`. Cổng đóng thì lỗi nổi lên trong vài mili giây, và phép kiểm
+khẳng định được nó hỏng ở đúng bước `lay_token` (subrequest đầu tiên).
+
+**Điều hai bộ này KHÔNG chứng minh được, nói thẳng:** không một tệp nào từng
+tới Drive từ đây. Chúng chứng minh mọi thứ đứng TRƯỚC lượt gọi ra ngoài, cộng
+nhánh hỏng của chính nó. Bằng chứng duy nhất đáng tin là mở thư mục Drive và
+thấy ảnh ở đó — đúng bài học của đường gửi thư ngày 24/8.
 
 ## Chạy bộ kiểm zone Lễ tốt nghiệp
 

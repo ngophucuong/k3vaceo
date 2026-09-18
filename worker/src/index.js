@@ -6,6 +6,7 @@
 import { json, error } from './lib/http.js';
 import { getCurrentMember } from './auth.js';
 import { clientIp, conQuota, ghiNhan } from './lib/ratelimit.js';
+import { driveCauHinh } from './lib/drive.js';
 import { getInvite, postInviteClaim } from './routes/invite.js';
 import { getHome } from './routes/home.js';
 import { getDanhBa, postDanhBaMoi } from './routes/danh-ba.js';
@@ -31,7 +32,8 @@ import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getTotNghiep, putHoSo, putGala, putDeTai,
          getDanhSachTotNghiep, getXuatCsv,
-         getTotNghiepCongKhai, postTotNghiepCongKhai } from './routes/tot-nghiep.js';
+         getTotNghiepCongKhai, postTotNghiepCongKhai, postAnhTotNghiep
+} from './routes/tot-nghiep.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
 import { pushCauHinh } from './lib/webpush.js';
 import { llmCauHinh } from './lib/llm.js';
@@ -275,6 +277,12 @@ export default {
       if (pathname === '/api/totnghiep/ho-so' && method === 'PUT') return putHoSo(request, env, me);
       if (pathname === '/api/totnghiep/gala' && method === 'PUT') return putGala(request, env, me);
       if (pathname === '/api/totnghiep/de-tai' && method === 'PUT') return putDeTai(request, env, me);
+      // Ảnh chân dung / logo → Google Drive. KHÔNG đi qua readJson: thân là
+      // tệp nhị phân thô, và giao diện cũng không gọi qua api() vì hàm ấy ép
+      // content-type: application/json cho mọi request có thân.
+      if (pathname === '/api/totnghiep/anh' && method === 'POST') {
+        return postAnhTotNghiep(request, env, me, clientIp(request));
+      }
       if (pathname === '/api/totnghiep/danh-sach' && method === 'GET') return getDanhSachTotNghiep(env, me);
       if (pathname === '/api/totnghiep/xuat.csv' && method === 'GET') return getXuatCsv(env, me);
 
@@ -456,5 +464,10 @@ async function handleHealth(env) {
     tro_ly: llmCauHinh(env)
       ? { bat: true, model: llmCauHinh(env).model, cong_tac: (troLyCongTac?.gia_tri ?? '1') === '1' }
       : { bat: false, cong_tac: (troLyCongTac?.gia_tri ?? '1') === '1' },
+    // Đường nộp ảnh chân dung / logo. Chỉ một CỜ — tuyệt đối không in một
+    // mẩu nào của client_id hay refresh token ra đây, khác hẳn khối `push`
+    // (khoá VAPID công khai in 8 ký tự đầu được). Đây là chỗ DUY NHẤT nói
+    // được "ba bí mật đã sang tới Worker chưa" mà không phải thử gửi một tệp.
+    drive: { bat: !!driveCauHinh(env) },
   });
 }

@@ -4798,9 +4798,16 @@ function veTotNghiep() {
         <textarea id="tnKN" maxlength="500" rows="3"
           placeholder="Ví dụ: muốn kết nối tới ban quản lý khu công nghiệp phía Bắc, và nhà phân phối ngành thực phẩm ở miền Trung.">${esc(v('nhu_cau_ket_noi'))}</textarea>
 
-        <div class="tnsoon">Ảnh chân dung và logo doanh nghiệp sẽ mở ở bước tiếp theo.
-          Chuẩn bị sẵn tệp <b>JPG dưới 2MB</b> giúp nhé — ảnh gốc của iPhone là
-          định dạng HEIC, mở ảnh lên rồi chọn Sao chép sẽ ra JPG.</div>
+        ${TN.drive_bat ? `
+        <label class="f">Ảnh chân dung và logo doanh nghiệp</label>
+        <div class="tnanh">
+          ${oAnh('anh', 'Ảnh chân dung', d.anh_url)}
+          ${oAnh('logo', 'Logo doanh nghiệp', d.logo_url)}
+        </div>
+        <div class="foot" style="padding:2px 0 10px">Ảnh gửi lên là lưu ngay, không
+          phải bấm Lưu hồ sơ. Nhận JPG và PNG; ảnh gốc của iPhone là định dạng HEIC —
+          mở ảnh lên, bấm Chia sẻ rồi chọn <b>Sao chép ảnh</b> là ra JPG.</div>
+        ` : ''}
 
         <div class="errline" id="tnHoSoErr" style="display:none"></div>
         <button class="wide" id="tnLuuHoSo">Lưu hồ sơ</button>
@@ -4868,6 +4875,104 @@ function oNganhKhac(wrap, o) {
   if (el) el.style.display = on ? 'block' : 'none';
 }
 
+/* ══ ẢNH CHÂN DUNG / LOGO — ba chỗ KHÔNG dùng lại được đồ có sẵn ═══════════
+
+   1. KHÔNG gọi qua api(). Hàm ấy ép content-type: application/json cho mọi
+      request có thân, nên tệp nhị phân đi qua nó là hỏng. Phải fetch riêng.
+   2. Xem trước phải dùng FileReader.readAsDataURL, KHÔNG dùng
+      URL.createObjectURL: CSP trong _headers là
+      `img-src 'self' data: https://img.vietqr.io` — KHÔNG có `blob:`, nên ảnh
+      xem trước bị chặn thẳng và không báo gì. (Cùng lý do `connect-src 'self'`
+      khiến trình duyệt không thể tự đẩy lên Google — đường "Worker làm ống
+      dẫn" cũng là đường DUY NHẤT mà CSP cho phép, không phải chọn cho vui.)
+   3. Thu nhỏ ảnh trước khi gửi, nhưng BỎ QUA PNG — xem thuNhoAnh().
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function oAnh(loai, nhan, urlDaCo) {
+  return `<div class="tnanh1" data-anh="${loai}">
+    <div class="tnanh-xem" id="xem-${loai}">${urlDaCo
+      ? '<span class="tnanh-ok">✓ đã gửi</span>'
+      : '<span class="tnanh-trong">chưa có</span>'}</div>
+    <div class="tnanh-nut">
+      <b>${esc(nhan)}</b>
+      <label class="tnanh-chon">${urlDaCo ? 'Đổi ảnh khác' : 'Chọn ảnh'}
+        <input type="file" accept="image/jpeg,image/png" data-anhfile="${loai}" hidden>
+      </label>
+      ${urlDaCo ? `<a class="tnanh-mo" href="${esc(urlDaCo)}" target="_blank" rel="noopener">xem trên Drive ›</a>` : ''}
+    </div>
+    <div class="tnanh-loi" id="loi-${loai}" style="display:none"></div>
+  </div>`;
+}
+
+/* Thu nhỏ để 2MB không thành chỗ chặn: ảnh iPhone thường 3–5MB, mà chứng chỉ
+   không cần hơn 1600px cạnh dài.
+
+   BỎ QUA PNG, và đây không phải tối ưu vặt: canvas vẽ nền TRONG SUỐT thành
+   ĐEN, mà logo doanh nghiệp phần lớn là PNG nền trong suốt → in lên chứng chỉ
+   ra một khối đen. Thà gửi nguyên tệp và để máy chủ từ chối nếu quá 2MB, còn
+   hơn gửi một tấm logo đã hỏng mà không ai biết cho tới lúc cầm chứng chỉ.
+
+   imageOrientation: 'from-image' là BẮT BUỘC: thiếu nó thì ảnh chụp dọc bằng
+   iPhone quay ngang 90° (EXIF orientation), và CHỈ ẢNH CHỤP mới thấy. */
+async function thuNhoAnh(file) {
+  if (file.type === 'image/png') return file;
+  if (file.size <= 700 * 1024) return file;
+  try {
+    const bm = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const canh = Math.max(bm.width, bm.height);
+    const ti = canh > 1600 ? 1600 / canh : 1;
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(bm.width * ti);
+    cv.height = Math.round(bm.height * ti);
+    cv.getContext('2d').drawImage(bm, 0, 0, cv.width, cv.height);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.86));
+    // Thu nhỏ mà ra to hơn thì giữ bản gốc — chuyện có thật với ảnh đã nén kỹ.
+    return blob && blob.size < file.size ? blob : file;
+  } catch {
+    return file;   // Không thu nhỏ được thì cứ gửi nguyên, máy chủ quyết.
+  }
+}
+
+async function tnGuiAnh(loai, file) {
+  const oLoi = $('#loi-' + loai);
+  const oXem = $('#xem-' + loai);
+  oLoi.style.display = 'none';
+  oXem.innerHTML = '<span class="tnanh-cho">đang gửi…</span>';
+
+  // Xem trước NGAY từ tệp gốc, không chờ máy chủ: trên 3G một lượt gửi mất
+  // hàng chục giây, và màn hình đứng im là thứ làm người ta bấm lại.
+  try {
+    const doc = new FileReader();
+    doc.onload = () => { oXem.innerHTML = `<img src="${doc.result}" alt="">`; };
+    doc.readAsDataURL(file);
+  } catch { /* xem trước hỏng thì thôi, không chặn việc gửi */ }
+
+  try {
+    const than = await thuNhoAnh(file);
+    const tra = await fetch(`/api/totnghiep/anh?loai=${loai}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'content-type': than.type || 'application/octet-stream' },
+      body: than,
+    });
+    const kq = await tra.json().catch(() => ({}));
+    if (!tra.ok) {
+      // goi_y của máy chủ nói được PHẢI LÀM GÌ (ca HEIC của iPhone), còn
+      // hong_o_buoc nói hỏng ở đâu khi log Worker câm — in cả hai ra, vì
+      // "Không xong, thử lại" thì học viên không nói lại được gì cho tôi.
+      const cau = kq.goi_y || (kq.hong_o_buoc ? `Chưa gửi được (hỏng ở bước: ${kq.hong_o_buoc}).` : null);
+      throw new Error(cau || errText({ error: kq.error }) || 'Chưa gửi được ảnh.');
+    }
+    TN = await api('/api/totnghiep');
+    veTotNghiep();
+    toast('Đã gửi ' + (loai === 'anh' ? 'ảnh chân dung' : 'logo'));
+  } catch (e) {
+    oXem.innerHTML = '<span class="tnanh-trong">chưa có</span>';
+    oLoi.textContent = String(e.message || e);
+    oLoi.style.display = 'block';
+  }
+}
+
 function tnVePhi(r) {
   if (r.i_am_verified) {
     return `<div class="tnphi">
@@ -4911,6 +5016,16 @@ function tnVePhi(r) {
 }
 
 function tnGanSuKien() {
+  document.querySelectorAll('[data-anhfile]').forEach(o => {
+    o.onchange = () => {
+      const f = o.files && o.files[0];
+      // Xoá value NGAY: không xoá thì chọn lại đúng tệp vừa chọn sẽ không bắn
+      // sự kiện change, và người vừa gửi hỏng bấm lại thấy không có gì xảy ra.
+      const loai = o.dataset.anhfile;
+      o.value = '';
+      if (f) tnGuiAnh(loai, f);
+    };
+  });
   // Người dùng gập/mở tay thì nhớ lại, để lượt vẽ sau (sau khi Lưu) giữ đúng
   // thứ họ đang mở. `toggle` là sự kiện riêng của <details>, không phải click
   // — bắt click thì hụt cả bàn phím lẫn cú chạm vào mũi tên.

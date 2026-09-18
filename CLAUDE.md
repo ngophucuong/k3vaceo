@@ -1540,7 +1540,7 @@ bấm chip "Ngành khác" ở cả hai form. Ba điều cố ý:
   nguyên nội dung cũ. Xem mục "Nới … thành KHAI BỔ SUNG" ở trên. Thứ vẫn
   KHÔNG làm được: xoá trắng một ô đã có chữ — cố ý, và đó là chốt chặn.
 
-## Ảnh chứng chỉ qua Google Drive — Đợt 2, CHƯA làm
+## Ảnh chứng chỉ qua Google Drive — ĐÃ LÀM (18/9)
 
 Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu
 trữ ảnh không"*. Có, cả ba, và **cả ba đều vướng đúng chỗ CLAUDE.md đã ghi**:
@@ -1599,6 +1599,68 @@ Thiết kế đã chốt, chưa viết dòng mã nào:
   trỏ thẳng `googleapis.com` thì request TREO chứ không hỏng.
 - Mọi phúc đáp 502 mang `hong_o_buoc`: `chua_cau_hinh` · `lay_token` ·
   `token_tu_choi` · `tai_len` · `qua_lau` · `drive_tu_choi` · `phuc_dap_la`.
+
+### Đã dựng xong 18/9 — ba tệp, và chỗ nào giữ luật gì
+
+| Tệp | Giữ gì |
+|---|---|
+| `worker/src/lib/drive.js` | CHỈ chuyên chở. Không biết gì về chứng chỉ. |
+| `worker/src/lib/anh.js` | Luật "tệp nào được nhận" + nối thân multipart ở mức BYTE. Tách ra để **Node gọi thẳng được** — đó là phần duy nhất của cả đường Drive mà sandbox chứng minh được. |
+| `routes/tot-nghiep.js` → `postAnhTotNghiep` | CHÍNH SÁCH: ai gửi được, hạn mức, ghi kết quả vào đâu. |
+
+`POST /api/totnghiep/anh?loai=anh|logo`, thân là **tệp nhị phân thô**. Năm chốt
+chặn xếp theo GIÁ, rẻ nhất hỏi trước — chỉ khi cả năm qua mới tiêu một lượt
+gọi ra Drive, đúng khuôn `congTacVaKhoa()` của trợ lý.
+
+**Thư mục đích tạo LƯỜI ở lượt gửi đầu tiên, id nhớ vào `cai_dat`** — không
+cần migration mới, và quan trọng hơn: **không còn bước tay nào.** Kế hoạch cũ
+bắt chạy một lượt thủ công rồi dán id vào Secret; một bước tay là một bước
+quên được, mà triệu chứng của việc quên là `404 File not found` — câu đọc lên
+như thư mục bị xoá, nên rất dễ đi tìm nhầm chỗ. Đặt sẵn `DRIVE_FOLDER_ID`
+trong Worker thì dùng cái đó, làm đường lui khi muốn ghim một thư mục cụ thể.
+
+**Tên tệp mang HỌ TÊN và NHÓM** (`chan-dung-Ngô Phú Cường - N6.jpg`): Ban tổ
+chức tải cả thư mục về rồi ghép chứng chỉ, nên một thư mục toàn `IMG_4821.jpg`
+là bắt họ mở từng tệp ra đoán.
+
+`/api/health` trả thêm `drive: {bat}` — **một CỜ, không một mẩu nào của khoá**,
+khác hẳn khối `push` (khoá VAPID công khai in 8 ký tự đầu được). Đây là chỗ duy
+nhất trả lời được "ba bí mật đã sang tới Worker chưa" mà không phải thử gửi
+một tệp, và `deploy.yml` đọc đúng nó.
+
+### Ba chỗ giao diện KHÔNG dùng lại được đồ có sẵn
+
+1. **KHÔNG gọi qua `api()`** — hàm ấy ép `content-type: application/json` cho
+   mọi request có thân, nên tệp nhị phân đi qua nó là hỏng.
+2. **Xem trước dùng `FileReader.readAsDataURL`, KHÔNG `URL.createObjectURL`** —
+   CSP là `img-src 'self' data: https://img.vietqr.io`, **không có `blob:`**,
+   nên ảnh xem trước bị chặn thẳng và không báo gì. (Cùng lý do
+   `connect-src 'self'` khiến trình duyệt không tự đẩy lên Google được —
+   đường "Worker làm ống dẫn" là đường DUY NHẤT CSP cho phép, không phải chọn
+   cho vui.)
+3. **Thu nhỏ bằng canvas nhưng BỎ QUA PNG.** Canvas vẽ nền TRONG SUỐT thành
+   ĐEN, mà logo doanh nghiệp phần lớn là PNG nền trong suốt → in lên chứng chỉ
+   ra một khối đen. Và phải `createImageBitmap(file, { imageOrientation:
+   'from-image' })`, không thì ảnh chụp dọc bằng iPhone quay ngang 90° (EXIF)
+   — **chỉ ảnh chụp mới thấy**.
+
+Thêm một chi tiết nhỏ mà thiếu thì lộ ngay: `input.value = ''` NGAY sau khi
+đọc tệp. Không xoá thì chọn lại đúng tệp vừa chọn không bắn sự kiện `change`,
+và người vừa gửi hỏng bấm lại thấy không có gì xảy ra.
+
+### Điều CHƯA kiểm chứng được
+
+**Chưa một tệp nào từng tới Drive từ sandbox** — không ra được internet. Hai bộ
+kiểm (`kiem-anh.mjs` chạy thẳng không cần máy chủ, `kiem-anh-route.mjs` cần
+server) chứng minh mọi thứ đứng TRƯỚC lượt gọi ra ngoài, cộng nhánh hỏng của
+chính nó: `.dev.vars` trỏ `GOOGLE_BASE_URL` vào **cổng đóng 2527** nên lượt gọi
+hỏng ngay và đọc được `hong_o_buoc = lay_token`. Bằng chứng duy nhất đáng tin
+là **mở thư mục Drive và thấy ảnh ở đó** — đúng bài học đường gửi thư 24/8.
+
+**Đường CÔNG KHAI hiện KHÔNG nhận ảnh.** 38 người không đăng nhập được vì vậy
+chưa nộp được ảnh chân dung. Nhận tệp từ người không có phiên là một quyết
+định KHÁC — ai cũng đổ được tệp vào Drive của Ban tổ chức — và chưa ai hỏi.
+Đây là chỗ phải quyết trước 26/9 nếu muốn cả lớp có ảnh trên chứng chỉ.
 
 **Mười hai bước Ngô Phú Cường phải tự làm trên Google Cloud Console**, thứ tự
 quan trọng (bước 9 làm sau bước 10 thì token chết sau 7 ngày): tạo dự án → bật

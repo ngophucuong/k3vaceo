@@ -740,3 +740,29 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    không phân biệt được "chưa ai chọn" với "mình quên mất nó". */
 .dstnlv.trong{opacity:.5;box-shadow:inset 0 0 0 1px var(--line)}
 .dstnai{flex:0 0 auto;background:var(--surf2);border-radius:10px;padding:2px 13px;margin:-2px 0 4px}
+
+/* ── Ảnh chân dung / logo cho chứng chỉ (zone Lễ tốt nghiệp) ────────────────
+   Ô xem trước có kích thước CỐ ĐỊNH và khai sẵn tỉ lệ: ảnh về sau không đẩy
+   nội dung nhảy xuống, đúng bài học đã ghi cho sổ tay ("ảnh phải khai
+   width/height hoặc aspect-ratio, không thì mỗi ảnh hiện ra lại đẩy nội dung
+   nhảy và đọc trên điện thoại giật liên tục"). */
+.tnanh{display:flex;gap:10px;margin:2px 0 4px}
+.tnanh1{flex:1 1 0;min-width:0;background:var(--surf);border:1px solid var(--line);
+        border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.tnanh-xem{aspect-ratio:1/1;border-radius:9px;background:var(--bg);
+           border:1px dashed var(--line2);display:flex;align-items:center;
+           justify-content:center;overflow:hidden}
+.tnanh-xem img{width:100%;height:100%;object-fit:cover;display:block}
+.tnanh-trong{color:var(--ink3);font-size:12px}
+.tnanh-ok{color:var(--go);font-size:12px;font-weight:600}
+.tnanh-cho{color:var(--ink3);font-size:12px;animation:tlnhay 1.1s ease-in-out infinite}
+.tnanh-nut{display:flex;flex-direction:column;gap:4px;min-width:0}
+.tnanh-nut>b{font-size:12.5px;line-height:1.3}
+/* <label> bọc một <input type=file> ẩn: bấm vào nhãn là mở trình chọn tệp,
+   không cần một dòng JS nào để nối hai thứ lại. */
+.tnanh-chon{display:inline-block;text-align:center;cursor:pointer;
+            font-size:12.5px;font-weight:600;padding:7px 9px;border-radius:9px;
+            background:var(--ink);color:#fff;touch-action:manipulation}
+.tnanh-chon:active{transform:scale(.985)}
+.tnanh-mo{font-size:11.5px;color:var(--ink3);text-decoration:none}
+.tnanh-loi{font-size:11.5px;color:var(--due);line-height:1.45}

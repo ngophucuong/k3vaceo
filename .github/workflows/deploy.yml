@@ -436,7 +436,10 @@ jobs:
           else
             echo "  ✗ /totnghiep không trả về ứng dụng"; loi=1
           fi
-          for duong in /api/totnghiep /api/totnghiep/de-tai /api/totnghiep/danh-sach /api/totnghiep/xuat.csv; do
+          # /api/totnghiep/anh NHẬN TỆP, nên nó là đường nguy nhất trong nhóm
+          # này: đẩy nhầm lên nửa trên dòng getCurrentMember là ai cũng đổ được
+          # tệp vào Drive của Ban tổ chức. Phải có trong danh sách.
+          for duong in /api/totnghiep /api/totnghiep/de-tai /api/totnghiep/anh /api/totnghiep/danh-sach /api/totnghiep/xuat.csv; do
             m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app$duong" || true)
             if [ "$m" = "401" ]; then
               echo "  ✓ $duong KHÔNG cookie → 401"
@@ -462,6 +465,18 @@ jobs:
               echo "  ✗ RÒ: đường công khai có chứa \"$cam\""; loi=1
             fi
           done
+          # Ba bí mật Google đã sang tới Worker chưa — trả lời được mà KHÔNG
+          # phải thử gửi một tệp. /api/health chỉ in một CỜ, không in một mẩu
+          # nào của client_id hay refresh token (khác khối push, nơi khoá VAPID
+          # công khai in 8 ký tự đầu được).
+          if grep -q '"drive":{"bat":true}' /tmp/health.json 2>/dev/null; then
+            echo "  ✓ Worker đã thấy đủ ba bí mật Google — đường nộp ảnh mở"
+          else
+            echo "::warning::Worker CHƯA thấy đủ GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN — giao diện sẽ ẩn ô chọn ảnh và route trả 503. Đặt cả ba vào GitHub Secrets."
+          fi
+          if grep -qE 'GOCSPX|"1//0' /tmp/health.json 2>/dev/null; then
+            echo "  ✗ RÒ: /api/health có chứa một mẩu khoá Google"; loi=1
+          fi
           [ "$loi" = "0" ] || { echo "::error::Zone /totnghiep chưa chạy đúng, hoặc một đường đã lọt ra công khai."; exit 1; }
 
           echo "--- lịch công khai tại /lich (KHÔNG đăng nhập) ---"

@@ -6,6 +6,8 @@ import { LINH_VUC_KHKD, docLinhVucKhkd, tenLinhVucKhkd } from '../lib/linh-vuc-k
 import { shapeRound } from './funds.js';
 import { conQuota, ghiNhan } from '../lib/ratelimit.js';
 import { buildTransferNote, buildQrUrl } from '../lib/vietqr.js';
+import { driveCauHinh, taiLenDrive, taoThuMuc } from '../lib/drive.js';
+import { doanLoaiAnh, TOI_DA_BYTE } from '../lib/anh.js';
 
 /* ══ Zone "Lễ tốt nghiệp" — /totnghiep ══════════════════════════════════════
    Ngô Phú Cường đưa 15 câu Ban tổ chức muốn thu để chuẩn bị Lễ tốt nghiệp
@@ -135,6 +137,10 @@ export async function getTotNghiep(env, me) {
     nganh_list: NGANH,
     linh_vuc_khkd_list: LINH_VUC_KHKD,
     la_ban_can_su: await isClassCommittee(env, me.id),
+    // Chưa có khoá Drive thì giao diện ẨN HẲN ô chọn ảnh, không bày một nút
+    // bấm vào là 503 — đúng khuôn đã dùng cho thẻ trợ lý và nút thông báo đẩy.
+    // Cờ thôi, KHÔNG BAO GIỜ trả một mẩu nào của khoá ra đây.
+    drive_bat: !!driveCauHinh(env),
     // Điền sẵn từ những gì D1 đã biết. Giao diện chỉ dùng phần này khi CHƯA có
     // bản đăng ký — đã lưu rồi thì đọc từ `dang_ky` để không đè bản người ta
     // vừa sửa bằng bản gốc (quy ước 3 CLAUDE.md, lỗi mất dữ liệu Đợt 1).
@@ -702,4 +708,136 @@ export async function getXuatCsv(env, me) {
       'content-disposition': 'attachment; filename="dang-ky-tot-nghiep-k3vaceo.csv"',
     },
   });
+}
+
+/* ══ ẢNH CHÂN DUNG VÀ LOGO — câu 7 và 8, qua Google Drive ═══════════════════
+   Lý lẽ "vì sao Drive chứ không phải R2", và vì sao đây KHÔNG phải bỏ N2,
+   nằm ở CLAUDE.md và ở đầu lib/drive.js. Tệp này chỉ lo CHÍNH SÁCH: ai được
+   gửi, tệp nào được nhận, và ghi kết quả vào đâu.
+
+   NĂM CHỐT CHẶN, xếp theo GIÁ — rẻ nhất hỏi trước, đúng khuôn congTacVaKhoa()
+   của trợ lý. Chỉ khi cả năm qua mới tiêu một lượt gọi ra Drive:
+
+     1. Có phiên            — vị trí dòng trong index.js, dưới getCurrentMember
+     2. Có khoá chưa        — thiếu thì 503, giao diện ẩn hẳn ô chọn ảnh
+     3. Kích thước          — đọc Content-Length TRƯỚC, rồi kiểm lại trên
+                              ArrayBuffer thật (header do máy khách gửi, sửa
+                              được bằng một dòng)
+     4. Magic bytes         — không tin phần mở rộng, không tin content-type
+     5. Hạn mức             — đắt nhất vì phải đếm bảng, nhưng vẫn rẻ hơn một
+                              lượt gọi ra ngoài
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const LOAI_ANH = {
+  anh:  { cot_url: 'anh_url',  cot_id: 'anh_drive_id',  nhan: 'Ảnh chân dung',      ma_ten: 'chan-dung' },
+  logo: { cot_url: 'logo_url', cot_id: 'logo_drive_id', nhan: 'Logo doanh nghiệp', ma_ten: 'logo' },
+};
+
+// Trần theo NGƯỜI, không theo IP — cả lớp ngồi chung WiFi hội trường là
+// chuyện thường xuyên ở đây (bài học 27/8), khoá theo IP thì người thứ hai
+// trong phòng đã hết lượt. Thùng IP vẫn có, nhưng đặt TRÊN sĩ số lớp.
+const ANH_MOI_NGUOI_MOI_NGAY = 20;
+const ANH_MOI_IP_MOI_GIO = 400;
+
+async function caiDatTn(env, khoa) {
+  const row = await env.DB.prepare('SELECT gia_tri FROM cai_dat WHERE khoa = ?').bind(khoa).first();
+  return row?.gia_tri ?? null;
+}
+
+/* Thư mục đích PHẢI do chính ứng dụng tạo ra — scope `drive.file` chỉ đụng
+   được tệp do nó tạo, nên một id thư mục tạo tay sẽ nhận `404 File not found`
+   (xem lib/drive.js). Vì vậy tạo LƯỜI ở lượt gửi đầu tiên rồi nhớ id vào bảng
+   `cai_dat`, thay vì bắt ai đó chạy một lượt thủ công rồi dán id vào Secret:
+   một bước tay là một bước quên được, và triệu chứng của việc quên là một câu
+   404 đọc lên như thư mục bị xoá.
+
+   `cai_dat` đã có sẵn từ migration 0038 cho đúng loại việc này, nên không cần
+   migration mới. Đặt sẵn DRIVE_FOLDER_ID trong Worker thì dùng cái đó và
+   không tạo gì — đường lui khi muốn ghim vào một thư mục cụ thể. */
+async function thuMucDich(env) {
+  if (env.DRIVE_FOLDER_ID) return env.DRIVE_FOLDER_ID;
+  const da = await caiDatTn(env, 'drive_thu_muc_id');
+  if (da) return da;
+
+  const id = await taoThuMuc(env, 'k3vaceo — ảnh chứng chỉ CEO K03');
+  // INSERT OR IGNORE rồi đọc lại: hai người gửi cùng lúc thì cả hai cùng tạo
+  // được một thư mục, nhưng chỉ một id được ghi và CẢ HAI dùng chung id ấy.
+  // Thư mục thừa là chuyện cosmetic dọn tay được; hai nửa lớp nằm ở hai thư
+  // mục khác nhau mới là chuyện Ban tổ chức phải đi tìm.
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO cai_dat (khoa, gia_tri, ghi_chu)
+     VALUES ('drive_thu_muc_id', ?, 'Thư mục Drive chứa ảnh chứng chỉ. Do CHÍNH ứng dụng tạo — scope drive.file không đụng được thư mục tạo tay.')`
+  ).bind(id).run();
+  return (await caiDatTn(env, 'drive_thu_muc_id')) ?? id;
+}
+
+export async function postAnhTotNghiep(request, env, me, ip) {
+  const loai = LOAI_ANH[new URL(request.url).searchParams.get('loai') ?? ''];
+  if (!loai) return error('loai_khong_hop_le', 422);
+
+  // Chốt 2 — thiếu khoá thì 503 và giao diện ẩn hẳn ô chọn ảnh, không bày một
+  // nút bấm vào là lỗi.
+  if (!driveCauHinh(env)) return error('drive_chua_cau_hinh', 503);
+
+  // Chốt 3a — Content-Length. Từ chối TRƯỚC khi đọc thân là không phải nuốt
+  // cả tệp vào bộ nhớ Worker chỉ để vứt đi.
+  const khai = Number(request.headers.get('content-length') || 0);
+  if (khai > TOI_DA_BYTE) return error('anh_qua_lon', 413, { toi_da: TOI_DA_BYTE, nhan_duoc: khai });
+
+  const bytes = new Uint8Array(await request.arrayBuffer());
+  // Chốt 3b — kiểm lại trên tệp THẬT. Content-Length do máy khách gửi.
+  if (bytes.length > TOI_DA_BYTE) {
+    return error('anh_qua_lon', 413, { toi_da: TOI_DA_BYTE, nhan_duoc: bytes.length });
+  }
+  if (bytes.length === 0) return error('anh_rong', 422);
+
+  // Chốt 4 — magic bytes. `goi_y` đi thẳng ra giao diện: "đây là ảnh HEIC,
+  // định dạng gốc của iPhone, mở ảnh lên rồi chọn Sao chép sẽ ra JPG" hữu ích
+  // hơn hẳn "tệp không hợp lệ", và iPhone là máy phần lớn lớp này đang dùng.
+  const soi = doanLoaiAnh(bytes);
+  if (!soi.ok) return error('anh_sai_dinh_dang', 422, { la: soi.la, goi_y: soi.goi_y });
+
+  // Chốt 5 — hạn mức.
+  if (!(await conQuota(env, 'tn_anh_nguoi', `m${me.id}`, ANH_MOI_NGUOI_MOI_NGAY, '-1 day'))) {
+    return error('qua_nhieu_lan', 429, { toi_da: ANH_MOI_NGUOI_MOI_NGAY });
+  }
+  if (!(await conQuota(env, 'tn_anh_ip', ip, ANH_MOI_IP_MOI_GIO))) {
+    return error('qua_nhieu_lan', 429);
+  }
+
+  // Tên tệp mang HỌ TÊN và NHÓM: Ban tổ chức tải cả thư mục về rồi ghép chứng
+  // chỉ, nên một thư mục toàn `IMG_4821.jpg` là bắt họ mở từng tệp ra đoán.
+  const nhom = await env.DB.prepare(
+    'SELECT g.no FROM members m LEFT JOIN groups g ON g.id = m.group_id WHERE m.id = ?'
+  ).bind(me.id).first();
+  const sach = String(me.full_name || `member-${me.id}`).replace(/[\\/:*?"<>|]/g, '').trim();
+  const ten = `${loai.ma_ten}-${sach}${nhom?.no ? ` - N${nhom.no}` : ''}.${soi.duoi}`;
+
+  let ketQua;
+  try {
+    ketQua = await taiLenDrive(env, {
+      ten, mime: soi.mime, bytes, thuMucId: await thuMucDich(env),
+    });
+  } catch (err) {
+    // `hong_o_buoc` là đường DUY NHẤT đọc được sự thật khi log Worker câm —
+    // bài học đã trả giá ở đường gửi thư 24/8 và trả lần nữa ở trợ lý. Giao
+    // diện in thẳng tên bước vào câu báo lỗi.
+    return error('drive_hong', 502, { hong_o_buoc: err?.buoc ?? 'khong_ro', chi_tiet: String(err?.message ?? err) });
+  }
+
+  // ghiNhan đứng SAU lượt gọi: một lượt HỎNG không được ăn mất lượt của học
+  // viên. Cùng lý lẽ đã ghi cho trợ lý.
+  await ghiNhan(env, 'tn_anh_nguoi', `m${me.id}`);
+  await ghiNhan(env, 'tn_anh_ip', ip);
+
+  await env.DB.prepare(
+    `INSERT INTO dang_ky_tot_nghiep (member_id, ${loai.cot_url}, ${loai.cot_id}, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(member_id) DO UPDATE SET
+       ${loai.cot_url} = excluded.${loai.cot_url},
+       ${loai.cot_id} = excluded.${loai.cot_id},
+       updated_at = excluded.updated_at`
+  ).bind(me.id, ketQua.url, ketQua.id).run();
+
+  return json({ ok: true, loai: loai.nhan, url: ketQua.url, ten: ketQua.ten });
 }
