@@ -37,6 +37,16 @@ tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
    cá nhân** (0043) vì lớp đổi cách nộp bài ngay chiều hôm ấy, cộng ô chữ
    "Ngành khác" (0044). Xem các mục riêng bên dưới trước khi đụng vào
    `worker/src/routes/tot-nghiep.js`.
+
+   **Và cùng ngày, phần ẢNH CHỨNG CHỈ qua Google Drive** — thứ CLAUDE.md gọi
+   là "Đợt 2, chưa viết dòng mã nào" lúc sáng. Ngô Phú Cường tự làm xong 12
+   bước trên Google Cloud Console (vấp đúng một chỗ: phải hoàn thành Branding
+   mới bấm Publish được, mà tôi đã hướng dẫn SAI — xem mục riêng), rồi đưa ba
+   bí mật. Đây là lần đầu **byte của người dùng đi XUYÊN QUA Worker ra một
+   dịch vụ ngoài**, và là cách đọc N2 đúng nhất: ứng dụng là **ống dẫn, không
+   phải kho**. Đọc mục "Ảnh chứng chỉ qua Google Drive" TRƯỚC khi đụng vào
+   `worker/src/lib/drive.js` hay `lib/anh.js` — ba chỗ sai được trong đó
+   **Drive vẫn trả HTTP 200**.
 2. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
    này, và là lần đầu tiên nó **tốn tiền theo lượt dùng** cùng lần đầu **bỏ
    HAI nguyên tắc gốc cùng lúc (N1 và N2)**. Ngô Phú Cường đưa hai tài liệu
@@ -128,7 +138,7 @@ deploy là production khi `--branch` TRÙNG nhánh ấy; sửa nó theo nhánh g
 thì deploy tụt xuống hạng "xem thử", workflow vẫn xanh mà tên miền vẫn chạy bản
 cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trước.
 
-**Sáu việc cần làm tiếp, xếp theo mức chặn:**
+**Chín việc cần làm tiếp, xếp theo mức chặn:**
 
 1. **PHÁT LINK `k3vaceo.cuongngo.app/totnghiep` CHO CẢ LỚP — hạn 21h00 NGÀY
    19/9.** Gấp nhất, và không phải việc lập trình. **Một link là đủ cho cả
@@ -142,23 +152,44 @@ cũ. Muốn đổi thật thì đổi trong bảng điều khiển Pages trướ
    ngân hàng.** Đây là đợt thu cấp lớp ĐẦU TIÊN của dự án — chưa đồng nào từng
    đi qua đường này, và ảnh QR chưa hiển thị thật lần nào (sandbox không có
    mạng). Hỏng thì cả lớp chuyển tiền sai chỗ.
-3. **Mở một phiên Trợ lý KHKD THẬT trên tên miền** — đây là phép nghiệm thu
+3. **GỬI MỘT ẢNH THẬT ở `/totnghiep` rồi mở Drive xem nó có ở đó không.** Đây
+   là phép nghiệm thu DUY NHẤT của đường Google Drive, và sandbox không làm
+   được: **chưa một tệp nào từng tới Drive từ đây**. Deploy #127 chỉ chứng
+   minh được ba bí mật đã sang tới Worker (`"drive":{"bat":true}`), không
+   chứng minh được khoá còn sống — khoá chết thì cờ vẫn `true`. Hỏng thì
+   `hong_o_buoc` nói ngay hỏng ở bước nào (`lay_token` = khoá; `tai_len` =
+   Drive từ chối). Lượt gửi ĐẦU TIÊN tự tạo thư mục **"k3vaceo — ảnh chứng
+   chỉ CEO K03"**; link của nó hiện thẳng trên màn Ban cán sự lớp, đó là thư
+   mục để chia sẻ cho Ban tổ chức.
+4. **QUYẾT: đường CÔNG KHAI có nhận ảnh không.** Hiện KHÔNG, nên **38 người
+   không đăng nhập được thì không nộp được ảnh chân dung** — mà ảnh là thứ
+   đi vào chứng chỉ. Nhận tệp từ người không có phiên là một quyết định KHÁC
+   (ai cầm link cũng đổ được tệp vào Drive của Ban tổ chức) và chưa ai hỏi.
+   Phải quyết trước 26/9. Đường lui rẻ nhất: phát link đăng nhập cho đúng 38
+   người ấy qua Danh bạ → Cả lớp, họ vào được là nộp ảnh được ngay.
+5. **Mở một phiên Trợ lý KHKD THẬT trên tên miền** — đây là phép nghiệm thu
    duy nhất cho tính năng lớn nhất vừa thêm, và sandbox không làm được (xem
    mục riêng). Hỏng thì `hong_o_buoc` trong phúc đáp 502 nói ngay hỏng ở bước
    nào. Kèm theo: thêm `DEEPSEEK_API_KEY` vào **GitHub Secrets** (ngoài
    Cloudflare) để `deploy.yml` tự kiểm khoá còn sống mỗi lượt deploy.
-4. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
+6. **Điền 51 số điện thoại** vào `scripts/data/bo-sung-dien-thoai.csv` (45
    người chưa có số nào, 6 số sai hoặc trùng — đã điền được 4/44 người chưa có
    số nhờ tệp "Trưởng, phó nhóm" của Ban tổ chức, migration 0020; thêm một
    người mới migration 0023 vào thẳng nhóm "sai" vì số trong tệp gốc thiếu một
    chữ số). Chưa điền thì từng ấy người không tự vào được — đây là chỗ chặn số
    một, và nó không phải việc lập trình.
-5. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
+7. **Thử passkey trên điện thoại thật** ở `/vao`. Nay passkey là thứ giữ chỗ
    cho những lần đăng nhập sau, mà nó CHƯA từng chạy trọn vẹn trên tên miền
    thật lần nào. Hỏng thì đường vào lại chỉ còn mã email, tức chưa thật sự bỏ
    được OTP.
-6. **Cloudflare → zone `cuongngo.app` → Caching → Browser Cache TTL → "Respect
-   Existing Headers"**. Không sửa được trong repo.
+8. **Cấp lại `GOOGLE_REFRESH_TOKEN`** sau khi ảnh đã chạy xuôi: ba giá trị
+   hiện tại đã đi qua khung chat. Không gấp, nhưng đó là thứ mở được Drive
+   của Ban tổ chức. Đổi ở OAuth Playground rồi thay trong GitHub Secrets.
+9. **Cloudflare → zone `cuongngo.app`**, hai việc trong bảng điều khiển,
+   không sửa được trong repo: Caching → Browser Cache TTL → **"Respect
+   Existing Headers"**; và Scrape Shield → **Email Address Obfuscation → Off**
+   (đang che địa chỉ liên hệ trên `/rieng-tu`, mà Google đọc trang ấy để duyệt
+   ứng dụng OAuth).
 
 **Một việc nên làm ở buổi học đầu tiên có người dùng thật:** đứng cạnh xem
 mươi người cùng đăng nhập trên WiFi hội trường. Giới hạn tần suất đã sửa và đã
@@ -1530,11 +1561,12 @@ bấm chip "Ngành khác" ở cả hai form. Ba điều cố ý:
   số ấy CỐ Ý không gieo vào D1 (ảnh chụp chỉ có avatar, không cho biết ai chọn
   gì — gieo vào là dựng một bảng đếm không dò ngược được, đúng thứ đang phải
   chữa). Cả lớp khai lại trong ứng dụng, lần này mỗi phiếu có tên.
-- **Ảnh chân dung và logo (câu 7, 8) CHƯA làm** — Đợt 2, qua Google Drive.
-  Cột `anh_url`/`logo_url` đã có sẵn trong bảng nên thêm vào là cộng thêm, chứ
-  không phải đổi lược đồ. Xem mục riêng ngay dưới. Đường công khai hiện KHÔNG
-  nhận ảnh: nhận tệp từ người không đăng nhập là một quyết định khác, chưa ai
-  hỏi.
+- ~~**Ảnh chân dung và logo (câu 7, 8) CHƯA làm**~~ → **ĐÃ LÀM 18/9**, qua
+  Google Drive; cột `anh_url`/`logo_url` có sẵn trong bảng từ 0041 nên chỉ là
+  cộng thêm, không đổi lược đồ. Xem mục riêng ngay dưới. **Vẫn còn nguyên một
+  vế chưa quyết:** đường công khai KHÔNG nhận ảnh, nên 38 người không đăng
+  nhập được vẫn chưa nộp được ảnh — nhận tệp từ người không có phiên là một
+  quyết định KHÁC, chưa ai hỏi.
 - ~~**Người đi đường công khai không sửa lại được**~~ → **đã nới 18/9**: mở
   lại trang, tìm tên, gửi thêm lần nữa là bổ sung được, và ô để trống giữ
   nguyên nội dung cũ. Xem mục "Nới … thành KHAI BỔ SUNG" ở trên. Thứ vẫn
@@ -1561,7 +1593,8 @@ thoả ĐÚNG điều này, R2 thì ngược lại; (2) không phát tán tài s
 ảnh học viên tự nộp không thuộc diện ấy; (3) *"R2 đòi gắn thẻ thanh toán"* —
 Drive API miễn phí. Ứng dụng là **ống dẫn, không phải kho**.
 
-Thiết kế đã chốt, chưa viết dòng mã nào:
+Thiết kế đã chốt, và **bản dựng 18/9 giữ đúng từng điều dưới đây** — giữ lại
+nguyên văn vì mỗi gạch đầu dòng là một chỗ sai được mà không có gì báo lỗi:
 
 - **Refresh token của Ban tổ chức, KHÔNG dùng service account.** Tài khoản
   dịch vụ **không có dung lượng Drive riêng** → `403 storageQuotaExceeded` khi
@@ -1684,13 +1717,26 @@ chưa nộp được ảnh chân dung. Nhận tệp từ người không có phi
 định KHÁC — ai cũng đổ được tệp vào Drive của Ban tổ chức — và chưa ai hỏi.
 Đây là chỗ phải quyết trước 26/9 nếu muốn cả lớp có ảnh trên chứng chỉ.
 
-**Mười hai bước Ngô Phú Cường phải tự làm trên Google Cloud Console**, thứ tự
-quan trọng (bước 9 làm sau bước 10 thì token chết sau 7 ngày): tạo dự án → bật
-Drive API → OAuth consent screen External → điền tên/email → thêm scope
+**Mười hai bước Ngô Phú Cường ĐÃ tự làm trên Google Cloud Console 18/9**, thứ
+tự quan trọng (bước 9 làm sau bước 10 thì token chết sau 7 ngày): tạo dự án →
+bật Drive API → OAuth consent screen External → điền tên/email → thêm scope
 `drive.file` (CHỈ scope này) → thêm test user → tạo OAuth client ID (Web
 application) → redirect URI `https://developers.google.com/oauthplayground` →
-**PUBLISH APP** → OAuth Playground đổi lấy refresh token → gửi tôi ba giá trị
-→ tôi chạy một lượt tạo thư mục rồi ghim `DRIVE_FOLDER_ID`.
+**PUBLISH APP** → OAuth Playground đổi lấy refresh token → đặt ba giá trị vào
+GitHub Secrets. **Bước mười hai của kế hoạch cũ ("chạy một lượt tạo thư mục
+rồi ghim `DRIVE_FOLDER_ID`") đã BỎ HẲN** — thư mục nay tạo lười ở lượt gửi đầu
+tiên, xem mục trên; một bước tay là một bước quên được.
+
+**Ba bí mật đã sang tới Worker, đo được ở deploy #127 (18/9):** `/api/health`
+trả `"drive":{"bat":true}` và `deploy.yml` in `✓ Worker đã thấy đủ ba bí mật
+Google — đường nộp ảnh mở`. Đó là bằng chứng khoá ĐÃ TỚI, **không** phải bằng
+chứng khoá còn sống — khoá chết thì cờ vẫn `true` và chỉ lộ ra ở
+`hong_o_buoc = token_tu_choi` của lượt gửi đầu tiên.
+
+**Ba giá trị ấy đã đi qua khung chat này, nên nên cấp lại một lượt refresh
+token mới** sau khi mọi thứ chạy xong: vào OAuth Playground đổi lấy token
+khác rồi thay `GOOGLE_REFRESH_TOKEN` trong GitHub Secrets. Không gấp, nhưng
+đây là thứ mở được Drive của Ban tổ chức.
 
 ### Điều kiện để bấm được PUBLISH APP — tôi hướng dẫn SAI một lần (18/9)
 
