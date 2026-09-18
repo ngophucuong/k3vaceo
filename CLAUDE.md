@@ -1608,6 +1608,75 @@ application) → redirect URI `https://developers.google.com/oauthplayground` �
 **PUBLISH APP** → OAuth Playground đổi lấy refresh token → gửi tôi ba giá trị
 → tôi chạy một lượt tạo thư mục rồi ghim `DRIVE_FOLDER_ID`.
 
+### Điều kiện để bấm được PUBLISH APP — tôi hướng dẫn SAI một lần (18/9)
+
+Console mới của Google tách trang cũ "OAuth consent screen" thành **Google
+Auth Platform** với bốn mục con: **Branding · Audience · Clients · Data
+access**. Nút Publish nằm ở **Audience**, không nằm ở Branding.
+
+Tôi dặn "để trống hết khối App domain" — **đúng khi ở Testing, SAI khi muốn
+Publish.** Để xuất bản một app External, Google đòi thêm hai ô trong Branding:
+
+| Ô | Điền gì |
+|---|---|
+| Application home page | `https://k3vaceo.cuongngo.app/` |
+| Application privacy policy link | `https://k3vaceo.cuongngo.app/rieng-tu` |
+| Authorized domains | `cuongngo.app` (tên miền gốc, KHÔNG phải subdomain) |
+
+Application terms of service thì vẫn tuỳ chọn, để trống được.
+
+**Và tôi đọc sai một dấu hiệu, ghi lại vì rất dễ lặp:** trên trang Branding
+`Save` mờ **và** `Discard changes` cũng mờ — tôi kết luận "không còn gì chưa
+lưu, tức là đã xong". Sai: Branding vẫn thiếu trường, chỉ là những trường ấy
+không đánh dấu `*` vì chúng chỉ bắt buộc KHI XUẤT BẢN. Chỗ nói thật là dòng
+chữ xám ngay dưới nút Publish ở trang **Audience**: *"To publish your app, you
+must complete your configuration on the Branding page."* Đọc dòng ấy, đừng suy
+từ trạng thái nút.
+
+Hai ô CỐ Ý vẫn để trống, vì điền vào là tự chuốc thêm vòng thẩm định:
+- **App logo** — chính Google ghi ngay tại đó: tải logo lên là app phải qua
+  *brand verification*. Ứng dụng này có đúng một người dùng OAuth (chủ Drive),
+  không cần logo.
+- **Application terms of service** — không bắt buộc.
+
+`Authorized domains` chỉ cần gõ vào, không phải xác minh qua Search Console —
+xác minh chỉ đòi khi app PHẢI qua thẩm định, mà `drive.file` là scope không
+nhạy cảm nên không phải.
+
+## Trang `/rieng-tu` — chính sách riêng tư
+
+Thêm 18/9. Sinh ra vì Google đòi một "Application privacy policy link" mới cho
+publish app Drive, nhưng **giá trị của nó độc lập với Google**: ứng dụng giữ
+dữ liệu cá nhân của 146 người mà tới 18/9 vẫn chưa có một trang nào nói ra là
+giữ gì, ai xem được, gửi đi đâu.
+
+Nội dung viết theo đúng thứ mã đang làm, không viết cho đẹp: bảng "ai xem được
+gì" chép đúng ma trận N6 thật, bảng "gửi đi đâu" liệt kê đủ **sáu** nơi kể cả
+hai chỗ nhỏ dễ giấu (`img.vietqr.io` nhận số tài khoản trong đường dẫn ảnh,
+Google Fonts nhận địa chỉ IP của người đọc). Nói thẳng cả chỗ không lùi được:
+gian hàng đã bật công khai thì gỡ khỏi D1 không gỡ được khỏi đệm của Google.
+
+Ba điều kỹ thuật:
+- **Thư mục rời trong `public/`, không phải một nhánh của app.js** — nó phải
+  mở được khi không có phiên, và Google phải tải được nó.
+- **Không một dòng JavaScript nào.** CSP `script-src 'self'` chặn script nội
+  dòng (bài học `/sotay`); còn `style-src` có `'unsafe-inline'` nên CSS nội
+  dòng chạy được. Trang chỉ để đọc, không JS thì không có gì hỏng được.
+- **Luật vét `/*` KHÔNG nuốt `/rieng-tu`** — đã ĐO bằng
+  `npx wrangler pages dev public` chứ không suy đoán: cả `/rieng-tu` lẫn
+  `/rieng-tu/` đều ra đúng trang, y như `/sotay`.
+
+**CỐ Ý không đặt `X-Robots-Tag: noindex`**, khác `/lich` và `/sotay`: hai trang
+kia có tên và nơi công tác của cả lớp, còn trang này không có dữ liệu của ai —
+và một chính sách riêng tư thì vốn dĩ nên tìm thấy được.
+
+`deploy.yml` có phép kiểm riêng cho nó, và lý do không phải là cẩn thận thừa:
+**Google đọc đường dẫn này để giữ app ở trạng thái đã xuất bản.** Trang hỏng
+thì Google có thể gỡ trạng thái ấy, refresh token quay về kiếp 7 ngày, và
+không chỗ nào kêu lên. Phép kiểm soi `<title>` và địa chỉ liên hệ chứ không
+chỉ đếm mã 200 — luật vét `/*` trả giao diện ứng dụng kèm 200 cho cả đường dẫn
+không tồn tại, đúng cái bẫy đã ghi cho `/sotay`.
+
 ## Xin đổi nhóm — tự phục vụ
 
 Thêm 9/9 (migration 0037). Ngay sau khi chuyển tay Trương Thị Ngọc Anh sang

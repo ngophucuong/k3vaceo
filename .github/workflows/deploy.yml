@@ -134,6 +134,14 @@ jobs:
           # ở đây để ai đặt thêm vào GitHub Secrets thì cũng được đồng bộ —
           # dòng trống thì bị bỏ qua, không tạo ra bí mật rỗng.
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # Google Drive — đường nộp ảnh chân dung và logo cho chứng chỉ.
+          # Đặt ở GitHub Secrets chứ không đặt tay trên dashboard Cloudflare:
+          # biến plaintext bị `wrangler deploy` xoá sạch mỗi lượt, còn ba giá
+          # trị này thì mất một cái là cả đường nộp ảnh chết câm.
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
 
         run: |
           da=
@@ -145,6 +153,8 @@ jobs:
                       SMTP_USER SMTP_PASS MAIL_FROM \
                       SMTP_USERNAME SMTP_PASSWORD SMTP_FROM_EMAIL \
                       RESEND_API_KEY DEEPSEEK_API_KEY \
+                      GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REFRESH_TOKEN \
+                      DRIVE_FOLDER_ID \
                       VAPID_PUBLIC_KEY VAPID_PRIVATE_KEY VAPID_SUBJECT; do
             # Bỏ qua cái không đặt: đẩy chuỗi rỗng lên là tạo ra một bí mật rỗng,
             # trông như "đã có" mà thực ra không dùng được.
@@ -356,6 +366,39 @@ jobs:
             echo "  ✗ thiếu X-Robots-Tag: noindex"; loi=1
           fi
           [ "$loi" = "0" ] || { echo "::error::Sổ tay ở /sotay chưa chạy đúng trên tên miền."; exit 1; }
+
+          # ── Chính sách riêng tư tại /rieng-tu ──────────────────────────────
+          # GOOGLE ĐỌC ĐƯỜNG DẪN NÀY. Nó là "Application privacy policy link"
+          # trên màn OAuth consent — điều kiện để xuất bản ứng dụng Drive, tức
+          # điều kiện để cả đường nộp ảnh chân dung chạy được. Trang hỏng thì
+          # Google có thể gỡ trạng thái đã xuất bản, và refresh token quay về
+          # kiếp 7 ngày mà không chỗ nào kêu lên.
+          #
+          # Bẫy y hệt /sotay: luật vét /* trong _redirects trả giao diện ứng
+          # dụng kèm HTTP 200 cho một đường dẫn không tồn tại, nên "200" MỘT
+          # MÌNH không chứng minh được gì. Phải soi nội dung.
+          echo "--- chính sách riêng tư tại /rieng-tu ---"
+          loi=0
+          rt=$(curl -sL -o /tmp/rt.html -w '%{http_code}' https://k3vaceo.cuongngo.app/rieng-tu)
+          echo "  HTTP $rt ($(wc -c < /tmp/rt.html) byte)"
+          [ "$rt" = "200" ] || { echo "  ✗ /rieng-tu không mở được (mã $rt)"; loi=1; }
+          if grep -q '<title>Chính sách riêng tư — k3vaceo</title>' /tmp/rt.html; then
+            echo "  ✓ đúng trang chính sách riêng tư"
+          else
+            echo "  ✗ /rieng-tu không ra trang chính sách"; loi=1
+          fi
+          if grep -q 'app\.js' /tmp/rt.html; then
+            echo "  ✗ /rieng-tu bị luật vét /* nuốt — trả về giao diện ứng dụng"; loi=1
+          fi
+          # Địa chỉ liên hệ là thứ Google đối chiếu với ô Developer contact, và
+          # cũng là đường DUY NHẤT người trong lớp xin gỡ dữ liệu. Mất nó thì
+          # trang còn đó mà không dùng được vào việc gì.
+          if grep -q 'ngophucuong@gmail.com' /tmp/rt.html; then
+            echo "  ✓ có địa chỉ liên hệ để xin gỡ dữ liệu"
+          else
+            echo "  ✗ /rieng-tu thiếu địa chỉ liên hệ"; loi=1
+          fi
+          [ "$loi" = "0" ] || { echo "::error::Trang /rieng-tu hỏng — Google đọc đường dẫn này để giữ ứng dụng Drive ở trạng thái đã xuất bản."; exit 1; }
 
           # ── Zone Lễ tốt nghiệp (/totnghiep, migration 0041) ────────────────
           # Chốt chặn quan trọng nhất của cả zone: danh sách cả lớp KÈM ĐIỆN
