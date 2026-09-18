@@ -37,20 +37,27 @@ jobs:
           cache: npm
       - run: npm ci
 
-      # ── BƯỚC TẠM (18/9) — xoá ngay sau khi đọc xong ──────────────────────
-      # Ngô Phú Cường hỏi "có cách nào phát link mời thuận tiện nhất không".
-      # Câu trả lời phụ thuộc đúng một con số chưa ai đo: trong 77 người chưa
-      # nhận hồ sơ, bao nhiêu người CÓ SỐ ĐIỆN THOẠI ĐÚNG KHUÔN trong danh
-      # sách gốc. Nhóm ấy KHÔNG cần ai phát gì — họ tự vào được ở /dangnhap
-      # (gõ tên, gõ số), vì soHopLeTuHoSo() nhận roster.phone làm bí mật mở
-      # cửa cho hồ sơ chưa ai nhận. Chỉ nhóm KHÔNG có số mới thật sự cần anh
-      # bấm "Tạo link mời" từng người.
+      # ── BƯỚC TẠM (18/9, lần hai) — xoá ngay sau khi đọc xong ─────────────
+      # Ngô Phú Cường: "Trong phần khai Lĩnh vực hoạt động thiếu Logistics của
+      # tôi, có thể rà soát những học viên đã khai báo để rà soát được không?
+      # Khác có thể điền free text không?"
       #
-      # Điều kiện "số đúng khuôn" phải TRÙNG KHÍT với isValidVnPhone /
-      # soHopLeTuHoSo, không thì con số này nói một đằng mà cửa /dangnhap làm
-      # một nẻo: 10 chữ số, bắt đầu bằng 0, KHÔNG lẫn ký tự nào khác (GLOB
-      # toàn chuỗi — bài học "lần: 7", số 03845375x8 lọt qua cách soi cũ).
-      - name: TẠM — ai tự vào được, ai cần phát link
+      # Câu thứ nhất đã trả lời được mà không cần D1: mã `van-tai` VỐN ĐÃ có,
+      # chỉ mang nhãn "Vận tải · Kho vận" nên người trong nghề không nhận ra —
+      # đã đổi nhãn thành "Vận tải · Logistics · Kho vận" (đổi NHÃN, không đụng
+      # mã, không dòng D1 nào phải sửa).
+      #
+      # Hai câu còn lại thì PHẢI đo, không đoán được: danh mục 19 ngành có đủ
+      # cho lớp NÀY không, và ô free text cho "Ngành khác" đáng làm tới đâu.
+      # Con số quyết định là TỈ LỆ CHỌN `khac`: gần 0 thì free text là ô không
+      # ai gõ; cao thì danh mục đang thiếu ngành thật và free text là đường
+      # duy nhất biết thiếu ngành nào.
+      #
+      # Đếm bằng instr trên chuỗi có bọc dấu phẩy hai đầu — `nganh` lưu dạng
+      # 'van-tai,thuong-mai', nên LIKE '%van-tai%' sẽ khớp nhầm bất cứ mã nào
+      # chứa nó làm khúc con. KHÔNG dùng UNION ALL (D1 từ chối từ 6 nhánh):
+      # 19 ngành nằm trong 19 cột của MỘT dòng.
+      - name: TẠM — ai đã khai ngành, và ngành nào đang thiếu
         run: |
           soi() {
             echo "════ $1 ════"
@@ -62,25 +69,54 @@ jobs:
             echo
           }
 
-          CHUA_NHAN="NOT EXISTS (SELECT 1 FROM members m WHERE m.roster_id = r.id AND m.claimed_at IS NOT NULL)"
-          SO_DUNG="(r.phone IS NOT NULL AND LENGTH(r.phone) = 10 AND r.phone GLOB '0*' AND r.phone NOT GLOB '*[^0-9]*')"
+          CO() { echo "SUM(CASE WHEN instr(',' || COALESCE(mp.nganh, '') || ',', ',$1,') > 0 THEN 1 ELSE 0 END) AS $2"; }
 
-          soi "1. Chia 77 người chưa vào được làm hai nhóm" \
-            "SELECT COUNT(*) AS chua_vao_duoc,
-                    SUM(CASE WHEN $SO_DUNG THEN 1 ELSE 0 END) AS tu_vao_duoc_o_dangnhap,
-                    SUM(CASE WHEN $SO_DUNG THEN 0 ELSE 1 END) AS can_phat_link_tay
-               FROM roster r WHERE $CHUA_NHAN"
+          soi "1. Mẫu số: bao nhiêu người đã khai ngành" \
+            "SELECT COUNT(*) AS co_ho_so,
+                    SUM(CASE WHEN mp.nganh IS NOT NULL AND mp.nganh <> '' THEN 1 ELSE 0 END) AS da_chon_nganh,
+                    SUM(CASE WHEN instr(',' || COALESCE(mp.nganh, '') || ',', ',khac,') > 0 THEN 1 ELSE 0 END) AS chon_nganh_khac
+               FROM member_profile mp"
 
-          soi "2. Số người CẦN PHÁT LINK, chia theo nhóm" \
-            "SELECT r.group_label AS nhom, COUNT(*) AS can_phat_link
-               FROM roster r WHERE $CHUA_NHAN AND NOT $SO_DUNG
-              GROUP BY r.group_label ORDER BY can_phat_link DESC"
+          soi "2. Mười chín ngành, mỗi ngành bao nhiêu người" \
+            "SELECT $(CO bat-dong-san bat_dong_san), $(CO xay-dung xay_dung),
+                    $(CO san-xuat san_xuat), $(CO thuong-mai thuong_mai),
+                    $(CO nong-nghiep nong_nghiep), $(CO am-thuc am_thuc),
+                    $(CO du-lich du_lich), $(CO van-tai van_tai),
+                    $(CO cong-nghe cong_nghe), $(CO truyen-thong truyen_thong),
+                    $(CO giao-duc giao_duc), $(CO y-te y_te),
+                    $(CO tai-chinh tai_chinh), $(CO tu-van tu_van),
+                    $(CO nhan-su nhan_su), $(CO thoi-trang thoi_trang),
+                    $(CO co-khi co_khi), $(CO moi-truong moi_truong),
+                    $(CO khac khac)
+               FROM member_profile mp"
 
-          soi "3. Tên từng người CẦN PHÁT LINK" \
-            "SELECT r.group_label AS nhom, r.full_name AS ho_ten,
-                    COALESCE(r.phone, '(không có số)') AS so_trong_danh_sach
-               FROM roster r WHERE $CHUA_NHAN AND NOT $SO_DUNG
-              ORDER BY r.group_label, r.full_name COLLATE NOCASE"
+          soi "3. Từng người đã khai, kèm chuỗi ngành thô" \
+            "SELECT m.full_name AS ho_ten, mp.nganh AS ma_nganh,
+                    COALESCE(m.company, '') AS don_vi
+               FROM member_profile mp JOIN members m ON m.id = mp.member_id
+              WHERE mp.nganh IS NOT NULL AND mp.nganh <> ''
+              ORDER BY m.full_name COLLATE NOCASE"
+
+          soi "4. Ai chọn 'Ngành khác' — đơn vị của họ nói ngành thật là gì" \
+            "SELECT m.full_name AS ho_ten, COALESCE(m.company, '') AS don_vi,
+                    COALESCE(m.title, '') AS chuc_vu,
+                    COALESCE(substr(mp.sells_what, 1, 60), '') AS ban_gi
+               FROM member_profile mp JOIN members m ON m.id = mp.member_id
+              WHERE instr(',' || COALESCE(mp.nganh, '') || ',', ',khac,') > 0
+              ORDER BY m.full_name COLLATE NOCASE"
+
+          soi "5. Zone tốt nghiệp: đã ai khai phần Hồ sơ chưa, ngành nào" \
+            "SELECT COUNT(*) AS so_dong,
+                    SUM(CASE WHEN d.ho_so_luc IS NOT NULL THEN 1 ELSE 0 END) AS da_xong_ho_so,
+                    SUM(CASE WHEN d.khkd_linh_vuc IS NOT NULL THEN 1 ELSE 0 END) AS da_chon_linh_vuc_khkd,
+                    SUM(CASE WHEN d.gala_luc IS NOT NULL THEN 1 ELSE 0 END) AS da_dang_ky_gala
+               FROM dang_ky_tot_nghiep d"
+
+          soi "6. Ngành đã xác nhận trong zone tốt nghiệp" \
+            "SELECT m.full_name AS ho_ten, COALESCE(d.linh_vuc, '(trống)') AS linh_vuc_da_xac_nhan,
+                    COALESCE(d.khkd_linh_vuc, '(chưa chọn)') AS linh_vuc_khkd
+               FROM dang_ky_tot_nghiep d JOIN members m ON m.id = d.member_id
+              ORDER BY m.full_name COLLATE NOCASE"
       # ── HẾT BƯỚC TẠM ─────────────────────────────────────────────────────
 
       # Phần này KHÔNG hỏi về một người, mà hỏi về CẢ LỚP — thêm 5/9 khi Ngô Phú

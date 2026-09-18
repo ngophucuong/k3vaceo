@@ -47,3 +47,4 @@ không". Đo con số quyết định câu trả lời: trong 77 người chưa 
 bao nhiêu người CÓ SỐ đúng khuôn trong danh sách gốc (tự vào được ở
 /dangnhap, không cần ai phát gì) và bao nhiêu người thật sự cần phát link
 tay. Kèm danh sách tên nhóm sau để chia việc.
+lần soi: 2026-09-18T14:51Z — ngành đã khai + có nên cho free text ở 'Ngành khác'
