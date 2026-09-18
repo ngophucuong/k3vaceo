@@ -1670,6 +1670,20 @@ Ba điều kỹ thuật:
 kia có tên và nơi công tác của cả lớp, còn trang này không có dữ liệu của ai —
 và một chính sách riêng tư thì vốn dĩ nên tìm thấy được.
 
+**Cloudflare CHE địa chỉ liên hệ trên trang này — đo được ở deploy #122.** Mã
+nguồn có `ngophucuong@gmail.com` ở hai chỗ, mà HTML tải từ tên miền thì không
+có chuỗi ấy: **Email Address Obfuscation** của Scrape Shield (cấp ZONE, không
+sửa được trong repo) thay mọi `mailto:` và mọi chuỗi trông như email bằng
+`/cdn-cgi/l/email-protection` cộng một script giải mã.
+
+Hệ quả thật thì nhẹ hơn vẻ ngoài: script giải mã nằm **cùng origin** nên CSP
+`script-src 'self'` cho qua, người đọc vẫn bấm được. Chỉ **trình đọc tự động**
+— kể cả của Google khi soi trang chính sách — là chỉ thấy bản mã hoá. Tắt ở
+Cloudflare → zone `cuongngo.app` → **Scrape Shield → Email Address
+Obfuscation**. Phép kiểm vì vậy chỉ **cảnh báo**, đúng cách đã xử cho Browser
+Cache TTL: đánh đỏ mọi lượt deploy vì một nút bấm ngoài repo chỉ dạy người ta
+bỏ qua màu đỏ.
+
 `deploy.yml` có phép kiểm riêng cho nó, và lý do không phải là cẩn thận thừa:
 **Google đọc đường dẫn này để giữ app ở trạng thái đã xuất bản.** Trang hỏng
 thì Google có thể gỡ trạng thái ấy, refresh token quay về kiếp 7 ngày, và

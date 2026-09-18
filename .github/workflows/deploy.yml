@@ -393,10 +393,25 @@ jobs:
           # Địa chỉ liên hệ là thứ Google đối chiếu với ô Developer contact, và
           # cũng là đường DUY NHẤT người trong lớp xin gỡ dữ liệu. Mất nó thì
           # trang còn đó mà không dùng được vào việc gì.
+          # Đo được ở deploy #122: địa chỉ liên hệ KHÔNG có trong HTML thô dù
+          # nguồn có hai chỗ. Thủ phạm là Cloudflare Email Address Obfuscation
+          # (Scrape Shield, cấp ZONE) — nó thay mọi mailto và mọi chuỗi trông
+          # như email bằng /cdn-cgi/l/email-protection cộng một script giải mã.
+          #
+          # Người đọc vẫn bấm được (script giải mã cùng origin nên CSP
+          # script-src self cho qua), nên đây KHÔNG phải trang hỏng. Nhưng
+          # trình đọc tự động — kể cả của Google — chỉ thấy bản mã hoá.
+          #
+          # Vì vậy CẢNH BÁO chứ không đánh hỏng: đây là một nút bấm NGOÀI
+          # repo, mà đánh đỏ mọi lượt deploy vì một nút ngoài repo thì chỉ dạy
+          # người ta bỏ qua màu đỏ — đúng cách đã xử cho Browser Cache TTL.
           if grep -q 'ngophucuong@gmail.com' /tmp/rt.html; then
             echo "  ✓ có địa chỉ liên hệ để xin gỡ dữ liệu"
+          elif grep -q 'email-protection' /tmp/rt.html; then
+            echo "  ⚠ địa chỉ liên hệ bị Cloudflare che (xem cảnh báo)"
+            echo "::warning::Cloudflare Email Address Obfuscation đang che địa chỉ liên hệ trên /rieng-tu. Người đọc vẫn bấm được, nhưng trình đọc tự động của Google chỉ thấy bản mã hoá. Tắt ở Cloudflare → zone cuongngo.app → Scrape Shield → Email Address Obfuscation."
           else
-            echo "  ✗ /rieng-tu thiếu địa chỉ liên hệ"; loi=1
+            echo "  ✗ /rieng-tu thiếu địa chỉ liên hệ, và cũng không phải do Cloudflare che"; loi=1
           fi
           [ "$loi" = "0" ] || { echo "::error::Trang /rieng-tu hỏng — Google đọc đường dẫn này để giữ ứng dụng Drive ở trạng thái đã xuất bản."; exit 1; }
 
