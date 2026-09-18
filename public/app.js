@@ -4888,11 +4888,24 @@ function oNganhKhac(wrap, o) {
    3. Thu nhỏ ảnh trước khi gửi, nhưng BỎ QUA PNG — xem thuNhoAnh().
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* Ảnh xem trước của phiên này, giữ NGOÀI hàm vẽ.
+   Gửi xong là màn vẽ lại (để đọc lại TN), và bản đầu vẽ lại thành chữ "✓ đã
+   gửi" — tức người vừa gửi ảnh không còn thấy thứ mình vừa gửi, trong khi đó
+   đúng là lúc họ muốn xác nhận mình không chọn nhầm tấm. Mở Drive để kiểm thì
+   quá xa cho một câu hỏi đơn giản như vậy.
+   KHÔNG dựng lại được từ máy chủ: webViewLink của Drive là trang xem, không
+   phải địa chỉ ảnh, mà CSP `img-src 'self' data: https://img.vietqr.io` cũng
+   không cho tải ảnh từ drive.google.com. Nên giữ chính data URL đã đọc lúc
+   chọn tệp — sống trong phiên này thôi, đúng bằng lúc nó có ích. */
+let TN_ANH_XEM = {};
+
 function oAnh(loai, nhan, urlDaCo) {
+  const xem = TN_ANH_XEM[loai]
+    ? `<img src="${TN_ANH_XEM[loai]}" alt="">`
+    : (urlDaCo ? '<span class="tnanh-ok">✓ đã gửi</span>'
+               : '<span class="tnanh-trong">chưa có</span>');
   return `<div class="tnanh1" data-anh="${loai}">
-    <div class="tnanh-xem" id="xem-${loai}">${urlDaCo
-      ? '<span class="tnanh-ok">✓ đã gửi</span>'
-      : '<span class="tnanh-trong">chưa có</span>'}</div>
+    <div class="tnanh-xem" id="xem-${loai}">${xem}</div>
     <div class="tnanh-nut">
       <b>${esc(nhan)}</b>
       <label class="tnanh-chon">${urlDaCo ? 'Đổi ảnh khác' : 'Chọn ảnh'}
@@ -4943,7 +4956,10 @@ async function tnGuiAnh(loai, file) {
   // hàng chục giây, và màn hình đứng im là thứ làm người ta bấm lại.
   try {
     const doc = new FileReader();
-    doc.onload = () => { oXem.innerHTML = `<img src="${doc.result}" alt="">`; };
+    doc.onload = () => {
+      TN_ANH_XEM[loai] = doc.result;
+      oXem.innerHTML = `<img src="${doc.result}" alt="">`;
+    };
     doc.readAsDataURL(file);
   } catch { /* xem trước hỏng thì thôi, không chặn việc gửi */ }
 
@@ -4967,6 +4983,10 @@ async function tnGuiAnh(loai, file) {
     veTotNghiep();
     toast('Đã gửi ' + (loai === 'anh' ? 'ảnh chân dung' : 'logo'));
   } catch (e) {
+    // Gửi hỏng thì BỎ ảnh xem trước đi. Để lại một tấm ảnh nằm đó bên cạnh
+    // dòng lỗi là nói dối rằng nó đã lên Drive — mà người đọc lướt sẽ tin cái
+    // ảnh chứ không tin dòng chữ nhỏ.
+    delete TN_ANH_XEM[loai];
     oXem.innerHTML = '<span class="tnanh-trong">chưa có</span>';
     oLoi.textContent = String(e.message || e);
     oLoi.style.display = 'block';
