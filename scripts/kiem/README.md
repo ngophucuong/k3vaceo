@@ -109,9 +109,9 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
-| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, N6 ở link bản nộp, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai KHÔNG ghi đè bản của người đã đăng nhập** |
-| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
-| `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả `groups.ban_nop_url` + bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
+| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai KHÔNG ghi đè bản của người đã đăng nhập** |
+| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **không mục lĩnh vực nào bị cắt chữ**, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
+| `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
 | `kiem-deploy-yml.mjs` | **không nháy đơn nào trong khối `node -e` của deploy.yml** — chạy thẳng, không cần máy chủ, xem mục dưới |
 | `pw-banmoi.mjs` | băng "Có bản mới" + phép soi bản lúc mở trang — **đếm số lượt nạp tài liệu**, vì hàm này gọi `location.reload()` trên đường khởi động của mọi người dùng |
 
@@ -120,7 +120,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Ba mươi mốt phép đối chứng đáng giữ nhất
+## Ba mươi ba phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -430,6 +430,33 @@ Cả hai lỗi đều im lặng: trang vẫn đẹp, chỉ thừa ra thứ khôn
    `FOREIGN KEY constraint failed` và **cả khối SQL không chạy dòng nào** —
    không phải chỉ dòng ấy hỏng. Cùng lỗi `reset-thongbao.sh` đã vấp (phép 19).
 
+32. **`innerText` của Chrome trả chữ ĐÃ ÁP `text-transform` — `textContent`
+   thì không.** Phép kiểm tìm `/Chưa chọn lĩnh vực/` trong màn Ban cán sự lớp
+   ĐỎ, dù đúng chuỗi ấy nằm trên màn hình và ảnh chụp cho thấy rõ: nhãn dùng
+   lớp `.eb` có `text-transform:uppercase`, nên `innerText` trả về
+   `CHƯA CHỌN LĨNH VỰC`. Hai hàm cho **hai kết quả khác nhau trên cùng một
+   phần tử**, và cái khác nhau ấy chỉ lộ ra ở những chuỗi có dấu tiếng Việt
+   viết hoa — tức gần như mọi nhãn trong ứng dụng này.
+
+   Luật từ nay: phép kiểm đọc `innerText` thì so **không phân biệt hoa
+   thường**, hoặc đọc `textContent` nếu cần đúng từng ký tự. Đừng chữa bằng
+   cách gỡ `text-transform` khỏi CSS — đó là sửa sản phẩm cho vừa bộ kiểm.
+
+33. **Cột flex có `max-height` BÓP con xuống dưới chiều cao nội dung, và chữ
+   bị cắt trong im lặng.** Màn Ban cán sự lớp liệt kê 15 lĩnh vực trong một
+   khung cuộn (`.dstnbox`, `display:flex; flex-direction:column; max-height`).
+   `flex-shrink` mặc định là **1**, nên khi tổng chiều cao các mục vượt
+   `max-height` thì trình duyệt **bóp từng mục lại** thay vì cho khung cuộn —
+   và mục có tên hai dòng ("Nông nghiệp - Lâm nghiệp - Thuỷ sản (trồng trọt &
+   chăn nuôi)") **mất hẳn dòng thứ hai**.
+
+   Không lỗi JS, không phép kiểm chuỗi nào đỏ: chuỗi VẪN nằm đủ trong DOM, chỉ
+   là không nhìn thấy được. **Chỉ ảnh chụp mới thấy** — cùng họ với `ORDER BY
+   scope` ngược và tiêu đề `/giao-thuong` rơi về monospace. Chữa bằng
+   `flex:0 0 auto` trên từng mục. Nay `pw-totnghiep.mjs` so
+   `scrollHeight > clientHeight` cho **từng mục một** rồi in số mục bị cắt, nên
+   lần sau máy thấy trước người.
+
 ## Chạy `kiem-tanso.mjs`
 
 ```bash
@@ -439,6 +466,26 @@ bash scripts/kiem/reset-tanso.sh && node scripts/kiem/kiem-tanso.mjs
 Nó giả lập địa chỉ IP bằng header `cf-connecting-ip` — đúng thứ `clientIp()`
 đọc trên bản thật — nên một tiến trình đóng được cả vai "cả lớp chung một
 WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài liệu RFC 5737.
+
+## Chạy bộ kiểm zone Lễ tốt nghiệp
+
+**MỖI BỘ MỘT LƯỢT RESET RIÊNG** — khác hẳn bộ kiểm Trợ lý ngay dưới, nơi hai
+bộ dùng chung một lượt:
+
+```bash
+bash scripts/kiem/reset-totnghiep.sh && node scripts/kiem/kiem-totnghiep.mjs
+bash scripts/kiem/reset-totnghiep.sh && node scripts/kiem/pw-totnghiep.mjs
+```
+
+Lý do: cả hai bộ đều **THẬT SỰ GHI** vào `dang_ky_tot_nghiep` của cùng một
+người (Ngô Phú Cường). Chạy nối đuôi không reset thì `pw-` mở màn với ba phần
+đã điền sẵn từ lượt `kiem-` vừa xong, và **sáu tới bảy phép đỏ** — chúng hỏi
+"chip còn *chưa điền* không", "khối Gala có mở sẵn không", "bấm chip thứ tư có
+bị chặn không", toàn những câu chỉ đúng trên một bảng trắng. Đã vấp thật.
+
+Triệu chứng dễ đọc nhầm nhất: **số phép đỏ đổi giữa hai lượt chạy liên tiếp**
+(7 rồi 6). Bộ kiểm hỏng thì đỏ đều; con số nhảy là dấu hiệu của trạng thái
+tồn đọng, không phải của mã sai.
 
 ## Chạy bộ kiểm Trợ lý KHKD
 

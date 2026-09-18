@@ -164,41 +164,91 @@ ok('tai_tro lạ → null', bLa.dang_ky?.tai_tro === null);
 // Trả lại giá trị đúng cho các phép sau
 await put('/api/totnghiep/gala', ckCuong, { du_le: 'co', tai_tro: 'tien' });
 
-// ── 8. N6 ở ban-nop: không có group_id nào để giả mạo ────────────────────
-console.log('\n── Link bản nộp KHKD: không lẫn nhóm, chỉ https ──');
-const rSai = await patch('/api/totnghiep/ban-nop', ckCuong, { ban_nop_url: 'http://drive.google.com/x' });
-const bSai = await rSai.json().catch(() => ({}));
-ok(`http:// → 422 link_must_be_https (nhận ${rSai.status} ${bSai.error ?? ''})`,
-   rSai.status === 422 && bSai.error === 'link_must_be_https');
+/* ── 8. Đề tài KHKD theo CÁ NHÂN / theo LĨNH VỰC (migration 0043) ────────
+   Đổi 18/9 chiều: "Các nhóm hoạt động không hiệu quả nên lớp quyết định nộp
+   đề tài tự do theo cá nhân hoặc cùng lĩnh vực, không bắt buộc ai cũng phải
+   nộp." Đường theo nhóm (ban_nop_*) đã gỡ hẳn. */
+console.log('\n── Đề tài KHKD: cá nhân, theo lĩnh vực, không bắt buộc ──');
 
-const rN6 = await patch('/api/totnghiep/ban-nop', ckCuong, { ban_nop_url: 'https://drive.google.com/nhom6' });
-ok(`Nhóm 6 nộp link → 200 (nhận ${rN6.status})`, rN6.status === 200);
-const rN7 = await patch('/api/totnghiep/ban-nop', ckN7, { ban_nop_url: 'https://drive.google.com/nhom7' });
-ok(`Nhóm 7 nộp link → 200 (nhận ${rN7.status})`, rN7.status === 200);
+// Đường theo nhóm phải BIẾN MẤT, không được sống sót thành nguồn sự thật thứ hai.
+const rCu = await patch('/api/totnghiep/ban-nop', ckCuong, { ban_nop_url: 'https://x.vn/a' });
+ok(`PATCH /api/totnghiep/ban-nop đã gỡ → 404 (nhận ${rCu.status})`, rCu.status === 404);
 
-const sauCuong = await get('/api/totnghiep', ckCuong).then(r => r.json());
-const sauN7 = await get('/api/totnghiep', ckN7).then(r => r.json());
-ok('Nhóm 6 vẫn là link của Nhóm 6 — người Nhóm 7 KHÔNG ghi đè được',
-   sauCuong.nhom?.ban_nop_url === 'https://drive.google.com/nhom6');
-ok('Nhóm 7 giữ link của Nhóm 7', sauN7.nhom?.ban_nop_url === 'https://drive.google.com/nhom7');
-ok('ghi nhận ai nộp (ban_nop_boi_ten)', sauCuong.nhom?.ban_nop_boi_ten === 'Ngô Phú Cường');
-ok('có mốc ban_nop_luc', !!sauCuong.nhom?.ban_nop_luc);
+const tnLv = await get('/api/totnghiep', ckCuong).then(r => r.json());
+ok('trả đủ 15 lĩnh vực KHKD', (tnLv.linh_vuc_khkd_list ?? []).length === 15);
+// Mã phải mang tiền tố lv- để không lẫn với danh mục NGANH của Giao thương:
+// không có tiền tố thì `bat-dong-san` hợp lệ ở CẢ HAI, nên một mã truyền nhầm
+// sẽ được nhận LẶNG LẼ thay vì bị loại.
+ok('mọi mã đều có tiền tố lv-', (tnLv.linh_vuc_khkd_list ?? []).every(x => x.ma.startsWith('lv-')));
+ok('không mã nào trùng với danh mục NGANH của Giao thương',
+   (tnLv.linh_vuc_khkd_list ?? []).every(x => !(tnLv.nganh_list ?? []).some(n => n.ma === x.ma)));
 
-// Xoá trắng được: thà trống còn hơn một đường dẫn hỏng (cùng quyết định đã áp
-// cho PATCH /api/links/:id ngày 25/8).
-const rXoa = await patch('/api/totnghiep/ban-nop', ckN7, { ban_nop_url: null });
-ok(`xoá trắng → 200 (nhận ${rXoa.status})`, rXoa.status === 200);
-const sauXoa = await get('/api/totnghiep', ckN7).then(r => r.json());
-ok('xoá xong thì ban_nop_url null VÀ mốc cũng null',
-   sauXoa.nhom?.ban_nop_url === null && sauXoa.nhom?.ban_nop_luc === null);
+const rSaiUrl = await put('/api/totnghiep/de-tai', ckCuong, { khkd_url: 'http://x.vn/a' });
+ok(`http:// → 422 link_must_be_https (nhận ${rSaiUrl.status})`, rSaiUrl.status === 422);
 
-// Link của nhóm hiện luôn ở tab Bài (getPlan). Chỉ Nhóm 6 có dòng plans ở D1
-// cục bộ — đúng như trên bản thật, nơi 9/10 nhóm chưa có.
-const plan = await get('/api/plan', ckCuong).then(r => r.json());
-ok('getPlan trả ban_nop_url của nhóm', plan.plan?.ban_nop_url === 'https://drive.google.com/nhom6');
+// Mã lạ → null (chưa chọn), KHÔNG 422 — cùng lý lẽ docNganh(): một mã thừa từ
+// giao diện cũ trong đệm trình duyệt không nên làm mất nguyên phần vừa gõ.
+const rLaLv = await put('/api/totnghiep/de-tai', ckCuong, {
+  khkd_linh_vuc: 'bat-dong-san', khkd_de_tai: 'Thử mã của danh mục kia',
+});
+const bLaLv = await rLaLv.json().catch(() => ({}));
+ok(`mã của danh mục NGANH → vẫn 200 (nhận ${rLaLv.status})`, rLaLv.status === 200);
+ok('nhưng KHÔNG được nhận: khkd_linh_vuc = null', bLaLv.dang_ky?.khkd_linh_vuc === null);
+ok('phần gõ tay vẫn giữ nguyên', bLaLv.dang_ky?.khkd_de_tai === 'Thử mã của danh mục kia');
+
+const truocDt = await get('/api/totnghiep', ckCuong).then(r => r.json());
+const rDt = await put('/api/totnghiep/de-tai', ckCuong, {
+  khkd_linh_vuc: 'lv-y-te-giao-duc', khkd_de_tai: 'Chuỗi nhà thuốc khu công nghiệp',
+  khkd_url: 'https://drive.google.com/bai-cuong',
+});
+const bDt = await rDt.json().catch(() => ({}));
+ok(`lưu đề tài → 200 (nhận ${rDt.status})`, rDt.status === 200);
+ok('lĩnh vực lưu đúng', bDt.dang_ky?.khkd_linh_vuc === 'lv-y-te-giao-duc');
+ok('có mốc khkd_luc', !!bDt.dang_ky?.khkd_luc);
+ok(`lưu đề tài KHÔNG xoá mất phần A (vẫn "${bDt.dang_ky?.nhu_cau_ket_noi}")`,
+   bDt.dang_ky?.nhu_cau_ket_noi === truocDt.dang_ky?.nhu_cau_ket_noi);
+ok('lưu đề tài KHÔNG xoá mất phần C', bDt.dang_ky?.du_le === 'co');
+
+// "Không bắt buộc ai cũng phải nộp": lưu RỖNG phải hợp lệ, và KHÔNG được đóng
+// dấu mốc — đóng dấu cho một lượt rỗng là màn Ban cán sự lớp đếm nhầm người ấy
+// vào cột "đã khai", mà con số ấy là cả lý do tính năng này tồn tại.
+const rRong = await put('/api/totnghiep/de-tai', ckCuong, {});
+const bRong = await rRong.json().catch(() => ({}));
+ok(`lưu rỗng → 200 (nhận ${rRong.status})`, rRong.status === 200);
+ok('lưu rỗng KHÔNG đóng dấu mốc (khkd_luc = null)', bRong.dang_ky?.khkd_luc === null);
+// Trả lại cho các phép sau
+await put('/api/totnghiep/de-tai', ckCuong, {
+  khkd_linh_vuc: 'lv-y-te-giao-duc', khkd_de_tai: 'Chuỗi nhà thuốc khu công nghiệp',
+  khkd_url: 'https://drive.google.com/bai-cuong',
+});
+
+// Người Nhóm 7 chọn CÙNG lĩnh vực — đúng ca "cùng lĩnh vực" mà lớp quyết.
+await put('/api/totnghiep/de-tai', ckN7, {
+  khkd_linh_vuc: 'lv-y-te-giao-duc', khkd_de_tai: 'Chuỗi nhà thuốc khu công nghiệp',
+  khkd_url: 'https://drive.google.com/bai-cuong',
+});
+
+// ── Đây là thứ THAY CHO lượt bình chọn Zalo ──────────────────────────────
+console.log('\n── Tổng hợp theo lĩnh vực (thay cho bình chọn Zalo) ──');
+const dsLv = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
+ok('trả ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai chọn',
+   (dsLv.theo_linh_vuc ?? []).length === 15);
+const yte = (dsLv.theo_linh_vuc ?? []).find(x => x.ma === 'lv-y-te-giao-duc');
+ok(`Y tế/Giáo dục đếm được 2 người (nhận ${yte?.so_nguoi})`, yte?.so_nguoi === 2);
+ok('và 2 người ấy đều đã nộp link', yte?.so_da_nop_link === 2);
+// Lượt bình chọn Zalo chỉ cho con số và avatar. Phép này canh đúng chỗ khác
+// biệt: phải dò ngược ra được TÊN, đề tài và link.
+ok('dò ngược ra TÊN từng người', (yte?.nguoi ?? []).some(x => x.full_name === 'Ngô Phú Cường'));
+ok('kèm đề tài và link của họ',
+   (yte?.nguoi ?? []).every(x => x.khkd_de_tai && x.khkd_url));
+ok(`đếm tổng đã chọn lĩnh vực (nhận ${dsLv.da_chon_linh_vuc})`, dsLv.da_chon_linh_vuc === 2);
+ok(`đếm tổng đã nộp link (nhận ${dsLv.da_nop_link})`, dsLv.da_nop_link === 2);
+ok('liệt kê được người CHƯA chọn lĩnh vực',
+   Array.isArray(dsLv.chua_chon_linh_vuc) && dsLv.chua_chon_linh_vuc.length > 0);
 
 // ── 9. Đợt thu phí có thật và đi qua shapeRound() ────────────────────────
 console.log('\n── Đợt thu phí Gala (migration 0041) ──');
+const sauCuong = await get('/api/totnghiep', ckCuong).then(r => r.json());
 const phi = sauCuong.dot_phi;
 ok('dot_phi khác null', !!phi);
 ok(`amount = 1.000.000 (nhận ${phi?.amount})`, phi?.amount === 1000000);
@@ -239,7 +289,9 @@ ok('có BOM UTF-8 (ef bb bf) ở ĐÚNG ba byte đầu — Excel đọc đúng d
    byteCsv[0] === 0xEF && byteCsv[1] === 0xBB && byteCsv[2] === 0xBF);
 const csv = await rCsv.text();
 ok('xuống dòng bằng CRLF', csv.includes('\r\n'));
-ok('có cột "Link bản KHKD của nhóm"', csv.includes('Link bản KHKD của nhóm'));
+ok('có ba cột KHKD cá nhân',
+   csv.includes('Lĩnh vực KHKD') && csv.includes('Đề tài KHKD') && csv.includes('Link bài KHKD'));
+ok('CSV in TÊN lĩnh vực chứ không in mã thô', csv.includes('Y tế, Giáo dục') && !csv.includes('lv-y-te-giao-duc'));
 ok('dòng của Ngô Phú Cường ghi "Đã tự khai"', /Đã tự khai/.test(csv));
 // Phép có RĂNG nhất của cả mục này: mục 6.4 SRS cấm tuyệt đối chữ ấy, và tệp
 // này đi ra ngoài cho Ban tổ chức đọc nên sai một chữ là sai chỗ dễ thấy nhất.

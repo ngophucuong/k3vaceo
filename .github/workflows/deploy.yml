@@ -378,7 +378,7 @@ jobs:
           else
             echo "  ✗ /totnghiep không trả về ứng dụng"; loi=1
           fi
-          for duong in /api/totnghiep /api/totnghiep/danh-sach /api/totnghiep/xuat.csv; do
+          for duong in /api/totnghiep /api/totnghiep/de-tai /api/totnghiep/danh-sach /api/totnghiep/xuat.csv; do
             m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app$duong" || true)
             if [ "$m" = "401" ]; then
               echo "  ✓ $duong KHÔNG cookie → 401"

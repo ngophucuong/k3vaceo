@@ -1696,17 +1696,6 @@ async function drawBai() {
          <div class="mut">Chưa có sản phẩm và khách hàng mục tiêu thì bảy phần sau đều treo.</div>`}
     ${can_assign ? `<button class="wide ghost" id="topicBtn" style="margin-top:13px;padding:11px;font-size:14px">
         ${topicDone ? 'Sửa đề tài' : 'Chốt đề tài'}</button>` : ''}
-    <div class="fi" style="margin:14px 0 0;padding-top:13px;border-top:1px solid var(--line)">
-      <div class="k">Link bản nộp cho hội đồng</div>
-      ${plan.ban_nop_url
-        ? `<div class="v"><a href="${esc(plan.ban_nop_url)}" target="_blank" rel="noopener"
-             style="overflow-wrap:anywhere">${esc(plan.ban_nop_url)}</a></div>
-           <div class="was">${plan.ban_nop_boi_ten ? esc(plan.ban_nop_boi_ten) + ' nộp ' : 'Nộp '}lúc ${esc(plan.ban_nop_luc)}</div>`
-        : `<div class="v blank">Nhóm chưa nộp link bản Kế hoạch kinh doanh.</div>`}
-      <a class="wide ghost" href="/totnghiep"
-         style="margin-top:11px;padding:11px;font-size:14px;display:block;text-align:center;text-decoration:none">
-        ${plan.ban_nop_url ? 'Sửa link bản nộp' : 'Nộp link bản nộp'}</a>
-    </div>
   </div></div>
 
   ${TROLY?.bat ? `
@@ -4556,6 +4545,14 @@ async function tnckForm() {
     <textarea id="ckKN" maxlength="500" rows="3"
       placeholder="Ví dụ: muốn kết nối tới ban quản lý khu công nghiệp phía Bắc."></textarea>
 
+    <label class="f">Lĩnh vực làm Kế hoạch kinh doanh (không bắt buộc)</label>
+    <div class="fl cuon" id="ckLv">${(cf.linh_vuc_khkd_list ?? []).map(x =>
+      `<button type="button" class="fc" data-lv="${esc(x.ma)}">${esc(x.ten)}</button>`).join('')}</div>
+    <input id="ckDeTai" maxlength="300" placeholder="Tên đề tài, nếu đã có">
+    <input id="ckKhkdUrl" maxlength="500" placeholder="Đường dẫn tới bài (https://…)">
+    <div class="hintline">Lớp chốt nộp tự do theo cá nhân hoặc cùng lĩnh vực, không
+      bắt buộc ai cũng nộp. Chưa có đề tài thì cứ chọn lĩnh vực trước.</div>
+
     <label class="f">Dự Lễ Tốt nghiệp &amp; Gala 17h00–22h00 ngày 26/9?</label>
     <div class="fl" id="ckDuLe">
       <button type="button" class="fc" data-dule="co">Có, tôi dự</button>
@@ -4574,7 +4571,8 @@ async function tnckForm() {
 
     <label class="tnsw"><input type="checkbox" id="ckGH">
       <span><b>Tôi muốn gian hàng hoặc standee miễn phí</b>
-      <i>Liên hệ trực tiếp anh Chử Minh Châu, học viên K3.</i></span></label>
+      <i>Ban tổ chức bố trí miễn phí. Liên hệ trực tiếp anh Chử Minh Châu
+      (0972182598).</i></span></label>
     <label class="tnsw"><input type="checkbox" id="ckVN">
       <span><b>Tôi đăng ký một tiết mục văn nghệ</b></span></label>
     <textarea id="ckVNMo" maxlength="500" rows="2" placeholder="Tiết mục gì, mấy người, cần nhạc hay micro gì."></textarea>
@@ -4592,6 +4590,7 @@ async function tnckForm() {
   });
   motLua('#ckDuLe', 'dule');
   motLua('#ckTaiTro', 'tt');
+  motLua('#ckLv', 'lv');
   document.querySelectorAll('#ckNg [data-ma]').forEach(b => {
     b.onclick = () => {
       if (!b.classList.contains('on') && document.querySelectorAll('#ckNg .fc.on').length >= 3) {
@@ -4615,6 +4614,9 @@ async function tnckForm() {
         chuc_vu: $('#ckCV').value,
         linh_vuc: [...document.querySelectorAll('#ckNg .fc.on')].map(x => x.dataset.ma),
         nhu_cau_ket_noi: $('#ckKN').value,
+        khkd_linh_vuc: document.querySelector('#ckLv .fc.on')?.dataset.lv ?? null,
+        khkd_de_tai: $('#ckDeTai').value,
+        khkd_url: $('#ckKhkdUrl').value.trim() || null,
         du_le: document.querySelector('#ckDuLe .fc.on')?.dataset.dule ?? null,
         tai_tro: document.querySelector('#ckTaiTro .fc.on')?.dataset.tt ?? null,
         tai_tro_mo_ta: $('#ckTTMo').value,
@@ -4704,7 +4706,7 @@ function veTotNghiep() {
 
     <div class="tnprog">
       <span>Hồ sơ ${tnMocXong(d.ho_so_luc)}</span>
-      <span>Đề tài ${tnMocXong(n?.ban_nop_luc)}</span>
+      <span>Đề tài ${tnMocXong(d.khkd_luc)}</span>
       <span>Dự Lễ ${tnMocXong(d.gala_luc)}</span>
     </div>
 
@@ -4732,7 +4734,8 @@ function veTotNghiep() {
 
         <label class="tnsw"><input type="checkbox" id="tnGH" ${d.gian_hang ? 'checked' : ''}>
           <span><b>Tôi muốn gian hàng hoặc standee miễn phí</b>
-          <i>Ban tổ chức bố trí miễn phí. Liên hệ trực tiếp anh Chử Minh Châu, học viên K3.</i></span></label>
+          <i>Ban tổ chức bố trí miễn phí. Liên hệ trực tiếp anh Chử Minh Châu
+          (0972182598).</i></span></label>
 
         <label class="tnsw"><input type="checkbox" id="tnVN" ${d.van_nghe ? 'checked' : ''}>
           <span><b>Tôi đăng ký một tiết mục văn nghệ</b>
@@ -4791,29 +4794,34 @@ function veTotNghiep() {
 
     <details class="tnsec" data-sec="detai" ${mo('detai')}>
       <summary><b>Đề tài Kế hoạch kinh doanh</b>
-        <i>Việc của cả nhóm</i>${tnMocXong(n?.ban_nop_luc)}</summary>
+        <i>Không bắt buộc</i>${tnMocXong(d.khkd_luc)}</summary>
       <div class="tnbody">
-        ${n ? `
-          <div class="fi"><div class="k">Nhóm</div><div class="v">${esc(n.label)}</div></div>
-          <div class="fi"><div class="k">Trưởng nhóm</div><div class="v">${esc(n.truong_nhom || '— chưa có ai nhận —')}</div></div>
-          <div class="fi"><div class="k">Đề tài</div><div class="v">${esc(n.topic_product || '— nhóm chưa chốt đề tài —')}</div></div>
-          ${n.topic_customers ? `<div class="fi"><div class="k">Khách hàng mục tiêu</div><div class="v">${esc(n.topic_customers)}</div></div>` : ''}
-          <div class="fi"><div class="k">Thành viên (${n.thanh_vien.length})</div>
-            <div class="v">${esc(n.thanh_vien.join(', '))}</div></div>
+        <p class="mut" style="margin:0 0 16px">Lớp đã chốt: <b>nộp tự do theo cá nhân
+          hoặc cùng lĩnh vực, không bắt buộc ai cũng phải nộp.</b> Làm chung đề tài với
+          ai thì cùng chọn một lĩnh vực và dán cùng một đường dẫn — Ban cán sự lớp nhìn
+          theo lĩnh vực là thấy các bạn đứng cạnh nhau.</p>
 
-          <label class="f" style="margin-top:18px">Link bản Kế hoạch kinh doanh</label>
-          <input id="tnLink" maxlength="500" value="${esc(n.ban_nop_url)}" placeholder="https://drive.google.com/…">
-          <div class="hintline">Dán đường dẫn Google Drive, Docs hoặc bất kỳ chỗ nào
-            mở được. Nhớ đặt quyền <b>"ai có đường dẫn đều xem được"</b> — để mặc định
-            thì hội đồng bấm vào chỉ thấy "Yêu cầu quyền truy cập".</div>
-          ${n.ban_nop_luc ? `<div class="hintline" style="color:var(--go)">Đã nộp
-            ${n.ban_nop_boi_ten ? 'bởi ' + esc(n.ban_nop_boi_ten) + ' ' : ''}lúc ${esc(n.ban_nop_luc)}.</div>` : ''}
-          <div class="errline" id="tnLinkErr" style="display:none"></div>
-          <button class="wide" id="tnLuuLink">Lưu link bản nộp</button>
-          <div class="foot" style="padding:9px 0 0">Ai trong nhóm cũng nộp được, và
-            tên người nộp lần cuối hiện ngay đây để cả nhóm cùng thấy. Đề tài thì sửa
-            ở tab Bài, không sửa ở đây.</div>
-        ` : `<div class="mut">Bạn chưa thuộc nhóm nào.</div>`}
+        <label class="f">Lĩnh vực bạn làm (chọn một)</label>
+        <div class="fl cuon" id="tnLv">${(TN.linh_vuc_khkd_list ?? []).map(x =>
+          `<button type="button" class="fc ${d.khkd_linh_vuc === x.ma ? 'on' : ''}" data-lv="${esc(x.ma)}">${esc(x.ten)}</button>`).join('')}</div>
+
+        <label class="f">Tên đề tài</label>
+        <input id="tnDeTai" maxlength="300" value="${esc(d.khkd_de_tai)}"
+          placeholder="Ví dụ: Chuỗi nhà thuốc tiện lợi cho khu công nghiệp">
+
+        <label class="f">Đường dẫn tới bài</label>
+        <input id="tnKhkdUrl" maxlength="500" value="${esc(d.khkd_url)}" placeholder="https://drive.google.com/…">
+        <div class="hintline">Google Drive, Docs hay bất kỳ chỗ nào mở được. Nhớ đặt
+          quyền <b>ai có đường dẫn đều xem được</b> — để mặc định thì hội đồng bấm vào
+          chỉ thấy "Yêu cầu quyền truy cập".</div>
+        ${d.khkd_luc ? `<div class="hintline" style="color:var(--go)">Đã khai lúc ${esc(d.khkd_luc)}.</div>` : ''}
+
+        <div class="errline" id="tnDeTaiErr" style="display:none"></div>
+        <button class="wide" id="tnLuuDeTai">Lưu đề tài</button>
+        <div class="foot" style="padding:9px 0 0">Chưa có đề tài thì cứ chọn lĩnh vực
+          trước rồi quay lại sau — cả ba ô đều để trống được.${n ? `
+          Nhóm ${esc(n.label)} của bạn vẫn còn, và tab Bài vẫn dùng được để chia việc
+          tám phần nếu nhóm bạn muốn làm chung.` : ''}</div>
       </div>
     </details>
 
@@ -4903,27 +4911,33 @@ function tnGanSuKien() {
     nhu_cau_ket_noi: $('#tnKN').value,
   }, 'Đã lưu hồ sơ');
 
-  const nutLink = $('#tnLuuLink');
-  if (nutLink) {
-    nutLink.onclick = async () => {
-      const u = $('#tnLink').value.trim();
-      // Chặn ngay trên giao diện cho lỗi hiển nhiên, khỏi tốn một lượt gọi.
-      // Máy chủ VẪN kiểm lại (quy ước 6 — không tin giao diện).
+  // Đề tài: chọn MỘT lĩnh vực (khác chip ngành ở phần A cho tối đa 3). Chạm
+  // lại để bỏ chọn — người đổi ý phải gỡ được, không thì họ kẹt với một lựa
+  // chọn lỡ tay và đành để nguyên.
+  document.querySelectorAll('#tnLv [data-lv]').forEach(b => {
+    b.onclick = () => {
+      const bat = b.classList.contains('on');
+      document.querySelectorAll('#tnLv [data-lv]').forEach(x => x.classList.remove('on'));
+      if (!bat) b.classList.add('on');
+    };
+  });
+
+  const nutDeTai = $('#tnLuuDeTai');
+  if (nutDeTai) {
+    nutDeTai.onclick = () => {
+      const u = $('#tnKhkdUrl').value.trim();
+      // Chặn ngay lỗi hiển nhiên, khỏi tốn một lượt gọi. Máy chủ VẪN kiểm lại
+      // (quy ước 6 — không tin giao diện).
       if (u && !/^https:\/\/[^\s/]+\./i.test(u)) {
-        $('#tnLinkErr').textContent = 'Đường dẫn phải bắt đầu bằng https://';
-        $('#tnLinkErr').style.display = 'block';
+        $('#tnDeTaiErr').textContent = 'Đường dẫn phải bắt đầu bằng https://';
+        $('#tnDeTaiErr').style.display = 'block';
         return;
       }
-      nutLink.disabled = true;
-      try {
-        await apiPatch('/api/totnghiep/ban-nop', { ban_nop_url: u || null });
-        toast(u ? 'Đã lưu link bản nộp' : 'Đã gỡ link bản nộp');
-        await renderTotNghiep();
-      } catch (e) {
-        $('#tnLinkErr').textContent = errText(e);
-        $('#tnLinkErr').style.display = 'block';
-        nutLink.disabled = false;
-      }
+      return tnLuu('#tnLuuDeTai', '#tnDeTaiErr', '/api/totnghiep/de-tai', {
+        khkd_linh_vuc: document.querySelector('#tnLv .fc.on')?.dataset.lv ?? null,
+        khkd_de_tai: $('#tnDeTai').value,
+        khkd_url: u || null,
+      }, 'Đã lưu đề tài');
     };
   }
 
@@ -4986,33 +5000,104 @@ async function openDanhSachTotNghiep() {
   let ds;
   try { ds = await apiGet('/api/totnghiep/danh-sach'); }
   catch (e) { toast(errText(e)); return; }
+  DSTN = ds;
+  DSTN_THE = DSTN_THE || 'linhvuc';
+  veDanhSachTotNghiep();
+}
 
-  const dong = ds.nguoi.map(p => {
-    const phi = p.trang_thai_phi === 'nguoi_thu_da_nhan'
-      ? '<span class="xongchip">✓ người thu đã nhận</span>'
-      : p.trang_thai_phi === 'da_tu_khai' ? '<span class="khaichip">đã tự khai</span>' : '';
-    return `<div class="fd">
-      <div class="x"><b>${esc(p.full_name)}</b>
-        <span class="mut"> · ${esc(p.group_label || '—')}</span>
-        <div class="tagrow" style="margin-top:4px">
-          ${p.ho_so_luc ? '<span class="tg go">hồ sơ ✓</span>' : '<span class="tg">hồ sơ —</span>'}
-          ${p.gala_luc ? `<span class="tg ${p.du_le === 'co' ? 'go' : ''}">${p.du_le === 'co' ? 'dự Lễ' : 'không dự'}</span>` : '<span class="tg">chưa trả lời</span>'}
-          ${phi}
-        </div></div></div>`;
-  }).join('');
+let DSTN = null;
+// Thẻ đang mở giữ NGOÀI hàm vẽ, cùng bài học với bộ lọc Sổ thu và thẻ Danh
+// bạ: bấm vào một lĩnh vực để mở rộng là vẽ lại, thẻ nằm trong hàm thì nó
+// nhảy về mặc định và người đang xem bị đá ra.
+let DSTN_THE = 'linhvuc';
+let DSTN_MO = new Set();
+
+function veDanhSachTotNghiep() {
+  const ds = DSTN;
+  const chip = (k, t) => `<button type="button" class="fc ${DSTN_THE === k ? 'on' : ''}" data-dstn="${k}">${t}</button>`;
+
+  /* ── Thẻ LĨNH VỰC: thứ thay cho lượt bình chọn Zalo ──────────────────────
+     Lượt bình chọn ấy cho avatar và con số. Chỗ này cho con số KÈM TÊN, kèm ai
+     đã có đề tài, ai đã nộp link — tức dò ngược được và xuất ra được.
+     Giữ ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai chọn: "chưa ai chọn" là một câu
+     trả lời, còn một dòng biến mất thì Ban cán sự lớp không biết là chưa ai
+     chọn hay là mình quên mất nó. Sắp theo số người giảm dần, y như Zalo. */
+  const lv = [...(ds.theo_linh_vuc ?? [])].sort((a, b) => b.so_nguoi - a.so_nguoi);
+  const donVi = Math.max(1, ...lv.map(x => x.so_nguoi));
+  const khoiLinhVuc = lv.map(x => `
+    <button type="button" class="dstnlv ${x.so_nguoi ? '' : 'trong'}" data-lv="${esc(x.ma)}">
+      <span class="thanh" style="width:${Math.round((x.so_nguoi / donVi) * 100)}%"></span>
+      <span class="tx"><b>${esc(x.ten)}</b>
+        <i>${x.so_nguoi ? `<span class="num">${x.so_nguoi}</span> người` : 'chưa ai chọn'}${
+          x.so_da_nop_link ? ` · <span class="num">${x.so_da_nop_link}</span> đã nộp link` : ''}</i></span>
+    </button>
+    ${DSTN_MO.has(x.ma) && x.so_nguoi ? `<div class="dstnai">${x.nguoi.map(n => `
+      <div class="fd"><div class="x"><b>${esc(n.full_name)}</b>
+        <span class="mut"> · ${esc(n.group_label || '—')}</span>
+        <div class="mut" style="margin-top:2px">${n.khkd_de_tai ? esc(n.khkd_de_tai) : '<i>chưa đặt tên đề tài</i>'}</div>
+        ${n.khkd_url ? `<a href="${esc(n.khkd_url)}" target="_blank" rel="noopener"
+           style="font-size:12px;overflow-wrap:anywhere">mở bài ›</a>`
+          : '<span class="tg">chưa nộp link</span>'}
+      </div></div>`).join('')}</div>` : ''}`).join('');
+
+  const chuaChon = ds.chua_chon_linh_vuc ?? [];
 
   openSheet(`<h3>Đăng ký Lễ tốt nghiệp — cả lớp</h3>
-    <p class="sub"><b class="num">${ds.xong_ho_so}</b>/${ds.tong} xong hồ sơ ·
-       <b class="num">${ds.xong_gala}</b>/${ds.tong} đã trả lời dự Lễ ·
-       <b class="num">${ds.du_le}</b> người dự Lễ.</p>
+    <div class="fl cuon" style="margin-bottom:12px">
+      ${chip('linhvuc', 'Theo lĩnh vực')}${chip('nguoi', 'Theo người')}
+    </div>
+
+    ${DSTN_THE === 'linhvuc' ? `
+      <p class="sub"><b class="num">${ds.da_chon_linh_vuc}</b>/${ds.tong} người đã chọn lĩnh vực ·
+         <b class="num">${ds.da_nop_link}</b> đã nộp link bài.</p>
+      <div class="dstnbox">${khoiLinhVuc}</div>
+      ${chuaChon.length ? `<div class="eb" style="margin-top:18px">Chưa chọn lĩnh vực (${chuaChon.length})</div>
+        <div class="card"><div class="cb"><div class="mut" style="line-height:1.7">${
+          chuaChon.map(x => esc(x.full_name) + ' <span style="color:var(--ink3)">·' + esc(x.group_label || '—') + '</span>').join(' — ')
+        }</div></div></div>` : ''}
+      <div class="foot" style="padding:12px 0 0">Lớp đã chốt nộp tự do theo cá nhân
+        hoặc cùng lĩnh vực, <b>không bắt buộc ai cũng nộp</b> — nên danh sách "chưa
+        chọn" là để biết, không phải để đòi.</div>
+    ` : `
+      <p class="sub"><b class="num">${ds.xong_ho_so}</b>/${ds.tong} xong hồ sơ ·
+         <b class="num">${ds.xong_gala}</b>/${ds.tong} đã trả lời dự Lễ ·
+         <b class="num">${ds.du_le}</b> người dự Lễ.</p>
+      <div class="card"><div class="cb" style="padding:4px 16px;max-height:52vh;overflow:auto">${
+        ds.nguoi.map(p => {
+          const phi = p.trang_thai_phi === 'nguoi_thu_da_nhan'
+            ? '<span class="xongchip">✓ người thu đã nhận</span>'
+            : p.trang_thai_phi === 'da_tu_khai' ? '<span class="khaichip">đã tự khai</span>' : '';
+          return `<div class="fd">
+            <div class="x"><b>${esc(p.full_name)}</b>
+              <span class="mut"> · ${esc(p.group_label || '—')}</span>
+              <div class="tagrow" style="margin-top:4px">
+                ${p.ho_so_luc ? '<span class="tg go">hồ sơ ✓</span>' : '<span class="tg">hồ sơ —</span>'}
+                ${p.gala_luc ? `<span class="tg ${p.du_le === 'co' ? 'go' : ''}">${p.du_le === 'co' ? 'dự Lễ' : 'không dự'}</span>` : '<span class="tg">chưa trả lời</span>'}
+                ${p.khkd_url ? '<span class="tg go">đã nộp bài</span>' : p.khkd_linh_vuc ? '<span class="tg">đã chọn lĩnh vực</span>' : ''}
+                ${phi}
+              </div></div></div>`;
+        }).join('')
+      }</div></div>
+    `}
+
     <a class="wide" href="/api/totnghiep/xuat.csv" download
-       style="display:block;text-align:center;text-decoration:none;margin-bottom:14px">Tải tệp CSV cho Ban tổ chức</a>
-    <div class="card"><div class="cb" style="padding:4px 16px;max-height:52vh;overflow:auto">${dong}</div></div>
+       style="display:block;text-align:center;text-decoration:none;margin-top:14px">Tải tệp CSV cho Ban tổ chức</a>
     <div class="foot" style="padding:10px 0 0">Tệp CSV mở bằng Excel đọc đúng dấu
       tiếng Việt. Cột phí ghi "đã tự khai" cho tới khi người thu đối chiếu sao kê,
       rồi mới thành "người thu đã nhận".</div>
     <div class="sa"><button class="big c" id="dsDong">Đóng</button></div>`);
+
   $('#dsDong').onclick = closeSheet;
+  document.querySelectorAll('#sheet [data-dstn]').forEach(b => {
+    b.onclick = () => { DSTN_THE = b.dataset.dstn; veDanhSachTotNghiep(); };
+  });
+  document.querySelectorAll('#sheet [data-lv]').forEach(b => {
+    b.onclick = () => {
+      const ma = b.dataset.lv;
+      if (DSTN_MO.has(ma)) DSTN_MO.delete(ma); else DSTN_MO.add(ma);
+      veDanhSachTotNghiep();
+    };
+  });
 }
 
 // Đăng ký service worker. Nó KHÔNG cache gì — chỉ để nhận thông báo đẩy và

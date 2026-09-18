@@ -85,6 +85,31 @@ ok(`Gala mở · Hồ sơ mở · Đề tài gập (${trangThaiMo.join(', ')})`,
    trangThaiMo[0] === true && trangThaiMo[1] === true && trangThaiMo[2] === false);
 ok('có ba chip tiến độ', await p.locator('.tnprog > span').count() === 3);
 
+/* ── Đề tài KHKD: cá nhân, theo lĩnh vực (migration 0043) ────────────────
+   Thay cho lượt bình chọn Zalo đã khoá. Ba điều phải chứng minh bằng trình
+   duyệt: 15 lĩnh vực hiện ra, chọn MỘT (khác chip ngành ở phần A cho tối đa
+   3), và lưu được mà không cần điền đủ — "không bắt buộc ai cũng phải nộp". */
+console.log('\n── Đề tài KHKD theo lĩnh vực ──');
+const khoiDeTai = await moKhoi(p, 'Đề tài Kế hoạch kinh doanh');
+ok('có 15 chip lĩnh vực', await p.locator('#tnLv .fc').count() === 15);
+ok('nói rõ KHÔNG BẮT BUỘC', /không bắt buộc/i.test(await khoiDeTai.innerText()));
+// Chọn MỘT, không phải nhiều: bấm chip thứ hai thì chip thứ nhất phải tắt.
+await p.locator('#tnLv .fc').nth(0).click(); await p.waitForTimeout(120);
+await p.locator('#tnLv .fc').nth(3).click(); await p.waitForTimeout(120);
+ok('chọn MỘT lĩnh vực (bấm cái thứ hai thì cái đầu tắt)',
+   await p.locator('#tnLv .fc.on').count() === 1);
+// Chạm lại để bỏ chọn — người lỡ tay phải gỡ được.
+await p.locator('#tnLv .fc').nth(3).click(); await p.waitForTimeout(120);
+ok('chạm lại thì bỏ chọn được', await p.locator('#tnLv .fc.on').count() === 0);
+
+await p.locator('#tnLv .fc').nth(0).click(); await p.waitForTimeout(120);
+await p.fill('#tnDeTai', 'KIEMTN Chuỗi nhà thuốc khu công nghiệp');
+await p.click('#tnLuuDeTai'); await p.waitForTimeout(1800);
+const chipSauDeTai = await p.locator('.tnprog > span').allInnerTexts();
+ok(`chip "Đề tài" thành ✓ xong dù CHƯA có link (${chipSauDeTai[1].replace(/\n/g, ' ')})`,
+   chipSauDeTai[1].includes('xong'));
+ok('không lỗi JS sau khi lưu đề tài: ' + (loi.join(' | ') || 'sạch'), loi.length === 0);
+
 // ── 4. Ngày sinh điền sẵn nguyên văn ─────────────────────────────────────
 console.log('\n── Hồ sơ: điền sẵn, và nói thẳng chỗ dữ liệu gốc chưa đủ ──');
 const khoiHoSo = await moKhoi(p, 'Hồ sơ làm chứng chỉ');
@@ -108,7 +133,11 @@ ok('bấm 4 chip mà chỉ 3 cái sáng', await p.locator('#tnNg .fc.on').count(
 // ── 5. Lưu từng phần RIÊNG ───────────────────────────────────────────────
 console.log('\n── Ba phần lưu riêng: chip tiến độ đổi đúng một cái ──');
 const chipTruoc = await p.locator('.tnprog > span').allInnerTexts();
-ok('ban đầu cả ba chip đều "chưa điền"', chipTruoc.every(x => x.includes('chưa điền')));
+// CHỈ hai chip Hồ sơ và Dự Lễ — chip Đề tài đã ✓ từ mục trên, vì mục ấy thật
+// sự lưu một đề tài. Ghim "cả ba đều chưa điền" ở đây là bộ kiểm tự mâu thuẫn
+// với chính bước nó vừa chạy.
+ok(`chip Hồ sơ và Dự Lễ còn "chưa điền" (${chipTruoc[0].replace(/\n/g, ' ')} · ${chipTruoc[2].replace(/\n/g, ' ')})`,
+   chipTruoc[0].includes('chưa điền') && chipTruoc[2].includes('chưa điền'));
 
 await moKhoi(p, 'Lễ tốt nghiệp');
 await p.locator('#tnDuLe [data-dule="co"]').click();
@@ -164,6 +193,43 @@ ok('sheet danh sách mở ra', (await p.locator('#sheet h3').innerText()).includ
 const chuSheet = await p.locator('#sheet').innerText();
 ok('sheet KHÔNG có chữ "đã đóng"', !/đã đóng/i.test(chuSheet));
 ok('có nút tải CSV', await p.locator('#sheet a[href="/api/totnghiep/xuat.csv"]').count() === 1);
+
+/* Thứ THAY CHO lượt bình chọn Zalo. Lượt ấy cho avatar và con số; chỗ này
+   phải cho con số KÈM TÊN, kèm đề tài và link — tức dò ngược được. */
+console.log('\n── Màn thay cho bình chọn Zalo ──');
+ok('mặc định mở thẻ "Theo lĩnh vực"',
+   await p.locator('#sheet [data-dstn="linhvuc"].on').count() === 1);
+ok('hiện ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai chọn',
+   await p.locator('#sheet .dstnlv').count() === 15);
+ok('lĩnh vực chưa ai chọn vẫn hiện (chỉ mờ đi), không biến mất',
+   await p.locator('#sheet .dstnlv.trong').count() > 0);
+ok('có thanh nền so sánh bằng mắt như Zalo',
+   await p.locator('#sheet .dstnlv .thanh').count() === 15);
+// Chỗ khác biệt thật sự với Zalo: bấm vào ra TÊN.
+ok('chưa bấm thì chưa hiện tên ai', await p.locator('#sheet .dstnai').count() === 0);
+await p.locator('#sheet .dstnlv').first().click(); await p.waitForTimeout(500);
+ok('bấm một lĩnh vực thì hiện TÊN từng người', await p.locator('#sheet .dstnai').count() === 1);
+ok('kèm tên đề tài của họ',
+   /KIEMTN Chuỗi nhà thuốc/.test(await p.locator('#sheet .dstnai').innerText()));
+// SO CHỮ KHÔNG PHÂN BIỆT HOA THƯỜNG. Nhãn nằm trong `.eb`, mà lớp ấy có
+// `text-transform:uppercase` — và innerText của Chrome trả về chữ ĐÃ BIẾN ĐỔI,
+// nên `/Chưa chọn lĩnh vực/` đỏ dù chữ có thật trong DOM. Cùng họ với bẫy
+// "đọc byte chứ đừng đọc chuỗi" của BOM: thứ trình duyệt trả về không phải
+// thứ mình viết ra.
+ok('có mục "Chưa chọn lĩnh vực"', /chưa chọn lĩnh vực/i.test(await p.locator('#sheet').innerText()));
+// Tên lĩnh vực dài phải hiện ĐỦ. .dstnbox là flex column có max-height nên
+// mặc định các mục CO LẠI dưới chiều cao nội dung, và tên hai dòng bị cắt mất
+// dòng dưới — không lỗi JS, phép kiểm chuỗi không thấy, chỉ ảnh chụp mới thấy.
+const bicat = await p.locator('#sheet .dstnlv').evaluateAll(
+  els => els.filter(e => e.scrollHeight > e.clientHeight + 1).length);
+ok(`không mục nào bị cắt chữ (${bicat} mục bị cắt)`, bicat === 0);
+// Thẻ đang mở phải sống lâu hơn một lượt vẽ lại — cùng bài học với bộ lọc Sổ thu.
+await p.locator('#sheet [data-dstn="nguoi"]').click(); await p.waitForTimeout(400);
+ok('đổi sang thẻ "Theo người" được', await p.locator('#sheet [data-dstn="nguoi"].on').count() === 1);
+ok('thẻ "Theo người" hiện danh sách từng người', await p.locator('#sheet .fd').count() > 0);
+await p.locator('#sheet [data-dstn="linhvuc"]').click(); await p.waitForTimeout(400);
+ok('quay lại thẻ lĩnh vực thì lĩnh vực vừa mở VẪN mở',
+   await p.locator('#sheet .dstnai').count() === 1);
 await p.click('#dsDong'); await p.waitForTimeout(400);
 
 // ── Người thường KHÔNG thấy nút ấy ───────────────────────────────────────
@@ -211,6 +277,7 @@ ok('tìm không dấu ra đúng người', (await p3.locator('#tnckDs').innerTex
 await p3.locator('#tnckDs [data-rid]').first().click(); await p3.waitForTimeout(1200);
 
 ok('mở ra form', await p3.locator('#ckGui').count() === 1);
+ok('form công khai cũng có 15 chip lĩnh vực KHKD', await p3.locator('#ckLv .fc').count() === 15);
 // PHÉP CÓ RĂNG NHẤT CỦA MỤC NÀY.
 ok('ô Ngày sinh để TRỐNG — không điền sẵn dữ liệu của ai',
    (await p3.inputValue('#ckDob')) === '');

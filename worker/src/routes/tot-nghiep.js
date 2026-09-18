@@ -2,6 +2,7 @@ import { json, error, readJson } from '../lib/http.js';
 import { isClassCommittee, logAudit, logActivity } from '../permissions.js';
 import { cleanText } from '../lib/validate.js';
 import { NGANH, nganhRaChuoi } from '../lib/nganh.js';
+import { LINH_VUC_KHKD, docLinhVucKhkd, tenLinhVucKhkd } from '../lib/linh-vuc-khkd.js';
 import { shapeRound } from './funds.js';
 import { conQuota, ghiNhan } from '../lib/ratelimit.js';
 import { buildTransferNote, buildQrUrl } from '../lib/vietqr.js';
@@ -13,14 +14,20 @@ import { buildTransferNote, buildQrUrl } from '../lib/vietqr.js';
 
    Ba phần, BA HẠN KHÁC NHAU, nên lưu độc lập:
      A · Hồ sơ & chứng chỉ   PUT /api/totnghiep/ho-so    hạn 26/9
-     B · Đề tài + link KHKD  PATCH /api/totnghiep/ban-nop hạn 26/9, của NHÓM
+     B · Đề tài KHKD         PUT /api/totnghiep/de-tai   hạn 26/9, của CÁ NHÂN
      C · Lễ + Gala           PUT /api/totnghiep/gala     hạn 21h00 NGÀY 19/9
 
-   MỌI route ở đây đều CẦN PHIÊN — đăng ký trong index.js ở nửa DƯỚI dòng 164.
-   Ranh giới công khai/cần-phiên của router này là VỊ TRÍ DÒNG chứ không phải
-   một cờ nào, nên đặt nhầm lên nửa trên là thành công khai mà không phép kiểm
-   nào kêu lên. Vì zone này chỉ dành cho học viên (Ngô Phú Cường chọn, không
-   mở cho khách ngoài lớp) nên ở đây KHÔNG có route công khai nào cả.
+   Phần B sáng 18/9 nộp theo NHÓM (PATCH /api/totnghiep/ban-nop, ghi vào
+   groups.ban_nop_*). Chiều cùng ngày lớp đổi cách nộp bài — nay theo LĨNH VỰC
+   và theo cá nhân, đường cũ GỠ HẲN. Lý lẽ ở migrations/0043_de_tai_theo_linh_
+   vuc.sql, danh mục 15 lĩnh vực ở lib/linh-vuc-khkd.js.
+
+   SÁU route đầu CẦN PHIÊN — đăng ký trong index.js ở nửa DƯỚI dòng
+   getCurrentMember. HAI route công khai (…/cong-khai, migration 0042) nằm ở
+   nửa TRÊN, ngược hẳn. Ranh giới công khai/cần-phiên của router này là VỊ TRÍ
+   DÒNG chứ không phải một cờ nào, nên đặt nhầm một dòng lên nửa trên là nó
+   thành công khai mà không phép kiểm nào kêu lên — deploy.yml canh CẢ HAI
+   chiều trên tên miền thật.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 // Hạn đăng ký Gala theo thư mời Ban tổ chức. Giao diện dùng để nói "còn N giờ"
@@ -63,12 +70,8 @@ export async function getTotNghiep(env, me) {
     ).bind(me.id).first(),
     me.group_id
       ? env.DB.prepare(
-          `SELECT g.id, g.no, g.label, g.ban_nop_url, g.ban_nop_luc,
-                  m.full_name AS ban_nop_boi_ten,
-                  p.topic_product, p.topic_customers
-             FROM groups g
-             LEFT JOIN members m ON m.id = g.ban_nop_boi
-             LEFT JOIN plans p ON p.group_id = g.id
+          `SELECT g.id, g.no, g.label, p.topic_product, p.topic_customers
+             FROM groups g LEFT JOIN plans p ON p.group_id = g.id
             WHERE g.id = ?`
         ).bind(me.group_id).first()
       : null,
@@ -100,6 +103,7 @@ export async function getTotNghiep(env, me) {
     han_gala: HAN_GALA,
     ngay_le: NGAY_LE,
     nganh_list: NGANH,
+    linh_vuc_khkd_list: LINH_VUC_KHKD,
     la_ban_can_su: await isClassCommittee(env, me.id),
     // Điền sẵn từ những gì D1 đã biết. Giao diện chỉ dùng phần này khi CHƯA có
     // bản đăng ký — đã lưu rồi thì đọc từ `dang_ky` để không đè bản người ta
@@ -130,9 +134,6 @@ export async function getTotNghiep(env, me) {
           label: nhom.label,
           topic_product: nhom.topic_product ?? null,
           topic_customers: nhom.topic_customers ?? null,
-          ban_nop_url: nhom.ban_nop_url ?? null,
-          ban_nop_luc: nhom.ban_nop_luc ?? null,
-          ban_nop_boi_ten: nhom.ban_nop_boi_ten ?? null,
           truong_nhom: (officers.results ?? []).find(o => o.role === 'truong_nhom')?.full_name ?? null,
           thanh_vien: (thanhVien.results ?? []).map(x => x.full_name),
         }
@@ -224,52 +225,64 @@ export async function putGala(request, env, me) {
   return json({ ok: true, dang_ky: await docDangKy(env, me.id) });
 }
 
-/* ── Phần B: link bản nộp KHKD ────────────────────────────────────────────
-   Ghi vào `groups`, KHÔNG vào `plans` — lý do đầy đủ trong migration 0041:
-   chỉ Nhóm 6 có dòng `plans`, chín nhóm còn lại không có chỗ nào để ghi.
+/* ── Phần B: đề tài KHKD — THEO CÁ NHÂN, theo LĨNH VỰC ────────────────────
+   Đổi 18/9, vài giờ sau khi phát hành bản theo nhóm. Ngô Phú Cường: "Các nhóm
+   hoạt động không hiệu quả nên lớp quyết định nộp đề tài tự do theo cá nhân
+   hoặc cùng lĩnh vực, không bắt buộc ai cũng phải nộp." Lý lẽ và phương án bị
+   loại ghi ở migrations/0043_de_tai_theo_linh_vuc.sql.
 
-   AI GHI ĐƯỢC: bất kỳ thành viên nào của nhóm, KHÔNG phải chỉ trưởng/phó.
-   Đây là chỗ cố ý lệch với patchTopic (dùng canManageGroup), và lý do đo
-   được chứ không phải suy đoán: trong 10 nhóm mới có Nhóm 6 và Nhóm 8 có
-   người giữ vai officer. Gác bằng canManageGroup là TÁM nhóm không ai nộp
-   được link, tám ngày trước buổi bảo vệ. Đổi lại, ban_nop_boi ghi rõ ai nộp
-   lần cuối và giao diện in tên ấy ra, nên nhóm tự thấy và tự sửa nhau được.
+   Thay cho một lượt BÌNH CHỌN ZALO đã khoá: lượt ấy cho thấy avatar và con số
+   nhưng không cho biết AI chọn GÌ, không nối được sang đề tài hay link bài, và
+   không xuất ra được — nguyên văn anh nói là "rất khó để Ban cán sự lớp theo
+   dõi".
 
-   N6 khoá chặt mà không cần kiểm gì: route KHÔNG nhận group_id trong thân,
-   nó ghi thẳng vào me.group_id. Không có id nào để giả mạo. */
-export async function patchBanNop(request, env, me, ip) {
-  if (!me.group_id) return error('chua_co_nhom', 409);
+   BA Ô ĐỀU ĐỂ TRỐNG ĐƯỢC, và đó là chủ ý: "không bắt buộc ai cũng phải nộp"
+   là quyết định của lớp. Người mới chọn lĩnh vực mà chưa có đề tài vẫn là một
+   dòng hợp lệ và vẫn được đếm — Ban cán sự lớp cần thấy CẢ HAI mức, không chỉ
+   mức đã xong.
 
+   Không nhận member_id trong thân: chính chủ tự khai, đúng khuôn putHoSo và
+   putGala. Không có chỗ nào để dò, và không ai khai hộ được. */
+export async function putDeTai(request, env, me) {
   const body = await readJson(request);
-  const url = cleanText(body.ban_nop_url, 500);
+
+  const url = cleanText(body.khkd_url, 500);
   // Cùng luật với Tư liệu và Giao thương (giao-thuong.js:122): chỉ https.
   // Chuỗi này đi thẳng vào href của một thẻ <a>, mà 'javascript:' thì esc()
   // không cứu được — nó không chứa ký tự HTML nào để thoát.
   if (url && !/^https:\/\/[^\s/]+\./i.test(url)) return error('link_must_be_https', 422);
 
-  const cu = await env.DB.prepare('SELECT ban_nop_url FROM groups WHERE id = ?')
-    .bind(me.group_id).first();
+  const linhVuc = docLinhVucKhkd(body.khkd_linh_vuc);
+  const deTai = cleanText(body.khkd_de_tai, 300);
+  const cu = await docDangKy(env, me.id);
 
-  // Xoá trắng được (url = null): thà trống còn hơn một đường dẫn hỏng — đúng
-  // quyết định đã áp cho PATCH /api/links/:id ngày 25/8.
+  // Mốc khkd_luc chỉ đóng khi người ta THẬT SỰ khai một thứ gì đó. Đóng dấu
+  // cho một lượt lưu rỗng thì màn Ban cán sự lớp đếm nhầm người ấy vào cột
+  // "đã khai" — và con số ấy là cả lý do tính năng này tồn tại.
+  const coGi = !!(linhVuc || deTai || url);
+
   await env.DB.prepare(
-    `UPDATE groups SET ban_nop_url = ?,
-       ban_nop_luc = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END,
-       ban_nop_boi = CASE WHEN ? IS NULL THEN NULL ELSE ? END
-     WHERE id = ?`
-  ).bind(url, url, url, me.id, me.group_id).run();
+    `INSERT INTO dang_ky_tot_nghiep
+       (member_id, khkd_linh_vuc, khkd_de_tai, khkd_url, khkd_luc, updated_at)
+     VALUES (?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, datetime('now'))
+     ON CONFLICT(member_id) DO UPDATE SET
+       khkd_linh_vuc = excluded.khkd_linh_vuc,
+       khkd_de_tai = excluded.khkd_de_tai,
+       khkd_url = excluded.khkd_url,
+       khkd_luc = excluded.khkd_luc,
+       updated_at = excluded.updated_at`
+  ).bind(me.id, linhVuc, deTai, url, coGi ? 1 : 0).run();
 
-  await logAudit(env, {
-    actorId: me.id, action: 'totnghiep.bannop', targetType: 'group', targetId: me.group_id,
-    before: { ban_nop_url: cu?.ban_nop_url ?? null }, after: { ban_nop_url: url }, ip,
-  });
-  await logActivity(env, {
-    cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
-    verb: 'totnghiep.bannop', objectType: 'group', objectId: me.group_id,
-    summary: url ? 'nộp link bản Kế hoạch kinh doanh của nhóm' : 'gỡ link bản Kế hoạch kinh doanh',
-  });
-
-  return json({ ok: true, ban_nop_url: url });
+  // Ghi hoạt động LẦN ĐẦU thôi — sửa lại một chữ mà đẩy thêm một dòng vào
+  // feed "Đang diễn ra" của cả nhóm thì feed thành sổ nháp của một người.
+  if (coGi && !cu?.khkd_luc) {
+    await logActivity(env, {
+      cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+      verb: 'totnghiep.detai', objectType: 'dang_ky_tot_nghiep', objectId: me.id,
+      summary: deTai ? `chốt đề tài KHKD: ${deTai}` : 'chọn lĩnh vực làm Kế hoạch kinh doanh',
+    });
+  }
+  return json({ ok: true, dang_ky: await docDangKy(env, me.id) });
 }
 
 /* ══ ĐƯỜNG CÔNG KHAI — cho 38 người chưa đăng nhập được ═════════════════════
@@ -304,6 +317,7 @@ export async function getTotNghiepCongKhai(env) {
     han_gala: HAN_GALA,
     ngay_le: NGAY_LE,
     nganh_list: NGANH,
+    linh_vuc_khkd_list: LINH_VUC_KHKD,
     phi: r ? {
       amount: r.amount,
       bank_name: r.bank_name || r.bank_bin,
@@ -362,6 +376,16 @@ export async function postTotNghiepCongKhai(request, env, ip) {
   if (cu && cu.nguon === 'phien') return error('da_dien_tu_tai_khoan', 409);
 
   const duLe = motTrong(body.du_le, DU_LE);
+  // Đề tài KHKD đi CÙNG đường công khai này, không dựng đường thứ hai: 38
+  // người không đăng nhập được cũng nằm trong diện "nộp tự do theo cá nhân
+  // hoặc cùng lĩnh vực", và bắt họ chờ một link mời để khai lĩnh vực là dựng
+  // lại đúng cái rào vừa gỡ.
+  const khkdUrl = cleanText(body.khkd_url, 500);
+  if (khkdUrl && !/^https:\/\/[^\s/]+\./i.test(khkdUrl)) return error('link_must_be_https', 422);
+  const khkdLinhVuc = docLinhVucKhkd(body.khkd_linh_vuc);
+  const khkdDeTai = cleanText(body.khkd_de_tai, 300);
+  const coKhkd = !!(khkdLinhVuc || khkdDeTai || khkdUrl);
+
   const dat = {
     ho_ten: cleanText(body.ho_ten, 120) ?? nguoi.full_name,
     ngay_sinh: cleanText(body.ngay_sinh, 20),
@@ -379,8 +403,10 @@ export async function postTotNghiepCongKhai(request, env, ip) {
     `INSERT INTO dang_ky_tot_nghiep
        (member_id, ho_ten, ngay_sinh, dien_thoai, doanh_nghiep, linh_vuc, chuc_vu,
         nhu_cau_ket_noi, du_le, tai_tro, tai_tro_mo_ta, gian_hang, van_nghe,
-        van_nghe_mo_ta, nguon, ho_so_luc, gala_luc, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cong_khai',
+        van_nghe_mo_ta, khkd_linh_vuc, khkd_de_tai, khkd_url, khkd_luc,
+        nguon, ho_so_luc, gala_luc, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+             CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, 'cong_khai',
              datetime('now'), datetime('now'), datetime('now'))
      ON CONFLICT(member_id) DO UPDATE SET
        ho_ten = excluded.ho_ten, ngay_sinh = excluded.ngay_sinh,
@@ -389,14 +415,18 @@ export async function postTotNghiepCongKhai(request, env, ip) {
        nhu_cau_ket_noi = excluded.nhu_cau_ket_noi, du_le = excluded.du_le,
        tai_tro = excluded.tai_tro, tai_tro_mo_ta = excluded.tai_tro_mo_ta,
        gian_hang = excluded.gian_hang, van_nghe = excluded.van_nghe,
-       van_nghe_mo_ta = excluded.van_nghe_mo_ta, nguon = 'cong_khai',
+       van_nghe_mo_ta = excluded.van_nghe_mo_ta,
+       khkd_linh_vuc = excluded.khkd_linh_vuc, khkd_de_tai = excluded.khkd_de_tai,
+       khkd_url = excluded.khkd_url, khkd_luc = excluded.khkd_luc,
+       nguon = 'cong_khai',
        ho_so_luc = excluded.ho_so_luc, gala_luc = excluded.gala_luc,
        updated_at = excluded.updated_at`
   ).bind(
     mem.id, dat.ho_ten, dat.ngay_sinh, dat.dien_thoai, dat.doanh_nghiep,
     dat.linh_vuc, dat.chuc_vu, dat.nhu_cau_ket_noi, duLe,
     motTrong(body.tai_tro, TAI_TRO), cleanText(body.tai_tro_mo_ta, 500),
-    coKhong(body.gian_hang), coKhong(body.van_nghe), cleanText(body.van_nghe_mo_ta, 500)
+    coKhong(body.gian_hang), coKhong(body.van_nghe), cleanText(body.van_nghe_mo_ta, 500),
+    khkdLinhVuc, khkdDeTai, khkdUrl, coKhkd ? 1 : 0
   ).run();
 
   // Cú pháp chuyển khoản phải do MÁY CHỦ dựng: buildTransferNote() bỏ dấu rồi
@@ -434,8 +464,8 @@ export async function postTotNghiepCongKhai(request, env, ip) {
 async function docDanhSach(env, me) {
   const rows = await env.DB.prepare(
     `SELECT m.id AS member_id, m.full_name, m.email, m.phone AS phone_hoso,
-            g.no AS group_no, g.label AS group_label,
-            g.ban_nop_url, r.dob AS dob_goc,
+            g.no AS group_no, g.label AS group_label, r.dob AS dob_goc,
+            d.khkd_linh_vuc, d.khkd_de_tai, d.khkd_url, d.khkd_luc,
             d.ho_ten, d.ngay_sinh, d.dien_thoai, d.doanh_nghiep, d.linh_vuc,
             d.chuc_vu, d.nhu_cau_ket_noi, d.anh_url, d.logo_url, d.ho_so_luc,
             d.du_le, d.tai_tro, d.tai_tro_mo_ta, d.gian_hang, d.van_nghe,
@@ -460,11 +490,35 @@ async function docDanhSach(env, me) {
 export async function getDanhSachTotNghiep(env, me) {
   if (!(await isClassCommittee(env, me.id))) return error('forbidden', 403);
   const ds = await docDanhSach(env, me);
+
+  // Đây là thứ THAY CHO lượt bình chọn Zalo. Lượt ấy chỉ cho con số; chỗ này
+  // cho con số KÈM TÊN, kèm ai đã có đề tài và ai đã nộp link — tức là dò
+  // ngược được, và xuất ra được. Trả về ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai
+  // chọn: "chưa ai chọn" là một câu trả lời, còn một dòng biến mất thì Ban cán
+  // sự lớp không biết là chưa ai chọn hay là mình quên mất nó.
+  const theoLinhVuc = LINH_VUC_KHKD.map(lv => {
+    const nguoi = ds.filter(x => x.khkd_linh_vuc === lv.ma);
+    return {
+      ma: lv.ma, ten: lv.ten,
+      so_nguoi: nguoi.length,
+      so_da_nop_link: nguoi.filter(x => x.khkd_url).length,
+      nguoi: nguoi.map(x => ({
+        member_id: x.member_id, full_name: x.full_name, group_label: x.group_label,
+        khkd_de_tai: x.khkd_de_tai, khkd_url: x.khkd_url,
+      })),
+    };
+  });
+
   return json({
     tong: ds.length,
     xong_ho_so: ds.filter(x => x.ho_so_luc).length,
     xong_gala: ds.filter(x => x.gala_luc).length,
     du_le: ds.filter(x => x.du_le === 'co').length,
+    da_chon_linh_vuc: ds.filter(x => x.khkd_linh_vuc).length,
+    da_nop_link: ds.filter(x => x.khkd_url).length,
+    chua_chon_linh_vuc: ds.filter(x => !x.khkd_linh_vuc)
+      .map(x => ({ full_name: x.full_name, group_label: x.group_label })),
+    theo_linh_vuc: theoLinhVuc,
     nguoi: ds,
   });
 }
@@ -493,7 +547,9 @@ export async function getXuatCsv(env, me) {
     ['Nhu cầu kết nối', x => x.nhu_cau_ket_noi],
     ['Ảnh chân dung', x => x.anh_url],
     ['Logo doanh nghiệp', x => x.logo_url],
-    ['Link bản KHKD của nhóm', x => x.ban_nop_url],
+    ['Lĩnh vực KHKD', x => tenLinhVucKhkd(x.khkd_linh_vuc)],
+    ['Đề tài KHKD', x => x.khkd_de_tai],
+    ['Link bài KHKD', x => x.khkd_url],
     ['Dự Lễ 17h-22h', x => (x.du_le === 'co' ? 'Có' : x.du_le === 'khong' ? 'Không' : '')],
     // Nhãn phải đúng mục 6.4 SRS: "đã tự khai" cho tới khi người thu đối
     // chiếu sao kê, KHÔNG BAO GIỜ "đã đóng". Tệp này đi ra ngoài cho Ban tổ

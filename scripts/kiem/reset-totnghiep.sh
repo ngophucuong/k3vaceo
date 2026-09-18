@@ -4,7 +4,7 @@
 # BỐN PHIÊN, mỗi phiên ứng với một vai phải phân biệt được:
 #   cuong  — Ngô Phú Cường, Nhóm 6, uy_vien cấp lớp → isClassCommittee TRUE
 #   thuong — một người Nhóm 6 KHÔNG giữ vai gì      → danh-sach phải 403
-#   n7     — một người Nhóm 7                        → kiểm ban-nop không lẫn nhóm
+#   n7     — một người Nhóm 7                        → kiểm danh sách không lẫn nhóm
 #   (không cookie)                                   → danh-sach phải 401
 #
 # Vì sao phải dựng "thường" và "n7" bằng tay chứ không mượn người có thật:
@@ -41,7 +41,7 @@ H_N7=$(bam "tk-tn-n7")
 
 npx wrangler d1 execute k3vaceo --local --command "
 -- Dọn sạch dấu vết lượt chạy trước. Bộ kiểm này THẬT SỰ ĐỔI TRẠNG THÁI
--- (ghi dang_ky_tot_nghiep, ghi groups.ban_nop_url, khai quỹ), nên reset phải
+-- (ghi dang_ky_tot_nghiep cả ba phần, khai quỹ), nên reset phải
 -- trả CẢ những thứ ấy về gốc chứ không chỉ dọn bảng phụ — đúng bài học đã trả
 -- giá ở reset-doi-nhom.sh (lượt hai mở đầu với người xin đã ở nhóm khác).
 -- THỨ TỰ XOÁ LÀ BẮT BUỘC: dòng con trước, dòng cha sau.
@@ -68,7 +68,7 @@ DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm 
 DELETE FROM members
  WHERE claimed_at IS NULL
    AND roster_id IN (SELECT id FROM roster WHERE full_name = 'Đinh Khánh Toàn');
-UPDATE groups SET ban_nop_url = NULL, ban_nop_luc = NULL, ban_nop_boi = NULL;
+-- (cột ban_nop_* đã gỡ ở migration 0043 — đề tài nay theo cá nhân, không theo nhóm)
 
 -- Vũ Thị Ngân: cho giống bản thật (xem chú thích đầu tệp).
 INSERT INTO members (cohort_id, group_id, roster_id, full_name, phone, is_active, claimed_at)

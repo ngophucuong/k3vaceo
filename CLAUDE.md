@@ -26,13 +26,16 @@ tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
 
 **Mười hai việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
-1. **Zone Lễ tốt nghiệp `/totnghiep`** (18/9, migration 0041) — Ngô Phú Cường
-   đưa 15 câu Ban tổ chức muốn thu để chuẩn bị Lễ 26/9 rồi hỏi *"bạn xem cái
-   gì có rồi cái gì chưa và đề xuất cho tôi một zone riêng cho việc này"*.
-   Phát hiện quyết định cả hình dạng việc này: **6/15 câu D1 ĐÃ CÓ SẴN dữ
-   liệu, 2 câu nữa có sẵn cả cỗ máy** — nên nó là màn XÁC NHẬN chứ không phải
-   biểu mẫu 15 câu. Kèm **đợt thu cấp lớp ĐẦU TIÊN** của dự án. Xem mục riêng
-   bên dưới trước khi đụng vào `worker/src/routes/tot-nghiep.js`.
+1. **Zone Lễ tốt nghiệp `/totnghiep`** (18/9, migration 0041 → 0042 → 0043 —
+   ba lượt trong MỘT ngày). Ngô Phú Cường đưa 15 câu Ban tổ chức muốn thu để
+   chuẩn bị Lễ 26/9 rồi hỏi *"bạn xem cái gì có rồi cái gì chưa và đề xuất cho
+   tôi một zone riêng cho việc này"*. Phát hiện quyết định cả hình dạng việc
+   này: **6/15 câu D1 ĐÃ CÓ SẴN dữ liệu, 2 câu nữa có sẵn cả cỗ máy** — nên nó
+   là màn XÁC NHẬN chứ không phải biểu mẫu 15 câu. Kèm **đợt thu cấp lớp ĐẦU
+   TIÊN** của dự án (0041), **đường CÔNG KHAI cho 38 người không đăng nhập
+   được** (0042), rồi **bỏ hẳn đường nộp theo NHÓM, chuyển sang LĨNH VỰC +
+   cá nhân** (0043) vì lớp đổi cách nộp bài ngay chiều hôm ấy. Xem ba mục
+   riêng bên dưới trước khi đụng vào `worker/src/routes/tot-nghiep.js`.
 2. **Trợ lý KHKD** (12/9, migration 0038) — thứ LỚN NHẤT từng thêm vào dự án
    này, và là lần đầu tiên nó **tốn tiền theo lượt dùng** cùng lần đầu **bỏ
    HAI nguyên tắc gốc cùng lúc (N1 và N2)**. Ngô Phú Cường đưa hai tài liệu
@@ -341,11 +344,10 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
   SRS viết trước khi có tính năng này, và chính nó là chỗ lệch N1/N2 lớn nhất
   (xem mục riêng). `cai_dat` là bảng cấu hình chạy-thời-gian ĐẦU TIÊN của dự
   án: mọi tính năng trước đều miễn phí nên không cần công tắc tắt gấp.
-- `dang_ky_tot_nghiep` + `groups.ban_nop_url`/`ban_nop_luc`/`ban_nop_boi`
-  (migration 0041) — zone Lễ tốt nghiệp 26/9. SRS viết trước khi Ban tổ chức
-  gửi 15 câu này. Ba cột `ban_nop_*` đặt trên `groups` chứ KHÔNG trên `plans`
-  — lý do đo được, không phải sở thích: chỉ Nhóm 6 có dòng `plans` (xem mục
-  riêng bên dưới).
+- `dang_ky_tot_nghiep` (migration 0041, mở rộng 0042 và 0043) — zone Lễ tốt
+  nghiệp 26/9. SRS viết trước khi Ban tổ chức gửi 15 câu này. Ba cột
+  `groups.ban_nop_*` của 0041 **đã GỠ ở 0043** khi lớp bỏ nộp bài theo nhóm;
+  đề tài nay là `dang_ky_tot_nghiep.khkd_*`, xem mục riêng bên dưới.
 
 ## Cạm bẫy của D1 thật — trả giá bằng bốn lần chạy hỏng
 
@@ -1070,16 +1072,25 @@ không bị chẻ làm hai nguồn.
 | | Nội dung | Hạn | Lưu vào |
 |---|---|---|---|
 | A · Hồ sơ & chứng chỉ | câu 1–9 | 26/9 | `dang_ky_tot_nghiep` |
-| B · Đề tài KHKD | câu 10 + link bản nộp | 26/9 | `groups` (của NHÓM) |
+| B · Đề tài KHKD | lĩnh vực + đề tài + link bài | 26/9 | `dang_ky_tot_nghiep` |
 | C · Lễ & Gala | câu 11–15 | **21h00 ngày 19/9** | `dang_ky_tot_nghiep` |
 
 Ngô Phú Cường hỏi "có nên tách các phần?" — nên, và vì lý do cụ thể chứ không
 phải cho gọn: gộp một form 15 câu thì người muốn đăng ký Gala tối nay bị chặn
 vì chưa có ảnh chân dung, tức mất đúng cái hạn gấp nhất. Mỗi phần đóng dấu một
-mốc riêng (`ho_so_luc`, `gala_luc`, `groups.ban_nop_luc`) nên câu Ban tổ chức
-thật sự cần — "còn ai chưa xong phần nào" — trả lời được bằng một truy vấn.
+mốc riêng (`ho_so_luc`, `khkd_luc`, `gala_luc`) nên câu Ban tổ chức thật sự
+cần — "còn ai chưa xong phần nào" — trả lời được bằng một truy vấn.
+
+Phần B sáng 18/9 nộp theo NHÓM và lưu vào `groups`; chiều cùng ngày lớp đổi
+cách nộp nên nó chuyển sang cá nhân — xem mục "Đề tài nộp theo LĨNH VỰC" bên
+dưới. Bảng trên đã là bản SAU khi đổi.
 
 ### Hai quyết định do SOI D1 THẬT bác bỏ phương án ban đầu
+
+> **Đường nộp theo nhóm nói ở mục này ĐÃ GỠ HẲN chiều 18/9** (migration 0043,
+> mục riêng bên dưới). Giữ nguyên mục vì HAI CON SỐ đo được ở đây vẫn đúng và
+> vẫn phải nhớ — chín nhóm không có dòng `plans`, tám nhóm không có officer —
+> chúng sẽ chặn bất kỳ tính năng nào khác định gác theo nhóm.
 
 Kế hoạch ban đầu định đặt link bản nộp trên `plans` và gác bằng
 `canManageGroup`. Cả hai đều SAI, và lượt soi ngày 18/9
@@ -1101,9 +1112,114 @@ Bài học chung: **đừng suy ra hình dạng dữ liệu từ lược đồ.*
 không có nghĩa là dòng có trong bảng — cùng họ với bài học ngược của
 `links.section_id` (cột nằm sẵn từ migration 0001 mà chưa từng được nối dây).
 
-N6 ở đường nộp link khoá chặt mà **không cần kiểm gì**: route không nhận
-`group_id` trong thân, nó ghi thẳng vào `me.group_id`. Không có id nào để giả
-mạo — chốt chặn tốt nhất là chốt không tồn tại.
+Một điều của bản cũ SỐNG SÓT nguyên vẹn sang bản mới và đáng giữ: **đường nộp
+khoá chặt mà không cần kiểm gì.** Route không nhận id nào trong thân, nó ghi
+thẳng vào `me.group_id` (bản cũ) / `me.id` (`putDeTai` nay). Không có id để
+giả mạo — chốt chặn tốt nhất là chốt không tồn tại.
+
+### Đề tài nộp theo LĨNH VỰC, theo cá nhân — không còn theo nhóm (0043)
+
+Chiều 18/9, vài giờ sau khi phần B lên thật, Ngô Phú Cường gửi ảnh chụp một
+lượt bình chọn Zalo (15 lĩnh vực, đã khoá) kèm quyết định của lớp: *"Các nhóm
+hoạt động không hiệu quả nên lớp quyết định nộp đề tài tự do theo cá nhân hoặc
+cùng lĩnh vực, không bắt buộc ai cũng phải nộp. Hình ảnh đính kèm là vote của
+zalo nhưng rất khó để Ban cán sự lớp theo dõi. hãy điều chỉnh chức năng này
+giúp tôi."*
+
+**Vì sao một lượt bình chọn Zalo không thay được việc này** — nói rõ để lần
+sau khỏi phải nghĩ lại: nó cho thấy avatar và tổng phiếu (14, 13, 8…) nhưng
+**không nối được người với đề tài**, không chứa link bài, không xuất ra được,
+và ai cũng sửa phiếu của mình bất cứ lúc nào mà không để lại dấu. Thứ Ban cán
+sự lớp cần là một danh sách **có tên** — chính là thứ zone này đã có sẵn cả
+màn hình lẫn nút xuất CSV.
+
+Hai câu hỏi đã hỏi thẳng qua AskUserQuestion, cả hai đều chọn phương án hẹp:
+
+- **Danh mục lĩnh vực: "đúng 15 mục, hết rồi"** — không có ô "khác", không tự
+  thêm mục. Chép đúng 15 mục của lượt bình chọn.
+- **Đường nộp theo nhóm: "bỏ hẳn, chỉ còn cá nhân"** — không giữ song song.
+
+**Gỡ hẳn được vì đã soi D1 thật lúc 11h34 cùng ngày: cả 10 nhóm đều `(chưa
+nộp)`**, không mất dữ liệu của ai. `DROP COLUMN` chạy được trên SQLite của D1
+(đã kiểm cục bộ). Vì sao không giữ cả hai "cho chắc": hai chỗ nộp là hai nguồn
+sự thật cho cùng một việc, và sẽ có ngày một người xuất hiện ở cả hai với hai
+link khác nhau — Ban cán sự lớp không có cách nào biết cái nào đúng. "Giữ lại
+phòng khi đổi ý" chính là cách lỗi ấy xảy ra.
+
+**Ba cột mới đặt trên `dang_ky_tot_nghiep`, KHÔNG dựng bảng riêng**
+(`khkd_linh_vuc`, `khkd_de_tai`, `khkd_url`, cộng mốc `khkd_luc`). Đây là cùng
+một sự thật về cùng một người ở cùng một thời điểm — "tôi làm gì cho buổi
+26/9" — và đặt ở đây thì được NGAY hai thứ mà một bảng riêng phải dựng lại từ
+đầu: **đường công khai** (38 người không đăng nhập được vẫn khai lĩnh vực và
+nộp link được, migration 0042), và **màn Ban cán sự lớp + xuất CSV** đã có.
+
+#### `LINH_VUC_KHKD` KHÔNG phải `NGANH` — và tiền tố `lv-` là cố ý
+
+`worker/src/lib/linh-vuc-khkd.js` là nguồn duy nhất của 15 mã. Đừng gộp nó
+với `lib/nganh.js` (19 mã) dù nhìn na ná:
+
+| | |
+|---|---|
+| `NGANH` | *"doanh nghiệp của bạn làm ngành gì"* — để GHÉP NỐI ở Giao thương. Sự thật về người ấy, còn giá trị sau 26/9. Tối đa **3**. |
+| `LINH_VUC_KHKD` | *"bạn làm bài cuối khoá về lĩnh vực nào"* — để CHIA NHÓM LÀM BÀI. Hết hạn 26/9. Đúng **1**. |
+
+Một người hoàn toàn có thể làm bài về lĩnh vực không phải ngành của mình. Hai
+danh sách còn khác cả độ mịn: `NGANH` tách Y tế và Giáo dục làm hai mã, lượt
+bình chọn của lớp gộp làm một.
+
+**Mọi mã của danh sách mới mang tiền tố `lv-`** để không mã nào hợp lệ ở CẢ
+HAI danh sách. Không có tiền tố thì `bat-dong-san` qua được `docNganh()` lẫn
+`docLinhVucKhkd()`, nên một mã truyền nhầm từ bên này sang bên kia được nhận
+**lặng lẽ** thay vì bị loại. **Mã đã vào D1 thì không đổi được nữa** (đổi mã
+là mọi dòng cũ thành mồ côi, không chỗ nào báo lỗi); đổi NHÃN thì thoải mái.
+
+Mã lạ → `null` (coi như chưa chọn) chứ **không** trả 422, đúng lý lẽ đã ghi
+cho `docNganh()`: mã lạ chỉ tới được từ một giao diện cũ còn trong đệm trình
+duyệt, mà chặn cả lượt lưu thì người dùng mất nguyên phần vừa gõ.
+
+#### `khkd_luc` chỉ đóng dấu khi THẬT SỰ khai, và nhả ra khi xoá trắng
+
+`coGi = !!(linhVuc || deTai || url)` — lưu một lượt rỗng thì mốc về `NULL`.
+Lý do không phải sạch sẽ: màn Ban cán sự lớp đếm "đã khai" bằng chính mốc ấy,
+mà con số đó là **cả lý do tính năng này tồn tại**. Đóng dấu cho một lượt bấm
+Lưu hụt là đếm nhầm một người vào cột đã xong.
+
+Cùng lẽ ấy, `logActivity` chỉ ghi **lần đầu** (`coGi && !cu?.khkd_luc`): sửa
+lại một chữ mà đẩy thêm một dòng vào feed "Đang diễn ra" của cả nhóm thì feed
+thành sổ nháp của một người.
+
+#### Màn Ban cán sự lớp: hai thẻ, và 15 lĩnh vực LUÔN hiện đủ
+
+`getDanhSachTotNghiep` trả thêm `theo_linh_vuc` — **cả 15 mục kể cả mục không
+ai chọn**, mỗi mục kèm `so_nguoi`, `so_da_nop_link` và danh sách `nguoi[]`.
+Lọc bỏ mục rỗng thì mất đúng câu hỏi Ban tổ chức hay hỏi nhất ("lĩnh vực nào
+chưa ai làm"); mục rỗng hiện chữ "chưa ai chọn" ở 50% độ mờ, đọc lướt vẫn
+phân biệt được ngay.
+
+Thẻ thứ hai xếp theo NGƯỜI, và dưới cùng là khối **"Chưa chọn lĩnh vực (N)"**
+kèm đúng một câu chú: *"Lớp đã chốt nộp tự do theo cá nhân hoặc cùng lĩnh vực,
+không bắt buộc ai cũng nộp — nên danh sách 'chưa chọn' là để biết, không phải
+để đòi."* Câu ấy có mặt là cố ý: một danh sách "chưa làm" mà không nói rõ điều
+này sẽ bị đọc thành danh sách người lười, trong khi chính lớp đã quyết không
+bắt buộc.
+
+Thẻ đang mở (`DSTN_THE`) và tập lĩnh vực đang bung (`DSTN_MO`) giữ **ngoài**
+hàm vẽ — cùng bài học `SOTHU`, `DANHBA_THE`, `TN_MO`.
+
+#### Hai bẫy MỚI của bộ kiểm, cả hai đều im lặng
+
+1. **`innerText` của Chrome trả về chữ ĐÃ ÁP `text-transform`.** Phép kiểm tìm
+   `/Chưa chọn lĩnh vực/` đỏ dù chữ ấy có thật trên màn hình, vì `.eb` có
+   `text-transform:uppercase` nên `innerText` trả `CHƯA CHỌN LĨNH VỰC`.
+   (`textContent` thì KHÔNG áp — hai hàm cho hai kết quả khác nhau trên cùng
+   một phần tử.) Nay so bằng regex không phân biệt hoa thường.
+2. **Cột flex có `max-height` BÓP con xuống dưới chiều cao nội dung.** Tên
+   lĩnh vực hai dòng ("Nông nghiệp - Lâm nghiệp - Thuỷ sản (trồng trọt & chăn
+   nuôi)") bị **cắt mất dòng thứ hai**: `.dstnbox` là cột cuộn có `max-height`
+   nên `flex-shrink` mặc định `1` bóp từng mục lại. Không lỗi JS, không phép
+   kiểm chuỗi nào đỏ — **chỉ ảnh chụp mới thấy**. Chữa bằng `flex:0 0 auto`
+   trên `.dstnlv`, và nay có phép kiểm so `scrollHeight > clientHeight` cho
+   TỪNG mục để lần sau máy thấy trước người.
 
 ### Đợt thu cấp lớp ĐẦU TIÊN của dự án
 
@@ -1245,6 +1361,18 @@ không phải ĐĂNG NHẬP ĐƯỢC.** Hai thứ ấy nới ra thì hậu quả
    hại thật**, chứ không phải một dòng rác thêm vào.
 4. **Hạn mức 400/IP/giờ**, trên sĩ số lớp (bài học 27/8).
 
+**Một ngoại lệ có chủ ý cho điểm 2, Ngô Phú Cường yêu cầu ngày 18/9:** dòng
+gian hàng in thẳng **số điện thoại anh Chử Minh Châu (0972182598)**, lấy từ
+`roster` seq 27 — *"Ban tổ chức bố trí miễn phí. Liên hệ trực tiếp anh Chử
+Minh Châu (…)"*. Đây là **lần đầu một số điện thoại có thật nằm trên một trang
+mở được KHÔNG CẦN đăng nhập**, nên ghi rõ để đừng ai "sửa cho nhất quán" sau
+này: nó là số liên hệ của một VAI trong sự kiện (như số tài khoản người thu đã
+in sẵn trên thư mời), do Ban cán sự lớp chủ động công bố, chứ không phải dữ
+liệu lấy ra từ danh bạ. Phép kiểm "không lộ số điện thoại của ai" vẫn nguyên
+vẹn vì nó soi **phúc đáp JSON** của đường công khai — số này là chữ tĩnh trong
+`app.js`. Muốn rút lại thì xoá đúng một cụm ở `tnckForm()` và giữ ở bản có
+phiên (`veTotNghiep()`).
+
 **KHÔNG đổi khoá của bảng — tự tạo dòng `members` thay vì thêm `roster_id`.**
 Cách hiển nhiên là thêm cột `roster_id` rồi cho `member_id` NULL, nhưng thế là
 bảng có HAI khoá và sinh ra một lỗi mất dữ liệu có thật: người điền form công
@@ -1274,6 +1402,10 @@ họ trong Danh bạ VẪN bị che, và khi họ đăng nhập thật thì vẫ
 
 - **Chưa ai dùng zone này với dữ liệu thật.** Mọi phép kiểm chạy trên D1 cục
   bộ với ba phiên dựng tay.
+- **Chưa ai khai lĩnh vực trên D1 thật.** Lớp đã bình chọn trên Zalo nhưng con
+  số ấy CỐ Ý không gieo vào D1 (ảnh chụp chỉ có avatar, không cho biết ai chọn
+  gì — gieo vào là dựng một bảng đếm không dò ngược được, đúng thứ đang phải
+  chữa). Cả lớp khai lại trong ứng dụng, lần này mỗi phiếu có tên.
 - **Ảnh chân dung và logo (câu 7, 8) CHƯA làm** — Đợt 2, qua Google Drive.
   Cột `anh_url`/`logo_url` đã có sẵn trong bảng nên thêm vào là cộng thêm, chứ
   không phải đổi lược đồ. Xem mục riêng ngay dưới. Đường công khai hiện KHÔNG

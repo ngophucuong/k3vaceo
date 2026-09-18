@@ -29,7 +29,7 @@ import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, 
          postThongBaoDaXem, patchThongBao, deleteThongBao } from './routes/lich.js';
 import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
-import { getTotNghiep, putHoSo, putGala, patchBanNop,
+import { getTotNghiep, putHoSo, putGala, putDeTai,
          getDanhSachTotNghiep, getXuatCsv,
          getTotNghiepCongKhai, postTotNghiepCongKhai } from './routes/tot-nghiep.js';
 import { getPushKhoa, postPushDangKy, postPushHuy, getPushTrangThai } from './routes/push.js';
@@ -274,9 +274,7 @@ export default {
       if (pathname === '/api/totnghiep' && method === 'GET') return getTotNghiep(env, me);
       if (pathname === '/api/totnghiep/ho-so' && method === 'PUT') return putHoSo(request, env, me);
       if (pathname === '/api/totnghiep/gala' && method === 'PUT') return putGala(request, env, me);
-      if (pathname === '/api/totnghiep/ban-nop' && method === 'PATCH') {
-        return patchBanNop(request, env, me, ip);
-      }
+      if (pathname === '/api/totnghiep/de-tai' && method === 'PUT') return putDeTai(request, env, me);
       if (pathname === '/api/totnghiep/danh-sach' && method === 'GET') return getDanhSachTotNghiep(env, me);
       if (pathname === '/api/totnghiep/xuat.csv' && method === 'GET') return getXuatCsv(env, me);
 
