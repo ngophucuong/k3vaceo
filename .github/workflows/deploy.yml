@@ -433,7 +433,16 @@ jobs:
           else
             echo "  ✗ /sotay chưa có mục Trợ lý KHKD — Pages còn phục vụ bản cũ"; loi=1
           fi
-          for t in sotay.css sotay.js anh/07-quy-nut-toi-da-chuyen.jpg; do
+          # Mục Lễ tốt nghiệp là thứ mới nhất của sổ tay (19/9), và là mục
+          # DUY NHẤT hướng dẫn 146 người dùng /totnghiep — hạn Gala 21h00 19/9
+          # và hạn chứng chỉ 26/9 đều nằm trong đó, nên Pages phục vụ bản cũ ở
+          # đây là cả lớp đọc một hướng dẫn thiếu đúng phần đang gấp.
+          if grep -q 'id="totnghiep"' /tmp/sotay.html; then
+            echo "  ✓ có mục Lễ tốt nghiệp (bản mới đã lên)"
+          else
+            echo "  ✗ /sotay chưa có mục Lễ tốt nghiệp — Pages còn phục vụ bản cũ"; loi=1
+          fi
+          for t in sotay.css sotay.js anh/07-quy-nut-toi-da-chuyen.jpg anh/31-ru-chon-nguoi.jpg; do
             m=$(curl -s -o /dev/null -w '%{http_code}' "https://k3vaceo.cuongngo.app/sotay/$t")
             if [ "$m" = "200" ]; then echo "  ✓ /sotay/$t"; else echo "  ✗ /sotay/$t = HTTP $m"; loi=1; fi
           done
