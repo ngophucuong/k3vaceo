@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Bốn mươi chín phép đối chứng đáng giữ nhất
+## Năm mươi ba phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -618,6 +618,41 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
 
    Đường này CÔNG KHAI, nên phép canh có răng nhất là grep thô nguyên văn
    phúc đáp: không `"phone"`, không `"email"`, không chuỗi 10 chữ số nào.
+
+50. **Cú chạm quan trọng nhất của sản phẩm phải BẤM VÀO GIỮA DÒNG.** Bước
+   chọn tên ở `/vao` (và ở đường công khai `/totnghiep`) trước 19/9 chỉ cho
+   bấm vào chữ "là tôi": 12px trong một ô cao 18px, sát mép phải — nhỏ hơn
+   mọi nút khác trên màn, ở đúng bước đầu tiên của 77 người chưa vào.
+
+   Phép kiểm bấm vào **chính chữ tên** chứ không vào chữ "là tôi": bấm chỗ cũ
+   thì một bản vá chỉ nới chữ "là tôi" ra cũng xanh. Kèm phép đo chiều cao
+   dòng ≥ 44px, và phép đòi chữ "là tôi" CÒN ĐÓ — bỏ nó đi thì dòng trông như
+   một dòng chữ để đọc, và không ai biết là bấm được.
+
+51. **Khối báo lỗi của màn vào phải đo được, không chỉ "có hiện ra".** Ba màn
+   vào trước nay báo lỗi bằng `.hintline` — 11,5px màu `--ink3` (2,7:1) — rồi
+   chỉ đổi MÀU CHỮ khi hỏng. Đó là thông điệp quyết định bỏ cuộc, đặt ở cỡ
+   chữ nhỏ nhất và màu nhạt nhất của cả ứng dụng.
+
+   Bốn phép: cỡ chữ ≥ 13px (đọc bằng `getComputedStyle`), nền đúng cặp
+   `--due-bg` (**lấy biến từ stylesheet rồi chuẩn hoá qua một phần tử thật**
+   — ghi cứng mã màu thì đổi biến là phép kiểm vẫn xanh, cùng bài học mục
+   45), câu chính ≤ 90 ký tự (bản cũ của `phone_mismatch` dài **203**), và
+   phải có dòng "làm gì tiếp" — một câu lỗi không nói được đường ra thì chỉ
+   làm người ta đứng lại.
+
+52. **Chỉ dấu bước phải đi HẾT ba số.** Một bản vá ghi cứng "Bước 1 / 3" ở
+   mọi màn vẫn xanh với phép hỏi một lần. Và so bằng `textContent`, KHÔNG
+   `innerText`: `.lb` có `text-transform:uppercase` nên `innerText` của Chrome
+   trả về `BƯỚC 1 / 3` — đúng cái bẫy đã ghi ở mục màn Ban cán sự lớp, vấp
+   lại ngay lượt chạy đầu.
+
+53. **Chỗ giữ chỗ "đang tìm" phải LÀM CHẬM lượt gọi mới nhìn thấy.** Trên
+   localhost khoảng chờ trôi qua trong vài mili giây, nên phép kiểm không làm
+   gì sẽ xanh cả khi chỗ giữ chỗ không tồn tại. `page.route` hoãn 900ms.
+
+   Bẫy kèm theo, đã vấp: gỡ route bằng `unroute` làm lượt gọi ĐANG BAY chết
+   với `Route is already handled`. Dùng một cờ, để route ở nguyên đó.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

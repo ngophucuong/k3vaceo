@@ -1954,6 +1954,129 @@ không thêm trường nào của ai, và phải là **khoá MỚI** chứ khôn
 `/vao` và wizard dùng chung đường này. Phép canh có răng nhất là grep thô
 nguyên văn phúc đáp: không `"phone"`, không `"email"`, không chuỗi 10 chữ số.
 
+## Màn VÀO — bốn chỗ sửa sau khảo sát các màn cũ (19/9)
+
+Ngô Phú Cường xin tư vấn chủ động về **giao diện cũ ở những chức năng ngoài
+zone Lễ tốt nghiệp**. Ba khảo sát chạy song song (Hôm nay + Bài + Trợ lý ·
+Danh bạ + Giao thương + Tư liệu · Quỹ + Tài khoản + đăng nhập + bốn trang
+rời) ra khoảng 50 phát hiện; anh chọn làm **màn vào** trước, tức `/vao` và
+`/dangnhap`. Những phần còn lại nằm ở mục "Đợt C — chưa chọn" cuối mục này.
+
+**Vì sao anh chọn đúng chỗ này:** đây là màn của **77 người chưa vào được**,
+và nó chưa ai đụng vào từ 27/8 — tức từ trước khi có Giao thương, Trợ lý, zone
+Lễ. Mọi bài học về cỡ chữ và vùng chạm học được sau đó chưa từng quay lại đây.
+
+### 1. Cả dòng tên bấm được — cú chạm quan trọng nhất của sản phẩm
+
+Trước 19/9, bước chọn tên chỉ cho bấm vào chữ **"là tôi"**: `.lnk` 12px nằm
+trong một ô cao **18px**, sát mép phải. Đó là cú chạm ĐẦU TIÊN của mọi người
+chưa vào, và nó nhỏ hơn mọi nút khác trên màn hình.
+
+Nay cả dòng là một `<button class="fdpick">` cao **≥ 56px** (đo thật: 62,8px).
+Chữ "là tôi" **GIỮ LẠI** làm dấu hiệu bấm được — bỏ đi thì dòng trông như một
+dòng chữ để đọc, và không ai biết là chạm được.
+
+**`veDongChon()` dùng CHUNG giữa `/vao` và đường công khai `/totnghiep`.** Hai
+bản sao thì sớm muộn lệch nhau, và chỗ lệch sẽ nằm đúng trên cú chạm đầu tiên
+của hai nhóm người khó vào nhất (77 người chưa đăng nhập và 38 người không
+đăng nhập được).
+
+**Phép kiểm bấm vào CHÍNH CHỮ TÊN**, không bấm vào chữ "là tôi": bấm chỗ cũ
+thì một bản vá chỉ nới chữ "là tôi" ra cũng xanh.
+
+### 2. Khối báo lỗi thật, thay cho `.hintline` đổi màu chữ
+
+Cả ba màn vào báo lỗi bằng `.hintline` — **11,5px màu `--ink3`, tức 2,7:1 trên
+nền trắng** — rồi chỉ đổi MÀU CHỮ sang `--due` khi hỏng. Đó là thông điệp
+**QUYẾT ĐỊNH BỎ CUỘC**, đặt ở đúng cỡ chữ nhỏ nhất và màu nhạt nhất của cả ứng
+dụng, cho một lớp 35–55 tuổi đang đứng ở cửa.
+
+`.vmsg` dùng lại **đúng cặp màu của `.claimcard .err`** (`--due` trên
+`--due-bg` = **4,78:1**, đạt AA), 13,5px. Không thêm màu mới. Và **không có
+nhánh xanh**: `--go`/`--go-bg` trong sản phẩm này có đúng một nghĩa (người thu
+đã nhận tiền) — mượn nó cho "đã gửi mã mới" là làm hỏng nghĩa ấy. Tin báo
+bình thường dùng nền xám trung tính (`.vmsg.tin`).
+
+**Câu chữ tách làm hai dòng: câu CHÍNH ngắn, ĐƯỜNG RA xuống dòng riêng.** Bản
+cũ của `phone_mismatch` nhồi cả nguyên nhân lẫn cách chữa vào **203 ký tự**
+một câu. Nay là *"Số không khớp với số Ban tổ chức đang giữ."* (42 ký tự) +
+*"Đã đổi số? Nhắn trưởng nhóm xin link đăng nhập, vào rồi tự sửa số trong tab
+Tài khoản."* Một câu lỗi không nói được đường ra thì chỉ làm người ta đứng lại.
+
+`.vmsg` áp cho cả **màn nhận link mời** (`renderClaim`, trước dùng `.errline`
+11,5px) — đó là thông điệp quyết định của người vừa bấm vào link, tức người
+chưa từng dùng ứng dụng lần nào.
+
+### 3. Chỉ dấu bước — ba bước trước nay không có dấu hiệu nào
+
+`vaoShell(title, sub, body, buoc)`. Bước nào cũng trông như bước cuối thì
+không ai biết còn bao xa, mà "còn bao xa" là câu hỏi quyết định đi tiếp hay
+đóng trang. Màn NGOÀI chuỗi (thiếu số, xong rồi) truyền `undefined` nên không
+có dấu — chúng không phải bước 4.
+
+**Phép kiểm đi HẾT ba số**: ghi cứng "Bước 1 / 3" ở mọi màn vẫn xanh với phép
+hỏi một lần. Và so bằng `textContent` chứ không `innerText` — `.lb` có
+`text-transform:uppercase` nên `innerText` của Chrome trả `BƯỚC 1 / 3`, đúng
+cái bẫy đã ghi cho màn Ban cán sự lớp và vấp lại ngay lượt chạy đầu.
+
+### 4. Hai chỗ nhỏ, mỗi chỗ một lý do
+
+- **Chỗ giữ chỗ "đang tìm".** Debounce 350ms CỘNG một lượt gọi trên WiFi hội
+  trường là vài giây màn hình đứng im — mà đứng im là thứ làm người ta gõ lại
+  từ đầu hoặc bỏ cuộc. Phép kiểm phải **làm chậm lượt gọi** (`page.route`,
+  900ms) mới nhìn thấy được; không làm gì thì nó xanh cả khi chỗ giữ chỗ không
+  tồn tại.
+- **Đường chuyển luồng thành NÚT.** "Đăng nhập bằng email" (ở `/vao`) và "tự
+  nhận diện" (ở `/dangnhap`) là hai đường ra duy nhất khi đi nhầm luồng, mà
+  chúng đang là liên kết 11,5px trong `.foot` màu `--ink3`. Ai đi nhầm luồng
+  đúng là người ít kiên nhẫn nhất còn lại. `.vlink` cao 46px, **viền NHẠT hơn
+  `.wide.ghost` và cách xa hơn** — nó là lối RẼ SANG LUỒNG KHÁC, không phải
+  lựa chọn thứ ba ngang hàng; cùng độ đậm thì ba nút xếp chồng đọc thành ba
+  việc như nhau.
+
+Kèm: `<input disabled>` của ô Họ tên ở màn nhận link đổi thành một dòng chữ
+(`.vdoc`) — một ô nhập mờ đi đọc lên như một ô **HỎNG**; và `.claimcard
+.hintline` nâng lên 12,5px `--ink2`, **chỉ trong phạm vi ba màn vào**.
+
+### Điều CỐ Ý KHÔNG làm trong đợt này
+
+**`--ink3` và khoá zoom giữ nguyên toàn ứng dụng.** Khảo sát chỉ ra rằng
+`--ink3` `#93999D` cho **2,7–2,9:1** trên nền trắng và đang tô mọi `label.f`,
+`.hintline`, `.foot` ở 9,5–12,5px, trong khi `index.html` đặt `user-scalable=
+no, maximum-scale=1` nên Android **không phóng to được** — tức chữ vừa dưới
+ngưỡng đọc được vừa không phóng được. Đó là hai dòng sửa cả ứng dụng, nhưng
+Ngô Phú Cường chưa chọn nó, nên **chỉ nâng trong phạm vi `.claimcard`**. Đừng
+tự ý đổi biến chung: nó chạm mọi màn cùng lúc và cần anh quyết.
+
+### Đợt C — phần CHƯA chọn, đã khảo sát xong
+
+Ghi lại để khỏi khảo sát lại. Xếp theo ai bị thiệt:
+
+- **Sổ thu 146 dòng ≈ 10.200px KHÔNG có ô tìm**, ba nút hành động cao 23px
+  cách nhau 6px trong đó một nút tuyên bố "người thu đã nhận" (tiền thật), và
+  xác nhận một người là **mất chỗ đang cuộn**.
+- **Nút chép nằm trong `<button>` có `user-select:none`** (`app.css:53`), nên
+  khi clipboard hỏng thì lời khuyên "chép tay giúp nhé" là **bất khả thi**.
+- **Tab Tài khoản**: cửa duy nhất là một vòng tròn 34px không nhãn; nhánh
+  iPhone-chưa-cài là chữ thuần 13,5px mô tả một nút không có nhãn trên iOS;
+  `catch { box.textContent = '' }` làm cả ô biến mất, câm.
+- **Trợ lý KHKD**: bàn phím bật là mất cả câu hỏi lẫn nút Gửi.
+- **Tab Bài**: khối yêu cầu `.rub` tĩnh 272px đẩy mọi thứ bấm được xuống dưới
+  màn.
+- **Giao thương**: ô tìm 15px → iPhone **tự phóng to cả trang** và không thu
+  lại (luật 16px đã ghi từ 5/9, sót đúng một chỗ).
+- **Tư liệu**: 12 dòng trống chỉ người dùng vào một nút ✎ **không có** trên
+  màn của họ.
+- **`/sotay`**: 17 ảnh chụp thu còn **61%**, chữ trong ảnh 7–8px, không phóng
+  được. **`/rieng-tu`** mồ côi, không trang nào trỏ tới.
+- **`_headers` bỏ sót `/lich/*`, `/sotay/*`, `/rieng-tu/*`** nên ba trang ấy
+  vẫn dính `max-age=14400` — đúng cái bẫy đệm mà chính chú thích trong tệp ấy
+  cảnh báo.
+- **Sĩ số 134 vs 146** còn sai ở `/sotay` và `/giao-thuong`.
+- **`lib/ics.js` không phát `LOCATION:`** — có nó thì lịch iPhone/Android tự
+  cho nút chỉ đường, không cần link Google Maps rút gọn nào. Cần một cột
+  `dia_diem` trên `lich_hoc`.
+
 ## Ảnh chứng chỉ qua Google Drive — ĐÃ LÀM (18/9)
 
 Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu

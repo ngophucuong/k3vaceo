@@ -457,7 +457,8 @@ async function renderClaim(token) {
       : laNhanLai
       ? 'Hồ sơ này đã có người nhận, nhưng chưa từng có số điện thoại lưu trong hệ thống — không cần xác nhận thêm. Sửa các ô cần thiết rồi bấm Lưu.'
       : 'Thông tin lấy từ danh sách Ban tổ chức, có chỗ đã cũ hoặc sai. Sửa lại cho đúng rồi xác nhận.'}</p>
-    <label class="f">Họ tên</label><input value="${esc(member.full_name)}" disabled>
+    <label class="f">Họ tên</label>
+    <div class="vdoc">${esc(member.full_name)}</div>
     <label class="f">Email <span style="color:var(--due)">*</span></label>
     <input id="cEmail" value="${esc(member.email)}" placeholder="ten@congty.vn" inputmode="email" maxlength="160">
     <div class="hintline">Dùng để tự đăng nhập lại nếu mất link này.</div>
@@ -466,10 +467,13 @@ async function renderClaim(token) {
     ${batBuocSo ? `<div class="hintline">Bắt buộc — dùng để xác nhận đúng là bạn, không phải số muốn đổi sang.</div>` : ''}
     <label class="f">Chức vụ</label><input id="cTitle" value="${esc(member.title)}" maxlength="120">
     <label class="f">Đơn vị</label><input id="cCompany" value="${esc(member.company)}" maxlength="160">
-    <div id="cErr" class="errline" style="display:none"></div>
+    <div id="cErr" class="vmsg"></div>
     <button class="wide" id="cSubmit">${laNhanLai ? 'Lưu' : 'Xác nhận hồ sơ'}</button>`;
 
-  const showErr = msg => { $('#cErr').textContent = msg; $('#cErr').style.display = 'block'; };
+  // Cùng khối báo lỗi với /vao và /dangnhap (19/9). Trước nay là `.errline`
+  // 11,5px — đúng cỡ chữ nhỏ nhất của ứng dụng cho thông điệp quyết định của
+  // người vừa bấm vào link mời, tức người chưa từng dùng ứng dụng lần nào.
+  const showErr = msg => vaoBao('#cErr', msg);
   $('#cSubmit').onclick = async () => {
     const email = $('#cEmail').value.trim();
     if (!email) { showErr('Cần điền email để dùng lần sau.'); return; }
@@ -520,13 +524,13 @@ function renderLogin(emailSan) {
     <h1>Đăng nhập</h1>
     <p class="sub">Nhập email bạn đã khai. Chúng tôi gửi một mã 6 số tới hộp thư đó.</p>
     <label class="f">Email</label><input id="lgEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160" value="${esc(emailSan ?? '')}">
-    <div id="lgMsg" class="hintline" style="display:none"></div>
+    <div id="lgMsg" class="vmsg"></div>
     <button class="wide" id="lgSend">Gửi mã đăng nhập</button>
     <button class="wide ghost" id="lgPasskey" style="margin-top:10px">Đăng nhập bằng passkey</button>
-    <div class="foot" style="padding:14px 0 0">Lần đầu đăng nhập? <a href="/dangnhap" id="lgVao">Bấm đây để tự nhận diện</a> bằng tên và số điện thoại.</div>
+    <button class="vlink" id="lgVao">Lần đầu đăng nhập? <b>Tự nhận diện bằng tên và số điện thoại</b></button>
   </div></div>`;
   $('#lgPasskey').onclick = loginWithPasskey;
-  $('#lgVao').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap'); renderVao(); };
+  $('#lgVao').onclick = () => { history.pushState({}, '', '/dangnhap'); renderVao(); };
   $('#lgSend').onclick = async () => {
     const email = $('#lgEmail').value.trim();
     if (!email) return;
@@ -536,9 +540,7 @@ function renderLogin(emailSan) {
       await apiPost('/api/auth/otp', { email });
       renderNhapMa(email, 'Nếu email này có trong lớp, mã vừa được gửi tới đó.');
     } catch (e) {
-      $('#lgMsg').style.display = 'block';
-      $('#lgMsg').style.color = 'var(--due)';
-      $('#lgMsg').textContent = errText(e);
+      vaoBao('#lgMsg', errText(e));
       btn.disabled = false; btn.textContent = 'Gửi mã đăng nhập';
     }
   };
@@ -556,18 +558,17 @@ function renderNhapMa(email, loiNhan) {
     <label class="f">Mã trong thư</label>
     <input id="maOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
            placeholder="000000" style="font-size:28px;letter-spacing:8px;text-align:center">
-    <div id="maMsg" class="hintline" style="display:none"></div>
+    <div id="maMsg" class="vmsg"></div>
     <button class="wide" id="maOk">Đăng nhập</button>
     <button class="wide ghost" id="maLai" style="margin-top:10px">Gửi lại mã</button>
     <div class="foot" style="padding:14px 0 0">Không thấy thư? Xem cả mục Spam.</div>
   </div></div>`;
   const oMa = $('#maOtp');
   oMa.focus();
-  const bao = (t, do_ = true) => {
-    $('#maMsg').style.display = 'block';
-    $('#maMsg').style.color = do_ ? 'var(--due)' : '';
-    $('#maMsg').textContent = t;
-  };
+  // `do_` false = tin báo bình thường ("đã gửi mã mới"). Nền xám trung tính
+  // chứ KHÔNG phải --go-bg: cặp màu xanh trong sản phẩm này có đúng một nghĩa
+  // (người thu đã nhận tiền), mượn nó ở đây là làm hỏng nghĩa ấy.
+  const bao = (t, do_ = true) => vaoBao('#maMsg', t, null, !do_);
   const guiDi = async () => {
     const code = oMa.value.replace(/\D/g, '');
     if (code.length !== 6) return bao('Mã gồm đúng 6 chữ số.');
@@ -604,14 +605,49 @@ function renderNhapMa(email, loiNhan) {
    Passkey chỉ hiện ở tab Tài khoản sau khi xong bước 3. */
 const VAO = { person: null };
 
-function vaoShell(title, sub, body) {
+/* `buoc` là số thứ tự trong ba bước, hoặc null cho những màn nằm NGOÀI chuỗi
+   (thiếu số, xong rồi). Trước 19/9 không màn nào có chỉ dấu, nên bước nào
+   cũng trông như bước cuối và không ai biết còn bao xa — mà "còn bao xa" là
+   câu hỏi quyết định người ta đi tiếp hay đóng trang. */
+function vaoShell(title, sub, body, buoc) {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
-    <div class="lb">k3vaceo · Khoá K03</div>
+    <div class="lb"><span>k3vaceo · Khoá K03</span>${
+      buoc ? `<span class="bw">Bước ${buoc} / 3</span>` : ''}</div>
     <h1>${esc(title)}</h1>
     <p class="sub">${sub}</p>
     ${body}
   </div></div>`;
+}
+
+/* MỘT khối báo lỗi cho cả ba màn vào, thay cho `.hintline` + đổi màu chữ.
+   Nhận thêm `lam` — việc cần làm tiếp — vì một câu lỗi không nói được đường
+   ra thì chỉ làm người ta đứng lại. Tách hai dòng để câu chính ngắn lại:
+   bản cũ nhồi cả nguyên nhân lẫn cách chữa vào một câu 203 ký tự ở 11,5px. */
+function vaoBao(id, cau, lam, tin) {
+  const o = $(id);
+  if (!o) return;
+  o.className = 'vmsg hien' + (tin ? ' tin' : '');
+  o.innerHTML = `${esc(cau)}${lam ? `<span class="lam">${esc(lam)}</span>` : ''}`;
+}
+
+/* Dòng chọn tên ở bước 1 — dùng CHUNG giữa `/vao` và đường công khai của
+   `/totnghiep`. Hai bản sao thì sớm muộn lệch nhau, và ở đây chỗ lệch sẽ nằm
+   đúng trên cú chạm đầu tiên của hai nhóm người khó vào nhất.
+
+   Cả dòng là một <button> cao tối thiểu 56px. Trước 19/9 chỉ chữ "là tôi"
+   bấm được: 12px trong một ô cao 18px, sát mép phải — nhỏ hơn mọi nút khác
+   trên màn, ở đúng cú chạm quan trọng nhất của sản phẩm. Vẫn giữ chữ ấy làm
+   dấu hiệu bấm được, nhưng nay nó là <span> chứ không phải nút lồng nút. */
+function veDongChon(ds, conNua) {
+  return `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
+    <button class="fdpick" data-rid="${p.roster_id}">
+      <span class="x"><b>${esc(p.full_name)}</b>
+        <span class="d">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</span>
+      </span><span class="ch">là tôi</span>
+    </button>`).join('')}
+  </div></div>${conNua ? `<div class="hintline">Còn ${conNua} người nữa cũng khớp —
+    gõ thêm chữ (họ, tên đệm) cho danh sách ngắn lại.</div>` : ''}`;
 }
 
 function renderVao() { vaoBuoc1(); }
@@ -621,9 +657,9 @@ function vaoBuoc1() {
     <label class="f">Họ tên</label>
     <input id="vTen" placeholder="ví dụ: cuong" autocomplete="name" maxlength="60">
     <div id="vDs" style="margin-top:10px"></div>
-    <div class="foot" style="padding:14px 0 0">Đã khai email rồi?
-      <a href="/dangnhap/email" id="vDn">Đăng nhập bằng email</a>.</div>`);
-  $('#vDn').onclick = e => { e.preventDefault(); history.pushState({}, '', '/dangnhap/email'); renderLogin(); };
+    <button class="vlink" id="vDn">Đã khai email rồi? <b>Đăng nhập bằng email</b></button>`,
+    1);
+  $('#vDn').onclick = () => { history.pushState({}, '', '/dangnhap/email'); renderLogin(); };
 
   let hen;
   // Lượt tìm gần nhất, chỉ giữ khi máy chủ trả về ĐỦ (dưới 12 người, tức không
@@ -646,6 +682,10 @@ function vaoBuoc1() {
         ds = truoc.ds.filter(p => nhu(p.full_name).includes(nhu(q)));
         tong = ds.length;
       } else {
+        // 350ms chờ gõ CỘNG một lượt gọi trên WiFi hội trường là vài giây màn
+        // hình đứng im — mà đứng im là thứ làm người ta gõ lại từ đầu hoặc bỏ
+        // cuộc. Nói ra rằng đang tìm, dù chỉ một dòng.
+        $('#vDs').innerHTML = '<div class="vdang">Đang tìm trong danh sách lớp…</div>';
         try {
           const kq = await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q));
           ds = kq.people; tong = kq.tong_khop ?? ds.length;
@@ -660,13 +700,7 @@ function vaoBuoc1() {
       }
       // Cùng bản vá của /totnghiep: danh sách cắt ở 12 thì phải nói ra. Đây là
       // cửa đăng nhập, nên người không thấy tên mình sẽ bỏ luôn ứng dụng.
-      const conNua = Math.max(0, tong - ds.length);
-      $('#vDs').innerHTML = `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
-        <div class="fd"><div class="x"><b>${esc(p.full_name)}</b>
-          <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
-        </div><button class="lnk" data-rid="${p.roster_id}">là tôi</button></div>`).join('')}
-      </div></div>${conNua ? `<div class="hintline">Còn ${conNua} người nữa cũng khớp —
-        gõ thêm chữ (họ, tên đệm) cho danh sách ngắn lại.</div>` : ''}`;
+      $('#vDs').innerHTML = veDongChon(ds, Math.max(0, tong - ds.length));
       document.querySelectorAll('#vDs [data-rid]').forEach(b => {
         b.onclick = () => {
           const p = ds.find(x => String(x.roster_id) === b.dataset.rid);
@@ -690,15 +724,16 @@ function vaoBuoc2() {
     `Nhập số điện thoại để đối chiếu với số Ban tổ chức đang giữ. <b>Không có tin nhắn nào được gửi tới số này</b> — chỉ dùng để xác nhận đúng người.`, `
     <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
       <b>${esc(p.full_name)}</b>
-      <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}${p.company ? '<br>' + esc(p.company) : ''}</div>
-      ${p.da_chuyen_nhom ? `<div style="font-size:11.5px;color:var(--ink3);margin-top:6px">
+      <div style="font-size:13px;color:var(--ink2);margin-top:3px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}${p.company ? '<br>' + esc(p.company) : ''}</div>
+      ${p.da_chuyen_nhom ? `<div style="font-size:12.5px;color:var(--ink2);margin-top:6px">
         Danh sách ngày 15/8 ghi bạn ở ${esc(p.group_label_goc)}; bạn đã được chuyển sang ${esc(p.group_label)}.</div>` : ''}
     </div></div>
     <label class="f">Số điện thoại</label>
     <input id="vSdt" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="09xx xxx xxx">
-    <div id="vMsg" class="hintline" style="display:none"></div>
+    <div id="vMsg" class="vmsg"></div>
     <button class="wide" id="vOk">Tiếp tục</button>
-    <button class="wide ghost" id="vLui" style="margin-top:10px">Không phải tôi, chọn lại</button>`);
+    <button class="wide ghost" id="vLui" style="margin-top:10px">Không phải tôi, chọn lại</button>`,
+    2);
   $('#vLui').onclick = vaoBuoc1;
 
   const tiep = async () => {
@@ -715,13 +750,19 @@ function vaoBuoc2() {
       // Chưa có số trong danh sách gốc là chuyện của dữ liệu, không phải người
       // dùng gõ sai — nói khác đi kẻo họ ngồi thử lại cả buổi.
       if (e?.data?.error === 'phone_missing_in_roster') return vaoThieuSo(e.data);
-      $('#vMsg').style.display = 'block';
-      $('#vMsg').style.color = 'var(--due)';
-      // Ở riêng ô này, "thử nhiều lần" nghĩa là gõ sai số nhiều lần — nói đúng
-      // như vậy thì người ta biết phải làm gì tiếp.
-      $('#vMsg').textContent = e?.data?.error === 'rate_limited'
-        ? 'Số điện thoại đã nhập sai nhiều lần. Chờ khoảng một tiếng rồi thử lại, hoặc xin trưởng nhóm một link đăng nhập để vào ngay.'
-        : errText(e);
+      // Câu chính NGẮN, đường ra tách xuống dòng riêng. Bản cũ nhồi cả hai vào
+      // một câu 203 ký tự ở 11,5px màu nhạt — đúng chỗ người ta bỏ cuộc.
+      // Và ở riêng ô này, "thử nhiều lần" nghĩa là gõ SAI SỐ nhiều lần.
+      const ma = e?.data?.error;
+      if (ma === 'rate_limited') {
+        vaoBao('#vMsg', 'Số này đã nhập sai nhiều lần nên tạm khoá.',
+          'Chờ khoảng một tiếng rồi thử lại — hoặc nhắn trưởng nhóm xin một link đăng nhập để vào ngay.');
+      } else if (ma === 'phone_mismatch') {
+        vaoBao('#vMsg', 'Số không khớp với số Ban tổ chức đang giữ.',
+          'Đã đổi số? Nhắn trưởng nhóm xin link đăng nhập, vào rồi tự sửa số trong tab Tài khoản.');
+      } else {
+        vaoBao('#vMsg', errText(e));
+      }
       $('#vOk').disabled = false; $('#vOk').textContent = 'Tiếp tục';
     }
   };
@@ -735,7 +776,7 @@ function vaoThieuSo(d) {
     'Danh sách lớp chưa có số điện thoại của bạn, nên ứng dụng chưa tự xác nhận được đúng người.', `
     <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
       <b>${esc(d.full_name ?? '')}</b>
-      <div style="font-size:12px;color:var(--ink3);margin-top:3px">${esc(d.group_label ?? '')}</div>
+      <div style="font-size:13px;color:var(--ink2);margin-top:3px">${esc(d.group_label ?? '')}</div>
     </div></div>
     <div class="mut">Liên hệ <b>Ban cán sự lớp</b> hoặc <b>trưởng nhóm</b> của bạn để xin một
       <b>link đăng nhập</b>. Bấm vào link là vào được ngay, không phải làm gì thêm.</div>
@@ -753,9 +794,10 @@ function vaoBuoc3() {
       : 'Còn một ô nữa là xong. Email là đường vào lại khi bạn đổi máy, nên hãy dùng hộp thư bạn mở được.', `
     <label class="f">Email</label>
     <input id="vEmail" inputmode="email" autocomplete="email" maxlength="160" placeholder="ten@congty.vn">
-    <div id="vMsg3" class="hintline" style="display:none"></div>
+    <div id="vMsg3" class="vmsg"></div>
     <button class="wide" id="vGui">${VAO.daNhanCho ? 'Gửi mã cho tôi' : 'Vào ứng dụng'}</button>
-    <button class="wide ghost" id="vLui3" style="margin-top:10px">Quay lại</button>`);
+    <button class="wide ghost" id="vLui3" style="margin-top:10px">Quay lại</button>`,
+    3);
   $('#vLui3').onclick = vaoBuoc2;
 
   const gui = async () => {
@@ -773,11 +815,12 @@ function vaoBuoc3() {
         vaoPasskey(email);
       }
     } catch (e) {
-      $('#vMsg3').style.display = 'block';
-      $('#vMsg3').style.color = 'var(--due)';
-      $('#vMsg3').textContent = e?.data?.error === 'email_taken'
-        ? `Email này đã thuộc về ${e.data.taken_by}. Dùng email khác, hoặc nhắn trưởng nhóm nếu bị nhầm.`
-        : errText(e);
+      if (e?.data?.error === 'email_taken') {
+        vaoBao('#vMsg3', `Email này đã thuộc về ${e.data.taken_by}.`,
+          'Dùng một email khác — hoặc nhắn trưởng nhóm nếu bạn nghĩ đây là nhầm lẫn.');
+      } else {
+        vaoBao('#vMsg3', errText(e));
+      }
       $('#vGui').disabled = false;
       $('#vGui').textContent = VAO.daNhanCho ? 'Gửi mã cho tôi' : 'Vào ứng dụng';
     }
@@ -797,7 +840,7 @@ function vaoPasskey(email) {
   const co = passkeySupported();
   vaoShell('Xong rồi', 'Bạn đã vào được ứng dụng.', `
     <div class="card" style="margin-bottom:14px"><div class="cb" style="padding:12px 14px">
-      <div style="font-size:11.5px;color:var(--ink3)">Email đăng nhập lại</div>
+      <div style="font-size:12px;color:var(--ink2)">Email đăng nhập lại</div>
       <b>${esc(email)}</b>
       <div style="font-size:12px;color:var(--ink2);margin-top:5px">Sai địa chỉ này thì đổi máy là
         không vào lại được. Sửa được trong tab Tài khoản bất cứ lúc nào.</div>
@@ -4598,13 +4641,10 @@ function tnckTimTen() {
       // DANH SÁCH BỊ CẮT thì phải NÓI RA. Giấu mức cắt là để người không thấy
       // tên mình kết luận Ban tổ chức bỏ sót họ — mà đây là bước đầu tiên của
       // lối đi DUY NHẤT dành cho 38 người không đăng nhập được.
-      const conNua = Math.max(0, tong - ds.length);
-      $('#tnckDs').innerHTML = `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
-        <div class="fd"><div class="x"><b>${esc(p.full_name)}</b>
-          <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
-        </div><button class="lnk" data-rid="${p.roster_id}">là tôi</button></div>`).join('')}
-      </div></div>${conNua ? `<div class="hintline">Còn ${conNua} người nữa cũng khớp —
-        gõ thêm chữ (họ, tên đệm) cho danh sách ngắn lại.</div>` : ''}`;
+      // Dùng CHUNG veDongChon() với /vao — cả dòng bấm được, cao tối thiểu
+      // 56px. Hai bản sao thì sớm muộn lệch nhau, và chỗ lệch sẽ nằm đúng
+      // trên cú chạm đầu tiên của 38 người khó vào nhất.
+      $('#tnckDs').innerHTML = veDongChon(ds, Math.max(0, tong - ds.length));
       document.querySelectorAll('#tnckDs [data-rid]').forEach(b => {
         b.onclick = () => {
           TNCK.nguoi = ds.find(x => String(x.roster_id) === b.dataset.rid);

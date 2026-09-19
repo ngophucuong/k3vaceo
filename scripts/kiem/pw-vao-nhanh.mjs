@@ -107,11 +107,86 @@ const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
              hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
 });
 await pb.goto(BL + '/vao'); await pb.waitForTimeout(1200);
-await pb.fill('#vTen', 'thanh nga'); await pb.waitForTimeout(1200);
-await pb.locator('[data-rid]').first().click(); await pb.waitForTimeout(500);
+
+/* ═══ BỐN CHỖ SỬA NGÀY 19/9 — mỗi phép ứng với đúng một chỗ ═══
+   Ba bước này là ấn tượng đầu tiên của 77 người chưa vào được ứng dụng. */
+
+// C3 — CHỈ DẤU BƯỚC. Trước nay không màn nào có, nên bước nào cũng trông như
+// bước cuối. Đi hết cả ba số chứ không chỉ hỏi "có chữ Bước không": một bản
+// vá ghi cứng "Bước 1 / 3" ở mọi màn vẫn xanh với phép hỏi một lần.
+// BẪY ĐÃ GHI TRONG CLAUDE.md: `innerText` của Chrome trả chữ ĐÃ ÁP
+// `text-transform`, mà `.lb` là chữ hoa — nên so bằng `textContent`.
+const soBuoc = async () =>
+  (await pb.locator('.claimcard .lb .bw').evaluate(e => e.textContent)).trim();
+ok('bước 1 tự xưng đúng số', (await soBuoc()) === 'Bước 1 / 3');
+
+// C4b — ĐƯỜNG CHUYỂN LUỒNG là một NÚT thật. Trước nay là liên kết 11,5px
+// trong .foot màu --ink3; ai đi nhầm luồng là người ít kiên nhẫn nhất còn lại.
+const hDn = await pb.locator('#vDn').evaluate(e => e.getBoundingClientRect().height);
+ok(`lối "đăng nhập bằng email" cao ${Math.round(hDn)}px (cần ≥ 44)`, hDn >= 44);
+
+// C4a — DẤU HIỆU ĐANG TÌM. Debounce 350ms cộng một lượt gọi trên WiFi hội
+// trường là vài giây màn hình đứng im. Làm chậm lượt gọi để nhìn thấy được
+// khoảng ấy — trên localhost nó trôi qua trong vài mili giây.
+// Gỡ route bằng `unroute` làm lượt gọi ĐANG BAY chết với "Route is already
+// handled" — dùng một cờ, route ở nguyên đó.
+let cham = true;
+await pb.route('**/api/wizard/roster/search*', async r => {
+  if (cham) await new Promise(x => setTimeout(x, 900));
+  await r.continue();
+});
+await pb.fill('#vTen', 'thanh nga'); await pb.waitForTimeout(700);
+ok('trong lúc chờ máy chủ thì nói ra là đang tìm',
+   await pb.locator('#vDs .vdang').count() === 1);
+await pb.waitForTimeout(1400);
+cham = false;
+
+// C1 — CẢ DÒNG BẤM ĐƯỢC, và đây là phép CÓ RĂNG nhất của cả mục.
+// Trước 19/9 chỉ chữ "là tôi" bấm được: 12px trong ô cao 18px, sát mép phải —
+// cú chạm quan trọng nhất của sản phẩm, nhỏ hơn mọi nút khác trên màn.
+// Bấm vào ĐÚNG CHỮ TÊN chứ không vào chữ "là tôi": bấm chỗ cũ thì một bản vá
+// chỉ nới chữ "là tôi" ra cũng xanh.
+const dong = pb.locator('.fdpick').first();
+const hDong = await dong.evaluate(e => e.getBoundingClientRect().height);
+ok(`dòng tên cao ${Math.round(hDong)}px (cần ≥ 44)`, hDong >= 44);
+ok('vẫn giữ chữ "là tôi" làm dấu hiệu bấm được',
+   await dong.locator('.ch').count() === 1);
+await dong.locator('.x b').click(); await pb.waitForTimeout(600);
+ok('chạm vào CHÍNH TÊN là sang bước 2', await pb.locator('#vSdt').count() === 1);
+
 ok('người có số thì hiện ô số điện thoại', await pb.locator('#vSdt').count() === 1);
-await pb.fill('#vSdt', CO2.sdt); await pb.click('#vOk'); await pb.waitForTimeout(1200);
+ok('bước 2 tự xưng đúng số', (await soBuoc()) === 'Bước 2 / 3');
+
+/* C2 — KHỐI BÁO LỖI THẬT. Trước nay là `.hintline` 11,5px màu --ink3 (2,7:1)
+   chỉ đổi màu chữ khi hỏng, và câu phone_mismatch dài 203 ký tự. Đó là thông
+   điệp QUYẾT ĐỊNH BỎ CUỘC, đặt ở cỡ chữ nhỏ nhất và màu nhạt nhất của cả ứng
+   dụng, cho một lớp 35–55 tuổi đang đứng ở cửa.
+
+   Đọc màu THẬT bằng getComputedStyle rồi so với chính biến --due-bg lấy từ
+   stylesheet — ghi cứng mã màu thì đổi biến là phép kiểm vẫn xanh (cùng bài
+   học đã ghi cho pw-totnghiep.mjs). */
+await pb.fill('#vSdt', '0900000009'); await pb.click('#vOk'); await pb.waitForTimeout(1500);
+const oLoi = pb.locator('#vMsg');
+ok('số sai thì hiện khối báo lỗi', await oLoi.isVisible());
+const doLoi = await oLoi.evaluate(e => {
+  const c = getComputedStyle(e);
+  const m = document.createElement('div');
+  m.style.color = 'var(--due-bg)'; document.body.appendChild(m);
+  const nen = getComputedStyle(m).color; m.remove();
+  return { co: parseFloat(c.fontSize), nen: c.backgroundColor, mong: nen,
+           cau: (e.firstChild?.textContent ?? '').trim() };
+});
+ok(`chữ ${doLoi.co}px (cần ≥ 13, trước nay 11,5)`, doLoi.co >= 13);
+ok('nền là cặp màu --due-bg, không phải nền trắng trơn',
+   doLoi.nen === doLoi.mong);
+ok(`câu chính dài ${doLoi.cau.length} ký tự (cần ≤ 90; bản cũ 203)`,
+   doLoi.cau.length > 0 && doLoi.cau.length <= 90);
+ok('và nói ra đường đi tiếp, không chỉ báo hỏng',
+   await oLoi.locator('.lam').count() === 1);
+
+await pb.fill('#vSdt', CO2.sdt); await pb.click('#vOk'); await pb.waitForTimeout(1500);
 ok('sang bước email', await pb.locator('#vEmail').count() === 1);
+ok('bước 3 tự xưng đúng số', (await soBuoc()) === 'Bước 3 / 3');
 ok('nút ghi "Vào ứng dụng", không phải "Gửi mã"',
    (await pb.locator('#vGui').innerText()).includes('Vào ứng dụng'));
 await pb.fill('#vEmail', 'nga.pt@congty.vn'); await pb.click('#vGui'); await pb.waitForTimeout(1800);
