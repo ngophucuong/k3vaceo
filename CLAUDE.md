@@ -2077,6 +2077,78 @@ Ghi lại để khỏi khảo sát lại. Xếp theo ai bị thiệt:
   cho nút chỉ đường, không cần link Google Maps rút gọn nào. Cần một cột
   `dia_diem` trên `lich_hoc`.
 
+## Dải ba ô tiến độ `/totnghiep` thành THANH TAB (19/9)
+
+Ngô Phú Cường gửi ảnh chụp, khoanh đỏ dải ba ô **Hồ sơ · Đề tài · Dự Lễ**:
+*"3 chip khoanh đỏ cũng bấm được nhé"*. Chúng vốn là ba `<span>` trần — muốn
+mở một khối thì phải cuộn xuống tìm đúng `<summary>`. Mà dải ấy nằm ngay dưới
+băng đầu trang và trông y như một thanh tab, nên chạm vào là chuyện đương
+nhiên; chạm mà không gì xảy ra thì đọc lên như ứng dụng đơ.
+
+### HAI DẢI XẾP NGƯỢC NHAU — chỗ sai được trong im lặng
+
+| ô | nhãn | khối | vị trí khối |
+|---|---|---|---|
+| 0 | Hồ sơ | `hoso` | thứ **2** |
+| 1 | Đề tài | `detai` | thứ **3** |
+| 2 | Dự Lễ | `gala` | thứ **1** (mở sẵn vì hạn 21h 19/9 gấp nhất) |
+
+Ánh xạ theo CHỈ SỐ thì chạm "Hồ sơ" mở ra Gala, và **không chỗ nào báo lỗi**.
+Nên `tnOTienDo()` nhận `sec` làm tham số ĐẦU TIÊN và ba nơi gọi truyền khoá
+tường minh. Phép kiểm cũng phải soi theo **tên `data-sec`**, tuyệt đối không
+theo vị trí — một phép soi theo chỉ số sẽ xanh với đúng bản vá hỏng.
+
+### Không viết lại accordion, và không vẽ lại màn
+
+Listener sẵn có nghe **`toggle` của `<details>`**, không nghe `click`. Nên
+handler của ô chỉ đặt `el.open = true` là việc gập hai khối kia và gán `TN_MO`
+tự chạy theo — một nguồn sự thật, không có bản sao logic.
+
+**TUYỆT ĐỐI không gọi `veTotNghiep()`** trong handler: hàm ấy vẽ lại toàn bộ
+`#root`, tức xoá trắng mọi ô người ta đang gõ dở ở hai khối kia.
+
+### Dấu "đang mở" đồng bộ trong listener `toggle`, KHÔNG trong handler của ô
+
+`tnSonChip()` được gọi từ trong chính listener `toggle`. Đặt nó ở handler của
+ô thì mở khối bằng `<summary>` — đường vốn có từ đầu — sẽ không làm dấu ấy
+đổi, và hai chỗ nói hai chuyện ngay lần đầu có người chạm summary. Có phép
+kiểm riêng cho đúng chiều ấy (bấm summary rồi soi dải ô).
+
+### `outline` chứ không `box-shadow`, và vì sao chàm là đúng luật
+
+Ô đã xong dùng `box-shadow` cho viền xanh `--go-line`; ghi đè bằng box-shadow
+là mất viền ấy. `outline:2px solid var(--le); outline-offset:-2px` chồng lên
+được và nằm trong ô nên không đội lưới. Đã chụp cả hai tổ hợp ở 390px —
+ô-trắng-đang-mở và ô-xanh-đang-mở — cả hai đều đọc được.
+
+Chàm `--le` ở đây là **nối tiếp ngôn ngữ đã có**, không phải màu mới:
+`.tnsec[open]` vốn đã dùng đúng chàm ấy cho dải trái, viền và nền đầu khối. Ô
+và khối nói cùng một chuyện ("bạn đang ở đây") nên phải cùng một màu — đúng vế
+"viền khối đang mở" mà luật `--le` cho phép, và không phải một trạng thái.
+
+### `toggle` là sự kiện KHÔNG ĐỒNG BỘ — và nói thẳng cái chưa chứng minh được
+
+Gán `el.open = true` rồi cuộn ngay thì cú cuộn được tính TRƯỚC lúc accordion
+gập hai khối kia, tức nhắm vào một toạ độ sắp không còn đúng. Handler vì vậy
+chờ `toggle` (`{ once: true }`) rồi mới cuộn, và có nhánh riêng cho khối đang
+mở sẵn — gán `open = true` lên khối đã mở thì **không bắn `toggle` nào cả**,
+thiếu nhánh ấy là chạm vào ô của khối đang mở thì không có gì xảy ra.
+
+**Nhưng phải ghi đúng sự thật: bản ngây thơ KHÔNG hỏng ở bố cục hiện nay.** Đã
+gỡ bản vá ra chạy đối chứng và bộ kiểm vẫn xanh. Đo được lý do: gập khối Hồ sơ
+làm trần cuộn tụt từ **2265px xuống 468px**, nên trình duyệt KẸP cú cuộn lại
+đúng vào chỗ cần tới (đỉnh khối ở 15px so với 36px của bản có vá — mắt không
+phân biệt được). Cú kẹp ấy chỉ cứu khi khối đích là khối CUỐI và khối vừa gập
+là khối dài nhất nằm trên nó; thêm một khối thứ tư hoặc đổi thứ tự là mất. Giữ
+cách chờ `toggle` để không phải nhớ điều kiện ấy — nhưng **đừng ghi nó vào sổ
+như một lỗi đã bắt được**, và bộ kiểm cũng không phân biệt được hai bản.
+
+### Chưa kiểm chứng được
+
+Cảm giác chạm thật trên điện thoại. Bộ kiểm chứng minh được ánh xạ đúng khối,
+vùng chạm 48px, dấu đồng bộ hai chiều và việc cuộn có xảy ra — không chứng
+minh được cú cuộn mượt ấy dễ chịu hay chóng mặt với người thật.
+
 ## Ảnh chứng chỉ qua Google Drive — ĐÃ LÀM (18/9)
 
 Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu

@@ -112,7 +112,10 @@ ok('gập hết cũng được', (await dangMo()).filter(Boolean).length === 0);
 // Trả lại khối Gala cho các phép bên dưới.
 await p.locator('.tnsec').first().locator('summary').click();
 await p.waitForTimeout(400);
-ok('có ba chip tiến độ', await p.locator('.tnprog > span').count() === 3);
+// NÚT THẬT, không phải <span>. Ngô Phú Cường 19/9: "3 chip khoanh đỏ cũng bấm
+// được nhé". <button> chứ không <span role="button">: bàn phím và trình đọc
+// màn hình hiểu sẵn, khỏi phải tự viết keydown cho Enter/Space.
+ok('có ba ô tiến độ, và cả ba là NÚT thật', await p.locator('.tnprog > button').count() === 3);
 
 /* BA Ô PHẢI NẰM CÙNG MỘT HÀNG. Ngô Phú Cường chụp màn hình 19/9: ở khổ 390px
    ô thứ ba rơi xuống dòng hai. Rơi dòng là mất đúng công dụng của dải này —
@@ -122,6 +125,70 @@ ok('có ba chip tiến độ', await p.locator('.tnprog > span').count() === 3);
 const hangChip = await p.locator('.tnprog').evaluate(el =>
   [...new Set([...el.children].map(c => c.offsetTop))].length);
 ok(`ba ô tiến độ nằm CÙNG một hàng (đếm được ${hangChip} hàng)`, hangChip === 1);
+
+const caoChip = await p.locator('.tnprog > button')
+  .evaluateAll(els => els.map(e => Math.round(e.getBoundingClientRect().height)));
+ok(`ba ô cao ${caoChip.join('/')}px (cần ≥ 44)`, caoChip.every(h => h >= 44));
+
+/* ── DẢI Ô LÀ MỘT THANH TAB: chạm ô nào mở khối ấy ───────────────────────
+   PHÉP CÓ RĂNG NHẤT CỦA CẢ MỤC, vì hai dải xếp NGƯỢC NHAU:
+     ô   0 Hồ sơ · 1 Đề tài · 2 Dự Lễ
+     khối 0 gala  · 1 hoso   · 2 detai
+   Ánh xạ theo CHỈ SỐ thì chạm "Hồ sơ" mở ra Gala, và không chỗ nào báo lỗi.
+   Nên phải soi theo ĐÚNG TÊN `data-sec`, tuyệt đối không theo vị trí. */
+console.log('\n── Ba ô tiến độ bấm được, và mở ĐÚNG khối của nó ──');
+const khoiDangMo = async () => p.locator('.tnsec[open]').getAttribute('data-sec');
+for (const [oTen, secMong] of [['Hồ sơ', 'hoso'], ['Đề tài', 'detai'], ['Dự Lễ', 'gala']]) {
+  await p.locator(`.tnprog > button[data-tnmo="${secMong}"]`).click();
+  await p.waitForTimeout(700);
+  const thay = await khoiDangMo();
+  ok(`chạm ô "${oTen}" → mở khối "${secMong}" (đang mở: ${thay})`, thay === secMong);
+  ok(`… và đúng MỘT khối mở, hai khối kia gập`,
+     (await p.locator('.tnsec[open]').count()) === 1);
+  ok(`… ô "${oTen}" được đánh dấu đang mở, hai ô kia thì không`,
+     (await p.locator('.tnprog > button.dangmo').count()) === 1
+     && (await p.locator(`.tnprog > button[data-tnmo="${secMong}"]`)
+           .evaluate(e => e.classList.contains('dangmo'))));
+}
+
+/* MỘT NGUỒN SỰ THẬT. Mở khối bằng <summary> — đường vốn có từ đầu, không đụng
+   tới ô nào — thì dấu trên dải ô VẪN phải đổi theo. Bỏ phép này thì một bản vá
+   đồng bộ dấu trong handler của ô vẫn xanh, và hai chỗ nói hai chuyện ngay lần
+   đầu có người chạm summary. */
+await p.locator('.tnsec[data-sec="hoso"] > summary').click();
+await p.waitForTimeout(400);
+ok('mở bằng <summary> thì dấu trên dải ô cũng đổi theo',
+   (await p.locator('.tnprog > button.dangmo').count()) === 1
+   && (await p.locator('.tnprog > button[data-tnmo="hoso"]')
+         .evaluate(e => e.classList.contains('dangmo'))));
+
+/* VÀ PHẢI CUỘN TỚI. Biểu mẫu dài hơn một màn điện thoại: mở một khối nằm dưới
+   mép màn mà không cuộn thì chạm xong màn hình đứng im, đọc lên y như hỏng.
+   Đo cả TRƯỚC lẫn SAU — chỉ đo "sau" thì phép kiểm vẫn xanh khi khối vốn đã
+   nằm sẵn trong màn, tức chẳng chứng minh được gì.
+
+   ĐIỀU PHÉP NÀY KHÔNG CHỨNG MINH, nói thẳng: nó không phân biệt được "chờ
+   `toggle` rồi mới cuộn" với "cuộn ngay". Đã thử gỡ bản vá ấy ra và phép kiểm
+   vẫn xanh — vì gập khối Hồ sơ làm trần cuộn tụt xuống nên trình duyệt kẹp cú
+   cuộn lại đúng chỗ cần tới. Xem chú thích trong `app.js` cho số đo. */
+await p.evaluate(() => window.scrollTo(0, 0));
+await p.waitForTimeout(300);
+const dinhTruoc = await p.locator('.tnsec[data-sec="detai"]')
+  .evaluate(e => e.getBoundingClientRect().top);
+await p.locator('.tnprog > button[data-tnmo="detai"]').click();
+await p.waitForTimeout(900);
+const dinhSau = await p.locator('.tnsec[data-sec="detai"]')
+  .evaluate(e => e.getBoundingClientRect().top);
+const caoMan = await p.evaluate(() => window.innerHeight);
+ok(`khối "Đề tài" vốn nằm NGOÀI màn (đỉnh ở ${Math.round(dinhTruoc)}px / màn ${caoMan}px)`,
+   dinhTruoc > caoMan);
+ok(`chạm ô là cuộn tới, khối vào trong màn (đỉnh nay ${Math.round(dinhSau)}px)`,
+   dinhSau >= -2 && dinhSau < caoMan);
+
+// Trả lại khối Gala cho các phép bên dưới.
+await p.locator('.tnprog > button[data-tnmo="gala"]').click();
+await p.evaluate(() => window.scrollTo(0, 0));
+await p.waitForTimeout(700);
 
 /* ── Mã QR phải NHÌN THẤY ĐƯỢC khi chưa chuyển phí ───────────────────────
    Ngô Phú Cường 18/9: "Câu hỏi đã chuyển khoản 1.000.000 chưa, nếu chưa thì
@@ -156,7 +223,7 @@ ok('chạm lại thì bỏ chọn được', await p.locator('#tnLv .fc.on').cou
 await p.locator('#tnLv .fc').nth(0).click(); await p.waitForTimeout(120);
 await p.fill('#tnDeTai', 'KIEMTN Chuỗi nhà thuốc khu công nghiệp');
 await p.click('#tnLuuDeTai'); await p.waitForTimeout(1800);
-const chipSauDeTai = await p.locator('.tnprog > span').allInnerTexts();
+const chipSauDeTai = await p.locator('.tnprog > button').allInnerTexts();
 ok(`chip "Đề tài" thành ✓ xong dù CHƯA có link (${chipSauDeTai[1].replace(/\n/g, ' ')})`,
    chipSauDeTai[1].includes('xong'));
 ok('không lỗi JS sau khi lưu đề tài: ' + (loi.join(' | ') || 'sạch'), loi.length === 0);
@@ -205,7 +272,7 @@ ok('bấm lại thì chữ vừa gõ VẪN CÒN, không bị ẩn rồi xoá',
 
 // ── 5. Lưu từng phần RIÊNG ───────────────────────────────────────────────
 console.log('\n── Ba phần lưu riêng: chip tiến độ đổi đúng một cái ──');
-const chipTruoc = await p.locator('.tnprog > span').allInnerTexts();
+const chipTruoc = await p.locator('.tnprog > button').allInnerTexts();
 // CHỈ hai chip Hồ sơ và Dự Lễ — chip Đề tài đã ✓ từ mục trên, vì mục ấy thật
 // sự lưu một đề tài. Ghim "cả ba đều chưa điền" ở đây là bộ kiểm tự mâu thuẫn
 // với chính bước nó vừa chạy.
@@ -218,7 +285,7 @@ await p.waitForTimeout(150);
 await p.click('#tnLuuGala');
 await p.waitForTimeout(1600);
 
-const chipSau = await p.locator('.tnprog > span').allInnerTexts();
+const chipSau = await p.locator('.tnprog > button').allInnerTexts();
 ok(`chip "Dự Lễ" thành ✓ xong (${chipSau[2]})`, chipSau[2].includes('xong'));
 ok(`chip "Hồ sơ" VẪN "chưa điền" (${chipSau[0]}) — lưu một phần không đụng phần kia`,
    chipSau[0].includes('chưa điền'));

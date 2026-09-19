@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Năm mươi ba phép đối chứng đáng giữ nhất
+## Năm mươi lăm phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -653,6 +653,28 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
 
    Bẫy kèm theo, đã vấp: gỡ route bằng `unroute` làm lượt gọi ĐANG BAY chết
    với `Route is already handled`. Dùng một cờ, để route ở nguyên đó.
+
+54. **Ánh xạ "chạm ô nào mở khối nào" phải soi theo TÊN, không theo chỉ số.**
+   Dải ba ô tiến độ của `/totnghiep` xếp Hồ sơ · Đề tài · Dự Lễ, còn ba khối
+   xếp gala · hoso · detai — **NGƯỢC NHAU**. Một bản vá ánh xạ theo vị trí thì
+   chạm "Hồ sơ" mở ra Gala, và không chỗ nào báo lỗi. Phép kiểm đi hết cả ba
+   ô, mỗi lượt đọc `data-sec` của khối đang mở rồi so với tên mong đợi; soi
+   theo chỉ số thì chính nó cũng sai cùng một kiểu và vẫn xanh.
+
+   Kèm hai vế nữa cho cùng dải ô: chiều cao ≥ 44px, và **mở bằng `<summary>`
+   thì dấu "đang mở" trên dải ô cũng phải đổi** — vế thứ hai bắt đúng bản vá
+   đồng bộ dấu trong handler của ô thay vì trong listener `toggle`.
+
+55. **Nói thẳng phép kiểm KHÔNG phân biệt được cái gì.** Phép "chạm ô là cuộn
+   tới" ở `pw-totnghiep.mjs` đo cả trước lẫn sau (chỉ đo "sau" thì nó xanh cả
+   khi khối vốn đã nằm trong màn). Nhưng nó **không** phân biệt được "chờ
+   `toggle` rồi mới cuộn" với "cuộn ngay": đã gỡ bản vá ấy ra chạy đối chứng
+   và phép kiểm vẫn xanh, vì gập khối Hồ sơ làm trần cuộn tụt từ 2265px xuống
+   468px nên trình duyệt kẹp cú cuộn lại đúng chỗ.
+
+   Ghi lại vì đây là loại nhầm đắt nhất: tưởng mình vừa vá một lỗi và có phép
+   kiểm canh nó, trong khi chưa lỗi nào được chứng minh và phép kiểm không có
+   răng ở đúng chiều ấy. Chạy đối chứng trước khi tin.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

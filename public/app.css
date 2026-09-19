@@ -796,16 +796,33 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    ba cột bằng nhau nên không có cách nào rơi; chữ trạng thái xuống dòng
    BÊN TRONG ô, không đẩy ô xuống. */
 .tnprog{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 18px}
-.tnprog>span{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;
-  text-align:center;background:var(--surf);border-radius:12px;padding:9px 5px;
-  box-shadow:var(--sh)}
-.tnprog>span b{font-size:12.5px;font-weight:600;line-height:1.2}
-.tnprog>span i{font-style:normal;font-size:10.5px;color:var(--ink3);line-height:1.2}
+/* NÚT THẬT từ 19/9, không còn là <span> — chạm một ô là mở đúng khối của nó.
+   Phải khai lại `border`/`font`/`color` vì thẻ button mang mặc định riêng của
+   trình duyệt. `min-height:48px` là phần thêm: padding cũ cho khoảng 40px,
+   dưới ngưỡng 44px mà phần còn lại của ứng dụng đang giữ; ô rộng ~114px ở khổ
+   390px nên chỉ thiếu chiều cao, không thiếu bề ngang. */
+.tnprog>button{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;min-width:0;min-height:48px;text-align:center;background:var(--surf);
+  border:0;border-radius:12px;padding:9px 5px;font:inherit;color:inherit;
+  box-shadow:var(--sh);cursor:pointer;transition:transform .16s}
+.tnprog>button:active{transform:scale(.97)}
+.tnprog>button b{font-size:12.5px;font-weight:600;line-height:1.2}
+.tnprog>button i{font-style:normal;font-size:10.5px;color:var(--ink3);line-height:1.2}
 /* Xong thì đổi CẢ Ô sang xanh, không chỉ thêm một chip con: liếc một cái là
    đếm được còn mấy ô trắng. Vẫn đúng luật màu — xanh ở đây là "xong", nghĩa
    duy nhất nó được phép mang. */
-.tnprog>span.xong{background:var(--go-bg);box-shadow:inset 0 0 0 1px var(--go-line)}
-.tnprog>span.xong b,.tnprog>span.xong i{color:var(--go)}
+.tnprog>button.xong{background:var(--go-bg);box-shadow:inset 0 0 0 1px var(--go-line)}
+.tnprog>button.xong b,.tnprog>button.xong i{color:var(--go)}
+/* Ô của khối ĐANG MỞ. Chàm `--le` là nối tiếp ngôn ngữ đã có chứ không phải
+   màu mới: `.tnsec[open]` ngay dưới cũng dùng đúng chàm ấy cho dải trái, viền
+   và nền đầu khối — ô và khối nói cùng một chuyện ("bạn đang ở đây") nên phải
+   cùng một màu. Đúng vế "viền khối đang mở" mà luật --le cho phép, và KHÔNG
+   phải một trạng thái: xong/còn nợ vẫn chỉ xanh và cam.
+
+   `outline` chứ không `box-shadow`: ô đã xong đang dùng box-shadow cho viền
+   xanh --go-line, ghi đè bằng box-shadow là mất viền ấy. Outline chồng lên
+   được, và `outline-offset:-2px` giữ nó nằm trong ô nên không đội lưới. */
+.tnprog>button.dangmo{outline:2px solid var(--le);outline-offset:-2px}
 
 /* <details> thay vì tự viết accordion bằng JS: mở/đóng chạy sẵn, bàn phím và
    trình đọc màn hình hiểu sẵn, và không có trạng thái nào để lệch. */

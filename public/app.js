@@ -4895,9 +4895,34 @@ function tnckXong(kq) {
 const NGAY_DU = /^\d{2}\/\d{2}\/\d{4}$/;
 
 /* Một ô trong dải tiến độ ba phần. Cả Ô đổi màu khi xong chứ không chỉ gắn
-   thêm một chip con — liếc một cái là đếm được còn mấy ô trắng. */
-const tnOTienDo = (ten, luc) =>
-  `<span class="${luc ? 'xong' : ''}"><b>${ten}</b><i>${luc ? '✓ xong' : 'chưa điền'}</i></span>`;
+   thêm một chip con — liếc một cái là đếm được còn mấy ô trắng.
+
+   NÚT THẬT, không phải <span> (Ngô Phú Cường 19/9: "3 chip khoanh đỏ cũng bấm
+   được nhé"). Dải này nằm ngay dưới băng đầu trang và trông y như một thanh
+   tab, nên chạm vào là chuyện đương nhiên — chạm mà không gì xảy ra thì đọc
+   lên như ứng dụng đơ. <button> chứ không <span role="button">, đúng khuôn
+   .fdpick của dòng chọn tên: bàn phím và trình đọc màn hình hiểu sẵn, và
+   user-select:none đã được luật chung phủ.
+
+   THAM SỐ `sec` LÀ BẮT BUỘC, và đây là chỗ sai được trong im lặng: dải ô xếp
+   Hồ sơ · Đề tài · Dự Lễ còn ba khối xếp gala · hoso · detai — NGƯỢC NHAU.
+   Ánh xạ theo chỉ số thì chạm "Hồ sơ" mở ra Gala, không chỗ nào báo lỗi. */
+const tnOTienDo = (sec, ten, luc) => `<button type="button" data-tnmo="${sec}"
+  class="${luc ? 'xong' : ''}${TN_MO === sec ? ' dangmo' : ''}"
+  aria-controls="tnsec-${sec}" aria-expanded="${TN_MO === sec}"
+  ><b>${ten}</b><i>${luc ? '✓ xong' : 'chưa điền'}</i></button>`;
+
+/* Sơn lại dấu "đang mở" trên dải ô theo TN_MO.
+   Gọi từ TRONG listener `toggle` của <details>, KHÔNG gọi từ handler của ô —
+   nếu gọi ở handler thì mở khối bằng <summary> (đường vốn có từ đầu) sẽ không
+   làm dấu ấy đổi, và hai chỗ nói hai chuyện ngay lần đầu ai đó chạm summary. */
+function tnSonChip() {
+  document.querySelectorAll('[data-tnmo]').forEach(b => {
+    const mo = b.dataset.tnmo === TN_MO;
+    b.classList.toggle('dangmo', mo);
+    b.setAttribute('aria-expanded', mo);
+  });
+}
 
 /* Huy hiệu ở đầu mỗi khối gập: SỐ THỨ TỰ khi chưa khai, ✓ khi xong. Số nói
    được "còn mấy việc nữa", một dấu chấm tròn thì không. */
@@ -4980,16 +5005,17 @@ function veTotNghiep() {
       <p>Dolce by Wyndham, Giảng Võ — chiều bảo vệ Kế hoạch kinh doanh,
         tối là Lễ tốt nghiệp &amp; Gala.</p>
     </div>
-    <p class="sub">Ba phần, lưu riêng từng phần — chạm vào tên phần để mở, làm
-      được phần nào lưu phần ấy, không phải xong hết mới bấm được.</p>
+    <p class="sub">Ba phần, lưu riêng từng phần — chạm vào ô bên dưới hoặc vào
+      tên phần để mở, làm được phần nào lưu phần ấy, không phải xong hết mới
+      bấm được.</p>
 
     <div class="tnprog">
-      ${tnOTienDo('Hồ sơ', d.ho_so_luc)}
-      ${tnOTienDo('Đề tài', d.khkd_luc)}
-      ${tnOTienDo('Dự Lễ', d.gala_luc)}
+      ${tnOTienDo('hoso', 'Hồ sơ', d.ho_so_luc)}
+      ${tnOTienDo('detai', 'Đề tài', d.khkd_luc)}
+      ${tnOTienDo('gala', 'Dự Lễ', d.gala_luc)}
     </div>
 
-    <details class="tnsec" data-sec="gala" ${mo('gala')}>
+    <details class="tnsec" id="tnsec-gala" data-sec="gala" ${mo('gala')}>
       <summary>${tnHuyHieu(1, d.gala_luc)}
         <span class="t"><b>Lễ tốt nghiệp &amp; Gala</b>
         <i class="${conPhaiTra ? 'con' : ''}">${conPhaiTra
@@ -5036,7 +5062,7 @@ function veTotNghiep() {
       </div>
     </details>
 
-    <details class="tnsec" data-sec="hoso" ${mo('hoso')}>
+    <details class="tnsec" id="tnsec-hoso" data-sec="hoso" ${mo('hoso')}>
       <summary>${tnHuyHieu(2, d.ho_so_luc)}
         <span class="t"><b>Hồ sơ làm chứng chỉ</b>
         <i>Hạn 26/9 · Ban tổ chức in chứng chỉ theo đúng những ô này</i></span>
@@ -5095,7 +5121,7 @@ function veTotNghiep() {
       </div>
     </details>
 
-    <details class="tnsec" data-sec="detai" ${mo('detai')}>
+    <details class="tnsec" id="tnsec-detai" data-sec="detai" ${mo('detai')}>
       <summary>${tnHuyHieu(3, d.khkd_luc)}
         <span class="t"><b>Đề tài Kế hoạch kinh doanh</b>
         <i>Không bắt buộc · nộp theo cá nhân hoặc cùng lĩnh vực</i></span>
@@ -5367,7 +5393,55 @@ function tnGanSuKien() {
       } else if (TN_MO === el.dataset.sec) {
         TN_MO = null;   // gập hết là một trạng thái hợp lệ, không phải "chưa chạm"
       }
+      tnSonChip();
     });
+  });
+
+  /* Dải ô tiến độ là một thanh tab: chạm một ô là mở đúng khối của nó.
+
+     CHỈ đặt `el.open = true`, không viết lại gì. Accordion ở trên nghe sự kiện
+     `toggle` của <details> chứ không nghe `click`, nên việc gập hai khối kia
+     và gán TN_MO tự chạy theo — một nguồn sự thật, không có bản sao logic.
+
+     LUÔN MỞ, KHÔNG BẬT TẮT. Chạm ô của khối đang mở nghĩa là "đưa tôi tới đó",
+     không phải "đóng lại". Muốn gập hết thì vẫn chạm <summary> như cũ.
+
+     VÀ PHẢI CUỘN TỚI. Biểu mẫu dài hơn một màn điện thoại; mở một khối nằm
+     dưới mép màn mà không cuộn thì chạm xong màn hình đứng im, đọc lên y như
+     hỏng. Màn này chạy với body.noapp nên KHÔNG có thanh đầu trang dán dính —
+     `block:'start'` là sạch, không phải bù trừ chiều cao nào. Một cú cuộn mượt
+     qua cả trang dài gây chóng mặt thật với người đã bật prefers-reduced-motion,
+     nên hỏi lại cờ ấy trước. */
+  document.querySelectorAll('[data-tnmo]').forEach(b => {
+    b.onclick = () => {
+      const el = document.querySelector(`.tnsec[data-sec="${b.dataset.tnmo}"]`);
+      if (!el) return;
+      const cuon = () => el.scrollIntoView({
+        block: 'start',
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+      });
+      /* CUỘN SAU KHI `toggle` ĐÃ CHẠY, không cuộn ngay sau khi gán `open`.
+         `toggle` của <details> là sự kiện KHÔNG ĐỒNG BỘ (trình duyệt xếp nó
+         vào hàng đợi tác vụ), nên cuộn ngay thì cuộn được tính TRƯỚC lúc
+         accordion gập hai khối kia, tức nhắm vào một toạ độ sắp không còn đúng.
+
+         NÓI THẲNG CÁI ĐÃ ĐO ĐƯỢC: ở bố cục ba khối hiện nay bản ngây thơ KHÔNG
+         hỏng. Đo ngày 19/9 — gập khối Hồ sơ làm trần cuộn tụt từ 2265px xuống
+         468px, và trình duyệt KẸP cú cuộn lại đúng vào chỗ cần tới (đỉnh khối
+         ở 15px, bản này ở 36px, mắt không phân biệt được). Nên đây không phải
+         một lỗi đã bắt được, và bộ kiểm cũng không phân biệt được hai bản.
+
+         Vẫn giữ cách này vì nó không phải dựa vào cú kẹp ấy: cú kẹp chỉ cứu
+         khi khối đích là khối CUỐI và khối vừa gập là khối dài nhất nằm trên
+         nó — thêm một khối thứ tư hoặc đổi thứ tự là mất. Hai dòng đổi lấy
+         việc không phải nhớ điều kiện ấy.
+
+         Khối đang mở sẵn thì gán `open = true` không bắn `toggle` nào cả, nên
+         nhánh ấy phải cuộn thẳng — thiếu nó là chạm vào ô của khối đang mở thì
+         không có gì xảy ra. */
+      if (el.open) cuon();
+      else { el.addEventListener('toggle', cuon, { once: true }); el.open = true; }
+    };
   });
 
   // Ba nhóm nút "chọn một": bấm là bật cái mình, tắt các cái còn lại. Giữ
