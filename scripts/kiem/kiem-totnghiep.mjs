@@ -693,5 +693,95 @@ const rBia = await fetch(B + '/api/totnghiep/cong-khai', {
 });
 ok(`roster_id bịa → 404 (nhận ${rBia.status})`, rBia.status === 404);
 
+/* ══ SỐ KHAI Ở PHẦN A PHẢI MỞ ĐƯỢC CỬA /dangnhap — và CHỈ từ đường có phiên ══
+   Ngô Phú Cường 19/9: *"Một số người đã đăng nhập và đã điền số điện thoại
+   email nhưng tôi gửi link đăng nhập cho họ, họ lại không thấy hiện lên?"*
+
+   Một nửa gốc rễ nằm ở `soHopLeTuHoSo()` (routes/onboard.js): nó chỉ tin
+   `roster.phone` — bản Ban tổ chức nạp 15/8 — TRỪ KHI chính chủ đã tự đặt số
+   của mình (`phone_self_set_at`). Mà `putHoSo` trước 19/9 chỉ ghi vào
+   `dang_ky_tot_nghiep.dien_thoai`, nên số người ta vừa gõ vào ứng dụng KHÔNG
+   bao giờ tới được cửa đăng nhập: gõ đúng số của mình mà vẫn "số không khớp".
+
+   Ba phép, và phép thứ hai mới là phép có răng. */
+console.log('\n── Số khai ở phần A mở được cửa /dangnhap ──');
+const SO_PHIEN = '0900000123';   // khai qua đường CÓ PHIÊN
+const SO_CK = '0900000456';      // khai qua đường CÔNG KHAI
+const doSo = async phone => {
+  const r = await fetch(B + '/api/onboard/check', {
+    method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+    body: JSON.stringify({ roster_id: rsCuong?.roster_id, phone }),
+  });
+  return { status: r.status, body: await r.json().catch(() => ({})) };
+};
+
+await put('/api/totnghiep/ho-so', ckCuong, {
+  ho_ten: 'Ngô Phú Cường', ngay_sinh: '01/02/1980', dien_thoai: SO_PHIEN,
+  doanh_nghiep: 'Công ty A', chuc_vu: 'Giám đốc',
+  linh_vuc: ['cong-nghe'], nhu_cau_ket_noi: 'số mới',
+});
+const soA = await doSo(SO_PHIEN);
+ok(`số tự khai ở phần A mở được /dangnhap (nhận ${soA.status} ${soA.body.error ?? 'ok'})`,
+   soA.status === 200);
+
+/* PHÉP CÓ RĂNG NHẤT CỦA CẢ MỤC. Đường công khai KHÔNG có phiên — nó chỉ biết
+   một `roster_id` gõ trong URL. Cho nó đặt `phone_self_set_at` là trao cho
+   bất kỳ ai cầm link `/totnghiep` quyền đặt chìa khoá đăng nhập cho MỘT NGƯỜI
+   KHÁC trong lớp: tìm tên họ, gõ số của mình, rồi sang `/dangnhap` tự nhận hồ
+   sơ của họ — mà vào được là đọc được danh bạ cả lớp kèm số điện thoại, sổ
+   thu, bài, thông báo nội bộ. Đúng lỗ hổng chiếm tài khoản đã vá ngày 5/9.
+   Bỏ phép này thì một bản vá "cho nhất quán hai đường ghi" sẽ lọt qua sạch. */
+await fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify({ roster_id: rsCuong?.roster_id, dien_thoai: SO_CK }),
+});
+const soB = await doSo(SO_CK);
+ok(`số khai qua LINK CÔNG KHAI KHÔNG mở được /dangnhap (nhận ${soB.status} ${soB.body.error ?? 'ok'})`,
+   soB.status !== 200);
+// Và nó cũng không được PHÁ mất số chính chủ đã tự đặt.
+const soC = await doSo(SO_PHIEN);
+ok(`… và số tự khai có phiên vẫn còn hiệu lực (nhận ${soC.status})`, soC.status === 200);
+
+// Trả lại số gốc để các bộ kiểm khác không vấp phải số của lượt chạy này.
+// (reset-totnghiep.sh vẫn xoá dấu phone_self_set_at — hai lớp, không chỉ một.)
+await put('/api/totnghiep/ho-so', ckCuong, {
+  ho_ten: 'Ngô Phú Cường', ngay_sinh: '01/02/1980', dien_thoai: '0979755857',
+  doanh_nghiep: 'Công ty A', chuc_vu: 'Giám đốc',
+  linh_vuc: ['cong-nghe'], nhu_cau_ket_noi: 'số mới',
+});
+
+/* ══ THỐNG KÊ CHO BAN CÁN SỰ LỚP — đếm ở MÁY CHỦ ═══════════════════════════
+   Ba thứ đã thu từ 18/9 mà màn hình CHƯA BAO GIỜ hiện (tài trợ, gian hàng,
+   văn nghệ) — chúng chỉ nằm trong tệp CSV. Nay có khối `thong_ke`.
+
+   Phép đáng giữ nhất là MẪU SỐ của khối phí: nó phải là số người DỰ LỄ, không
+   phải sĩ số lớp. Lấy sĩ số thì con số đọc lên như cả lớp đang nợ tiền, mà
+   phần lớn trong đó còn chưa trả lời có đi hay không. */
+console.log('\n── Thống kê: đếm ở máy chủ, mẫu số đúng ──');
+await put('/api/totnghiep/gala', ckCuong, {
+  du_le: 'co', tai_tro: 'tien', tai_tro_mo_ta: 'ủng hộ 5 triệu',
+  gian_hang: 1, van_nghe: 1, van_nghe_mo_ta: 'song ca 2 người',
+});
+const tk = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json()).catch(() => ({}));
+const t = tk.thong_ke ?? {};
+ok('có khối thong_ke', !!t.gala && !!t.phi);
+ok(`gala.co đếm đúng 1 người (nhận ${t.gala?.co})`, t.gala?.co === 1);
+ok(`gala.chua = tổng − đã trả lời (${t.gala?.chua} = ${t.tong} − ${tk.xong_gala})`,
+   t.gala?.chua === t.tong - tk.xong_gala);
+ok(`MẪU SỐ của khối phí là người DỰ LỄ (${t.phi?.mau_so}), không phải sĩ số (${t.tong})`,
+   t.phi?.mau_so === t.gala?.co && t.phi?.mau_so !== t.tong);
+ok(`tài trợ trả kèm TÊN, không chỉ con số (${(t.tai_tro?.nguoi ?? []).length} người)`,
+   (t.tai_tro?.nguoi ?? []).some(x => x.full_name === 'Ngô Phú Cường' && x.loai === 'tien'
+     && x.mo_ta === 'ủng hộ 5 triệu'));
+ok('gian hàng trả kèm TÊN',
+   (t.gian_hang ?? []).some(x => x.full_name === 'Ngô Phú Cường'));
+ok('văn nghệ trả kèm TÊN và mô tả tiết mục',
+   (t.van_nghe ?? []).some(x => x.full_name === 'Ngô Phú Cường' && x.mo_ta === 'song ca 2 người'));
+/* Mục 6.4 SRS, áp cho một phúc đáp MỚI. Khối thong_ke nói về tiền, nên nó là
+   đúng chỗ chữ "đã đóng" dễ lọt vào nhất — và grep thô nguyên văn JSON là
+   phép canh duy nhất không bỏ sót một nhánh nào. */
+ok('phúc đáp thống kê KHÔNG chứa chữ "đã đóng" (mục 6.4 SRS)',
+   !JSON.stringify(tk).includes('đã đóng'));
+
 console.log(hong === 0 ? '\n✅ TẤT CẢ ĐỀU XANH' : `\n❌ ${hong} phép ĐỎ`);
 process.exit(hong === 0 ? 0 : 1);

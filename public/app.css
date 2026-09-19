@@ -593,6 +593,22 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    phạm vi `.claimcard` chứ không đổi biến chung. */
 .claimcard .hintline{font-size:12.5px;color:var(--ink2)}
 
+/* 5. BĂNG "máy này đang đăng nhập rồi" (19/9).
+   Người đã ở trong ứng dụng mở /dangnhap ra thì gặp một màn "Bạn là ai?" rồi
+   bị đòi số điện thoại — số phải khớp bản Ban tổ chức nạp 15/8 chứ không phải
+   số họ tự khai, nên với 38 người thiếu số đó là ngõ cụt. Băng này là lối ra.
+
+   Nền xám trung tính chứ KHÔNG --go-bg: cặp màu xanh trong sản phẩm này có
+   đúng một nghĩa (người thu đã nhận tiền). Đây không phải một trạng thái
+   "xong", chỉ là một lời chỉ đường.
+   Viền trên liền `--line` để nó tách khỏi tiêu đề mà không thành một khối
+   cảnh báo: người đang muốn đăng nhập bằng tài khoản khác KHÔNG làm gì sai. */
+.vphien{background:var(--bg);border-radius:12px;padding:13px 14px 12px;
+  margin:12px 0 4px;box-shadow:inset 0 0 0 1px var(--line)}
+.vphien .t{font-size:13.5px;line-height:1.5;color:var(--ink2);margin-bottom:11px}
+.vphien .t b{color:var(--ink);font-weight:600}
+.vphien .n{font-size:12px;line-height:1.5;color:var(--ink2);margin-top:9px}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
 /* Chấm đỏ báo có thông báo chưa xem. Đặt ở góc trên phải của biểu tượng tab,
@@ -781,8 +797,21 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    đọc của tiêu đề. pointer-events:none vì nó nằm đè lên vùng chạm. */
 .tnhead::after{content:'🎓';position:absolute;right:-8px;top:-14px;font-size:96px;
   line-height:1;opacity:.14;pointer-events:none}
-.tnhead .lb{font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
+.tnhead .lb{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
   color:rgba(255,255,255,.72);margin-bottom:7px}
+/* Lối về ở ĐẦU trang (19/9). Biểu mẫu dài hơn ba màn điện thoại và `noapp` đã
+   bỏ thanh sáu tab, nên trước đó đường ra duy nhất nằm tận chân trang.
+   Nền trắng mờ chứ không phải nút đặc: nó là lối RA, không được giành sự chú
+   ý với ba khối cần khai. Vùng chạm 44px giữ bằng padding dọc cộng
+   `min-height` — chữ chỉ 10,5px nên tự nó cao chưa tới 16px.
+   `position:relative` + `z-index` để nằm TRÊN mũ 🎓 của ::after, thứ đang phủ
+   đúng góc phải này. */
+.tnhead .tnve{position:relative;z-index:1;flex:0 0 auto;display:inline-flex;
+  align-items:center;gap:6px;min-height:44px;padding:0 15px;border-radius:999px;
+  background:rgba(255,255,255,.16);color:#fff;text-decoration:none;
+  letter-spacing:.04em;box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+.tnhead .tnve:active{background:rgba(255,255,255,.28)}
 .tnhead h1{font-size:25px;font-weight:700;letter-spacing:-.02em;margin:0 0 7px;
   line-height:1.15;color:#fff}
 .tnhead p{margin:0;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.84)}
@@ -921,6 +950,26 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    không phân biệt được "chưa ai chọn" với "mình quên mất nó". */
 .dstnlv.trong{opacity:.5;box-shadow:inset 0 0 0 1px var(--line)}
 .dstnai{flex:0 0 auto;background:var(--surf2);border-radius:10px;padding:2px 13px;margin:-2px 0 4px}
+
+/* ── Thẻ TỔNG QUAN của màn thống kê (19/9) ─────────────────────────────────
+   Ba ô số một hàng, LƯỚI chứ không flex-wrap — cùng lý do `.tnprog`: ba con
+   số của một câu hỏi phải nhìn thấy CÙNG LÚC thì mới so được với nhau, rơi
+   dòng là mất đúng công dụng ấy. Nhãn xuống dòng BÊN TRONG ô.
+
+   MÀU: `.go` chỉ dùng cho "người thu đã nhận" và `.due` chỉ cho việc còn phải
+   làm — đúng hai nghĩa duy nhất của hai màu ấy trong sản phẩm này. Ô không
+   mang nghĩa nào thì để trung tính, KHÔNG tô cho đẹp: tô xanh ô "có dự" là
+   biến một câu trả lời thành một lời khen. */
+.dstnso{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.dstno{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+  gap:3px;min-width:0;text-align:center;background:var(--surf2);border-radius:10px;
+  padding:10px 5px}
+.dstno b{font-size:21px;font-weight:700;line-height:1.05;letter-spacing:-.02em}
+.dstno i{font-style:normal;font-size:11px;line-height:1.35;color:var(--ink2)}
+.dstno.go{background:var(--go-bg)}
+.dstno.go b{color:var(--go)}
+.dstno.due{background:var(--due-bg)}
+.dstno.due b{color:var(--due)}
 
 /* ── Ảnh chân dung / logo cho chứng chỉ (zone Lễ tốt nghiệp) ────────────────
    Ô xem trước có kích thước CỐ ĐỊNH và khai sẵn tỉ lệ: ảnh về sau không đẩy

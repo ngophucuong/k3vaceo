@@ -62,6 +62,18 @@ DELETE FROM fund_declarations;
 UPDATE member_profile SET nganh = NULL
  WHERE member_id IN (SELECT id FROM members WHERE full_name IN
    ('Ngô Phú Cường', 'Kiểm TN Thường', 'Kiểm TN Nhóm Bảy', 'Đinh Khánh Toàn'));
+-- Và từ 19/9 putHoSo còn ghi ngược SỐ ĐIỆN THOẠI sang members.phone kèm dấu
+-- phone_self_set_at — tức số khai ở form tốt nghiệp thành số tự đăng nhập
+-- được ở /dangnhap. Bộ kiểm này ĐỔI chính hai cột ấy, nên reset phải trả
+-- chúng về bản danh sách gốc.
+--
+-- Bỏ bước này là một lỗi IM LẶNG và nó giết đúng phép đối chứng quan trọng
+-- nhất: lượt chạy trước để lại dấu phone_self_set_at, nên lượt sau phép
+-- 'số tự khai mở được cửa /dangnhap' XANH kể cả khi bản vá đã bị gỡ ra.
+UPDATE members
+   SET phone = (SELECT r.phone FROM roster r WHERE r.id = members.roster_id),
+       phone_self_set_at = NULL
+ WHERE full_name = 'Ngô Phú Cường' AND roster_id IS NOT NULL;
 DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy');
 -- Đường CÔNG KHAI (migration 0042) TỰ TẠO dòng members cho người chưa có hồ
 -- sơ. Không dọn thì lượt chạy sau mở đầu với người ấy ĐÃ có members — phép

@@ -521,6 +521,7 @@ function renderLogin(emailSan) {
   document.body.classList.add('noapp');
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
     <div class="lb">k3vaceo · Khoá K03</div>
+    <div id="vPhien"></div>
     <h1>Đăng nhập</h1>
     <p class="sub">Nhập email bạn đã khai. Chúng tôi gửi một mã 6 số tới hộp thư đó.</p>
     <label class="f">Email</label><input id="lgEmail" placeholder="ten@congty.vn" inputmode="email" maxlength="160" value="${esc(emailSan ?? '')}">
@@ -529,6 +530,7 @@ function renderLogin(emailSan) {
     <button class="wide ghost" id="lgPasskey" style="margin-top:10px">Đăng nhập bằng passkey</button>
     <button class="vlink" id="lgVao">Lần đầu đăng nhập? <b>Tự nhận diện bằng tên và số điện thoại</b></button>
   </div></div>`;
+  vaoSonPhien();
   $('#lgPasskey').onclick = loginWithPasskey;
   $('#lgVao').onclick = () => { history.pushState({}, '', '/dangnhap'); renderVao(); };
   $('#lgSend').onclick = async () => {
@@ -614,10 +616,57 @@ function vaoShell(title, sub, body, buoc) {
   $('#root').innerHTML = `<div class="claimwrap"><div class="claimcard">
     <div class="lb"><span>k3vaceo · Khoá K03</span>${
       buoc ? `<span class="bw">Bước ${buoc} / 3</span>` : ''}</div>
+    <div id="vPhien"></div>
     <h1>${esc(title)}</h1>
     <p class="sub">${sub}</p>
     ${body}
   </div></div>`;
+  vaoSonPhien();
+}
+
+/* ── "Máy này đang đăng nhập rồi" ────────────────────────────────────────
+   Ngô Phú Cường 19/9: *"Một số người đã đăng nhập và đã điền số điện thoại
+   email nhưng tôi gửi link đăng nhập cho họ, họ lại không thấy hiện lên?"* —
+   triệu chứng họ gặp là *"mở ra màn đòi số điện thoại"*.
+
+   Gốc rễ ở `boot()`: `/dangnhap` gọi thẳng màn tự nhận diện mà KHÔNG hề hỏi
+   người đang mở đã có phiên hay chưa. Người đã đăng nhập bấm vào link nhận
+   được một màn "Bạn là ai?" — rồi bước 2 đòi số điện thoại, mà số ấy phải
+   khớp bản Ban tổ chức nạp 15/8 chứ không phải số họ tự khai. Với 38 người
+   không có số đúng trong bản ấy thì đó là ngõ cụt, trong khi họ VỐN ĐÃ ở
+   trong ứng dụng rồi.
+
+   Ba quyết định:
+   - **Một BĂNG, không phải chuyển hướng.** Tự đá sang `/` thì người thật sự
+     muốn đăng nhập bằng tài khoản khác (máy dùng chung, trưởng nhóm mở hộ)
+     mất luôn đường vào — mà biểu mẫu vẫn nằm ngay dưới băng thì không ai mất
+     gì cả.
+   - **Không chặn lượt vẽ đầu.** Màn vào là màn của 77 người chưa vào được;
+     bắt họ chờ một lượt gọi mạng trước khi thấy ô nhập là đổi chỗ hỏng này
+     lấy một chỗ hỏng khác. Nên vẽ trước, hỏi sau, và băng chỉ hiện ra khi
+     phúc đáp 200 về tới — người không có phiên không bao giờ thấy gì.
+   - **Đo MỘT lần cho cả ba bước.** `VAO_PHIEN` nằm ngoài hàm vẽ, `vaoShell()`
+     sơn lại ở mỗi bước — đúng khuôn `SOTHU` / `DANHBA_THE` / `TN_MO`. */
+let VAO_PHIEN = null;
+
+async function vaoDoPhien() {
+  try {
+    const h = await apiGet('/api/home');
+    VAO_PHIEN = h?.me ? { ten: h.me.full_name, nhom: h.group?.label ?? null } : null;
+  } catch { VAO_PHIEN = null; }
+  vaoSonPhien();
+}
+
+function vaoSonPhien() {
+  const o = $('#vPhien');
+  if (!o || !VAO_PHIEN) return;
+  o.innerHTML = `<div class="vphien">
+    <div class="t">Máy này <b>đang đăng nhập</b> với tên ${esc(VAO_PHIEN.ten)}${
+      VAO_PHIEN.nhom ? ` · ${esc(VAO_PHIEN.nhom)}` : ''}.</div>
+    <button class="wide" id="vPhienVao">Vào ứng dụng</button>
+    <div class="n">Không phải bạn? Cứ điền tiếp bên dưới để đăng nhập bằng tài khoản khác.</div>
+  </div>`;
+  $('#vPhienVao').onclick = () => { document.body.classList.remove('noapp'); location.href = '/'; };
 }
 
 /* MỘT khối báo lỗi cho cả ba màn vào, thay cho `.hintline` + đổi màu chữ.
@@ -5000,7 +5049,17 @@ function veTotNghiep() {
 
   $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
     <div class="tnhead">
-      <div class="lb">k3vaceo · Khoá K03</div>
+      <div class="lb"><span>k3vaceo · Khoá K03</span>
+        ${/* Lối về ở ĐẦU trang, không chỉ ở chân. Biểu mẫu này dài hơn ba màn
+             điện thoại, mà `body.noapp` đã bỏ thanh điều hướng sáu tab — nên
+             trước 19/9 người muốn quay lại ứng dụng phải cuộn hết xuống đáy,
+             qua cả ba khối đang mở, mới thấy đường ra. Trên iPhone đã cài lên
+             màn hình chính thì càng kẹt: không có cả nút Back của trình duyệt.
+             Chỉ đặt ở bản CÓ PHIÊN — đường công khai là một chuỗi ba bước cho
+             người không có ứng dụng nào để về, ở đó một nút "về ứng dụng" vừa
+             sai vừa dẫn thẳng vào màn 401. */''}
+        <a class="tnve" href="/" aria-label="Về ứng dụng"><span aria-hidden="true">←</span> Ứng dụng</a>
+      </div>
       <h1>Lễ tốt nghiệp 26/9</h1>
       <p>Dolce by Wyndham, Giảng Võ — chiều bảo vệ Kế hoạch kinh doanh,
         tối là Lễ tốt nghiệp &amp; Gala.</p>
@@ -5012,7 +5071,12 @@ function veTotNghiep() {
     <div class="tnprog">
       ${tnOTienDo('hoso', 'Hồ sơ', d.ho_so_luc)}
       ${tnOTienDo('detai', 'Đề tài', d.khkd_luc)}
-      ${tnOTienDo('gala', 'Dự Lễ', d.gala_luc)}
+      ${/* "Gala" chứ không "Dự Lễ" (Ngô Phú Cường 19/9). Cùng một ngày 26/9 có
+           HAI việc — buổi bảo vệ chiều và Lễ & Gala tối — nên chữ "Lễ" đứng
+           một mình trong một ô rộng 114px đọc ra được cả hai, mà hai việc ấy
+           khác hẳn nhau: một bắt buộc và miễn phí, một tự nguyện và 1.000.000đ.
+           "Gala" thì không lẫn vào đâu, và đó cũng là từ cả lớp đang dùng. */''}
+      ${tnOTienDo('gala', 'Gala', d.gala_luc)}
     </div>
 
     <details class="tnsec" id="tnsec-gala" data-sec="gala" ${mo('gala')}>
@@ -5085,6 +5149,8 @@ function veTotNghiep() {
 
         <label class="f">Số điện thoại</label>
         <input id="tnSdt" maxlength="20" value="${esc(v('dien_thoai'))}" inputmode="tel">
+        <div class="hintline">Lưu xong, đây cũng là số bạn tự đăng nhập được ở
+          <b>k3vaceo.cuongngo.app/dangnhap</b> khi đổi máy.</div>
 
         <label class="f">Doanh nghiệp</label>
         <input id="tnDN" maxlength="200" value="${esc(v('doanh_nghiep'))}">
@@ -5588,7 +5654,8 @@ async function openDanhSachTotNghiep() {
   try { ds = await apiGet('/api/totnghiep/danh-sach'); }
   catch (e) { toast(errText(e)); return; }
   DSTN = ds;
-  DSTN_THE = DSTN_THE || 'linhvuc';
+  DSTN_THE = DSTN_THE || 'tong';
+  DSTN_CUON = 0;
   veDanhSachTotNghiep();
 }
 
@@ -5596,12 +5663,41 @@ let DSTN = null;
 // Thẻ đang mở giữ NGOÀI hàm vẽ, cùng bài học với bộ lọc Sổ thu và thẻ Danh
 // bạ: bấm vào một lĩnh vực để mở rộng là vẽ lại, thẻ nằm trong hàm thì nó
 // nhảy về mặc định và người đang xem bị đá ra.
-let DSTN_THE = 'linhvuc';
+let DSTN_THE = 'tong';
 let DSTN_MO = new Set();
+let DSTN_CUON = 0;
 
+/* Ba thẻ chứ không hai (19/9). Ngô Phú Cường: *"Điều chỉnh UI thông minh,
+   logic hơn zone Thống kê dành cho Lớp trưởng … xem số người đăng ký dự Gala,
+   tài trợ, tách thống kê đề tài."*
+
+   Bản cũ trộn hai việc khác hẳn nhau vào một sheet: danh mục ĐỀ TÀI (việc của
+   khoá học, hạn 26/9, lớp đã chốt KHÔNG bắt buộc) và việc tổ chức LỄ & GALA
+   (hạn 21h00 ngày 19/9, có tiền, phải gọi từng người). Hai nhịp khác nhau,
+   hai người hỏi khác nhau — nên tách hẳn.
+
+   Và ba thứ đã thu từ 18/9 mà màn hình CHƯA BAO GIỜ hiện: tài trợ, gian hàng,
+   văn nghệ. Chúng chỉ nằm trong tệp CSV, tức muốn biết ai đăng ký tiết mục
+   văn nghệ thì phải tải tệp về rồi mở Excel — trong khi đó đúng là câu hỏi
+   người dựng chương trình hỏi nhiều nhất trong tuần cuối. */
 function veDanhSachTotNghiep() {
   const ds = DSTN;
+  const tk = ds.thong_ke ?? {};
   const chip = (k, t) => `<button type="button" class="fc ${DSTN_THE === k ? 'on' : ''}" data-dstn="${k}">${t}</button>`;
+
+  // Một dòng người, dùng lại ở cả bốn khối của thẻ Tổng quan.
+  const dongAi = (n, phu) => `<div class="fd"><div class="x">
+    <b>${esc(n.full_name)}</b><span class="mut"> · ${esc(n.group_label || '—')}</span>
+    ${phu ? `<div class="mut" style="margin-top:2px">${esc(phu)}</div>` : ''}
+  </div></div>`;
+
+  // Ô số. `nhan` là NHÃN, `to` là con số. Dùng --due cho ô "còn phải làm gì
+  // đó" và --go CHỈ cho "người thu đã nhận" — hai nghĩa duy nhất của hai màu
+  // ấy trong sản phẩm này, không mượn sang chỗ khác.
+  const oSo = (so, nhan, mau) =>
+    `<div class="dstno ${mau ?? ''}"><b class="num">${so ?? 0}</b><i>${nhan}</i></div>`;
+
+  const khoiTrong = cau => `<div class="mut" style="padding:10px 2px">${cau}</div>`;
 
   /* ── Thẻ LĨNH VỰC: thứ thay cho lượt bình chọn Zalo ──────────────────────
      Lượt bình chọn ấy cho avatar và con số. Chỗ này cho con số KÈM TÊN, kèm ai
@@ -5636,23 +5732,90 @@ function veDanhSachTotNghiep() {
      khác cho Ban tổ chức thì còn tệ hơn hẳn việc không chia sẻ gì.
      Chỉ có mặt sau lượt gửi ảnh ĐẦU TIÊN: trước đó thư mục chưa tồn tại. */
   const oDrive = ds.drive_thu_muc_url ? `
-    <div class="card" style="margin-bottom:12px"><div class="cb">
-      <div class="eb">Ảnh cho chứng chỉ</div>
-      <div class="mut" style="margin:2px 0 8px"><b class="num">${ds.so_co_anh}</b> ảnh chân dung ·
-        <b class="num">${ds.so_co_logo}</b> logo · trên ${ds.tong} người</div>
-      <a class="wide ghost" href="${esc(ds.drive_thu_muc_url)}" target="_blank" rel="noopener">Mở thư mục Drive ›</a>
+      <a class="wide ghost" href="${esc(ds.drive_thu_muc_url)}" target="_blank" rel="noopener"
+         style="display:block;text-align:center;text-decoration:none">Mở thư mục Drive ›</a>
       <div class="foot" style="padding:8px 0 0">Đây là thư mục để chia sẻ cho Ban tổ chức.
         Mở ra, bấm Chia sẻ, chọn "Bất kỳ ai có đường liên kết" rồi gửi họ link ấy.
-        Tên tệp đã mang sẵn họ tên và nhóm, không dấu.</div>
-    </div></div>` : '';
+        Tên tệp đã mang sẵn họ tên và nhóm, không dấu.</div>`
+    : `<div class="foot" style="padding:6px 0 0">Chưa ai gửi ảnh nào, nên thư mục Drive
+        chưa tồn tại — nó tự tạo ở lượt gửi ảnh ĐẦU TIÊN.</div>`;
 
-  openSheet(`<h3>Đăng ký Lễ tốt nghiệp — cả lớp</h3>
-    ${oDrive}
+  /* ── THẺ 1 · TỔNG QUAN ───────────────────────────────────────────────────
+     Xếp theo mức GẤP chứ không theo thứ tự trong biểu mẫu, đúng khuôn
+     `tnKhoiMoDau()`: Gala (hạn 21h00 ngày 19/9) → tiền → ba việc tổ chức →
+     hồ sơ chứng chỉ (hạn 26/9). */
+  const tt = tk.tai_tro ?? {};
+  const gh = tk.gian_hang ?? [];
+  const vn = tk.van_nghe ?? [];
+  const hs = tk.ho_so ?? {};
+  const oTong = `
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Dự Lễ &amp; Gala 26/9</div>
+      <div class="mut" style="margin:2px 0 10px">Hạn trả lời 21h00 ngày 19/9.</div>
+      <div class="dstnso">
+        ${oSo(tk.gala?.co, 'có dự')}
+        ${oSo(tk.gala?.khong, 'không dự')}
+        ${oSo(tk.gala?.chua, 'chưa trả lời', 'due')}
+      </div>
+    </div></div>
+
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Phí Gala 1.000.000 đ</div>
+      <div class="mut" style="margin:2px 0 10px">Trên <b class="num">${tk.phi?.mau_so ?? 0}</b>
+        người trả lời CÓ dự — người không dự không phải đóng khoản này.</div>
+      <div class="dstnso">
+        ${oSo(tk.phi?.nguoi_thu_da_nhan, 'người thu đã nhận', 'go')}
+        ${oSo(tk.phi?.da_tu_khai, 'đã tự khai', 'due')}
+        ${oSo(tk.phi?.chua_khai, 'chưa khai')}
+      </div>
+      <div class="foot" style="padding:9px 0 0">"Đã tự khai" là người ta nói đã chuyển
+        khoản; chỉ thành "người thu đã nhận" khi chị Ngân đối chiếu sao kê.</div>
+    </div></div>
+
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Tài trợ chương trình</div>
+      ${/* "nhận tài trợ" là NGƯỢC CHIỀU — người khai ở đây là người ĐỨNG RA
+           tài trợ cho chương trình, không phải người được nhận. Đọc ngược một
+           chữ ở đây là Ban cán sự lớp gọi điện sai vai. */''}
+      <div class="mut" style="margin:2px 0 10px"><b class="num">${(tt.nguoi ?? []).length}</b> người
+        đứng ra tài trợ · ${tt.khong ?? 0} nói không · ${tt.chua ?? 0} chưa trả lời.</div>
+      ${(tt.nguoi ?? []).length
+        ? (tt.nguoi ?? []).map(n => dongAi(n,
+            (n.loai === 'tien' ? 'Tiền' : 'Hiện vật') + (n.mo_ta ? ' · ' + n.mo_ta : ''))).join('')
+        : khoiTrong('Chưa ai nhận lời tài trợ.')}
+    </div></div>
+
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Gian hàng / standee</div>
+      <div class="mut" style="margin:2px 0 10px"><b class="num">${gh.length}</b> người đăng ký.
+        Ban tổ chức bố trí miễn phí — đầu mối là anh Chử Minh Châu.</div>
+      ${gh.length ? gh.map(n => dongAi(n)).join('') : khoiTrong('Chưa ai đăng ký gian hàng.')}
+    </div></div>
+
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Tiết mục văn nghệ</div>
+      <div class="mut" style="margin:2px 0 10px"><b class="num">${vn.length}</b> tiết mục đăng ký.</div>
+      ${vn.length ? vn.map(n => dongAi(n, n.mo_ta || 'chưa ghi chi tiết')).join('')
+        : khoiTrong('Chưa ai đăng ký tiết mục.')}
+    </div></div>
+
+    <div class="card" style="margin-bottom:12px"><div class="cb">
+      <div class="eb">Hồ sơ &amp; ảnh cho chứng chỉ</div>
+      <div class="mut" style="margin:2px 0 10px">Hạn 26/9.</div>
+      <div class="dstnso">
+        ${oSo(hs.xong, `xong hồ sơ / ${tk.tong ?? 0}`)}
+        ${oSo(hs.co_anh, 'có ảnh chân dung')}
+        ${oSo(hs.co_logo, 'có logo')}
+      </div>
+      ${oDrive}
+    </div></div>`;
+
+  openSheet(`<h3>Thống kê Lễ tốt nghiệp — cả lớp</h3>
     <div class="fl cuon" style="margin-bottom:12px">
-      ${chip('linhvuc', 'Theo lĩnh vực')}${chip('nguoi', 'Theo người')}
+      ${chip('tong', 'Tổng quan')}${chip('linhvuc', 'Đề tài')}${chip('nguoi', 'Từng người')}
     </div>
 
-    ${DSTN_THE === 'linhvuc' ? `
+    ${DSTN_THE === 'tong' ? oTong : DSTN_THE === 'linhvuc' ? `
       <p class="sub"><b class="num">${ds.da_chon_linh_vuc}</b>/${ds.tong} người đã chọn lĩnh vực ·
          <b class="num">${ds.da_nop_link}</b> đã nộp link bài.</p>
       <div class="dstnbox">${khoiLinhVuc}</div>
@@ -5664,25 +5827,35 @@ function veDanhSachTotNghiep() {
         hoặc cùng lĩnh vực, <b>không bắt buộc ai cũng nộp</b> — nên danh sách "chưa
         chọn" là để biết, không phải để đòi.</div>
     ` : `
-      <p class="sub"><b class="num">${ds.xong_ho_so}</b>/${ds.tong} xong hồ sơ ·
-         <b class="num">${ds.xong_gala}</b>/${ds.tong} đã trả lời dự Lễ ·
-         <b class="num">${ds.du_le}</b> người dự Lễ.</p>
-      <div class="card"><div class="cb" style="padding:4px 16px;max-height:52vh;overflow:auto">${
+      ${/* Ô TÌM. 146 dòng là khoảng 10.000px cuộn — cùng cái hỏng đã ghi cho
+           Sổ thu. Ban cán sự lớp mở màn này gần như luôn để tra MỘT người
+           ("anh A đã trả lời chưa"), mà không có ô tìm thì cách duy nhất là
+           cuộn và đọc bằng mắt qua 146 cái tên.
+           Lọc THẲNG TRÊN DOM, không vẽ lại: vẽ lại là ô tìm mất tiêu điểm và
+           bàn phím điện thoại sập xuống sau mỗi chữ. Cùng lý lẽ "lọc ở giao
+           diện" của Sổ thu, chỉ khác là ở đây không được đụng tới hàm vẽ. */''}
+      <input id="dstnTim" placeholder="Tìm tên hoặc nhóm…" maxlength="60" autocomplete="off">
+      <div class="mut" id="dstnDem" style="margin:8px 0 10px">
+        <b class="num">${tk.ho_so?.xong ?? 0}</b>/${ds.tong} xong hồ sơ ·
+        <b class="num">${ds.xong_gala}</b>/${ds.tong} đã trả lời Gala ·
+        <b class="num">${tk.gala?.co ?? 0}</b> người dự.</div>
+      <div class="card"><div class="cb" id="dstnDs"
+           style="padding:4px 16px;max-height:52vh;max-height:52dvh;overflow:auto">${
         ds.nguoi.map(p => {
           const phi = p.trang_thai_phi === 'nguoi_thu_da_nhan'
             ? '<span class="xongchip">✓ người thu đã nhận</span>'
             : p.trang_thai_phi === 'da_tu_khai' ? '<span class="khaichip">đã tự khai</span>' : '';
-          return `<div class="fd">
+          return `<div class="fd" data-tim="${esc(boDau(`${p.full_name} ${p.group_label || ''}`).toLowerCase())}">
             <div class="x"><b>${esc(p.full_name)}</b>
               <span class="mut"> · ${esc(p.group_label || '—')}</span>
               <div class="tagrow" style="margin-top:4px">
                 ${p.ho_so_luc ? '<span class="tg go">hồ sơ ✓</span>' : '<span class="tg">hồ sơ —</span>'}
-                ${p.gala_luc ? `<span class="tg ${p.du_le === 'co' ? 'go' : ''}">${p.du_le === 'co' ? 'dự Lễ' : 'không dự'}</span>` : '<span class="tg">chưa trả lời</span>'}
+                ${p.gala_luc ? `<span class="tg ${p.du_le === 'co' ? 'go' : ''}">${p.du_le === 'co' ? 'dự Gala' : 'không dự'}</span>` : '<span class="tg">chưa trả lời</span>'}
                 ${p.khkd_url ? '<span class="tg go">đã nộp bài</span>' : p.khkd_linh_vuc ? '<span class="tg">đã chọn lĩnh vực</span>' : ''}
                 ${phi}
               </div></div></div>`;
         }).join('')
-      }</div></div>
+      }<div class="mut" id="dstnKhong" style="display:none;padding:12px 2px">Không có ai khớp.</div></div></div>
     `}
 
     <a class="wide" href="/api/totnghiep/xuat.csv" download
@@ -5692,9 +5865,24 @@ function veDanhSachTotNghiep() {
       rồi mới thành "người thu đã nhận".</div>
     <div class="sa"><button class="big c" id="dsDong">Đóng</button></div>`);
 
+  /* Trả lại đúng chỗ đang cuộn. `openSheet()` thay sạch innerHTML nên trình
+     duyệt đưa sheet về đầu — mà bung một lĩnh vực ở cuối danh sách 15 mục là
+     một lượt vẽ lại, tức người vừa bấm bị ném ngược lên đầu và phải cuộn lại
+     tìm chỗ cũ. Cùng họ với bài học `SOTHU` (xác nhận một người xong là danh
+     sách nhảy về đầu, đến người thứ ba thì bỏ cuộc). */
+  const sh = $('#sheet');
+  if (sh && DSTN_CUON) sh.scrollTop = DSTN_CUON;
+  if (sh) sh.onscroll = () => { DSTN_CUON = sh.scrollTop; };
+
   $('#dsDong').onclick = closeSheet;
   document.querySelectorAll('#sheet [data-dstn]').forEach(b => {
-    b.onclick = () => { DSTN_THE = b.dataset.dstn; veDanhSachTotNghiep(); };
+    b.onclick = () => {
+      // Đổi THẺ thì về đầu: nội dung khác hẳn, giữ lại chỗ cuộn cũ chỉ làm
+      // người ta mở ra giữa chừng một danh sách chưa từng thấy.
+      DSTN_CUON = 0;
+      DSTN_THE = b.dataset.dstn;
+      veDanhSachTotNghiep();
+    };
   });
   document.querySelectorAll('#sheet [data-lv]').forEach(b => {
     b.onclick = () => {
@@ -5703,6 +5891,23 @@ function veDanhSachTotNghiep() {
       veDanhSachTotNghiep();
     };
   });
+
+  const oTim = $('#dstnTim');
+  if (oTim) {
+    oTim.oninput = () => {
+      const q = boDau(oTim.value.trim()).toLowerCase();
+      let con = 0;
+      document.querySelectorAll('#dstnDs .fd').forEach(d => {
+        const hien = !q || (d.dataset.tim ?? '').includes(q);
+        d.style.display = hien ? '' : 'none';
+        if (hien) con++;
+      });
+      $('#dstnKhong').style.display = con ? 'none' : 'block';
+      // Con số ở trên là của CẢ LỚP, không đổi theo ô tìm — nói rõ ra khi
+      // đang lọc, kẻo đọc "12 kết quả" cạnh "146 người" thành mâu thuẫn.
+      $('#dstnDem').style.opacity = q ? '.45' : '';
+    };
+  }
 }
 
 // Đăng ký service worker. Nó KHÔNG cache gì — chỉ để nhận thông báo đẩy và
@@ -5719,12 +5924,17 @@ async function boot() {
   // /dangnhap là CỬA CHÍNH — màn tự nhận diện bằng tên và số điện thoại.
   // /dangnhap/email là đường cho ai đã khai email rồi. Phải xét trước nhánh
   // magic link, không thì 'email' bị nhận nhầm là token.
-  if (location.pathname.replace(/\/$/, '') === '/dangnhap/email') return renderLogin();
+  // Cả ba màn vào đều hỏi NGẦM xem máy này đã có phiên chưa. Vẽ trước, hỏi
+  // sau: `vaoDoPhien()` KHÔNG await, nên 77 người chưa vào được vẫn thấy ô
+  // nhập ngay lập tức như cũ; ai đã đăng nhập rồi thì một băng hiện ra ở đầu
+  // thẻ khi phúc đáp về tới. Xem chú thích của `vaoSonPhien()` cho lý lẽ.
+  if (location.pathname.replace(/\/$/, '') === '/dangnhap/email') { vaoDoPhien(); return renderLogin(); }
   if ((m = location.pathname.match(/^\/dangnhap\/([^/]+)\/?$/))) return renderMagicConsume(m[1]);
-  if (location.pathname.replace(/\/$/, '') === '/dangnhap') return renderVao();
+  if (location.pathname.replace(/\/$/, '') === '/dangnhap') { vaoDoPhien(); return renderVao(); }
   // /vao là địa chỉ cũ đã phát cho lớp — giữ sống, lặng lẽ đổi sang /dangnhap.
   if (location.pathname.replace(/\/$/, '') === '/vao') {
     history.replaceState({}, '', '/dangnhap');
+    vaoDoPhien();
     return renderVao();
   }
   if (location.pathname.replace(/\/$/, '') === '/start') return renderStart();

@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Năm mươi lăm phép đối chứng đáng giữ nhất
+## Năm mươi chín phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -675,6 +675,54 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    Ghi lại vì đây là loại nhầm đắt nhất: tưởng mình vừa vá một lỗi và có phép
    kiểm canh nó, trong khi chưa lỗi nào được chứng minh và phép kiểm không có
    răng ở đúng chiều ấy. Chạy đối chứng trước khi tin.
+
+56. **Một đường ghi MỚI vào cột đăng nhập thì phải kiểm CẢ HAI CHIỀU, bằng
+   hai người gọi khác nhau.** Từ 19/9 `putHoSo` ghi ngược số điện thoại sang
+   `members.phone` kèm dấu `phone_self_set_at` — tức số khai ở form tốt
+   nghiệp thành số tự đăng nhập được ở `/dangnhap`.
+
+   `kiem-totnghiep.mjs` kiểm bằng `POST /api/onboard/check`, ba phép:
+   số khai qua đường CÓ PHIÊN mở được cửa (200); số khai qua LINK CÔNG KHAI
+   thì KHÔNG (401); và số có phiên vẫn còn hiệu lực sau đó.
+
+   **Phép thứ hai mới là phép đáng giữ.** Đường công khai không có phiên, nó
+   chỉ biết một `roster_id` gõ trong URL — cho nó đặt dấu ấy là trao cho bất
+   kỳ ai cầm link `/totnghiep` quyền đặt chìa khoá đăng nhập cho MỘT NGƯỜI
+   KHÁC. Đã chạy đối chứng cả hai chiều: gỡ lời gọi ở `putHoSo` → phép 1 đỏ;
+   thêm lời gọi vào `postTotNghiepCongKhai` → phép 2 VÀ phép 3 đỏ (lượt ghi
+   công khai còn ĐÈ MẤT số chính chủ đã tự đặt).
+
+   Và `reset-totnghiep.sh` phải trả `members.phone` + `phone_self_set_at` về
+   bản danh sách gốc. Không trả thì lượt chạy sau mở đầu với dấu đã đặt sẵn,
+   nên phép 1 XANH kể cả khi bản vá đã bị gỡ — cùng bài học của phép 3.
+
+57. **Băng "máy này đang đăng nhập rồi" phải kiểm CẢ LÚC KHÔNG CÓ PHIÊN.**
+   `/dangnhap` trước 19/9 gọi thẳng màn tự nhận diện mà không hỏi người đang
+   mở đã có phiên chưa, nên người đã ở trong ứng dụng bấm vào link nhận được
+   một màn "Bạn là ai?" rồi bị đòi số điện thoại.
+
+   `pw-totnghiep.mjs` kiểm bằng HAI ngữ cảnh trình duyệt: phiên Cường thấy
+   băng kèm ĐÚNG TÊN, ngữ cảnh không cookie thì KHÔNG thấy gì. Bỏ vế thứ hai
+   thì một bản vá vẽ băng vô điều kiện vẫn xanh — và nó sẽ bảo 77 người chưa
+   vào được rằng họ đang đăng nhập rồi, ở đúng màn của họ. Kèm một vế nữa:
+   biểu mẫu phải CÒN NGUYÊN bên dưới, vì một bản vá `location.href = '/'`
+   cũng làm phép đầu xanh mà lại chặn đường đăng nhập bằng tài khoản khác.
+
+58. **Lối về ở đầu trang: đo VỊ TRÍ, đừng đếm phần tử.** Ngô Phú Cường xin
+   nút Back ở đầu `/totnghiep` vì nó vốn chỉ có ở chân trang. `.tnve` phải
+   nằm TRÊN khối `<details>` đầu tiên (so `getBoundingClientRect().top`) —
+   một nút thứ hai đặt nhầm xuống cuối vẫn làm phép đếm xanh mà chẳng chữa
+   được gì. Kèm phép đối chứng cho chỗ LỆCH CÓ CHỦ Ý: đường CÔNG KHAI phải
+   KHÔNG có nút ấy (với 38 người không đăng nhập được thì "về ứng dụng" dẫn
+   thẳng vào màn 401), và soi ở màn ĐÃ dựng băng chàm chứ không ở màn 401
+   ngay trước — màn ấy dùng `.claimcard`, đo ở đó thì xanh mà vô nghĩa.
+
+59. **Ô tìm phải kiểm được rằng nó KHÔNG vẽ lại cả màn.** Màn thống kê có 146
+   dòng nên phải có ô tìm, và nó lọc thẳng trên DOM. Phép "lọc đúng người"
+   một mình vẫn xanh với một bản vá gọi `veDanhSachTotNghiep()` trong
+   `oninput` — mà bản vá ấy làm ô tìm mất tiêu điểm và bàn phím điện thoại
+   sập xuống sau MỖI CHỮ gõ vào. Phép có răng là
+   `document.activeElement?.id === 'dstnTim'` sau khi lọc.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

@@ -95,6 +95,26 @@ const mo1 = await dangMo();
 ok(`ĐÚNG MỘT khối đang mở (${mo1.join(', ')})`, mo1.filter(Boolean).length === 1);
 ok('và đó là Gala — hạn 21h00 ngày 19/9, gấp nhất trong ba', mo1[0] === true);
 
+/* ── LỐI VỀ Ở ĐẦU TRANG (19/9) ────────────────────────────────────────────
+   Ngô Phú Cường: *"Ở phần tốt nghiệp thêm icon nút Back (Trở về ứng dụng) ở
+   phía trên (hiện tạo chỉ có ở dưới cùng)."* Biểu mẫu này dài hơn ba màn điện
+   thoại, mà `body.noapp` đã bỏ thanh sáu tab — nên đường ra duy nhất nằm tận
+   chân trang, sau cả ba khối đang mở. Trên iPhone đã cài lên màn hình chính
+   thì còn không có cả nút Back của trình duyệt.
+
+   Phép đo VỊ TRÍ, không chỉ đếm phần tử: một nút "về ứng dụng" thứ hai đặt
+   nhầm xuống cuối thì phép đếm vẫn xanh mà chẳng chữa được gì. */
+ok('có lối về ở ĐẦU trang', await p.locator('.tnhead .tnve').count() === 1);
+const viTri = await p.evaluate(() => ({
+  ve: document.querySelector('.tnhead .tnve')?.getBoundingClientRect().top,
+  khoi: document.querySelector('.tnsec')?.getBoundingClientRect().top,
+  cao: Math.round(document.querySelector('.tnhead .tnve')?.getBoundingClientRect().height ?? 0),
+}));
+ok(`lối về nằm TRÊN khối đầu tiên (${Math.round(viTri.ve)}px < ${Math.round(viTri.khoi)}px)`,
+   viTri.ve < viTri.khoi);
+ok(`vùng chạm cao ${viTri.cao}px (cần ≥ 44)`, viTri.cao >= 44);
+ok('trỏ về gốc ứng dụng', await p.locator('.tnhead .tnve').getAttribute('href') === '/');
+
 // Mở khối thứ hai thì khối thứ nhất phải TỰ ĐÓNG. Chỉ cách này mới phân biệt
 // được accordion thật với ba <details> độc lập cùng mở sẵn một cái.
 await p.locator('.tnsec').nth(1).locator('summary').click();
@@ -132,13 +152,13 @@ ok(`ba ô cao ${caoChip.join('/')}px (cần ≥ 44)`, caoChip.every(h => h >= 44
 
 /* ── DẢI Ô LÀ MỘT THANH TAB: chạm ô nào mở khối ấy ───────────────────────
    PHÉP CÓ RĂNG NHẤT CỦA CẢ MỤC, vì hai dải xếp NGƯỢC NHAU:
-     ô   0 Hồ sơ · 1 Đề tài · 2 Dự Lễ
+     ô   0 Hồ sơ · 1 Đề tài · 2 Gala
      khối 0 gala  · 1 hoso   · 2 detai
    Ánh xạ theo CHỈ SỐ thì chạm "Hồ sơ" mở ra Gala, và không chỗ nào báo lỗi.
    Nên phải soi theo ĐÚNG TÊN `data-sec`, tuyệt đối không theo vị trí. */
 console.log('\n── Ba ô tiến độ bấm được, và mở ĐÚNG khối của nó ──');
 const khoiDangMo = async () => p.locator('.tnsec[open]').getAttribute('data-sec');
-for (const [oTen, secMong] of [['Hồ sơ', 'hoso'], ['Đề tài', 'detai'], ['Dự Lễ', 'gala']]) {
+for (const [oTen, secMong] of [['Hồ sơ', 'hoso'], ['Đề tài', 'detai'], ['Gala', 'gala']]) {
   await p.locator(`.tnprog > button[data-tnmo="${secMong}"]`).click();
   await p.waitForTimeout(700);
   const thay = await khoiDangMo();
@@ -273,20 +293,30 @@ ok('bấm lại thì chữ vừa gõ VẪN CÒN, không bị ẩn rồi xoá',
 // ── 5. Lưu từng phần RIÊNG ───────────────────────────────────────────────
 console.log('\n── Ba phần lưu riêng: chip tiến độ đổi đúng một cái ──');
 const chipTruoc = await p.locator('.tnprog > button').allInnerTexts();
-// CHỈ hai chip Hồ sơ và Dự Lễ — chip Đề tài đã ✓ từ mục trên, vì mục ấy thật
+// CHỈ hai chip Hồ sơ và Gala — chip Đề tài đã ✓ từ mục trên, vì mục ấy thật
 // sự lưu một đề tài. Ghim "cả ba đều chưa điền" ở đây là bộ kiểm tự mâu thuẫn
 // với chính bước nó vừa chạy.
-ok(`chip Hồ sơ và Dự Lễ còn "chưa điền" (${chipTruoc[0].replace(/\n/g, ' ')} · ${chipTruoc[2].replace(/\n/g, ' ')})`,
+ok(`chip Hồ sơ và Gala còn "chưa điền" (${chipTruoc[0].replace(/\n/g, ' ')} · ${chipTruoc[2].replace(/\n/g, ' ')})`,
    chipTruoc[0].includes('chưa điền') && chipTruoc[2].includes('chưa điền'));
 
 await moKhoi(p, 'Lễ tốt nghiệp');
 await p.locator('#tnDuLe [data-dule="co"]').click();
 await p.waitForTimeout(150);
+/* Khai nốt tài trợ / gian hàng / văn nghệ QUA CHÍNH BIỂU MẪU, không bơm
+   thẳng vào API. Ba thứ này thu từ 18/9 mà tới 19/9 màn Ban cán sự lớp vẫn
+   chưa hiện chúng — phần dưới của bộ kiểm soi đúng chỗ ấy, nên chúng phải
+   tới D1 bằng đường người dùng thật đi. */
+await p.locator('#tnTaiTro [data-tt="tien"]').click();
+await p.fill('#tnTTMo', 'ủng hộ 5 triệu');
+await p.locator('#tnGH').check();
+await p.locator('#tnVN').check();
+await p.fill('#tnVNMo', 'song ca 2 người');
+await p.waitForTimeout(150);
 await p.click('#tnLuuGala');
 await p.waitForTimeout(1600);
 
 const chipSau = await p.locator('.tnprog > button').allInnerTexts();
-ok(`chip "Dự Lễ" thành ✓ xong (${chipSau[2]})`, chipSau[2].includes('xong'));
+ok(`chip "Gala" thành ✓ xong (${chipSau[2]})`, chipSau[2].includes('xong'));
 ok(`chip "Hồ sơ" VẪN "chưa điền" (${chipSau[0]}) — lưu một phần không đụng phần kia`,
    chipSau[0].includes('chưa điền'));
 ok('không lỗi JS sau khi lưu: ' + (loi.join(' | ') || 'sạch'), loi.length === 0);
@@ -355,10 +385,41 @@ const chuSheet = await p.locator('#sheet').innerText();
 ok('sheet KHÔNG có chữ "đã đóng"', !/đã đóng/i.test(chuSheet));
 ok('có nút tải CSV', await p.locator('#sheet a[href="/api/totnghiep/xuat.csv"]').count() === 1);
 
-/* Thứ THAY CHO lượt bình chọn Zalo. Lượt ấy cho avatar và con số; chỗ này
-   phải cho con số KÈM TÊN, kèm đề tài và link — tức dò ngược được. */
-console.log('\n── Màn thay cho bình chọn Zalo ──');
-ok('mặc định mở thẻ "Theo lĩnh vực"',
+/* ── THẺ TỔNG QUAN (19/9) ─────────────────────────────────────────────────
+   Ngô Phú Cường xin "UI thông minh, logic hơn … xem số người đăng ký dự Gala,
+   tài trợ, tách thống kê đề tài". Ba thứ đã thu từ 18/9 mà màn hình CHƯA BAO
+   GIỜ hiện: tài trợ, gian hàng, văn nghệ — muốn biết ai đăng ký tiết mục văn
+   nghệ thì phải tải CSV về rồi mở Excel. */
+console.log('\n── Thẻ Tổng quan: Gala, phí, tài trợ, gian hàng, văn nghệ ──');
+ok('mặc định mở thẻ "Tổng quan", không phải danh mục đề tài',
+   await p.locator('#sheet [data-dstn="tong"].on').count() === 1);
+const chuTong = await p.locator('#sheet').innerText();
+for (const muc of ['Gala 26/9', 'Phí Gala', 'Tài trợ', 'Gian hàng', 'văn nghệ', 'chứng chỉ']) {
+  ok(`thẻ Tổng quan có khối "${muc}"`, new RegExp(muc, 'i').test(chuTong));
+}
+// Ba thứ kia phải kèm TÊN, không chỉ con số: cả ba đều phải liên hệ lại từng
+// người (chốt hiện vật, xếp chỗ standee, dựng chương trình), mà một con số
+// trần thì vẫn phải mở CSV ra mới biết gọi cho ai.
+ok('tài trợ / gian hàng / văn nghệ kèm TÊN người, không chỉ con số',
+   (chuTong.match(/Ngô Phú Cường/g) ?? []).length >= 3);
+ok('… và kèm chi tiết tiết mục văn nghệ', /song ca 2 người/.test(chuTong));
+/* Ô SỐ PHẢI CÙNG MỘT HÀNG — cùng lý do dải `.tnprog`: ba con số của một câu
+   hỏi phải nhìn thấy cùng lúc thì mới so được. Đo bằng offsetTop, vì phép
+   đếm "có ba ô" một mình vẫn xanh khi chúng xếp thành ba dòng chồng nhau. */
+const hangSo = await p.locator('#sheet .dstnso').first()
+  .evaluate(el => [...el.children].map(c => c.offsetTop));
+ok(`ba ô số nằm CÙNG MỘT HÀNG (offsetTop ${hangSo.join('/')})`,
+   hangSo.length === 3 && new Set(hangSo).size === 1);
+/* MÀU ĐI THEO NGHĨA. `--go` trong sản phẩm này có đúng MỘT nghĩa: người thu
+   đã nhận tiền. Ô "có dự Gala" là một câu trả lời, không phải một lời khen —
+   tô xanh nó là phá quy ước màu đã giữ từ Đợt 3. Soi ô đầu của khối Gala. */
+const oGalaCo = await p.locator('#sheet .dstnso').first().locator('.dstno').first()
+  .getAttribute('class');
+ok(`ô "có dự" KHÔNG mang lớp .go (class="${oGalaCo}")`, !/\bgo\b/.test(oGalaCo));
+
+console.log('\n── Màn thay cho bình chọn Zalo (thẻ Đề tài) ──');
+await p.locator('#sheet [data-dstn="linhvuc"]').click(); await p.waitForTimeout(400);
+ok('mở được thẻ "Đề tài"',
    await p.locator('#sheet [data-dstn="linhvuc"].on').count() === 1);
 ok('hiện ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai chọn',
    await p.locator('#sheet .dstnlv').count() === 15);
@@ -386,8 +447,30 @@ const bicat = await p.locator('#sheet .dstnlv').evaluateAll(
 ok(`không mục nào bị cắt chữ (${bicat} mục bị cắt)`, bicat === 0);
 // Thẻ đang mở phải sống lâu hơn một lượt vẽ lại — cùng bài học với bộ lọc Sổ thu.
 await p.locator('#sheet [data-dstn="nguoi"]').click(); await p.waitForTimeout(400);
-ok('đổi sang thẻ "Theo người" được', await p.locator('#sheet [data-dstn="nguoi"].on').count() === 1);
-ok('thẻ "Theo người" hiện danh sách từng người', await p.locator('#sheet .fd').count() > 0);
+ok('đổi sang thẻ "Từng người" được', await p.locator('#sheet [data-dstn="nguoi"].on').count() === 1);
+ok('thẻ "Từng người" hiện danh sách từng người', await p.locator('#sheet .fd').count() > 0);
+
+/* Ô TÌM. 146 dòng là khoảng 10.000px cuộn, mà màn này gần như luôn mở ra để
+   tra MỘT người ("anh A đã trả lời chưa"). Lọc THẲNG TRÊN DOM chứ không vẽ
+   lại: vẽ lại là ô tìm mất tiêu điểm và bàn phím điện thoại sập xuống sau mỗi
+   chữ gõ vào — phép cuối của khối này canh đúng chỗ ấy, và nó có răng thật vì
+   một bản vá gọi veDanhSachTotNghiep() trong oninput vẫn LỌC ĐÚNG. */
+const truocTim = await p.locator('#sheet #dstnDs .fd:visible').count();
+await p.fill('#dstnTim', 'cuong');
+await p.waitForTimeout(250);
+const sauTim = await p.locator('#sheet #dstnDs .fd:visible').count();
+ok(`gõ "cuong" (KHÔNG DẤU) lọc được danh sách (${truocTim} → ${sauTim})`,
+   sauTim >= 1 && sauTim < truocTim);
+ok('… và người khớp đúng là Ngô Phú Cường',
+   /Ngô Phú Cường/.test(await p.locator('#sheet #dstnDs .fd:visible').first().innerText()));
+ok('ô tìm GIỮ ĐƯỢC TIÊU ĐIỂM sau khi lọc (không vẽ lại cả sheet)',
+   await p.evaluate(() => document.activeElement?.id) === 'dstnTim');
+await p.fill('#dstnTim', 'khong-co-ai-ten-nhu-vay');
+await p.waitForTimeout(250);
+ok('không ai khớp thì nói ra, không để một khung trống câm',
+   await p.locator('#sheet #dstnKhong').isVisible());
+await p.fill('#dstnTim', ''); await p.waitForTimeout(250);
+
 await p.locator('#sheet [data-dstn="linhvuc"]').click(); await p.waitForTimeout(400);
 ok('quay lại thẻ lĩnh vực thì lĩnh vực vừa mở VẪN mở',
    await p.locator('#sheet .dstnai').count() === 1);
@@ -481,6 +564,32 @@ const camOi = await p.evaluate(() => {
 });
 ok('khối Đề tài KHÔNG còn dùng màu cam --due', camOi === false);
 
+/* ── /dangnhap phải BIẾT máy này đã đăng nhập rồi (19/9) ───────────────────
+   Ngô Phú Cường: *"Một số người đã đăng nhập và đã điền số điện thoại email
+   nhưng tôi gửi link đăng nhập cho họ, họ lại không thấy hiện lên?"* — triệu
+   chứng họ gặp là *"mở ra màn đòi số điện thoại"*.
+
+   `boot()` gọi thẳng màn tự nhận diện cho `/dangnhap` mà KHÔNG hề hỏi người
+   đang mở đã có phiên hay chưa. Người đã ở trong ứng dụng bấm vào link nhận
+   được một màn "Bạn là ai?", rồi bước 2 đòi số khớp bản danh sách 15/8 — với
+   38 người thiếu số đúng thì đó là ngõ cụt.
+
+   Dùng CHÍNH phiên Cường ở trên, vì chỗ này chỉ lộ ra khi CÓ phiên. */
+console.log('\n── /dangnhap khi máy đã đăng nhập rồi ──');
+await p.goto(B + '/dangnhap'); await p.waitForTimeout(1800);
+ok('hiện băng "máy này đang đăng nhập"', await p.locator('#vPhien .vphien').count() === 1);
+ok('… và nói ĐÚNG TÊN đang đăng nhập, không phải một câu chung chung',
+   /Ngô Phú Cường/.test(await p.locator('#vPhien').innerText()));
+/* Băng chứ không phải chuyển hướng: người thật sự muốn đăng nhập bằng tài
+   khoản khác (máy dùng chung, trưởng nhóm mở hộ) phải còn nguyên đường vào.
+   Bỏ phép này thì một bản vá `location.href = '/'` vẫn xanh ở phép trên. */
+ok('biểu mẫu đăng nhập VẪN còn bên dưới, không bị đá về trang chủ',
+   await p.locator('#vTen').count() === 1);
+ok('nút "Vào ứng dụng" đưa về gốc', await p.locator('#vPhienVao').count() === 1);
+await p.locator('#vPhienVao').click(); await p.waitForTimeout(1600);
+ok(`bấm vào thì về thật (đang ở ${new URL(p.url()).pathname})`,
+   new URL(p.url()).pathname === '/');
+
 /* ── Đường công khai: người CHƯA đăng nhập vẫn điền được (migration 0042) ──
    Đo trên D1 thật 18/9: 38/146 người không có số điện thoại trong danh sách
    gốc nên cửa /dangnhap đóng với họ. Ngô Phú Cường chọn mở RIÊNG form tốt
@@ -493,6 +602,15 @@ console.log('\n── Đường công khai (chưa đăng nhập) ──');
 const c3 = await b.newContext({ viewport: { width: 390, height: 1400 } });
 const p3 = await c3.newPage();          // KHÔNG có cookie
 const loi3 = []; p3.on('pageerror', e => loi3.push(e.message));
+
+/* Phép đối chứng cho băng vừa kiểm ở trên: KHÔNG có phiên thì KHÔNG có băng.
+   Bỏ phép này thì một bản vá vẽ băng vô điều kiện vẫn xanh — và nó sẽ bảo
+   77 người chưa vào được rằng họ đang đăng nhập rồi, ở đúng màn của họ. */
+await p3.goto(B + '/dangnhap'); await p3.waitForTimeout(1600);
+ok('chưa đăng nhập thì KHÔNG có băng "đang đăng nhập"',
+   await p3.locator('#vPhien .vphien').count() === 0);
+ok('… và màn vào vẫn dựng đủ như cũ', await p3.locator('#vTen').count() === 1);
+
 await p3.goto(B + '/totnghiep'); await p3.waitForTimeout(1600);
 
 // Phải bày ĐỦ HAI lối: 39 người kia CÓ số nên vẫn đăng nhập được, và đăng
@@ -503,6 +621,20 @@ ok('có lối "điền thẳng ở đây"', await p3.locator('#tnckBatDau').coun
 
 await p3.click('#tnckBatDau'); await p3.waitForTimeout(500);
 ok('mở ra màn tìm tên', await p3.locator('#tnckTen').count() === 1);
+
+/* LỐI VỀ ỨNG DỤNG CHỈ CÓ Ở BẢN CÓ PHIÊN — phép đối chứng cho một chỗ LỆCH CÓ
+   CHỦ Ý, không phải chỗ quên. Đường này dành cho 38 người KHÔNG đăng nhập
+   được: với họ "về ứng dụng" dẫn thẳng vào màn 401, tức một lối ra dẫn vào
+   ngõ cụt. Thiếu phép này thì một lần sửa "cho nhất quán hai màn" lọt qua
+   sạch, và nó hỏng đúng với nhóm người khó vào nhất.
+   Soi ở ĐÂY chứ không ở màn 401 ngay trước: màn ấy dùng `.claimcard` chứ
+   chưa dựng băng chàm, nên phép đo ở đó xanh mà chẳng chứng minh được gì. */
+ok('đường CÔNG KHAI có băng nhận diện chàm, để họ biết mình đang ở đúng chỗ',
+   await p3.locator('.tnhead').count() === 1);
+ok('… nhưng KHÔNG có nút "về ứng dụng" trong băng ấy',
+   await p3.locator('.tnhead .tnve').count() === 0);
+// Vẫn phải có lối lui từng bước — bỏ luôn cả hai là nhốt người ta trong form.
+ok('… mà có lối "Quay lại" theo từng bước', await p3.locator('.tnback').count() >= 1);
 
 /* A4 — DANH SÁCH BỊ CẮT PHẢI NÓI RA.
    searchRoster cắt cứng ở 12 người và trước 19/9 không báo là đã cắt: gõ

@@ -72,6 +72,43 @@ jobs:
           [ "$xau" = "0" ] && echo "✓ không còn câu chữ của luồng đề tài theo nhóm"
           [ "$xau" = "0" ] || exit 1
 
+      # Từ 19/9 putHoSo ghi ngược số điện thoại sang members.phone KÈM dấu
+      # phone_self_set_at — tức số khai ở form tốt nghiệp thành số tự đăng
+      # nhập được ở /dangnhap (soHopLeTuHoSo trong routes/onboard.js).
+      #
+      # Đường CÔNG KHAI (postTotNghiepCongKhai) TUYỆT ĐỐI không được làm việc
+      # ấy: nó không có phiên, chỉ biết một roster_id gõ trong URL. Cho nó đặt
+      # dấu này là trao cho bất kỳ ai cầm link /totnghiep quyền đặt chìa khoá
+      # đăng nhập cho MỘT NGƯỜI KHÁC trong lớp — mà vào được là đọc được danh
+      # bạ cả lớp kèm số điện thoại, sổ thu, bài, thông báo nội bộ. Đúng lỗ
+      # hổng chiếm tài khoản đã vá ngày 5/9.
+      #
+      # kiem-totnghiep.mjs đã canh chiều này ở TẦNG CHẠY, nhưng bộ kiểm ấy chỉ
+      # chạy khi có người nhớ chạy nó. Phép grep dưới đây chạy MỖI LƯỢT DEPLOY
+      # và chặn TRƯỚC khi bản vá lên tên miền.
+      #
+      # Grep theo "await chepSoSangMembers(env" chứ không theo tên hàm trần:
+      # dòng ĐỊNH NGHĨA hàm cũng khớp tên trần (nên đếm ra 2 thay vì 1), và chính
+      # hàm ấy được NHẮC TÊN trong một chú thích nằm ngay trong đường công khai
+      # (để lần sửa sau không ai "cho nhất quán hai đường ghi"), nên một phép
+      # grep tên trần sẽ đỏ với đúng dòng chú thích dựng lên để bảo vệ nó.
+      - name: Kiểm nguồn — đường công khai KHÔNG được đặt chìa khoá đăng nhập
+        run: |
+          f=worker/src/routes/tot-nghiep.js
+          xau=0
+          so=$(grep -c "await chepSoSangMembers(env" "$f" || true)
+          if [ "$so" != "1" ]; then
+            echo "::error::Có $so nơi gọi chepSoSangMembers — phải ĐÚNG MỘT, và nó nằm trong putHoSo (đường có phiên). Đọc chú thích của chính hàm ấy trước khi thêm nơi gọi thứ hai."
+            xau=1
+          fi
+          if sed -n "/export async function postTotNghiepCongKhai/,/^export /p" "$f" \
+             | grep -n "await chepSoSangMembers(env"; then
+            echo "::error::Đường CÔNG KHAI đang đặt phone_self_set_at. Đường ấy không có phiên — ai cầm link /totnghiep cũng đặt được chìa khoá đăng nhập cho người khác. Đây là lỗ hổng chiếm tài khoản đã vá 5/9."
+            xau=1
+          fi
+          [ "$xau" = "0" ] && echo "✓ chỉ đường CÓ PHIÊN mới ghi được phone_self_set_at"
+          [ "$xau" = "0" ] || exit 1
+
       # Chưa đặt bí mật thì BỎ QUA chứ không báo hỏng — deploy bằng Git
       # integration ngay trên dashboard Cloudflare cũng là đường hợp lệ, và ai
       # chọn đường đó thì không phải nhìn dấu X đỏ ở mỗi commit.

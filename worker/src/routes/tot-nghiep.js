@@ -9,6 +9,7 @@ import { buildTransferNote, buildQrUrl } from '../lib/vietqr.js';
 import { driveCauHinh, taiLenDrive, taoThuMuc } from '../lib/drive.js';
 import { doanLoaiAnh, TOI_DA_BYTE, tenTepAnh } from '../lib/anh.js';
 import { boDau } from '../lib/ghep.js';
+import { isValidVnPhone } from '../lib/phone.js';
 
 /* ══ Zone "Lễ tốt nghiệp" — /totnghiep ══════════════════════════════════════
    Ngô Phú Cường đưa 15 câu Ban tổ chức muốn thu để chuẩn bị Lễ tốt nghiệp
@@ -159,6 +160,38 @@ async function chepNganhSangHoSo(env, memberId, linhVuc) {
   ).bind(memberId, linhVuc, memberId).run();
 }
 
+/* Số điện thoại khai ở PHẦN A đi ngược về `members.phone`, KÈM dấu
+   `phone_self_set_at` — tức nó thành số tự đăng nhập được ở `/dangnhap`.
+
+   Vì sao phải có: `soHopLeTuHoSo()` (routes/onboard.js) chỉ tin `roster.phone`
+   — bản Ban tổ chức nạp ngày 15/8 — TRỪ KHI chính chủ đã tự đặt số của mình.
+   38 người trong lớp không có số đúng trong bản ấy. Từ 18/9 điện thoại là ô
+   BẮT BUỘC của phần A, nên cả lớp sắp gõ số thật vào đây; để nó nằm lại trong
+   `dang_ky_tot_nghiep` thì `/dangnhap` vẫn trả "số không khớp" cho CHÍNH cái
+   số người ta vừa khai trong ứng dụng — hai nguồn sự thật cho cùng một sự
+   thật, đúng lỗi vừa chữa cho `linh_vuc` ở hàm ngay trên.
+
+   Ba điều làm nó an toàn, và CẢ BA phải còn đúng:
+   - Chỉ gọi từ `putHoSo` — đường CÓ PHIÊN, ghi vào `me.id`, không nhận
+     `member_id` trong thân. Cùng đúng mức tin cậy với `patchMember`
+     (routes/members.js), nơi duy nhất từ trước tới nay đặt được dấu này.
+     N5 nguyên vẹn: dữ liệu của chính người đang bấm Lưu.
+   - TUYỆT ĐỐI KHÔNG gọi từ `postTotNghiepCongKhai`. Đường ấy không có phiên,
+     nên ai cầm link `/totnghiep` cũng đặt được chìa khoá đăng nhập cho người
+     khác — đúng lỗ hổng chiếm tài khoản đã vá ngày 5/9. `kiem-totnghiep.mjs`
+     có phép đối chứng riêng cho chiều này.
+   - Chỉ nhận số ĐÚNG KHUÔN 10 chữ số. Ghi một số sai khuôn vào đây là dựng
+     một chìa khoá không bao giờ mở được, mà lại che mất `roster.phone` đang
+     dùng tốt — hỏng ngầm, không chỗ nào báo. */
+async function chepSoSangMembers(env, memberId, so) {
+  if (!isValidVnPhone(so)) return;
+  await env.DB.prepare(
+    `UPDATE members SET phone = ?, phone_self_set_at = datetime('now'),
+        updated_at = datetime('now')
+      WHERE id = ?`
+  ).bind(so, memberId).run();
+}
+
 /* ── Màn hình chỉ gọi MỘT lượt ────────────────────────────────────────────
    Gộp sẵn mọi thứ: hồ sơ điền sẵn, danh mục ngành, đề tài + link của nhóm,
    danh sách thành viên, đợt thu phí kèm QR, và bản đăng ký đã lưu nếu có. */
@@ -293,6 +326,7 @@ export async function putHoSo(request, env, me) {
   ).run();
 
   await chepNganhSangHoSo(env, me.id, dat.linh_vuc);
+  await chepSoSangMembers(env, me.id, dat.dien_thoai);
 
   // Chỉ ghi hoạt động LẦN ĐẦU. Sửa lại một chữ mà đẩy thêm một dòng vào feed
   // "Đang diễn ra" của cả nhóm thì feed thành sổ nháp của một người.
@@ -699,6 +733,13 @@ export async function postTotNghiepCongKhai(request, env, ip) {
   // doanh nghiệp trong lớp, gian hàng Giao thương của họ cũng cần đúng ngành.
   await chepNganhSangHoSo(env, mem.id, dat.linh_vuc);
 
+  // VÀ TUYỆT ĐỐI KHÔNG gọi `chepSoSangMembers()` ở đây. Đó KHÔNG phải chỗ
+  // quên — đường này không có phiên, nên ghi `phone_self_set_at` từ đây là
+  // trao cho bất kỳ ai cầm link `/totnghiep` quyền đặt chìa khoá đăng nhập
+  // cho một người khác trong lớp: tìm tên họ, gõ số của mình, rồi tự nhận
+  // hồ sơ của họ ở `/dangnhap`. Đúng lỗ hổng chiếm tài khoản đã vá 5/9.
+  // Lý lẽ đầy đủ ở chú thích của chính hàm ấy.
+
   // Cú pháp chuyển khoản phải do MÁY CHỦ dựng: buildTransferNote() bỏ dấu rồi
   // viết hoa, chép logic ấy sang giao diện là có ngày hai bên ra hai chuỗi
   // khác nhau và người thu không dò được tiền về của ai.
@@ -790,7 +831,63 @@ export async function getDanhSachTotNghiep(env, me) {
   const thuMuc = await caiDatTn(env, 'drive_thu_muc_id');
   const thuMucId = env.DRIVE_FOLDER_ID || thuMuc;
 
+  /* ── Thống kê: ĐẾM Ở MÁY CHỦ, không đếm ở hàm vẽ ────────────────────────
+     Không phải để tiết kiệm vài vòng lặp. Màn Ban cán sự lớp có ô tìm và sẽ
+     còn thêm bộ lọc, nên một phép đếm viết trong hàm vẽ sẽ lặng lẽ đếm theo
+     BỘ LỌC ĐANG BẬT — con số đúng với người đang gõ "nhóm 6" vào ô tìm lại
+     là con số sai để báo Ban tổ chức. Đếm một lần ở đây thì nó luôn là con
+     số của CẢ LỚP, bất kể màn hình đang hiện gì. */
+  const gon = x => ({
+    member_id: x.member_id, full_name: x.full_name, group_label: x.group_label,
+  });
+  const duLeCo = ds.filter(x => x.du_le === 'co');
+  const dem = f => ds.filter(f).length;
+
+  const thong_ke = {
+    tong: ds.length,
+    // Hạn 21h00 ngày 19/9 — câu hỏi gấp nhất của cả zone này. Ba nhánh chứ
+    // không hai: "chưa trả lời" KHÁC "không dự", và chỉ nhánh đầu mới là
+    // việc còn phải đi đòi.
+    gala: { co: duLeCo.length, khong: dem(x => x.du_le === 'khong'), chua: dem(x => !x.du_le) },
+    /* Phí Gala. Ba điều cố ý:
+       - MẪU SỐ là người DỰ LỄ, không phải cả lớp: khoản này chỉ của người dự
+         buổi tối. Lấy mẫu số 146 thì con số đọc lên như cả lớp đang nợ tiền.
+       - Hai nhánh ĐÃ CÓ TIỀN đếm trên TOÀN BỘ danh sách, không chỉ người dự
+         Lễ: ai chuyển tiền rồi mới đổi ý không dự thì khoản ấy vẫn có thật
+         trong tài khoản người thu, giấu nó đi là làm lệch sổ.
+       - `chua_khai` thì chỉ đếm người DỰ LỄ, vì đó là danh sách còn phải đi
+         nhắc; cả lớp trừ đi số đã khai sẽ ra một con số đúng mà vô nghĩa.
+       Nhãn theo mục 6.4 SRS: "đã tự khai" cho tới khi người thu đối chiếu
+       sao kê, TUYỆT ĐỐI không có chữ "đã đóng" ở bất kỳ đâu. */
+    phi: {
+      mau_so: duLeCo.length,
+      nguoi_thu_da_nhan: dem(x => x.trang_thai_phi === 'nguoi_thu_da_nhan'),
+      da_tu_khai: dem(x => x.trang_thai_phi === 'da_tu_khai'),
+      chua_khai: duLeCo.filter(x => !x.trang_thai_phi).length,
+    },
+    /* Tài trợ, gian hàng, văn nghệ — ba thứ đã thu từ 18/9 mà màn hình CHƯA
+       BAO GIỜ hiện, chỉ có trong tệp CSV. Trả kèm TÊN chứ không chỉ con số:
+       ba việc này đều phải liên hệ lại từng người (chốt hiện vật, xếp chỗ
+       standee, dựng chương trình văn nghệ), mà một con số trần thì Ban cán sự
+       lớp vẫn phải mở CSV ra mới biết gọi cho ai. */
+    tai_tro: {
+      khong: dem(x => x.tai_tro === 'khong'),
+      chua: dem(x => !x.tai_tro),
+      nguoi: ds.filter(x => x.tai_tro === 'tien' || x.tai_tro === 'hien_vat')
+        .map(x => ({ ...gon(x), loai: x.tai_tro, mo_ta: x.tai_tro_mo_ta })),
+    },
+    gian_hang: ds.filter(x => x.gian_hang).map(gon),
+    van_nghe: ds.filter(x => x.van_nghe).map(x => ({ ...gon(x), mo_ta: x.van_nghe_mo_ta })),
+    ho_so: {
+      xong: dem(x => x.ho_so_luc),
+      co_anh: dem(x => x.anh_url),
+      co_logo: dem(x => x.logo_url),
+      thieu_anh: ds.filter(x => !x.anh_url).map(gon),
+    },
+  };
+
   return json({
+    thong_ke,
     drive_thu_muc_url: thuMucId ? `https://drive.google.com/drive/folders/${thuMucId}` : null,
     so_co_anh: ds.filter(x => x.anh_url).length,
     so_co_logo: ds.filter(x => x.logo_url).length,

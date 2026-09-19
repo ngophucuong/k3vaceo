@@ -24,6 +24,18 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 `claude/content-deployment-continuation-m2inni` — mọi thay đổi phải tới ĐÓ thì
 tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
 
+**MỚI NHẤT (19/9), chưa nằm trong danh sách đánh số bên dưới** — bốn mục
+riêng ở giữa tệp, đọc trước nếu đang sửa đúng chỗ ấy:
+- **"Số khai ở `/totnghiep` nay MỞ ĐƯỢC cửa `/dangnhap`"** — hai lỗi chồng
+  nhau trên đường đăng nhập, một trong hai là chỗ CHẠM VÀO CỘT ĐĂNG NHẬP nên
+  có ba điều an toàn phải giữ. Đọc trước khi đụng `putHoSo` hay `boot()`.
+- **"Màn Thống kê của Ban cán sự lớp: BA thẻ"** — tách đề tài khỏi việc tổ
+  chức Lễ, và ba thứ thu từ 18/9 mà màn hình chưa từng hiện.
+- **"Hai chỗ nhỏ cùng đợt"** — lối về ở đầu `/totnghiep`, và "Gala" thay
+  "Dự Lễ".
+- **"Màn VÀO — bốn chỗ sửa"** và **"Dải ba ô tiến độ thành THANH TAB"**
+  (cùng 19/9, đã phát hành).
+
 **Mười hai việc gần nhất, theo thứ tự nên đọc nếu tiếp nhận:**
 
 1. **Zone Lễ tốt nghiệp `/totnghiep`** (18/9, migration 0041 → 0042 → 0043 —
@@ -2149,6 +2161,194 @@ Cảm giác chạm thật trên điện thoại. Bộ kiểm chứng minh đư�
 vùng chạm 48px, dấu đồng bộ hai chiều và việc cuộn có xảy ra — không chứng
 minh được cú cuộn mượt ấy dễ chịu hay chóng mặt với người thật.
 
+## Số khai ở `/totnghiep` nay MỞ ĐƯỢC cửa `/dangnhap` (19/9)
+
+Ngô Phú Cường: *"Một số người đã đăng nhập và đã điền số điện thoại email
+nhưng tôi gửi link đăng nhập cho họ, họ lại không thấy hiện lên?"* — hỏi lại
+thì triệu chứng là **"mở ra màn đòi số điện thoại"**, và cách phát là **"tôi
+bảo họ tự vào `/dangnhap`"** (không phát link mời nào cả).
+
+**Hai lỗi chồng lên nhau, và cả hai đều thật.** Tra tới nơi rồi dựng lại bằng
+một trình duyệt có phiên sống, không suy đoán.
+
+### Lỗi một: `/dangnhap` không hề hỏi máy này đã có phiên chưa
+
+`boot()` (`public/app.js`) gọi thẳng `renderVao()` cho `/dangnhap`, `/vao` và
+`renderLogin()` cho `/dangnhap/email` — **không nhánh nào kiểm phiên**. Dựng
+lại được: một trình duyệt mà `/api/home` trả 200 với tên "Ngô Phú Cường" vẫn
+nhận về màn *"BƯỚC 1 / 3 · Bạn là ai?"*.
+
+Nay có một **BĂNG**, không phải một cú chuyển hướng. Ba quyết định:
+
+- **Băng chứ không đá về `/`.** Người thật sự muốn đăng nhập bằng tài khoản
+  khác — máy dùng chung, trưởng nhóm mở hộ — phải còn nguyên đường vào. Biểu
+  mẫu vẫn nằm ngay dưới băng, không ai mất gì.
+- **Không chặn lượt vẽ đầu.** `vaoDoPhien()` KHÔNG await: màn vào là màn của
+  77 người chưa vào được, bắt họ chờ một lượt gọi mạng trước khi thấy ô nhập
+  là đổi chỗ hỏng này lấy một chỗ hỏng khác. Vẽ trước, hỏi sau; người không có
+  phiên không bao giờ thấy gì. (Cookie phiên là `HttpOnly` nên JS không đọc
+  được — bắt buộc phải hỏi máy chủ, không có đường tắt.)
+- **Đo MỘT lần cho cả ba bước.** `VAO_PHIEN` nằm ngoài hàm vẽ và `vaoShell()`
+  sơn lại ở mỗi bước — đúng khuôn `SOTHU` / `DANHBA_THE` / `TN_MO`.
+
+### Lỗi hai: số họ tự khai trong ứng dụng CHƯA BAO GIỜ tới được cửa đăng nhập
+
+`soHopLeTuHoSo()` (`routes/onboard.js`) chỉ tin `roster.phone` — bản Ban tổ
+chức nạp 15/8 — **trừ khi** chính chủ đã tự đặt số của mình
+(`phone_self_set_at`). Mà trước 19/9 dấu ấy chỉ được ghi ở **đúng một chỗ**:
+`patchMember` (`routes/members.js:101`, tab Tài khoản, tự sửa của chính mình).
+
+`putHoSo` thì chỉ ghi `dang_ky_tot_nghiep.dien_thoai`. Nghĩa là cả lớp sắp gõ
+số thật vào ô BẮT BUỘC của phần Hồ sơ, rồi sang `/dangnhap` gõ đúng số ấy và
+nhận *"Số không khớp với số Ban tổ chức đang giữ"*. Đo thẳng trên D1 cục bộ để
+chắc, không suy từ code: `members.phone = 0900000123` + `phone_self_set_at`
+NULL + `roster.phone = 0911111111` → gõ số tự khai ra `phone_mismatch`, gõ số
+trong danh sách gốc ra `ok`.
+
+Nay `putHoSo` gọi `chepSoSangMembers()`. Cùng lý lẽ đã dùng cho `linh_vuc` →
+`member_profile.nganh` ngày 18/9: để hai bên rời nhau là tự tay dựng hai nguồn
+sự thật cho cùng một sự thật về cùng một người.
+
+#### Ba điều làm nó an toàn — CẢ BA phải còn đúng
+
+1. **Chỉ gọi từ `putHoSo`** — đường CÓ PHIÊN, ghi vào `me.id`, không nhận
+   `member_id` trong thân. Đúng cùng mức tin cậy với `patchMember`. N5 nguyên
+   vẹn: dữ liệu của chính người đang bấm Lưu.
+2. **TUYỆT ĐỐI không gọi từ `postTotNghiepCongKhai`.** Đường ấy không có phiên
+   — nó chỉ biết một `roster_id` gõ trong URL. Cho nó đặt dấu này là trao cho
+   bất kỳ ai cầm link `/totnghiep` quyền đặt chìa khoá đăng nhập cho MỘT NGƯỜI
+   KHÁC: tìm tên họ, gõ số của mình, rồi sang `/dangnhap` tự nhận hồ sơ của
+   họ — mà vào được là đọc được danh bạ cả lớp kèm số điện thoại, sổ thu, bài,
+   thông báo nội bộ. Đúng lỗ hổng đã vá ngày 5/9. Có chú thích ghi thẳng điều
+   ấy ngay tại chỗ gọi `chepNganhSangHoSo` của đường công khai, để lần sửa sau
+   không ai "cho nhất quán hai đường ghi".
+3. **Chỉ nhận số ĐÚNG KHUÔN 10 chữ số** (`isValidVnPhone`). Ghi một số sai
+   khuôn vào là dựng một chìa khoá không bao giờ mở được, mà lại che mất
+   `roster.phone` đang dùng tốt — hỏng ngầm, không chỗ nào báo.
+
+**Đã chạy đối chứng cả hai chiều** (xem README phép 56): gỡ lời gọi ở
+`putHoSo` → phép "số tự khai mở được cửa" ĐỎ; thêm lời gọi vào đường công khai
+→ phép an ninh ĐỎ, và kèm theo lộ ra rằng lượt ghi công khai còn **ĐÈ MẤT** số
+chính chủ đã tự đặt.
+
+Và ô Số điện thoại ở phần Hồ sơ nay có một dòng nói ra chuyện đó — không nói
+thì người ta không biết mình vừa mở được cửa cho chính mình.
+
+### Điều CỐ Ý không làm
+
+**Không đụng `/i/:token`.** Link mời trỏ tới một người CỤ THỂ, nên một người
+đang đăng nhập mở link mời của chính mình (hoặc của người khác trên máy dùng
+chung) là ca hợp lệ — chặn ở đó là làm hỏng đúng đường vá ngày 5/9. Băng chỉ
+đặt ở ba màn ĐĂNG NHẬP.
+
+**Không chép `email` sang `members`.** `BAT_BUOC` của phần Hồ sơ cố ý không có
+email, và `members.email` là cột UNIQUE trong cohort — một đường ghi thứ hai
+vào đó là một nhánh 409 mới ở giữa biểu mẫu tốt nghiệp, cho một thứ không ai
+xin.
+
+## Màn Thống kê của Ban cán sự lớp: BA thẻ, và ba thứ chưa từng hiện (19/9)
+
+Ngô Phú Cường: *"Điều chỉnh UI thông minh, logic hơn zone Thống kê dành cho
+Lớp trưởng (người đã được phân quyền) xem số người đăng ký dự Gala, tài trợ,
+tách thống kê đề tài."*
+
+Bản cũ trộn hai việc khác hẳn nhau vào một sheet hai thẻ: danh mục **ĐỀ TÀI**
+(việc của khoá học, hạn 26/9, lớp đã chốt KHÔNG bắt buộc ai cũng nộp) và việc
+tổ chức **LỄ & GALA** (hạn 21h00 ngày 19/9, có tiền, phải gọi từng người). Hai
+nhịp khác nhau, hai người hỏi khác nhau.
+
+Và **ba thứ đã thu từ 18/9 mà màn hình chưa bao giờ hiện**: `tai_tro`,
+`gian_hang`, `van_nghe`. Chúng chỉ nằm trong tệp CSV — tức muốn biết ai đăng
+ký tiết mục văn nghệ thì phải tải tệp về rồi mở Excel, trong khi đó đúng là
+câu hỏi người dựng chương trình hỏi nhiều nhất trong tuần cuối.
+
+Nay ba thẻ: **Tổng quan · Đề tài · Từng người**, mặc định mở Tổng quan.
+
+### ĐẾM Ở MÁY CHỦ, không đếm trong hàm vẽ
+
+`getDanhSachTotNghiep` trả thêm khối `thong_ke`. Lý do không phải tiết kiệm
+vài vòng lặp: thẻ "Từng người" nay có ô tìm và sẽ còn thêm bộ lọc, nên một
+phép đếm viết trong hàm vẽ sẽ lặng lẽ đếm **theo bộ lọc đang bật** — con số
+đúng với người đang gõ "nhóm 6" vào ô tìm lại là con số sai để báo Ban tổ
+chức. Đếm một lần ở máy chủ thì nó luôn là con số của CẢ LỚP.
+
+### Mẫu số của khối phí là NGƯỜI DỰ LỄ, không phải sĩ số
+
+Khoản 1.000.000đ chỉ của người dự buổi tối. Lấy mẫu số 146 thì con số đọc lên
+như cả lớp đang nợ tiền, mà phần lớn trong đó còn chưa trả lời có đi hay
+không. Ba chi tiết đi kèm, mỗi cái một lý do:
+
+- **Hai nhánh ĐÃ CÓ TIỀN đếm trên TOÀN BỘ danh sách**, không chỉ người dự Lễ:
+  ai chuyển tiền rồi mới đổi ý không dự thì khoản ấy vẫn có thật trong tài
+  khoản người thu — giấu đi là làm lệch sổ.
+- **`chua_khai` thì chỉ đếm người DỰ LỄ**, vì đó là danh sách còn phải đi
+  nhắc. "Cả lớp trừ đi số đã khai" ra một con số đúng mà vô nghĩa.
+- **Nhãn theo mục 6.4 SRS**: "đã tự khai" / "người thu đã nhận", tuyệt đối
+  không có chữ "đã đóng". `kiem-totnghiep.mjs` grep thô nguyên văn JSON của
+  khối thống kê — đây là phúc đáp MỚI nói về tiền, tức đúng chỗ chữ ấy dễ lọt
+  vào nhất.
+
+### Ba việc tổ chức trả kèm TÊN, không chỉ con số
+
+Tài trợ, gian hàng, văn nghệ đều phải liên hệ lại từng người (chốt hiện vật,
+xếp chỗ standee, dựng chương trình). Một con số trần thì Ban cán sự lớp vẫn
+phải mở CSV ra mới biết gọi cho ai — tức màn hình không giải quyết gì.
+
+**Một chỗ câu chữ suýt sai NGƯỢC CHIỀU**, chỉ ảnh chụp mới thấy: bản đầu viết
+*"1 người nhận tài trợ"*. Người khai ở ô ấy là người **ĐỨNG RA** tài trợ cho
+chương trình, không phải người được nhận. Đọc ngược một chữ ở đây là Ban cán
+sự lớp gọi điện sai vai.
+
+### Màu: `--go` và `--due` giữ đúng một nghĩa
+
+`.dstno.go` chỉ dùng cho "người thu đã nhận"; `.dstno.due` chỉ cho việc còn
+phải làm (chưa trả lời Gala, đã tự khai chờ đối chiếu). Ô "có dự Gala" để
+**trung tính** — nó là một câu trả lời, không phải một lời khen; tô xanh nó là
+phá quy ước màu đã giữ từ Đợt 3. Có phép kiểm đọc `class` của ô ấy.
+
+Ba ô số là **LƯỚI ba cột**, không `flex-wrap` — cùng lý do dải `.tnprog`: ba
+con số của một câu hỏi phải nhìn thấy cùng lúc thì mới so được. Đo bằng
+`offsetTop`, vì phép đếm "có ba ô" một mình vẫn xanh khi chúng xếp ba dòng.
+
+### Ô tìm lọc THẲNG TRÊN DOM, không vẽ lại
+
+146 dòng là khoảng 10.000px cuộn, mà màn này gần như luôn mở ra để tra MỘT
+người. Vẽ lại sheet trong `oninput` thì ô tìm mất tiêu điểm và bàn phím điện
+thoại sập xuống sau **mỗi chữ** gõ vào — nên phép kiểm có răng là
+`document.activeElement?.id === 'dstnTim'` sau khi lọc, chứ không phải "lọc
+đúng người" (phép ấy xanh với cả bản vá hỏng). So khớp bằng `boDau()` nên gõ
+không dấu vẫn ra.
+
+Kèm: `DSTN_CUON` nhớ chỗ đang cuộn qua các lượt vẽ lại (bung một lĩnh vực ở
+cuối danh sách 15 mục vốn ném người ta ngược lên đầu — cùng bài học `SOTHU`),
+nhưng **đổi THẺ thì về đầu**: nội dung khác hẳn, giữ chỗ cuộn cũ chỉ làm người
+ta mở ra giữa chừng một danh sách chưa từng thấy.
+
+## Hai chỗ nhỏ cùng đợt: lối về ở đầu `/totnghiep`, và "Gala" thay "Dự Lễ"
+
+**Lối về ở ĐẦU trang.** Ngô Phú Cường: *"Ở phần tốt nghiệp thêm icon nút Back
+(Trở về ứng dụng) ở phía trên (hiện tạo chỉ có ở dưới cùng)."* Biểu mẫu dài
+hơn ba màn điện thoại, mà `body.noapp` đã bỏ thanh sáu tab — nên đường ra duy
+nhất nằm tận chân trang, sau cả ba khối đang mở; trên iPhone đã cài lên màn
+hình chính thì còn không có cả nút Back của trình duyệt. `.tnve` nằm trong
+hàng `.lb` của băng chàm, nền trắng mờ (lối RA, không giành chú ý với ba khối
+cần khai), vùng chạm 44px, `z-index:1` để nằm trên mũ 🎓 của `::after`.
+
+**CHỈ ở bản CÓ PHIÊN.** Đường công khai là chuỗi ba bước cho 38 người KHÔNG
+đăng nhập được — với họ "về ứng dụng" dẫn thẳng vào màn 401, tức một lối ra
+dẫn vào ngõ cụt. Có phép đối chứng riêng, và nó soi ở màn ĐÃ dựng băng chàm
+chứ không ở màn 401 ngay trước (màn ấy dùng `.claimcard`, đo ở đó thì xanh mà
+vô nghĩa).
+
+**"Gala" thay "Dự Lễ".** Ngô Phú Cường hỏi *"Nên thay Dự Lễ bằng Gala không
+nhỉ"* — nên. Cùng ngày 26/9 có HAI việc, buổi bảo vệ chiều và Lễ & Gala tối,
+nên chữ "Lễ" đứng một mình trong một ô rộng 114px đọc ra được cả hai — mà hai
+việc ấy khác hẳn nhau: một bắt buộc và miễn phí, một tự nguyện và 1.000.000đ.
+"Gala" không lẫn vào đâu, và đó cũng là từ cả lớp đang dùng. Đổi ở nhãn ô tiến
+độ và thẻ trạng thái của màn thống kê; **cột CSV giữ nguyên** "Dự Lễ 17h-22h"
+— nó đã có sẵn khung giờ nên không lẫn, và Ban tổ chức có thể đã ghép cột theo
+tên ấy.
+
 ## Ảnh chứng chỉ qua Google Drive — ĐÃ LÀM (18/9)
 
 Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu
@@ -4245,7 +4445,7 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "bốn mươi phép đối chứng đáng giữ nhất" và hai
+  trước khi chạy — có mục "năm mươi chín phép đối chứng đáng giữ nhất" và hai
   chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày
