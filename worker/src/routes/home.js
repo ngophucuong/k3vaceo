@@ -40,14 +40,21 @@ async function computeAction(env, me) {
   //
   // MỘT truy vấn, và MỌI phép so ngày giờ do SQLite làm (quy ước 1): so bằng
   // Date của JS với chuỗi của SQLite là đúng cái bẫy 'T' đã suýt giết magic
-  // link Đợt 2. Hai truy vấn con chạy trên chỉ mục UNIQUE member_id nên rẻ;
+  // link Đợt 2. Ba truy vấn con chạy trên chỉ mục UNIQUE member_id nên rẻ;
   // KHÔNG dùng UNION ALL (D1 từ chối từ 6 nhánh trở lên khi chạy qua tệp).
+  // `du_le` đọc ra ở ĐÂY, không phải chỗ nào khác: bước 5 (quỹ đang mở) ở cuối
+  // hàm cần nó để không mời người đã từ chối Gala chuyển 1.000.000 đ. Bản vá
+  // 19/9 viết điều kiện ấy mà QUÊN select cột, nên `tn.du_le` là `undefined`,
+  // `tn?.du_le !== 'co'` luôn đúng, và đợt Gala bị bỏ qua với MỌI người — kể
+  // cả người đã trả lời "Có dự" và chưa chuyển tiền. Không lỗi, không cảnh
+  // báo; triệu chứng duy nhất là ô "Việc của bạn" im lặng đúng lúc cần nhắc.
   const tn = await env.DB.prepare(
     `SELECT datetime('now', '+7 hours') <= ? AS con_gala,
             date('now', '+7 hours')     <= ? AS con_ho_so,
             (SELECT ho_so_luc FROM dang_ky_tot_nghiep WHERE member_id = ?) AS ho_so_luc,
-            (SELECT gala_luc  FROM dang_ky_tot_nghiep WHERE member_id = ?) AS gala_luc`
-  ).bind(HAN_GALA, NGAY_LE, me.id, me.id).first();
+            (SELECT gala_luc  FROM dang_ky_tot_nghiep WHERE member_id = ?) AS gala_luc,
+            (SELECT du_le     FROM dang_ky_tot_nghiep WHERE member_id = ?) AS du_le`
+  ).bind(HAN_GALA, NGAY_LE, me.id, me.id, me.id).first();
 
   // HAI mốc, HAI điều kiện riêng chứ không một mốc chung: sau 21h00 ngày 19/9
   // nhánh Gala tự tắt (đăng ký đã đóng, nhắc nữa là vô ích), nhánh hồ sơ còn

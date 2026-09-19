@@ -783,5 +783,50 @@ ok('văn nghệ trả kèm TÊN và mô tả tiết mục',
 ok('phúc đáp thống kê KHÔNG chứa chữ "đã đóng" (mục 6.4 SRS)',
    !JSON.stringify(tk).includes('đã đóng'));
 
+/* (d2) BƯỚC 5 (quỹ đang mở) PHẢI ĐỌC ĐƯỢC `du_le` — lỗi có thật, vá 19/9.
+   Bản vá cùng ngày viết `tn?.du_le !== 'co'` để không mời người đã từ chối
+   Gala chuyển 1.000.000 đ, nhưng QUÊN select cột `du_le` trong truy vấn ở đầu
+   hàm. Nên `tn.du_le` là `undefined`, vế ấy luôn đúng, và đợt Gala bị bỏ qua
+   với MỌI người — kể cả người vừa trả lời "Có dự" và chưa chuyển tiền. Không
+   lỗi, không cảnh báo; triệu chứng duy nhất là ô "Việc của bạn" im lặng đúng
+   lúc cần nhắc nhất.
+
+   Chạy bằng phiên NHÓM 7 chứ không phải Nhóm 6, và đó là điều kiện để phép
+   này tới được bước 5: Nhóm 6 là nhóm DUY NHẤT có dòng `plans`, nên với Cường
+   bước 4 luôn chặn trước. Nhóm 7 không có `plans` nên bước 4 bị bỏ qua sạch.
+
+   ĐI CẢ HAI CHIỀU. Phép một chiều ("có dự → fund") một mình vẫn ĐỎ đúng với
+   bản lỗi, nhưng lại XANH với một bản vá thô bạo bỏ luôn điều kiện `du_le` —
+   và bản ấy mời cả người đã từ chối Gala chuyển tiền, đúng cái vừa chữa.
+
+   ĐẶT Ở CUỐI TỆP, không phải cạnh mấy phép hero khác, và đó không phải sở
+   thích: khối này ghi `ho_so_luc` và `gala_luc` cho phiên Nhóm Bảy, nên đặt
+   giữa chừng là mọi phép ĐẾM đứng sau nó (`xong_ho_so`, `xong_gala`,
+   `theo_linh_vuc`) đọc ra một sĩ số khác. Đã vấp đúng chỗ ấy: `xong_ho_so`
+   đỏ ở một chỗ chẳng liên quan gì tới thứ nó đang canh. */
+console.log('\n── Bước "quỹ đang mở" phải phân biệt người dự Lễ và người không ──');
+const meN7 = (await get('/api/home', ckN7).then(r => r.json()).catch(() => ({}))).me ?? {};
+ok('đọc được member_id của phiên Nhóm 7', !!meN7.id);
+// Ba bước đứng TRƯỚC bước 5 phải qua hết, nếu không phép này đo nhầm chỗ.
+await put('/api/totnghiep/ho-so', ckN7, {
+  ho_ten: 'Kiểm TN Nhóm Bảy', ngay_sinh: '02/03/1981', dien_thoai: '0900000071',
+  doanh_nghiep: 'Công ty Bảy', chuc_vu: 'Chủ tịch',
+  linh_vuc: ['cong-nghe'], nhu_cau_ket_noi: 'kiểm bước quỹ',
+});
+await put(`/api/members/${meN7.id}/profile`, ckN7, {
+  sells_what: 'a', sells_to: 'b', needs: 'c', offers: 'd',
+});
+const heroN7 = async () => (await get('/api/home', ckN7).then(r => r.json()).catch(() => ({}))).action ?? {};
+
+await put('/api/totnghiep/gala', ckN7, { du_le: 'co' });
+const aCo = await heroN7();
+ok(`trả lời "Có dự" mà chưa khai phí → hero mời mở mã QR (nhận "${aCo.target}" · "${aCo.h}")`,
+   aCo.target === 'fund');
+
+await put('/api/totnghiep/gala', ckN7, { du_le: 'khong' });
+const aKhong = await heroN7();
+ok(`trả lời "Không dự" → KHÔNG mời chuyển 1.000.000 đ (nhận "${aKhong.target}")`,
+   aKhong.target !== 'fund');
+
 console.log(hong === 0 ? '\n✅ TẤT CẢ ĐỀU XANH' : `\n❌ ${hong} phép ĐỎ`);
 process.exit(hong === 0 ? 0 : 1);

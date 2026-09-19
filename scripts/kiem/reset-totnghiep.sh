@@ -74,6 +74,14 @@ UPDATE members
    SET phone = (SELECT r.phone FROM roster r WHERE r.id = members.roster_id),
        phone_self_set_at = NULL
  WHERE full_name = 'Ngô Phú Cường' AND roster_id IS NOT NULL;
+-- Phép canh bước quỹ-đang-mở (19/9) điền bốn ô member_profile cho phiên Nhóm
+-- Bảy, vì profileCompleteness < 4 là bước ĐỨNG TRƯỚC bước quỹ và sẽ chặn mất.
+-- (Không một dấu nháy kép nào trong khối này, kể cả chú thích — xem cảnh báo
+--  ở khối trên. Vừa vấp lại đúng chỗ ấy 19/9.)
+-- Dòng member_profile ấy trỏ vào members(id), nên phải xoá TRƯỚC dòng cha —
+-- cùng thứ tự bắt buộc đã ghi ở đầu khối này.
+DELETE FROM member_profile WHERE member_id IN
+  (SELECT id FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy'));
 DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy');
 -- Đường CÔNG KHAI (migration 0042) TỰ TẠO dòng members cho người chưa có hồ
 -- sơ. Không dọn thì lượt chạy sau mở đầu với người ấy ĐÃ có members — phép
