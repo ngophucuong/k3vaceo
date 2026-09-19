@@ -1497,8 +1497,12 @@ khoản + nút chép; **đã tự khai → cất cả ba**; người thu đã nh
 tab Quỹ, nay áp **sớm hơn một nấc**: ở tab Quỹ mã chỉ biến mất khi người thu
 xác nhận, ở đây biến mất ngay khi chính chủ tự khai. Lý do mạnh hơn ở đây vì
 sandbox đã cho thấy đúng cảnh người dùng gặp lúc mạng yếu: mã không tải được
-thì nhánh dự phòng hiện một khối CAM đọc lên y như cảnh báo — nằm ngay dưới
-dòng người ta vừa nói mình đã chuyển tiền xong.
+thì chỗ ấy thành một ô trống với dòng "Chưa hiện được mã" — nằm ngay dưới dòng
+người ta vừa nói mình đã chuyển tiền xong, nên đọc lên như một lời báo hỏng.
+
+(Đính chính 19/9: hai chỗ trong tệp này từng gọi ô ấy là "khối CAM". SAI —
+`.qrw .ph` trong `app.css` là nền TRẮNG, viền xám `--line2`, chữ 12px `--ink3`.
+Quyết định cất mã QR vẫn đúng, chỉ lý lẽ là nhẹ hơn bản ghi cũ.)
 
 **Câu chữ mục 6.4 SRS KHÔNG đổi**: vẫn "đã tự khai", vẫn chip CAM, vẫn nói
 người thu còn phải đối chiếu sao kê. Cất mã QR là bớt một lời mời trả tiền,
@@ -2398,7 +2402,8 @@ Với **đợt thu**, "xong" còn phải CẤT BỚT chứ không chỉ thêm d�
 - người thu đã xác nhận tiền **của bạn** → cất hẳn mã QR, số tài khoản và nút
   chép nội dung. Để lại là mời chuyển tiền thêm lần nữa; tệ hơn, khi mạng yếu
   mã không tải được thì nhánh dự phòng hiện "Chưa hiện được mã. Kiểm tra lại số
-  tài khoản" — một khối cam đọc lên y như cảnh báo trên một đợt đã xong.
+  tài khoản" — một lời báo hỏng nằm trên một đợt đã xong. (Ô ấy là nền TRẮNG
+  viền xám chứ không phải khối cam; xem đính chính 19/9 ở mục `/totnghiep`.)
 - người thu đã nhận đủ của **tất cả** → chip `.xongchip` "✓ đã thu đủ" ở đầu
   thẻ, dòng tổng đổi thành "Đợt này xong".
 
