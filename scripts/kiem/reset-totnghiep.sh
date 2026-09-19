@@ -64,6 +64,19 @@ DELETE FROM fund_declarations;
 -- -cửa đỏ với 429 rate_limited — một câu trỏ hoàn toàn sai chỗ hỏng, vì mã sản
 -- phẩm vẫn đúng. Đúng bài học đã ghi cho reset-moi.sh, nay áp cho bộ kiểm này.
 DELETE FROM rate_events WHERE bucket IN ('doan_so_ho_so', 'doan_so_ip');
+-- Dòng plans của NHÓM 7, nếu có. Phép canh bước quỹ-đang-mở chạy bằng phiên
+-- Nhóm 7 vì Nhóm 6 là nhóm DUY NHẤT có plans trên D1 thật, nên bước 4 (phần
+-- bài) luôn chặn trước bước 5 với Cường. Điều kiện ấy NGẦM, và một bộ kiểm
+-- KHÁC phá được nó: reset-tulieu-bai.sh cố ý seed một plan_sections của Nhóm 7
+-- để chứng minh chốt N6, rồi để lại đó.
+--
+-- Triệu chứng khi bị phá: phép du_le đỏ với target = plan và câu
+-- Con 1 phan chua ai nhan — một chỗ chẳng liên quan gì tới thứ nó đang canh,
+-- và chỉ đỏ khi chạy SAU bộ kiểm kia. Đã trả giá 19/9.
+-- Thứ tự bắt buộc: plan_sections trỏ vào plans.
+DELETE FROM plan_sections WHERE plan_id IN
+  (SELECT p.id FROM plans p JOIN groups g ON g.id = p.group_id WHERE g.no <> 6);
+DELETE FROM plans WHERE group_id IN (SELECT id FROM groups WHERE no <> 6);
 -- Từ 18/9 putHoSo GHI NGƯỢC linh_vuc sang member_profile.nganh, để ngành khai
 -- ở form tốt nghiệp tới được bộ lọc ngành của tab Giao thương. Nghĩa là bộ
 -- kiểm này nay ĐỔI member_profile — nên reset phải trả chính cột ấy về gốc.

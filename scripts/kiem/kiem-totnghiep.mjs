@@ -823,6 +823,19 @@ const heroN7 = async () => (await get('/api/home', ckN7).then(r => r.json()).cat
 
 await put('/api/totnghiep/gala', ckN7, { du_le: 'co' });
 const aCo = await heroN7();
+/* KHẲNG ĐỊNH THẲNG ĐIỀU KIỆN NGẦM, và phải đặt ĐÚNG Ở ĐÂY — sau khi Nhóm 7
+   đã xong Gala, hồ sơ và bốn dòng Giao thương. Đặt sớm hơn thì bước Gala còn
+   chặn trước, hero trả "totnghiep", và phép này xanh mà chẳng canh được gì —
+   đã thử và thấy đúng vậy.
+
+   Điều kiện: Nhóm 7 KHÔNG có dòng `plans`, đúng như D1 thật (Nhóm 6 là nhóm
+   duy nhất có). reset-tulieu-bai.sh cố ý seed một plan_sections của Nhóm 7 để
+   chứng minh chốt N6 rồi để lại đó — chạy bộ kiểm này sau nó thì bước 4 chặn
+   trước và ba phép dưới đỏ với câu "Còn N phần chưa ai nhận", một câu trỏ sai
+   hoàn toàn chỗ hỏng. reset-totnghiep.sh nay dọn dòng ấy; dòng dưới là cái
+   chuông báo nếu nó thôi dọn. */
+ok(`Nhóm 7 không có dòng plans nên bước phần bài không chặn trước (nhận "${aCo.target}")`,
+   aCo.target !== 'plan');
 ok(`trả lời "Có dự" mà chưa khai phí → hero mời mở mã QR (nhận "${aCo.target}" · "${aCo.h}")`,
    aCo.target === 'fund');
 

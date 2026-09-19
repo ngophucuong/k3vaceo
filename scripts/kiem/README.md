@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Sáu mươi tư phép đối chứng đáng giữ nhất
+## Sáu mươi lăm phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -782,6 +782,29 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    ba phép CSV đỏ với một lý do không có trong mã sản phẩm. Đổi tên biến bằng
    regex thì phải soi lại các chuỗi hằng, hoặc chọn tên không trùng một mẩu
    nào của đường dẫn.
+
+65. **Một bộ kiểm KHÁC phá được điều kiện ngầm của bộ kiểm này — và triệu
+   chứng trỏ sai hoàn toàn chỗ hỏng.** Phép canh bước quỹ-đang-mở
+   (`kiem-totnghiep.mjs`) chạy bằng phiên **Nhóm 7**, vì Nhóm 6 là nhóm DUY
+   NHẤT có dòng `plans` trên D1 thật nên bước 4 của `computeAction` (phần bài)
+   luôn chặn trước bước 5 với Cường. Điều kiện "Nhóm 7 không có `plans`" đúng
+   trên D1 thật, nên nó ngầm — và `reset-tulieu-bai.sh` phá đúng nó: bộ kiểm
+   ấy **cố ý** seed một `plan_sections` của Nhóm 7 để chứng minh chốt N6, rồi
+   để lại đó. Chạy hai bộ kiểm theo thứ tự ấy thì phép `du_le` đỏ với
+   `target = plan` và câu "Còn 1 phần chưa ai nhận" — một chỗ chẳng liên quan
+   gì tới cột `du_le`, và **chỉ đỏ khi chạy sau bộ kiểm kia**, nên đọc lên như
+   một lỗi lúc-có-lúc-không trong mã sản phẩm.
+
+   Hai việc, không phải một: `reset-totnghiep.sh` **dọn dòng `plans` của mọi
+   nhóm khác Nhóm 6** (thứ tự bắt buộc: `plan_sections` trỏ vào `plans`), và
+   `kiem-totnghiep.mjs` **khẳng định thẳng điều kiện ấy** bằng một dòng ngay
+   trước phép `du_le` — để lần sau nó bị phá thì cái đỏ nói đúng tên chuyện.
+
+   Và dòng khẳng định ấy phải đặt **đúng chỗ**: đặt sớm hơn, lúc Nhóm 7 chưa
+   trả lời Gala, thì bước 1 chặn trước và `target` là `totnghiep` — phép xanh
+   mà chẳng canh được gì. Đã thử và thấy đúng vậy. Bài học chung: reset của
+   một bộ kiểm chỉ dọn **bảng của chính nó**, nên mọi điều kiện nó mượn từ
+   trạng thái chung phải được chính nó dọn và chính nó khẳng định.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

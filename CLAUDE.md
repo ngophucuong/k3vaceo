@@ -4681,7 +4681,7 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "sáu mươi tư phép đối chứng đáng giữ nhất" và hai
+  trước khi chạy — có mục "sáu mươi lăm phép đối chứng đáng giữ nhất" và hai
   chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày
