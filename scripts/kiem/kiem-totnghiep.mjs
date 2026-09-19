@@ -35,6 +35,8 @@
 //
 // Chạy:  bash scripts/kiem/reset-totnghiep.sh && node scripts/kiem/kiem-totnghiep.mjs
 
+import { readFileSync } from 'node:fs';
+
 let hong = 0;
 const ok = (t, d) => { console.log((d ? '  ✓ ' : '  ✗ ') + t); if (!d) hong++; };
 const B = 'http://127.0.0.1:8787';
@@ -106,6 +108,62 @@ const dobGoc = await fetch(B + '/api/home', { headers: { cookie: ckCuong } })
   .then(r => r.json()).then(() => null).catch(() => null);
 ok('goi_y.ngay_sinh là chuỗi hoặc null (không phải object/Date đã chế biến)',
    tnCuong.goi_y.ngay_sinh === null || typeof tnCuong.goi_y.ngay_sinh === 'string');
+
+/* ── 3b. Ô "Việc của bạn" ở tab Hôm nay (19/9) ────────────────────────────
+   Ngô Phú Cường: *"ở Trang 'Hôm nay' vẫn có session 'Nhóm chưa có đề tài'.
+   dù chúng ta đã thay đổi luồng này rồi mà."* Chuỗi thật là "Nhóm chưa chốt
+   đề tài", sinh ở computeAction() (routes/home.js) chứ không ở giao diện.
+
+   Bốn phép, và phép thứ HAI mới là phép có răng: phép "chuỗi cũ đã biến mất"
+   một mình vẫn XANH với một bản vá chỉ xoá bước cũ mà quên thêm bước mới, và
+   cũng xanh với một bước mới không bao giờ tắt. Phải đi hết ba trạng thái. */
+console.log('\n── Ô "Việc của bạn" nói đúng việc đang gấp ──');
+
+const heroRaw = async () => (await get('/api/home', ckCuong)).text();
+const hero = async () => JSON.parse(await heroRaw()).action ?? {};
+
+// (a) Chưa khai gì → phải là việc Lễ & Gala (hạn 21h00 ngày 19/9, gấp nhất).
+const tho0 = await heroRaw();
+const a0 = JSON.parse(tho0).action ?? {};
+ok(`chưa khai gì → target = "totnghiep" (nhận "${a0.target}")`, a0.target === 'totnghiep');
+ok(`câu hero nhắc Lễ tốt nghiệp (nhận "${a0.h}")`, /Lễ tốt nghiệp/i.test(a0.h ?? ''));
+// Grep THÔ trên nguyên văn JSON — không chỉ đọc action.h, vì chuỗi cũ có thể
+// còn nấp ở một nhánh khác của cùng hàm.
+ok('chuỗi "Nhóm chưa chốt đề tài" KHÔNG còn trong /api/home',
+   !tho0.includes('Nhóm chưa chốt đề tài'));
+
+// (b) Trả lời Gala xong → phải CHUYỂN sang việc hồ sơ chứng chỉ, chưa tắt hẳn.
+await put('/api/totnghiep/gala', ckCuong, { du_le: 'co' });
+const a1 = await hero();
+ok(`khai Gala xong → vẫn "totnghiep" nhưng đổi câu (nhận "${a1.h}")`,
+   a1.target === 'totnghiep' && /hồ sơ|chứng chỉ/i.test(a1.h ?? ''));
+
+// (c) Khai nốt hồ sơ → bước này phải TẮT và nhường chỗ cho chuỗi cũ của SRS.
+await put('/api/totnghiep/ho-so', ckCuong, {
+  ho_ten: 'Ngô Phú Cường', ngay_sinh: '01/02/1980', dien_thoai: '0979755857',
+  doanh_nghiep: 'Công ty A', chuc_vu: 'Giám đốc',
+  linh_vuc: ['cong-nghe'], nhu_cau_ket_noi: 'kiểm hero',
+});
+const a2 = await hero();
+ok(`khai đủ hai phần → bước tốt nghiệp TẮT, rơi xuống bước cũ (nhận "${a2.target}")`,
+   a2.target !== 'totnghiep' && !!a2.target);
+
+/* (d) HAI MỐC KHÔNG ĐƯỢC CHÉP TAY. home.js phải `import { HAN_GALA, NGAY_LE }`
+   từ tot-nghiep.js. Chép giá trị sang tệp thứ hai thì sớm muộn hai bản lệch
+   nhau, và triệu chứng là ô hero tắt sớm hoặc muộn một ngày — không chỗ nào
+   báo lỗi. Đây là chốt DUY NHẤT chặn được chuyện ấy. */
+const nguonHome = readFileSync(new URL('../../worker/src/routes/home.js', import.meta.url), 'utf8');
+const ngayChepTay = nguonHome.match(/2026-09-\d\d/g) ?? [];
+ok(`home.js KHÔNG chép tay mốc ngày nào (thấy ${ngayChepTay.length}: ${ngayChepTay.join(', ') || 'không'})`,
+   ngayChepTay.length === 0);
+ok('home.js import HAN_GALA và NGAY_LE từ tot-nghiep.js',
+   /import\s*\{[^}]*HAN_GALA[^}]*NGAY_LE[^}]*\}\s*from\s*'\.\/tot-nghiep\.js'/.test(nguonHome));
+
+// (e) /api/totnghiep thôi trả đề tài NHÓM — payload chết, giao diện chưa bao
+// giờ đọc, để lại thì lần sửa sau có người tưởng hai luồng còn dính nhau.
+const tnSau = await get('/api/totnghiep', ckCuong).then(r => r.json());
+ok('phúc đáp /api/totnghiep không còn topic_product / topic_customers',
+   !('topic_product' in (tnSau.nhom ?? {})) && !('topic_customers' in (tnSau.nhom ?? {})));
 
 // ── 4. Lưu hai lần KHÔNG đẻ hai dòng ─────────────────────────────────────
 console.log('\n── Chốt UNIQUE member_id có răng không ──');

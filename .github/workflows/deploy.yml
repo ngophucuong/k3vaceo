@@ -43,6 +43,35 @@ jobs:
           node-version: '22'
           cache: npm
 
+      # Câu chữ của một luồng ĐÃ BỎ mà còn sót lại thì không có gì báo lỗi —
+      # mã chạy đúng, deploy xanh, và người dùng đọc một câu nói sai. Lần này
+      # là bước "Nhóm chưa chốt đề tài" ở tab Hôm nay: lớp bỏ đường nộp bài
+      # theo NHÓM từ 18/9 (migration 0043) mà câu giục vẫn còn tới 19/9.
+      #
+      # Kiểm ở tầng NGUỒN chứ không trên tên miền, vì hai lý do: chuỗi hero
+      # sinh từ MÁY CHỦ nên /api/home đòi phiên, mà workflow không có phiên;
+      # và bắt được ở đây là chặn TRƯỚC khi bản vá nửa vời lên tên miền.
+      #
+      # CHỈ soi worker/src và public. migrations/ và CLAUDE.md PHẢI được nhắc
+      # lại chuỗi cũ — đó là chỗ ghi lịch sử, không phải chỗ hiển thị.
+      - name: Kiểm nguồn — câu chữ của luồng đã bỏ không còn sót
+        run: |
+          xau=0
+          if grep -RIn "Nhóm chưa chốt đề tài" worker/src public; then
+            echo "::error::Còn sót câu giục đề tài theo NHÓM. Lớp bỏ đường nộp theo nhóm từ 18/9 (migration 0043) — đề tài nay nộp theo LĨNH VỰC + cá nhân ở /totnghiep."
+            xau=1
+          fi
+          if grep -RIn "chốt đề tài của nhóm" worker/src; then
+            echo "::error::logActivity còn ghi \"chốt đề tài của nhóm\" — dòng này hiện ở khối Đang diễn ra, ngay trên tab Hôm nay vừa chữa."
+            xau=1
+          fi
+          if grep -RIn "bảy phần sau đều treo" worker/src public; then
+            echo "::error::Còn câu \"bảy phần sau đều treo\" — đề tài chung của nhóm thôi chặn việc gì từ 18/9."
+            xau=1
+          fi
+          [ "$xau" = "0" ] && echo "✓ không còn câu chữ của luồng đề tài theo nhóm"
+          [ "$xau" = "0" ] || exit 1
+
       # Chưa đặt bí mật thì BỎ QUA chứ không báo hỏng — deploy bằng Git
       # integration ngay trên dashboard Cloudflare cũng là đường hợp lệ, và ai
       # chọn đường đó thì không phải nhìn dấu X đỏ ở mỗi commit.

@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Bốn mươi phép đối chứng đáng giữ nhất
+## Bốn mươi lăm phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -552,6 +552,35 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    trên chính trang form công khai (nơi hàng chip ấy luôn hiện) mới lộ ra 42px.
    `.fc` có `white-space:nowrap` — đúng cho hàng CUỘN NGANG, sai cho hàng
    `.cuon` (xuống dòng), vì ở đó không có gì để kéo tới.
+
+41. **Phép "chuỗi cũ đã biến mất" một mình KHÔNG có răng.** Bỏ bước "Nhóm chưa
+   chốt đề tài" khỏi tab Hôm nay (19/9): phép grep chuỗi ấy trong `/api/home`
+   vẫn XANH với một bản vá chỉ xoá bước cũ mà quên thêm bước mới, và xanh cả
+   với một bước mới không bao giờ TẮT. Phải đi hết BA trạng thái — chưa khai →
+   khai Gala → khai nốt hồ sơ — rồi đòi bước ấy **rơi xuống một bước CŨ**.
+
+42. **Phép canh phải chạy bằng phiên NHÓM 6.** Nhóm 6 là nhóm DUY NHẤT có dòng
+   `plans`, nên chín nhóm kia không bao giờ chạy vào nhánh đề tài. Chạy bằng
+   cookie của nhóm khác là xanh giả, và không có gì nói cho biết.
+
+43. **Regex quét feed "Đang diễn ra" bắt NHẦM luồng MỚI.** `/chốt đề tài/`
+   khớp luôn `"chốt đề tài KHKD: …"` của đường CÁ NHÂN (`totnghiep.detai`) —
+   tức bắt nhầm đúng thứ vừa dựng lên. Soi đúng chuỗi của đường NHÓM.
+
+44. **Chuỗi mốc ngày phải `import`, và phép canh là GREP NGUỒN.** `home.js`
+   không được chứa chuỗi `2026-09` nào: hai bản sao của một cái hạn thì sớm
+   muộn lệch nhau, và triệu chứng là ô hero tắt sớm hoặc muộn một ngày mà
+   không chỗ nào báo lỗi. Không đo được bằng hành vi — sandbox không đẩy được
+   đồng hồ của D1 — nên ghi thẳng: đây là phép GREP, không phải phép đo.
+
+45. **Màu phải đọc bằng `getComputedStyle`, và so với BIẾN chứ không mã màu.**
+   Khối Đề tài ở tab Bài thôi dùng cam `--due`; phép kiểm chuỗi một mình mù
+   với chuyện ấy. Ghi cứng `#A8500E` thì đổi giá trị biến là phép kiểm vẫn
+   xanh — phải lấy `--due` từ chính stylesheet rồi chuẩn hoá qua một phần tử
+   thật. Cùng họ với mục 29 và 33.
+
+   Kèm một bẫy nhỏ: đổi cấu trúc DOM là các bộ chọn `>` gãy trong im lặng.
+   `h1` chuyển vào trong băng `.tnhead` làm `.tncard > h1` thôi khớp ở ba chỗ.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

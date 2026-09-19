@@ -212,7 +212,7 @@ export async function patchTopic(request, env, me, ip) {
   });
   await logActivity(env, {
     cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
-    verb: 'plan.topic', objectType: 'plan', objectId: plan.id, summary: 'chốt đề tài của nhóm',
+    verb: 'plan.topic', objectType: 'plan', objectId: plan.id, summary: 'ghi đề tài chung của nhóm',
   });
 
   return json({ ok: true });

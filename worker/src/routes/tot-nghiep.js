@@ -37,8 +37,13 @@ import { boDau } from '../lib/ghep.js';
 // chứ KHÔNG dùng để chặn: ai đăng ký muộn vẫn ghi được, và Ban cán sự lớp đọc
 // mốc gala_luc để biết ai kịp ai không. Chặn cứng thì người lỡ hạn không còn
 // đường nào báo là mình muốn đi, mà đó lại đúng là lúc cần biết nhất.
-const HAN_GALA = '2026-09-19 21:00';
-const NGAY_LE = '2026-09-26';
+// XUẤT ra ngoài vì routes/home.js cũng cần đúng hai mốc này (bước "việc tốt
+// nghiệp còn nợ" ở tab Hôm nay tự tắt theo chúng). Chép giá trị sang tệp thứ
+// hai thì sớm muộn hai bản lệch nhau, và triệu chứng là ô "Việc của bạn" tắt
+// sớm hoặc muộn một ngày — không chỗ nào báo lỗi. kiem-totnghiep.mjs quét
+// home.js tìm chuỗi 2026-09 và đòi ra 0 kết quả để canh đúng chỗ này.
+export const HAN_GALA = '2026-09-19 21:00';
+export const NGAY_LE = '2026-09-26';
 
 const DU_LE = ['co', 'khong'];
 const TAI_TRO = ['tien', 'hien_vat', 'khong'];
@@ -171,9 +176,11 @@ export async function getTotNghiep(env, me) {
     ).bind(me.id).first(),
     me.group_id
       ? env.DB.prepare(
-          `SELECT g.id, g.no, g.label, p.topic_product, p.topic_customers
-             FROM groups g LEFT JOIN plans p ON p.group_id = g.id
-            WHERE g.id = ?`
+          // CHỈ tên nhóm. topic_* ĐÃ GỠ (19/9): zone này là đường nộp CÁ NHÂN
+          // theo lĩnh vực (migration 0043), giao diện chưa bao giờ đọc hai
+          // trường ấy, và để lại thì lần sửa sau có người tưởng đề tài cá
+          // nhân vẫn dính vào đề tài nhóm. Không cần JOIN plans nữa.
+          `SELECT id, no, label FROM groups WHERE id = ?`
         ).bind(me.group_id).first()
       : null,
     me.group_id
@@ -237,8 +244,6 @@ export async function getTotNghiep(env, me) {
       ? {
           no: nhom.no,
           label: nhom.label,
-          topic_product: nhom.topic_product ?? null,
-          topic_customers: nhom.topic_customers ?? null,
           truong_nhom: (officers.results ?? []).find(o => o.role === 'truong_nhom')?.full_name ?? null,
           thanh_vien: (thanhVien.results ?? []).map(x => x.full_name),
         }

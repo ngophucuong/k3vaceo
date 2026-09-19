@@ -1700,6 +1700,156 @@ cũ không thấy vì nó đo lúc khối chứa hàng chip đang GẬP. Nay `.f
   nguyên nội dung cũ. Xem mục "Nới … thành KHAI BỔ SUNG" ở trên. Thứ vẫn
   KHÔNG làm được: xoá trắng một ô đã có chữ — cố ý, và đó là chốt chặn.
 
+## Tab Hôm nay thôi giục "đề tài nhóm" — và cách đọc màu của zone Lễ (19/9)
+
+Ngô Phú Cường: *"ở Trang 'Hôm nay' vẫn có session 'Nhóm chưa có đề tài'. dù
+chúng ta đã thay đổi luồng này rồi mà."*
+
+Chuỗi thật là **"Nhóm chưa chốt đề tài"**, và nó sinh ở **MÁY CHỦ** —
+`computeAction()` (`routes/home.js`), không phải ở giao diện. `drawNay()` chỉ
+in thẳng `HOME.action.h/.p/.c` vào ô hero, không có một điều kiện nào. Ai đi
+tìm chuỗi ấy trong `app.js` sẽ không thấy gì.
+
+**Vì sao nó chỉ gõ cửa Nhóm 6, suốt từ Đợt 2:** migration 0003 gieo dòng
+`plans` của Nhóm 6 với `topic_* = NULL`, và **Nhóm 6 là nhóm DUY NHẤT có dòng
+`plans`** (chín nhóm kia chưa chạy wizard — con số đo được 18/9). Với họ
+`if (plan)` là false nên bước này không bao giờ chạy. Hệ quả cho bộ kiểm: phép
+canh chuỗi ấy **phải chạy bằng phiên Nhóm 6**, chạy bằng nhóm khác là xanh
+giả.
+
+Tệ hơn "lỗi thời": nó đứng ở **bước 2 của chuỗi ưu tiên** nên chặn mọi gợi ý
+sau nó, và câu chữ còn tự xưng *"đây là việc chặn mọi việc khác"*.
+
+### Phạm vi đã chốt: bỏ ở Hôm nay, LÀM MỀM ở tab Bài, GIỮ cỗ máy
+
+Hỏi thẳng qua AskUserQuestion, Ngô Phú Cường chọn phương án hẹp. `plans.topic_*`
+**GIỮ NGUYÊN**, cùng `PATCH /api/plan/topic`, wizard và xuất Word — vì nó còn
+một người dùng thật: **giai đoạn `de_tai` của Trợ lý KHKD** (`routes/tro-ly.js`),
+tức vế *"dẫn dắt TỪ Ý TƯỞNG"* chính anh yêu cầu ngày 12/9. Thứ hỏng chỉ là
+**câu chữ** và **thứ tự ưu tiên**, không phải cột dữ liệu. `kiem-tro-ly.mjs`
+chạy lại KHÔNG sửa gì và vẫn xanh — đó là bằng chứng cỗ máy không bị đụng.
+
+### Bước tốt nghiệp xếp LÊN ĐẦU — lần đầu một việc CÓ HẠN chen trên mục 7.1 SRS
+
+`computeAction()` nay mở đầu bằng việc tốt nghiệp của CHÍNH người đang xem, đọc
+`dang_ky_tot_nghiep`. Hai nhánh, xếp theo mức gấp đúng khuôn `tnKhoiMoDau()`:
+chưa trả lời Gala (hạn 21h00 19/9) → chưa xong hồ sơ chứng chỉ (hạn 26/9).
+
+Xếp trên cả bước "bốn dòng hồ sơ" là cố ý: hai hạn này nằm **ngoài** ứng dụng
+và hỏng thì mất chứng chỉ hoặc mất suất dự Lễ; bốn dòng Giao thương không có
+hạn nào. Bước này **tự tắt sau 26/9** nên chuỗi của SRS trở lại nguyên vẹn —
+không để lại một việc chết trong "Việc của bạn" suốt phần đời còn lại của ứng
+dụng.
+
+**Đề tài KHKD CỐ Ý không có nhánh nào ở đây.** Lớp đã chốt "không bắt buộc ai
+cũng phải nộp"; đặt một việc không bắt buộc vào khối mang tên "Việc của bạn"
+là nói sai bản chất — đúng cái sai vừa phải chữa.
+
+Bốn chi tiết mà thiếu một cái là hỏng ngầm:
+
+1. **HAI mốc, HAI điều kiện riêng.** Sau 21h00 19/9 nhánh Gala tự tắt, nhánh
+   hồ sơ còn sống tới hết 26/9. Gộp một mốc thì hoặc nhắc Gala sau khi hết
+   hạn, hoặc tắt hồ sơ sớm bảy ngày.
+2. **`HAN_GALA`/`NGAY_LE` `export` từ `tot-nghiep.js`, KHÔNG chép sang.** Hai
+   bản sao của một cái hạn thì sớm muộn lệch nhau, và triệu chứng là ô hero
+   tắt sớm hoặc muộn một ngày mà không chỗ nào báo. `kiem-totnghiep.mjs` quét
+   `home.js` tìm chuỗi `2026-09` và đòi ra **0 kết quả** — chốt duy nhất chặn
+   được chuyện ấy.
+3. **Mọi phép so ngày giờ do SQLite làm** (quy ước 1), trong MỘT truy vấn có
+   hai truy vấn con trên chỉ mục UNIQUE. Không `UNION ALL` (bẫy D1).
+4. **Thẻ 🎓 ở tab Hôm nay ẩn đi khi hero đã dẫn sang `/totnghiep`.** Hai khối
+   liền nhau cùng một đường dẫn, cùng một câu, thì cái thứ hai chỉ làm loãng
+   cái thứ nhất.
+
+### Vá kèm: đừng mời người đã từ chối Gala chuyển 1.000.000 đ
+
+Gỡ bước đề tài làm lộ ra một lỗi CÓ THẬT: bước "Có quỹ đang mở" không biết đợt
+Gala là khoản **chỉ của người dự Lễ**, nên ai trả lời "Không" vẫn được mời "Mở
+mã QR". Lỗi ấy đang sống với **chín nhóm** ngay hôm nay (họ không có dòng
+`plans` nên vốn đã rơi thẳng xuống bước quỹ); chỉ Nhóm 6 được bước đề tài che
+mất. Nay bước 5 bỏ qua đợt Gala khi `du_le <> 'co'`, nhận ra đợt ấy bằng
+`(scope, amount, account_no)` chứ **không theo tiêu đề** — tiêu đề sửa được
+bằng nút ✎ trong ứng dụng.
+
+### Ba chỗ câu chữ nữa, cùng một luồng, ở ba tầng khác nhau
+
+Sửa hero mà quên ba chỗ này thì chữ cũ vẫn còn, có chỗ **trên đúng màn hình
+vừa chữa**:
+- **`logActivity` ở `routes/plan.js`** ghi `summary: 'chốt đề tài của nhóm'` —
+  dòng ấy chảy thẳng vào khối "Đang diễn ra" của CHÍNH tab Hôm nay. Nay là
+  "ghi đề tài chung của nhóm".
+- **Khối Đề tài ở tab Bài** thôi dùng chữ CAM `var(--due)` — cam trong sản
+  phẩm này nghĩa là "còn phải làm gì đó", mà đề tài chung thôi là việc còn nợ.
+  `pw-totnghiep.mjs` đọc màu THẬT bằng `getComputedStyle` rồi so với chính giá
+  trị `--due` lấy từ stylesheet; ghi cứng mã màu là có ngày đổi biến mà phép
+  kiểm vẫn xanh.
+- **Bìa bản Word** (`routes/export.js`) — một lời kể trạng thái trên tài liệu
+  đi ra ngoài, nay nói đúng rằng đề tài chung là tuỳ chọn.
+
+**Một cái bẫy của chính phép kiểm, đã vấp:** regex `/chốt đề tài/` quét feed
+"Đang diễn ra" bắt NHẦM chuỗi của đường CÁ NHÂN (`totnghiep.detai` ghi "chốt đề
+tài KHKD: …"), tức bắt nhầm đúng thứ vừa dựng lên. Phải soi đúng chuỗi của
+đường NHÓM.
+
+**`deploy.yml` có một bước NGUỒN chạy trước khi deploy**, grep `worker/src` và
+`public` tìm ba chuỗi đã bỏ. Kiểm ở tầng nguồn chứ không trên tên miền vì chuỗi
+hero sinh ở máy chủ mà `/api/home` đòi phiên. Hệ quả cho người viết chú thích:
+**không trích nguyên văn chuỗi cũ trong `worker/src` hay `public`**, kể cả
+trong chú thích — một phép grep phải chừa ngoại lệ là một phép grep sẽ mục.
+`migrations/` và CHÍNH tệp này thì phải nhắc lại, đó là chỗ ghi lịch sử.
+
+### Zone `/totnghiep` nay có NHẬN DIỆN riêng — và vì sao là màu CHÀM
+
+Ngô Phú Cường gửi ảnh chụp kèm ba yêu cầu: ba chip tiến độ bị rơi xuống hai
+dòng, ba khối cần khai chưa nổi bật, và *"riêng phần tốt nghiệp bạn hãy trau
+chuốt cho khác với giao diện hàng ngày một chút"*.
+
+**Màu nhận diện là CHÀM (`--le` `#403A72`), và lý do là NGỮ NGHĨA chứ không
+phải thẩm mỹ.** Trong sản phẩm này `--go` (xanh) có đúng một nghĩa (xong /
+người thu đã nhận) và `--due` (cam) có đúng một nghĩa (còn phải làm gì đó).
+Mượn một trong hai làm màu nhận diện là làm hỏng cả hai. Chàm là hướng duy
+nhất còn trống, và nó tách xa cả hai trên **trục xanh lam** — trục mà người mù
+màu đỏ-lục vẫn phân biệt được, khác hẳn cặp xanh-lá ↔ cam vốn đã sát nhau
+(ΔE 7.7 protan, đo được ở khối biểu đồ tiến độ thu).
+
+**LUẬT: `--le` CHỈ dùng cho khung sườn** — băng đầu trang, huy hiệu bước, viền
+khối đang mở. Tuyệt đối không dùng nó để nói một trạng thái; trạng thái vẫn chỉ
+có ba màu cũ: xanh xong, cam còn nợ, xám chưa tới.
+
+Ba thay đổi, mỗi cái chữa đúng một điều anh chỉ ra:
+
+1. **Băng đầu trang `.tnhead`** — nền đặc chàm chuyển sắc, chữ trắng, mũ tốt
+   nghiệp chìm ở góc. Trên điện thoại người ta nhận ra một màn hình bằng MẢNG
+   MÀU trước khi kịp đọc chữ, mà cả ứng dụng còn lại là thẻ trắng trên nền xám
+   ấm. Áp cho CẢ đường công khai (`tnckShell`) — 38 người đi lối ấy phải thấy
+   mình đang ở đúng chỗ.
+2. **Ba ô tiến độ thành LƯỚI BA CỘT**, không còn `flex-wrap`. Wrap là ô thứ ba
+   rơi xuống dòng hai ở khổ 390px, mà rơi dòng là mất đúng công dụng của dải
+   này: ba mốc phải nhìn thấy CÙNG LÚC. Chữ trạng thái xuống dòng BÊN TRONG ô.
+   `pw-totnghiep.mjs` đo bằng `offsetTop` — cùng hàng thì cả ba bằng nhau;
+   phép đếm "có ba ô" một mình vẫn xanh khi chúng xếp thành ba dòng chồng nhau.
+3. **Mỗi `<summary>` có HUY HIỆU BƯỚC** (số thứ tự → ✓ khi xong), tiêu đề
+   15.5px, và **dòng hạn xuống dòng RIÊNG**. Nằm cạnh tiêu đề thì ở khổ 390px
+   nó đẩy tiêu đề vỡ ra thành ba dòng so le — đúng cảnh trong ảnh chụp. Khối
+   ĐANG MỞ có **dải chàm bên trái cộng nền đầu khối**: hai dấu hiệu chứ không
+   một, vì ba khối giống hệt nhau thì không biết mình đang đứng ở đâu sau khi
+   cuộn giữa một biểu mẫu dài.
+
+**Một bẫy nhỏ của bộ kiểm kèm theo:** `h1` nay nằm TRONG băng nên
+`.tncard > h1` thôi khớp — ba phép trong `pw-totnghiep.mjs` phải đổi sang
+`.tncard h1`.
+
+### Chưa kiểm chứng được
+
+- **Chưa ai mở ô hero mới trên tên miền thật.** Sandbox không gọi vào
+  `k3vaceo.cuongngo.app` được. Bằng chứng duy nhất là Ngô Phú Cường mở tab Hôm
+  nay và đọc câu mới.
+- **Hành vi sau 21h00 19/9 và sau 26/9** — không đẩy được đồng hồ của D1, nên
+  hai nhánh tự-tắt chỉ chứng minh được ở tầng biểu thức.
+- **Hai nửa của bản vá có hai tốc độ khác nhau:** chuỗi hero sinh ở máy chủ nên
+  đúng ngay sau lượt deploy; câu chữ ở tab Bài nằm trong `app.js` nên có thể
+  trễ tới 4 tiếng vì Browser Cache TTL cấp zone (xem mục "Làm mới").
+
 ## Ảnh chứng chỉ qua Google Drive — ĐÃ LÀM (18/9)
 
 Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu

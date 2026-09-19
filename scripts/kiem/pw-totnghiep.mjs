@@ -67,7 +67,7 @@ console.log('── /totnghiep có thật sự nạp không ──');
 await p.goto(B + '/totnghiep'); await p.waitForTimeout(1800);
 ok('mdSafe() có mặt → app.js đã chạy thật', await p.evaluate(() => typeof window.mdSafe) !== 'undefined');
 ok('có khung .tncard', await p.locator('.tncard').count() === 1);
-ok('tiêu đề đúng', (await p.locator('.tncard > h1').innerText()).includes('Lễ tốt nghiệp'));
+ok('tiêu đề đúng', (await p.locator('.tncard h1').innerText()).includes('Lễ tốt nghiệp'));
 ok('không lỗi JS: ' + (loi.join(' | ') || 'sạch'), loi.length === 0);
 
 // ── 2. Mục 6.4 SRS: không bao giờ có chữ "đã đóng" ───────────────────────
@@ -113,6 +113,15 @@ ok('gập hết cũng được', (await dangMo()).filter(Boolean).length === 0);
 await p.locator('.tnsec').first().locator('summary').click();
 await p.waitForTimeout(400);
 ok('có ba chip tiến độ', await p.locator('.tnprog > span').count() === 3);
+
+/* BA Ô PHẢI NẰM CÙNG MỘT HÀNG. Ngô Phú Cường chụp màn hình 19/9: ở khổ 390px
+   ô thứ ba rơi xuống dòng hai. Rơi dòng là mất đúng công dụng của dải này —
+   ba mốc phải nhìn thấy CÙNG LÚC thì mới biết còn thiếu phần nào.
+   Đo bằng `offsetTop`: cùng hàng thì cả ba bằng nhau. Phép đếm số ô (ngay
+   trên) một mình vẫn xanh khi chúng xếp thành ba dòng chồng nhau. */
+const hangChip = await p.locator('.tnprog').evaluate(el =>
+  [...new Set([...el.children].map(c => c.offsetTop))].length);
+ok(`ba ô tiến độ nằm CÙNG một hàng (đếm được ${hangChip} hàng)`, hangChip === 1);
 
 /* ── Mã QR phải NHÌN THẤY ĐƯỢC khi chưa chuyển phí ───────────────────────
    Ngô Phú Cường 18/9: "Câu hỏi đã chuyển khoản 1.000.000 chưa, nếu chưa thì
@@ -327,13 +336,83 @@ ok('người thường KHÔNG thấy nút "xem cả lớp"', await p2.locator('#
 ok('người thường vẫn mở được form', await p2.locator('.tnsec').count() === 3);
 ok('không lỗi JS ở phiên thứ hai: ' + (loi2.join(' | ') || 'sạch'), loi2.length === 0);
 
-// ── Thẻ ở tab Hôm nay dẫn sang đúng đây ──────────────────────────────────
-console.log('\n── Thẻ ở tab Hôm nay ──');
+/* ── Tab Hôm nay: ô "Việc của bạn" và thẻ 🎓 KHÔNG được nói cùng một chuyện ──
+   Ngô Phú Cường 19/9: ô hero vẫn giục "Nhóm chưa chốt đề tài" dù lớp đã bỏ
+   đường nộp theo nhóm từ 18/9 (migration 0043). Bước ấy nay thay bằng việc
+   TỐT NGHIỆP còn nợ, và khi hero đã dẫn sang /totnghiep thì thẻ 🎓 ngay dưới
+   là bản sao đặt cạnh nhau — ẩn đi.
+
+   Phép này phải đi CẢ HAI CHIỀU. Phép một chiều cũ ("luôn có đúng một thẻ")
+   sẽ đỏ sau bản vá, vì bộ kiểm này CỐ Ý không bao giờ lưu phần Hồ sơ (xem mục
+   "lưu một phần không đụng phần kia" ở trên) nên hero của chính phiên ấy đang
+   là bước hồ sơ tốt nghiệp. Chữa bằng cách XOÁ phép là mất luôn chốt canh
+   "còn lối vào /totnghiep từ tab Hôm nay" — đúng bài học số 35 trong README.
+   Nên nó xoay sang chiều còn lại, và bắt được cả hai kiểu hỏng: ẩn CẢ HAI
+   (mất hẳn lối vào) và hiện CẢ HAI (nói một chuyện hai lần). */
+console.log('\n── Tab Hôm nay: hero và thẻ 🎓 ──');
+await p.goto(B + '/#/nay'); await p.waitForTimeout(1600);
+ok('không thêm tab thứ bảy vào thanh nav', await p.locator('.nb').count() === 6);
+
+const heroH = await p.locator('#v-nay .hero h2').innerText().catch(() => '');
+ok(`hero KHÔNG còn giục đề tài nhóm (đang nói: "${heroH}")`, !/chưa chốt đề tài/i.test(heroH));
+ok(`hero nói việc tốt nghiệp còn nợ (hồ sơ chứng chỉ)`, /hồ sơ|chứng chỉ/i.test(heroH));
+ok('hero đang dẫn sang /totnghiep → thẻ 🎓 ẩn đi, không nói hai lần',
+   await p.locator('.tnthe').count() === 0);
+
+/* Khối "Đang diễn ra" nằm NGAY DƯỚI trên cùng màn hình ấy, và logActivity ở
+   routes/plan.js ghi vào đó. Sửa hero mà quên dòng kia thì chữ cũ vẫn còn
+   trên đúng tab vừa chữa.
+
+   Soi ĐÚNG chuỗi của đường NHÓM. Đừng nới thành /chốt đề tài/ — đường CÁ NHÂN
+   (routes/tot-nghiep.js) ghi "chốt đề tài KHKD: …", và đó là luồng MỚI, phải
+   còn nguyên; một regex rộng hơn sẽ bắt nhầm chính thứ vừa dựng lên. */
+const feed = await p.locator('#v-nay').innerText();
+ok('khối "Đang diễn ra" không còn chữ "chốt đề tài của nhóm"',
+   !/chốt đề tài của nhóm/i.test(feed));
+
+/* Nút hero phải ĐIỀU HƯỚNG THẬT. Quên nhánh `target === 'totnghiep'` trong
+   onclick thì nút không làm gì cả: không lỗi JS, không log, hero nói đúng câu
+   mà bấm vào đứng im — đúng loại hỏng im lặng tệ nhất của cả bản vá. */
+await p.locator('#heroCta').click();
+await p.waitForTimeout(1500);
+ok(`bấm nút hero → sang /totnghiep (đang ở ${new URL(p.url()).pathname})`,
+   new URL(p.url()).pathname === '/totnghiep');
+ok('và trang ấy dựng đủ ba khối', await p.locator('.tnsec').count() === 3);
+
+// Khai nốt hồ sơ → bước tốt nghiệp TẮT, và thẻ 🎓 phải QUAY LẠI.
+await p.evaluate(() => fetch('/api/totnghiep/ho-so', {
+  method: 'PUT', headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({
+    ho_ten: 'Ngô Phú Cường', ngay_sinh: '01/02/1980', dien_thoai: '0979755857',
+    doanh_nghiep: 'Công ty A', chuc_vu: 'Giám đốc',
+    linh_vuc: ['cong-nghe'], nhu_cau_ket_noi: 'kiểm thẻ hôm nay',
+  }),
+}).then(r => r.text()));
 await p.goto(B + '/#/nay'); await p.waitForTimeout(1600);
 const the = p.locator('.tnthe');
-ok('có thẻ "Đăng ký Lễ tốt nghiệp" ở tab Hôm nay', await the.count() === 1);
+ok('khai xong → hero nhường chỗ, thẻ 🎓 hiện lại', await the.count() === 1);
 ok('thẻ trỏ đúng /totnghiep', (await the.getAttribute('href')) === '/totnghiep');
-ok('không thêm tab thứ bảy vào thanh nav', await p.locator('.nb').count() === 6);
+
+/* ── Tab Bài: khối Đề tài thôi màu CAM ───────────────────────────────────
+   Cam trong sản phẩm này nghĩa là "còn phải làm gì đó", mà đề tài chung của
+   nhóm thôi là việc còn nợ từ 18/9. Đọc màu THẬT bằng getComputedStyle và so
+   với chính giá trị --due lấy từ stylesheet — ghi cứng mã màu là có ngày đổi
+   biến mà phép kiểm vẫn xanh. Phép kiểm chuỗi một mình mù với chuyện này. */
+console.log('\n── Tab Bài: đề tài nhóm nay là tuỳ chọn ──');
+await p.goto(B + '/#/bai'); await p.waitForTimeout(1800);
+const baiTxt = await p.locator('#v-bai').innerText();
+ok('không còn câu "bảy phần sau đều treo"', !/bảy phần sau đều treo/i.test(baiTxt));
+ok('không còn chữ "chưa chốt đề tài"', !/chưa chốt đề tài/i.test(baiTxt));
+ok('có dẫn sang trang Lễ tốt nghiệp', await p.locator('#v-bai a[href="/totnghiep"]').count() >= 1);
+const camOi = await p.evaluate(() => {
+  const due = getComputedStyle(document.documentElement).getPropertyValue('--due').trim();
+  const chuan = c => { const d = document.createElement('i'); d.style.color = c;
+    document.body.appendChild(d); const v = getComputedStyle(d).color; d.remove(); return v; };
+  const mucTieu = chuan(due);
+  return [...document.querySelectorAll('#v-bai .cb *')]
+    .some(e => getComputedStyle(e).color === mucTieu && /đề tài|nhóm chưa/i.test(e.textContent));
+});
+ok('khối Đề tài KHÔNG còn dùng màu cam --due', camOi === false);
 
 /* ── Đường công khai: người CHƯA đăng nhập vẫn điền được (migration 0042) ──
    Đo trên D1 thật 18/9: 38/146 người không có số điện thoại trong danh sách
@@ -418,7 +497,7 @@ await p3.locator('#ckNg .fc').first().click(); await p3.waitForTimeout(150);
 await p3.click('#ckGui'); await p3.waitForTimeout(2000);
 
 ok('điền đủ thì gửi được, ra màn "Đã gửi xong"',
-   (await p3.locator('.tncard > h1').innerText()).includes('Đã gửi'));
+   (await p3.locator('.tncard h1').innerText()).includes('Đã gửi'));
 // Mã QR chỉ hiện SAU khi chọn "có dự" — chưa nói là đi thì chưa có gì để
 // chuyển tiền, mà bày sẵn mã là mời chuyển nhầm.
 ok('hiện khối phí kèm cú pháp chuyển khoản', await p3.locator('.tnphi').count() === 1);
@@ -442,7 +521,7 @@ ok('mở lại được form cho cùng một người', await p3.locator('#ckGui
 // CỐ Ý chỉ điền MỘT ô rồi gửi — đúng hình dạng của một lượt bổ sung thật.
 await p3.fill('#ckKN', 'bổ sung nhu cầu kết nối');
 await p3.click('#ckGui'); await p3.waitForTimeout(2000);
-const tieuDe2 = await p3.locator('.tncard > h1').innerText();
+const tieuDe2 = await p3.locator('.tncard h1').innerText();
 ok(`màn cuối đổi thành "Đã cập nhật" (đang là "${tieuDe2}")`, /cập nhật/i.test(tieuDe2));
 const than2 = await p3.locator('.tncard').innerText();
 ok('nói rõ ô để trống vẫn giữ nguyên nội dung cũ',

@@ -1173,7 +1173,11 @@ function drawNay() {
     <h2>${esc(a.h)}</h2><p>${esc(a.p)}</p>
     <button class="cta ${a.done ? 'done' : ''}" id="heroCta">${esc(a.c)} <span>→</span></button>
   </div>
-  ${veTheTotNghiep()}
+  ${/* Hero đã là việc tốt nghiệp rồi thì thôi thẻ này — hai khối liền nhau
+        cùng dẫn một chỗ, cùng một câu, thì cái thứ hai chỉ làm loãng cái thứ
+        nhất. Người đã khai xong vẫn thấy thẻ (để quay lại sửa), người chưa
+        khai thấy hero: mỗi người đúng một lối. */
+    HOME.action?.target === 'totnghiep' ? '' : veTheTotNghiep()}
   ${veThongBao()}
   ${veLichHoc()}
   <div class="sect">
@@ -1213,6 +1217,9 @@ function drawNay() {
     else if (a.target === 'plan') go('bai');
     else if (a.target === 'insight') { go('bai'); setTimeout(openInsightAdd, 260); }
     else if (a.target === 'fund') go('quy');
+    // /totnghiep là một nhánh location.pathname riêng (không phải một tab),
+    // nên phải điều hướng thật chứ không go().
+    else if (a.target === 'totnghiep') location.href = '/totnghiep';
   };
   document.querySelectorAll('#v-nay .ico[data-role]').forEach(btn => {
     btn.onclick = () => openOfficerEdit(btn.dataset.role, btn.dataset.label);
@@ -1704,15 +1711,36 @@ async function drawBai() {
     đến 26/9 nó là bằng chứng, không phải lời nói.
   </div>
 
-  <div class="eb">Đề tài</div>
+  ${/* Đề tài CHUNG của nhóm — nay là TUỲ CHỌN.
+       18/9 (migration 0043) lớp bỏ hẳn đường nộp bài theo NHÓM, chuyển sang
+       LĨNH VỰC + cá nhân ở /totnghiep. Nên nhánh "chưa có" ở đây thôi dùng
+       chữ CAM var(--due): trong sản phẩm này cam là màu của việc CÒN NỢ, mà
+       đây thôi còn là một món nợ. Câu cũ cũng sai từ hôm ấy: nó nói bảy phần
+       sau bị treo và đây là việc chặn mọi việc khác. (Cố ý KHÔNG trích nguyên
+       văn — deploy.yml grep đúng chuỗi cũ trong worker/src và public để chặn
+       một bản vá nửa vời, mà một phép grep phải chừa ngoại lệ là một phép
+       grep sẽ mục.)
+
+       Nút vẫn giữ cho trưởng/phó nhóm, vì đề tài chung còn HAI việc thật: Trợ
+       lý KHKD đọc nó để biết nhóm đã có ý tưởng chưa (giai đoạn de_tai), và
+       bản Word in nó lên bìa.
+
+       Chữ "tuỳ chọn" CỐ Ý nằm trong thân chứ không thành <span class="c"> ở
+       đầu mục: .eb .c dùng font var(--num) là Space Grotesk, mà font ấy thiếu
+       glyph tiếng Việt nên "tuỳ chọn" sẽ rơi về monospace dự phòng và đứng
+       lệch hẳn — đúng lỗi đã trả giá với tiêu đề trang /giao-thuong. */ ''}
+  <div class="eb">Đề tài của nhóm</div>
   <div class="card"><div class="cb">
     ${topicDone
       ? `<div class="fi"><div class="k">Sản phẩm / dịch vụ</div><div class="v">${esc(plan.topic_product)}</div></div>
          <div class="fi" style="margin-bottom:0"><div class="k">Khách hàng mục tiêu</div><div class="v">${esc(plan.topic_customers)}</div></div>`
-      : `<div style="font-weight:600;margin-bottom:4px;color:var(--due)">Nhóm chưa chốt đề tài</div>
-         <div class="mut">Chưa có sản phẩm và khách hàng mục tiêu thì bảy phần sau đều treo.</div>`}
+      : `<div style="font-weight:600;margin-bottom:4px">Nhóm chưa đặt đề tài chung — không sao.</div>
+         <div class="mut">Lớp đã chốt nộp bài <b>tự do theo cá nhân hoặc cùng lĩnh vực,
+           không bắt buộc ai cũng phải nộp</b>. Khai phần của riêng anh chị ở
+           <a href="/totnghiep">trang Lễ tốt nghiệp</a>. Đặt đề tài chung ở đây chỉ để
+           Trợ lý KHKD biết nhóm đang làm gì.</div>`}
     ${can_assign ? `<button class="wide ghost" id="topicBtn" style="margin-top:13px;padding:11px;font-size:14px">
-        ${topicDone ? 'Sửa đề tài' : 'Chốt đề tài'}</button>` : ''}
+        ${topicDone ? 'Sửa đề tài' : 'Đặt đề tài chung'}</button>` : ''}
   </div></div>
 
   ${TROLY?.bat ? `
@@ -1721,7 +1749,7 @@ async function drawBai() {
     <div class="mut" style="margin-bottom:11px">
       ${topicDone
         ? 'Trợ lý đọc bài của nhóm, soi khoảng trống theo sáu cổng kiểm soát của giảng viên, rồi hỏi từng câu để anh chị viết tiếp. Mở từ trong mỗi phần bài, hoặc bấm dưới đây để tập phản biện cả bài.'
-        : 'Nhóm chưa chốt đề tài. Trợ lý dẫn anh chị chọn đề tài trước — hỏi từng câu, không bắt ngồi trước trang trắng.'}
+        : 'Chưa có đề tài thì Trợ lý dẫn anh chị chọn — hỏi từng câu, không bắt ngồi trước trang trắng.'}
     </div>
     <button class="wide ghost" id="tlMo" style="padding:11px;font-size:14px">
       ${topicDone ? 'Tập phản biện cả bài' : 'Bắt đầu: chọn đề tài'}</button>
@@ -4504,9 +4532,15 @@ function tnChuaDangNhap() {
 
 function tnckShell(title, sub, body) {
   document.body.classList.add('noapp');
+  // Cùng băng chàm với form có phiên: 38 người đi đường công khai phải thấy
+  // mình đang ở đúng chỗ ấy, không phải một trang rời nào khác.
   $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
-    <div class="lb">k3vaceo · Lễ tốt nghiệp 26/9</div>
-    <h1>${esc(title)}</h1><p class="sub">${sub}</p>${body}</div></div>`;
+    <div class="tnhead">
+      <div class="lb">k3vaceo · Khoá K03</div>
+      <h1>${esc(title)}</h1>
+      <p>Lễ tốt nghiệp 26/9 · Dolce by Wyndham, Giảng Võ</p>
+    </div>
+    <p class="sub">${sub}</p>${body}</div></div>`;
 }
 
 // Bước 1: tìm tên. Dùng LẠI /api/wizard/roster/search — đường ấy vốn đã công
@@ -4770,9 +4804,14 @@ function tnckXong(kq) {
 // nguyên văn rồi nói thẳng là phải kiểm lại.
 const NGAY_DU = /^\d{2}\/\d{2}\/\d{4}$/;
 
-function tnMocXong(luc) {
-  return luc ? '<span class="xongchip">✓ xong</span>' : '<span class="tg">chưa điền</span>';
-}
+/* Một ô trong dải tiến độ ba phần. Cả Ô đổi màu khi xong chứ không chỉ gắn
+   thêm một chip con — liếc một cái là đếm được còn mấy ô trắng. */
+const tnOTienDo = (ten, luc) =>
+  `<span class="${luc ? 'xong' : ''}"><b>${ten}</b><i>${luc ? '✓ xong' : 'chưa điền'}</i></span>`;
+
+/* Huy hiệu ở đầu mỗi khối gập: SỐ THỨ TỰ khi chưa khai, ✓ khi xong. Số nói
+   được "còn mấy việc nữa", một dấu chấm tròn thì không. */
+const tnHuyHieu = (so, luc) => `<span class="n ${luc ? 'xong' : ''}">${luc ? '✓' : so}</span>`;
 
 /* ══ "ÉP" KHAI ĐỦ PHẦN HỒ SƠ ═══════════════════════════════════════════════
    Ngô Phú Cường yêu cầu 18/9. Lý lẽ đầy đủ ở BAT_BUOC trong
@@ -4845,26 +4884,33 @@ function veTotNghiep() {
   const mo = k => (TN_MO === k ? 'open' : '');
 
   $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
-    <div class="lb">k3vaceo · Khoá K03</div>
-    <h1>Lễ tốt nghiệp 26/9</h1>
+    <div class="tnhead">
+      <div class="lb">k3vaceo · Khoá K03</div>
+      <h1>Lễ tốt nghiệp 26/9</h1>
+      <p>Dolce by Wyndham, Giảng Võ — chiều bảo vệ Kế hoạch kinh doanh,
+        tối là Lễ tốt nghiệp &amp; Gala.</p>
+    </div>
     <p class="sub">Ba phần, lưu riêng từng phần — chạm vào tên phần để mở, làm
       được phần nào lưu phần ấy, không phải xong hết mới bấm được.</p>
 
     <div class="tnprog">
-      <span>Hồ sơ ${tnMocXong(d.ho_so_luc)}</span>
-      <span>Đề tài ${tnMocXong(d.khkd_luc)}</span>
-      <span>Dự Lễ ${tnMocXong(d.gala_luc)}</span>
+      ${tnOTienDo('Hồ sơ', d.ho_so_luc)}
+      ${tnOTienDo('Đề tài', d.khkd_luc)}
+      ${tnOTienDo('Dự Lễ', d.gala_luc)}
     </div>
 
     <details class="tnsec" data-sec="gala" ${mo('gala')}>
-      <summary><b>Lễ tốt nghiệp &amp; Gala</b>
-        <i>${conPhaiTra
+      <summary>${tnHuyHieu(1, d.gala_luc)}
+        <span class="t"><b>Lễ tốt nghiệp &amp; Gala</b>
+        <i class="${conPhaiTra ? 'con' : ''}">${conPhaiTra
           // Ba khối nay chỉ mở một, nên khi người dùng mở khối khác thì khối
           // này gập lại và trạng thái tiền biến mất khỏi màn hình. Dòng này là
           // thứ duy nhất còn nhìn thấy được lúc ấy — nói đúng việc còn lại,
-          // không dùng chip màu (✓ xanh chỉ có MỘT nghĩa: người thu đã nhận).
+          // và tô CAM (màu của việc còn nợ) chứ không dùng chip ✓ xanh, thứ
+          // trong sản phẩm này chỉ có MỘT nghĩa: người thu đã nhận tiền.
           ? `Còn phải chuyển ${vnMoney(r.amount)} đ`
-          : 'Hạn đăng ký 21h00 ngày 19/9'}</i>${tnMocXong(d.gala_luc)}</summary>
+          : 'Hạn đăng ký 21h00 ngày 19/9'}</i></span>
+        <span class="ch">▾</span></summary>
       <div class="tnbody">
         <label class="f">Bạn có dự Lễ Tốt nghiệp &amp; Gala 17h00–22h00 không?</label>
         <div class="fl" id="tnDuLe">
@@ -4901,8 +4947,10 @@ function veTotNghiep() {
     </details>
 
     <details class="tnsec" data-sec="hoso" ${mo('hoso')}>
-      <summary><b>Hồ sơ làm chứng chỉ</b>
-        <i>Hạn 26/9</i>${tnMocXong(d.ho_so_luc)}</summary>
+      <summary>${tnHuyHieu(2, d.ho_so_luc)}
+        <span class="t"><b>Hồ sơ làm chứng chỉ</b>
+        <i>Hạn 26/9 · Ban tổ chức in chứng chỉ theo đúng những ô này</i></span>
+        <span class="ch">▾</span></summary>
       <div class="tnbody">
         <p class="mut" style="margin:0 0 16px">Phần lớn đã điền sẵn từ dữ liệu Ban tổ
           chức — bạn chỉ cần soi lại rồi bấm Lưu.</p>
@@ -4958,8 +5006,10 @@ function veTotNghiep() {
     </details>
 
     <details class="tnsec" data-sec="detai" ${mo('detai')}>
-      <summary><b>Đề tài Kế hoạch kinh doanh</b>
-        <i>Không bắt buộc</i>${tnMocXong(d.khkd_luc)}</summary>
+      <summary>${tnHuyHieu(3, d.khkd_luc)}
+        <span class="t"><b>Đề tài Kế hoạch kinh doanh</b>
+        <i>Không bắt buộc · nộp theo cá nhân hoặc cùng lĩnh vực</i></span>
+        <span class="ch">▾</span></summary>
       <div class="tnbody">
         <p class="mut" style="margin:0 0 16px">Lớp đã chốt: <b>nộp tự do theo cá nhân
           hoặc cùng lĩnh vực, không bắt buộc ai cũng phải nộp.</b> Làm chung đề tài với

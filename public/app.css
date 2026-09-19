@@ -3,6 +3,21 @@
   --ink:#17191B; --ink2:#5C6266; --ink3:#93999D; --line:#E3E3DF; --line2:#D2D3CE;
   --go:#146450; --go-bg:#E4F0EB; --go-line:#B6D6C9;
   --due:#A8500E; --due-bg:#FAEDE0; --due-line:#E8CBAA;
+  /* Màu NHẬN DIỆN riêng của zone Lễ tốt nghiệp (19/9). Ngô Phú Cường xin cho
+     zone này "khác với giao diện hàng ngày một chút".
+
+     Chàm chứ không phải một sắc xanh lá hay cam đậm hơn, và lý do là ngữ
+     nghĩa chứ không phải thẩm mỹ: trong sản phẩm này --go (xanh) có ĐÚNG một
+     nghĩa (xong / người thu đã nhận) và --due (cam) có đúng một nghĩa (còn
+     phải làm gì đó). Mượn một trong hai làm màu nhận diện là làm hỏng cả hai.
+     Chàm là hướng duy nhất còn trống, và nó tách xa cả hai trên trục XANH
+     LAM — trục mà người mù màu đỏ-lục vẫn phân biệt được, khác hẳn cặp
+     xanh-lá ↔ cam vốn đã sát nhau (ΔE 7.7 protan, xem khối biểu đồ bên dưới).
+
+     LUẬT: --le CHỈ dùng cho khung sườn (băng đầu trang, huy hiệu bước, viền
+     khối đang mở). TUYỆT ĐỐI không dùng nó để nói một trạng thái — trạng thái
+     vẫn chỉ có ba màu cũ: xanh xong, cam còn nợ, xám chưa tới. */
+  --le:#403A72; --le2:#57508F; --le-bg:#EEEDF6; --le-line:#CBC8E4;
   --r:14px; --r2:10px; --wrap:520px;
   --sh:0 1px 2px rgba(23,25,27,.05), 0 4px 14px rgba(23,25,27,.045);
   --sh2:0 2px 6px rgba(23,25,27,.07), 0 12px 32px rgba(23,25,27,.1);
@@ -663,33 +678,85 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    trang bị đẩy lên khỏi màn hình và không cuộn ngược lên được. Vì vậy .tnwrap
    canh flex-start và tự cuộn. */
 .tnwrap{min-height:100vh;min-height:100dvh;padding:calc(env(safe-area-inset-top) + 22px) 16px
-  calc(env(safe-area-inset-bottom) + 40px);background:var(--bg)}
+  calc(env(safe-area-inset-bottom) + 40px);background:var(--bg);
+  background-image:radial-gradient(130% 320px at 50% 0,rgba(64,58,114,.11),rgba(64,58,114,0) 72%)}
 .tncard{max-width:var(--wrap);margin:0 auto}
-.tncard>.lb{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
-  color:var(--ink3);margin-bottom:8px}
-.tncard>h1{font-size:23px;font-weight:700;letter-spacing:-.015em;margin:0 0 8px}
-.tncard>p.sub{font-size:13.5px;color:var(--ink2);margin:0 0 18px;line-height:1.55}
+/* Băng đầu trang — thứ nói "bạn đang ở một chỗ KHÁC" trong đúng nửa giây đầu.
+   Nền đặc chàm chứ không phải một thẻ trắng nữa: trên điện thoại người ta
+   nhận ra một màn hình bằng MẢNG MÀU trước khi kịp đọc chữ, và cả ứng dụng
+   còn lại là thẻ trắng trên nền xám ấm. */
+.tnhead{position:relative;overflow:hidden;border-radius:18px;padding:19px 17px 17px;
+  margin-bottom:15px;color:#fff;
+  background:linear-gradient(135deg,var(--le) 0%,var(--le2) 58%,#6E62AD 100%);
+  box-shadow:0 12px 28px -16px rgba(64,58,114,.85)}
+/* Mũ tốt nghiệp chìm ở góc: đủ để nhận ra chủ đề, đủ mờ để không giành chỗ
+   đọc của tiêu đề. pointer-events:none vì nó nằm đè lên vùng chạm. */
+.tnhead::after{content:'🎓';position:absolute;right:-8px;top:-14px;font-size:96px;
+  line-height:1;opacity:.14;pointer-events:none}
+.tnhead .lb{font-size:10.5px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;
+  color:rgba(255,255,255,.72);margin-bottom:7px}
+.tnhead h1{font-size:25px;font-weight:700;letter-spacing:-.02em;margin:0 0 7px;
+  line-height:1.15;color:#fff}
+.tnhead p{margin:0;font-size:12.5px;line-height:1.5;color:rgba(255,255,255,.84)}
 
-/* Ba chip tiến độ. Xuống dòng chứ không cuộn ngang — cùng bài học với hàng
-   chip lọc của Sổ thu: lề âm của .fl bị mép vùng cuộn cắt mất chip cuối, và
-   ba mốc phải nhìn thấy CÙNG LÚC thì mới biết còn thiếu phần nào. */
-.tnprog{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 20px}
-.tnprog>span{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);
-  background:var(--surf);box-shadow:var(--sh);border-radius:99px;padding:6px 12px}
+.tncard>p.sub{font-size:13.5px;color:var(--ink2);margin:0 0 16px;line-height:1.55}
+
+/* BA Ô TIẾN ĐỘ — LUÔN MỘT HÀNG.
+   Bản đầu dùng flex-wrap và ở khổ 390px ô thứ ba rơi xuống dòng hai (Ngô Phú
+   Cường chụp màn hình 19/9). Rơi dòng là mất đúng công dụng của dải này: ba
+   mốc phải nhìn thấy CÙNG LÚC thì mới biết còn thiếu phần nào. Nay là lưới
+   ba cột bằng nhau nên không có cách nào rơi; chữ trạng thái xuống dòng
+   BÊN TRONG ô, không đẩy ô xuống. */
+.tnprog{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:0 0 18px}
+.tnprog>span{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;
+  text-align:center;background:var(--surf);border-radius:12px;padding:9px 5px;
+  box-shadow:var(--sh)}
+.tnprog>span b{font-size:12.5px;font-weight:600;line-height:1.2}
+.tnprog>span i{font-style:normal;font-size:10.5px;color:var(--ink3);line-height:1.2}
+/* Xong thì đổi CẢ Ô sang xanh, không chỉ thêm một chip con: liếc một cái là
+   đếm được còn mấy ô trắng. Vẫn đúng luật màu — xanh ở đây là "xong", nghĩa
+   duy nhất nó được phép mang. */
+.tnprog>span.xong{background:var(--go-bg);box-shadow:inset 0 0 0 1px var(--go-line)}
+.tnprog>span.xong b,.tnprog>span.xong i{color:var(--go)}
 
 /* <details> thay vì tự viết accordion bằng JS: mở/đóng chạy sẵn, bàn phím và
    trình đọc màn hình hiểu sẵn, và không có trạng thái nào để lệch. */
-.tnsec{background:var(--surf);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:12px;
-  overflow:hidden}
-.tnsec>summary{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:15px 16px;
+.tnsec{position:relative;background:var(--surf);border-radius:var(--r);box-shadow:var(--sh);
+  margin-bottom:11px;overflow:hidden}
+/* Khối ĐANG MỞ phải nhận ra được từ xa — Ngô Phú Cường 19/9: "3 phần cần khai
+   chưa nổi bật". Ba khối giống hệt nhau thì không biết mình đang đứng ở đâu,
+   nhất là sau khi cuộn xuống giữa một biểu mẫu dài. Dải chàm bên trái cộng
+   nền đầu khối: hai dấu hiệu, không chỉ một. */
+.tnsec[open]{box-shadow:0 0 0 1.5px var(--le-line),var(--sh)}
+.tnsec[open]::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;
+  background:var(--le);z-index:1}
+.tnsec>summary{display:flex;align-items:center;gap:12px;padding:14px 14px 14px 16px;
   cursor:pointer;list-style:none;user-select:none}
+.tnsec[open]>summary{background:var(--le-bg)}
 .tnsec>summary::-webkit-details-marker{display:none}
-.tnsec>summary::after{content:'▾';margin-left:auto;color:var(--ink3);font-size:13px;
+/* Huy hiệu bước: SỐ khi chưa khai, ✓ khi xong. Số thứ tự nói được "còn mấy
+   việc nữa" — thứ một dấu chấm tròn không nói được. Vòng tròn 30px cũng là
+   mỏ neo cho mắt: ba khối nay bắt đầu bằng ba hình tròn thẳng hàng. */
+.tnsec>summary .n{flex:0 0 auto;width:30px;height:30px;border-radius:50%;display:grid;
+  place-items:center;font-family:var(--num);font-size:13px;font-weight:600;
+  color:var(--le);background:var(--le-bg);box-shadow:inset 0 0 0 1.5px var(--le-line)}
+.tnsec>summary .n.xong{background:var(--go-bg);color:var(--go);font-family:inherit;
+  font-size:15px;box-shadow:inset 0 0 0 1.5px var(--go-line)}
+.tnsec>summary .t{flex:1;min-width:0}
+.tnsec>summary .t b{display:block;font-size:15.5px;font-weight:600;line-height:1.3}
+/* Dòng hạn đi XUỐNG DÒNG RIÊNG chứ không nằm cạnh tiêu đề. Nằm cạnh thì ở khổ
+   390px nó đẩy tiêu đề vỡ ra và cả hàng thành ba dòng so le — đúng cảnh trong
+   ảnh chụp ngày 19/9. */
+.tnsec>summary .t i{display:block;font-style:normal;font-size:11.5px;color:var(--ink3);
+  margin-top:2px;line-height:1.35}
+/* Còn phải chuyển tiền thì dòng ấy là CAM — màu của việc còn nợ, nghĩa duy
+   nhất cam được mang. Không dùng chip: chip ✓ xanh có nghĩa khác hẳn. */
+.tnsec>summary .t i.con{color:var(--due);font-weight:600}
+.tnsec>summary .ch{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:grid;
+  place-items:center;background:var(--surf2);color:var(--ink3);font-size:11px;
   transition:transform .18s}
-.tnsec[open]>summary::after{transform:rotate(180deg)}
-.tnsec>summary b{font-size:15px;font-weight:600}
-.tnsec>summary i{font-style:normal;font-size:11.5px;color:var(--ink3)}
-.tnbody{padding:4px 16px 18px;border-top:1px solid var(--line)}
+.tnsec[open]>summary .ch{transform:rotate(180deg);background:#fff}
+.tnbody{padding:14px 16px 18px;border-top:1px solid var(--le-line)}
 .tnbody>.wide{margin-top:4px}
 
 /* Công tắc gian hàng / văn nghệ — cùng khuôn .gtsw của Giao thương. Không

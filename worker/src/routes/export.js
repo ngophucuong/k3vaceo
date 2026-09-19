@@ -49,7 +49,11 @@ export async function exportPlanDocx(env, me) {
     if (plan.topic_product) blocks.push(para(`Sản phẩm / dịch vụ: ${plan.topic_product}`));
     if (plan.topic_customers) blocks.push(para(`Khách hàng mục tiêu: ${plan.topic_customers}`));
   } else {
-    blocks.push(para('Nhóm chưa chốt đề tài.', { italic: true, color: '999999' }));
+    // Đề tài CHUNG của nhóm là tuỳ chọn từ 18/9 (migration 0043): lớp nộp bài
+    // theo LĨNH VỰC + cá nhân ở /totnghiep, không nộp theo nhóm nữa. Câu cũ
+    // đọc lên như một thiếu sót trên trang bìa một bản thảo hoàn toàn hợp lệ.
+    blocks.push(para('Nhóm không đặt đề tài chung (tuỳ chọn — lớp nộp bài theo cá nhân hoặc cùng lĩnh vực).',
+      { italic: true, color: '999999' }));
   }
 
   /* ── Mục lục phẳng, kèm người phụ trách và tiến độ ── */

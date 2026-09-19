@@ -2,6 +2,9 @@ import { json } from '../lib/http.js';
 import { layTuLieuTheoBuoi } from './lich.js';
 import { isClassCommittee } from '../permissions.js';
 import { cheEmail } from '../lib/che.js';
+// Hai mốc lấy THẲNG từ module sở hữu chúng, không chép lại — xem chú thích
+// ở chỗ khai báo trong tot-nghiep.js.
+import { HAN_GALA, NGAY_LE } from './tot-nghiep.js';
 
 const PROFILE_FIELDS = ['sells_what', 'sells_to', 'needs', 'offers'];
 
@@ -12,10 +15,62 @@ async function profileCompleteness(env, memberId) {
   return PROFILE_FIELDS.filter(f => p[f] && String(p[f]).trim() !== '').length;
 }
 
-// Thứ tự xét đúng mục 7.1 SRS. "Chưa nhận tên" không xét ở đây — người gọi
-// endpoint này đã đăng nhập (đã nhận tên) rồi, trường hợp đó xử lý ở màn hình
-// nhận link mời (routes/invite.js).
+// Thứ tự xét theo mục 7.1 SRS, cộng MỘT bước chen lên đầu từ 19/9 (việc tốt
+// nghiệp còn nợ — SRS viết trước khi Ban tổ chức gửi 15 câu ấy; bước này tự
+// tắt sau 26/9 nên chuỗi của SRS trở lại nguyên vẹn).
+// "Chưa nhận tên" không xét ở đây — người gọi endpoint này đã đăng nhập (đã
+// nhận tên) rồi, trường hợp đó xử lý ở màn hình nhận link mời
+// (routes/invite.js).
 async function computeAction(env, me) {
+  // ── Bước 1: việc TỐT NGHIỆP còn nợ (thêm 19/9) ──────────────────────────
+  // Đây là lần ĐẦU TIÊN chuỗi này xếp một việc CÓ HẠN lên trước mọi việc khác,
+  // và đó là chủ ý: hạn đăng ký Gala là 21h00 ngày 19/9, hạn hồ sơ làm chứng
+  // chỉ là 26/9 — còn bốn dòng hồ sơ Giao thương ngay dưới thì không có hạn
+  // nào. Xếp theo MỨC GẤP, đúng khuôn tnKhoiMoDau() đã dùng cho ba khối gập ở
+  // /totnghiep (public/app.js).
+  //
+  // Nó THAY CHỖ bước giục đề tài theo NHÓM: 18/9 (migration 0043) lớp bỏ hẳn
+  // đường nộp ấy, chuyển sang LĨNH VỰC + cá nhân, nên câu cũ — bảy phần sau
+  // đều treo, đây là việc chặn mọi việc khác — sai cả nội dung lẫn mức độ.
+  // (Cố ý KHÔNG trích nguyên văn chuỗi cũ ở đây: deploy.yml grep đúng chuỗi
+  // ấy trong worker/src và public để chặn một bản vá nửa vời, và một phép
+  // grep phải chừa ngoại lệ là một phép grep sẽ mục.) Nặng hơn:
+  // nó đứng ở bước 2 nên CHẶN mọi gợi ý sau nó, mà migration 0003 gieo
+  // plans.topic_* của Nhóm 6 là NULL — tức nó gõ cửa đúng Nhóm 6 suốt từ Đợt 2.
+  //
+  // MỘT truy vấn, và MỌI phép so ngày giờ do SQLite làm (quy ước 1): so bằng
+  // Date của JS với chuỗi của SQLite là đúng cái bẫy 'T' đã suýt giết magic
+  // link Đợt 2. Hai truy vấn con chạy trên chỉ mục UNIQUE member_id nên rẻ;
+  // KHÔNG dùng UNION ALL (D1 từ chối từ 6 nhánh trở lên khi chạy qua tệp).
+  const tn = await env.DB.prepare(
+    `SELECT datetime('now', '+7 hours') <= ? AS con_gala,
+            date('now', '+7 hours')     <= ? AS con_ho_so,
+            (SELECT ho_so_luc FROM dang_ky_tot_nghiep WHERE member_id = ?) AS ho_so_luc,
+            (SELECT gala_luc  FROM dang_ky_tot_nghiep WHERE member_id = ?) AS gala_luc`
+  ).bind(HAN_GALA, NGAY_LE, me.id, me.id).first();
+
+  // HAI mốc, HAI điều kiện riêng chứ không một mốc chung: sau 21h00 ngày 19/9
+  // nhánh Gala tự tắt (đăng ký đã đóng, nhắc nữa là vô ích), nhánh hồ sơ còn
+  // sống tới hết 26/9. Gộp một mốc thì hoặc nhắc Gala sau khi hết hạn, hoặc
+  // tắt hồ sơ sớm bảy ngày.
+  if (tn?.con_gala && !tn.gala_luc) {
+    return {
+      h: 'Chưa trả lời dự Lễ tốt nghiệp',
+      p: 'Chiều 26/9 bảo vệ bài — bắt buộc, không thu phí. Buổi tối là Lễ và Gala, có phí và phải đăng ký trước 21h00 ngày 19/9.',
+      c: 'Mở đăng ký', target: 'totnghiep',
+    };
+  }
+  if (tn?.con_ho_so && !tn.ho_so_luc) {
+    return {
+      h: 'Hồ sơ làm chứng chỉ còn trống',
+      p: 'Ban tổ chức in chứng chỉ theo đúng những ô này. Phần lớn đã điền sẵn từ danh sách lớp — anh chị chỉ xác nhận lại.',
+      c: 'Điền hồ sơ', target: 'totnghiep',
+    };
+  }
+  // Đề tài KHKD CỐ Ý không có nhánh nào ở đây: lớp đã chốt "không bắt buộc ai
+  // cũng phải nộp" (migration 0043), nên biến nó thành một việc-đang-nợ là đi
+  // ngược đúng quyết định vừa làm.
+
   const filled = await profileCompleteness(env, me.id);
   if (filled < 4) {
     return {
@@ -25,20 +80,13 @@ async function computeAction(env, me) {
     };
   }
 
-  const plan = await env.DB.prepare('SELECT id, topic_product, topic_customers FROM plans WHERE group_id = ?')
+  // plans.topic_* KHÔNG còn được xét ở đây (19/9) — xem chú thích đầu hàm.
+  // Cột vẫn giữ nguyên và vẫn có việc thật: Trợ lý KHKD đọc nó để biết nhóm đã
+  // có ý tưởng chưa (giai đoạn `de_tai`, routes/tro-ly.js), và bản Word in nó
+  // lên bìa. Chỉ riêng việc GIỤC trên tab Hôm nay là bỏ.
+  const plan = await env.DB.prepare('SELECT id FROM plans WHERE group_id = ?')
     .bind(me.group_id).first();
   if (plan) {
-    // "Chốt đề tài" là đã ghi được sản phẩm và khách hàng mục tiêu vào
-    // plans.topic_* — không phải là đã có ai nhận phần 0. Hai việc khác nhau:
-    // mục 7.1 SRS xét đề tài ở bước 3 rồi mới xét nhận phần ở bước 4.
-    if (!plan.topic_product || !plan.topic_customers) {
-      return {
-        h: 'Nhóm chưa chốt đề tài',
-        p: 'Chưa có sản phẩm và khách hàng mục tiêu thì bảy phần sau đều treo. Đây là việc chặn mọi việc khác.',
-        c: 'Mở phần 0', target: 'plan', section_ord: 0,
-      };
-    }
-
     const mine = await env.DB.prepare('SELECT ord, pct FROM plan_sections WHERE plan_id = ? AND owner_member_id = ? ORDER BY ord')
       .bind(plan.id, me.id).all();
     const mineRows = mine.results ?? [];
@@ -61,13 +109,25 @@ async function computeAction(env, me) {
     }
   }
 
+  /* Đợt thu phí Gala KHÔNG phải khoản của người đã trả lời "Không dự" (hoặc
+     chưa trả lời). Mời họ chuyển 1.000.000 đ cho bữa tiệc họ vừa từ chối là
+     nói sai, và nó là lỗi CÓ THẬT ngay hôm nay với chín nhóm chưa có dòng
+     `plans` — chỉ Nhóm 6 được che vì bước đề tài cũ chặn trước. Gỡ bước ấy là
+     nó lộ ra với cả 10 nhóm, nên phải vá cùng lúc.
+
+     Nhận ra đợt Gala bằng (scope, amount, account_no) chứ KHÔNG theo tiêu đề:
+     tiêu đề sửa được bằng nút ✎ ngay trong ứng dụng, so tên là có ngày phép
+     lọc này lặng lẽ thôi ăn — đúng lý lẽ getTotNghiep đã ghi cho cùng đợt ấy.
+     Mọi đợt thu khác giữ NGUYÊN hành vi cũ. */
   const openFund = await env.DB.prepare(
-    `SELECT f.id FROM fund_rounds f
+    `SELECT f.id, f.scope, f.amount, f.account_no FROM fund_rounds f
      WHERE f.status = 'open' AND (f.scope = 'class' OR f.group_id = ?)
        AND NOT EXISTS (SELECT 1 FROM fund_declarations d WHERE d.round_id = f.id AND d.member_id = ?)
      LIMIT 1`
   ).bind(me.group_id, me.id).first();
-  if (openFund) {
+  const laGala = !!openFund && openFund.scope === 'class'
+    && openFund.amount === 1000000 && openFund.account_no === '0975587586';
+  if (openFund && !(laGala && tn?.du_le !== 'co')) {
     return { h: 'Có quỹ đang mở', p: 'Mã chuyển khoản riêng của bạn đã sẵn, nội dung điền tự động.', c: 'Mở mã QR', target: 'fund' };
   }
 
