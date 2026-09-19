@@ -779,6 +779,181 @@ ok(`không tràn ngang ở 390px (thừa ${tran3}px)`, tran3 <= 1);
 await p3.screenshot({ path: '/tmp/tn-congkhai.png', fullPage: true });
 console.log('  (ảnh chụp: /tmp/tn-congkhai.png)');
 
+/* ══ RỦ NGƯỜI CÙNG LÀM ĐỀ TÀI (migration 0045) ════════════════════════════
+   kiem-totnghiep.mjs đã kiểm hết phần máy chủ. Ở đây chỉ kiểm thứ máy chủ
+   KHÔNG kiểm được, và cả ba đều là loại lỗi im lặng:
+
+   · người đã có quan hệ hiện MỜ và bấm KHÔNG được — chặn ở giao diện, vì
+     bày một dòng bấm vào là 409 thì tệ hơn hẳn không bày;
+   · ô tìm GIỮ TIÊU ĐIỂM sau khi lọc — vẽ lại sheet là bàn phím điện thoại
+     sập xuống sau MỖI chữ gõ vào, và không phép kiểm chuỗi nào thấy;
+   · dòng phụ của <summary> tô ĐÚNG màu cam `--due`, đọc bằng getComputedStyle
+     rồi so với chính giá trị biến lấy từ stylesheet — ghi cứng mã màu là có
+     ngày đổi biến mà phép kiểm vẫn xanh.
+
+   Dùng HAI phiên trong cùng một trình duyệt (Cường rủ, Thường trả lời), đúng
+   khuôn pw-doi-nhom.mjs: một phiên thì không bao giờ thấy được vế ĐỒNG Ý. */
+console.log('\n── Rủ người cùng làm đề tài ──');
+const c4 = await b.newContext({ viewport: { width: 390, height: 1400 }, deviceScaleFactor: 2 });
+await c4.addCookies([{ name: 's', value: 'tk-tn-cuong', domain: '127.0.0.1', path: '/' }]);
+const p4 = await c4.newPage();
+const loi4 = []; p4.on('pageerror', e => loi4.push(e.message));
+await p4.goto(B + '/totnghiep', { waitUntil: 'networkidle' }); await p4.waitForTimeout(900);
+
+const clKhoiDeTai = await moKhoi(p4, 'Đề tài');
+ok('khối Đề tài có nút "Rủ người cùng làm"', await p4.locator('#tnRu').count() === 1);
+await p4.click('#tnRu'); await p4.waitForTimeout(500);
+ok('sheet mở ra với danh sách chọn người', await p4.locator('#ruDs .fdpick').count() > 0);
+
+// Vùng chạm: cả dòng là một <button> ≥56px, dùng LẠI .fdpick của /vao. Đo
+// thật chứ không tin lớp CSS — một bản vá đổi .fdpick ở chỗ khác sẽ lộ ra.
+const caoDong = await p4.locator('#ruDs .fdpick').first().evaluate(el => el.getBoundingClientRect().height);
+ok(`cả dòng tên bấm được, cao ${Math.round(caoDong)}px (≥56)`, caoDong >= 56);
+
+// Ô tìm lọc THẲNG TRÊN DOM và GIỮ TIÊU ĐIỂM. Phép có răng là tiêu điểm, không
+// phải "lọc đúng người" — phép sau xanh với cả một bản vẽ lại cả sheet.
+await p4.click('#ruTim');
+await p4.type('#ruTim', 'nhom bay', { delay: 40 }); await p4.waitForTimeout(400);
+const conHien = await p4.locator('#ruDs .fdpick:visible').count();
+ok(`gõ không dấu vẫn lọc đúng (còn ${conHien} dòng)`, conHien >= 1 && conHien < 7);
+ok('ô tìm GIỮ tiêu điểm sau khi lọc — không vẽ lại sheet',
+   await p4.evaluate(() => document.activeElement?.id) === 'ruTim');
+
+// Bước hai: công tắc hai vế, và vế thứ hai gửi đúng `bai_cua: 'ho'`.
+await p4.locator('#ruDs .fdpick:visible').first().click(); await p4.waitForTimeout(400);
+ok('bước hai hiện công tắc hai vế', await p4.locator('#ruBen [data-ben]').count() === 2);
+ok('mặc định là "bài của tôi"',
+   await p4.locator('#ruBen [data-ben="toi"]').evaluate(el => el.classList.contains('on')));
+await p4.click('#ruBen [data-ben="ho"]'); await p4.waitForTimeout(200);
+ok('bấm vế kia thì vế kia bật và vế đầu tắt',
+   await p4.locator('#ruBen [data-ben="ho"]').evaluate(el => el.classList.contains('on'))
+   && !(await p4.locator('#ruBen [data-ben="toi"]').evaluate(el => el.classList.contains('on'))));
+
+// Bắt request để chắc thân gửi lên ĐÚNG `bai_cua` đang chọn — đây là chỗ
+// giao diện dễ gửi ngược nhất, và gửi ngược thì không chỗ nào báo lỗi: lời rủ
+// vẫn đi, chỉ là nó nói sai bài của ai.
+await p4.fill('#ruNhan', 'cùng làm nhé');
+const [reqRu] = await Promise.all([
+  p4.waitForRequest(r => r.url().endsWith('/api/totnghiep/cung-lam') && r.method() === 'POST'),
+  p4.click('#ruGui'),
+]);
+const thanRu = JSON.parse(reqRu.postData() ?? '{}');
+ok(`gửi đúng bai_cua đang chọn (nhận "${thanRu.bai_cua}")`, thanRu.bai_cua === 'ho');
+ok('gửi kèm lời nhắn vừa gõ', thanRu.loi_nhan === 'cùng làm nhé');
+await p4.waitForTimeout(1600);
+
+// Sau khi gửi: người ấy hiện MỜ trong danh sách và bấm KHÔNG được.
+await p4.click('#tnRu'); await p4.waitForTimeout(500);
+const soMo = await p4.locator('#ruDs .fdpick.mo').count();
+ok(`người đã có quan hệ hiện MỜ (${soMo} dòng)`, soMo === 1);
+ok('… và bấm KHÔNG được', await p4.locator('#ruDs .fdpick.mo').first().isDisabled());
+ok('… nhưng KHÔNG bị lọc khỏi danh sách',
+   await p4.locator('#ruDs .fdpick').count() === await p4.locator('#ruDs [data-ru]').count()
+   && await p4.locator('#ruDs .fdpick').count() > 1);
+await p4.keyboard.press('Escape');
+await p4.locator('#veil').evaluate(el => el.classList.remove('on')).catch(() => {});
+await p4.waitForTimeout(300);
+
+/* ── Phía NGƯỜI ĐƯỢC RỦ: dòng phụ <summary> tô đúng màu, và hai nút ─── */
+const c5 = await b.newContext({ viewport: { width: 390, height: 1400 }, deviceScaleFactor: 2 });
+await c5.addCookies([{ name: 's', value: 'tk-tn-n7', domain: '127.0.0.1', path: '/' }]);
+const p5 = await c5.newPage();
+const loi5 = []; p5.on('pageerror', e => loi5.push(e.message));
+
+/* PHẢI TRẢ LỜI GALA TRƯỚC, và đó không phải dọn dẹp cho gọn: `tnKhoiMoDau()`
+   xếp Gala LÊN TRƯỚC lời rủ (hạn 21h00 ngày 19/9 là hạn gấp nhất của cả
+   zone), nên người chưa trả lời Gala mở trang ra thấy khối Gala chứ không
+   phải khối Đề tài — đúng thiết kế.
+
+   Bỏ bước này thì hai phép dưới ĐỎ vì một lý do chẳng liên quan, và còn tệ
+   hơn: `innerText` của Chrome trả về RỖNG cho nội dung nằm trong <details>
+   đang đóng, nên mọi phép so chuỗi sau đó cũng hỏng theo mà câu báo lỗi chỉ
+   nói "không khớp". Đã vấp đúng vậy ở lượt chạy đầu. */
+/* Trước đó, canh đúng cảnh ấy: CHƯA trả lời Gala mà đã có lời rủ chờ thì
+   khối Đề tài GẬP, và dòng phụ cam ở <summary> là thứ DUY NHẤT còn nhìn
+   thấy được. Đó chính là lý do dòng phụ tồn tại — nếu nó im thì người ta
+   không bao giờ biết có ai đang chờ mình. */
+await p5.goto(B + '/totnghiep', { waitUntil: 'networkidle' }); await p5.waitForTimeout(900);
+ok('chưa trả lời Gala thì Gala vẫn mở trước (hạn 21h00 19/9 gấp hơn)',
+   await p5.locator('.tnsec[data-sec="gala"]').evaluate(el => el.hasAttribute('open'))
+   && !(await p5.locator('.tnsec[data-sec="detai"]').evaluate(el => el.hasAttribute('open'))));
+ok('… nhưng dòng phụ CAM ở summary vẫn báo có người đang chờ',
+   /đang chờ bạn trả lời/i.test(
+     await p5.locator('.tnsec[data-sec="detai"] > summary .t i').innerText()));
+
+await fetch(B + '/api/totnghiep/gala', {
+  method: 'PUT',
+  headers: { cookie: 's=tk-tn-n7', 'content-type': 'application/json' },
+  body: JSON.stringify({ du_le: 'khong' }),
+});
+await p5.goto(B + '/totnghiep', { waitUntil: 'networkidle' }); await p5.waitForTimeout(900);
+
+ok('khối Đề tài MỞ SẴN với người đang có lời rủ chờ trả lời',
+   await p5.locator('.tnsec[data-sec="detai"]').evaluate(el => el.hasAttribute('open')));
+const phuDeTai = p5.locator('.tnsec[data-sec="detai"] > summary .t i');
+ok(`dòng phụ nói có người đang chờ ("${await phuDeTai.innerText()}")`,
+   /đang chờ bạn trả lời/i.test(await phuDeTai.innerText()));
+/* Đọc màu THẬT và so với chính biến --due lấy từ stylesheet. Ghi cứng
+   #A8500E là có ngày đổi biến mà phép kiểm vẫn xanh. */
+const [mauPhu, mauDue] = await p5.evaluate(() => {
+  const el = document.querySelector('.tnsec[data-sec="detai"] > summary .t i');
+  const norm = c => c.replace(/\s/g, '');
+  const d = getComputedStyle(document.documentElement).getPropertyValue('--due').trim();
+  const do1 = document.createElement('span');
+  do1.style.color = d; document.body.appendChild(do1);
+  const chuan = norm(getComputedStyle(do1).color); do1.remove();
+  return [norm(getComputedStyle(el).color), chuan];
+});
+ok(`dòng phụ tô đúng màu --due (${mauPhu} vs ${mauDue})`, mauPhu === mauDue);
+
+const choDuyet = p5.locator('.tncl.cho');
+ok('có khối "Có người muốn làm chung với bạn"', await choDuyet.count() === 1);
+ok('khối ấy đặt TRÊN CÙNG trong thân khối Đề tài',
+   await p5.locator('.tnsec[data-sec="detai"] .tnbody > *').first().evaluate(
+     el => el.classList.contains('tncl') && el.classList.contains('cho')));
+ok('in lời nhắn của người gửi', /cùng làm nhé/.test(await choDuyet.innerText()));
+ok('có đủ hai nút Đồng ý / Từ chối',
+   await p5.locator('[data-cldy]').count() === 1 && await p5.locator('[data-cltc]').count() === 1);
+const caoNut = await p5.locator('[data-cldy]').evaluate(el => el.getBoundingClientRect().height);
+ok(`nút Đồng ý cao ${Math.round(caoNut)}px (≥44, vùng chạm tối thiểu)`, caoNut >= 44);
+
+await p5.click('[data-cldy]'); await p5.waitForTimeout(1800);
+ok('bấm Đồng ý xong thì khối lời rủ biến mất', await p5.locator('.tncl.cho').count() === 0);
+const thanDeTai = await p5.locator('.tnsec[data-sec="detai"]').innerText();
+ok('… và hiện khối "Cùng làm bài của bạn" hoặc "Bài chung bạn đang đứng tên"',
+   /Cùng làm bài của bạn|Bài chung bạn đang đứng tên/i.test(thanDeTai));
+ok('không lỗi JS phía người được rủ: ' + (loi5.join(' | ') || 'sạch'), loi5.length === 0);
+
+/* CHỦ BÀI KHÔNG GỠ ĐƯỢC AI — kiểm ở GIAO DIỆN, vì máy chủ trả 404 thì giao
+   diện vẫn có thể bày ra một nút bấm vào là lỗi, mà bày một nút bấm vào là
+   lỗi còn tệ hơn hẳn không bày.
+
+   VAI Ở ĐÂY NGƯỢC VỚI TRỰC GIÁC, và đó đúng là chỗ phép kiểm soi nhầm màn:
+   lượt gửi ở trên chọn `bai_cua: 'ho'` (Cường XIN vào bài của Nhóm Bảy), nên
+   NHÓM BẢY (p5) là CHỦ BÀI còn CƯỜNG (p4) là người cùng làm — ngược hẳn với
+   thứ tự hai phiên xuất hiện trong tệp này. Soi nhầm màn thì cả hai phép đỏ
+   ở một chỗ chẳng liên quan gì tới thứ chúng đang canh; đã vấp đúng vậy. */
+await p4.reload({ waitUntil: 'networkidle' }); await p4.waitForTimeout(900);
+await moKhoi(p4, 'Đề tài');
+const thanChuBai = await p5.locator('.tnsec[data-sec="detai"]').innerText();
+ok('màn CHỦ BÀI không có nút Rời nào (chỉ người cùng làm mới rời được)',
+   await p5.locator('[data-clroi]').count() === 0);
+ok('… và nói rõ muốn ai rời thì chính họ tự bấm',
+   /chính họ bấm|tự rời|không gỡ tên/i.test(thanChuBai));
+ok('màn NGƯỜI CÙNG LÀM có nút "Rời khỏi bài này"',
+   await p4.locator('[data-clroi]').count() === 1);
+// Bài neo vào CHỦ: thẻ bài chung ở màn người cùng làm phải là CHỈ ĐỌC.
+ok('… và thẻ bài chung là CHỈ ĐỌC, không có ô nhập nào trong đó',
+   await p4.locator('.tncl .it input, .tncl .it textarea').count() === 0);
+
+const tran4 = await p4.evaluate(() =>
+  document.documentElement.scrollWidth - document.documentElement.clientWidth);
+ok(`không tràn ngang ở 390px sau khi thêm bốn phần (thừa ${tran4}px)`, tran4 <= 1);
+ok('không lỗi JS phía người rủ: ' + (loi4.join(' | ') || 'sạch'), loi4.length === 0);
+await p4.screenshot({ path: '/tmp/tn-cunglam-chu.png', fullPage: true });
+await p5.screenshot({ path: '/tmp/tn-cunglam-ban.png', fullPage: true });
+console.log('  (ảnh chụp: /tmp/tn-cunglam-chu.png · /tmp/tn-cunglam-ban.png)');
+
 await b.close();
 console.log(hong === 0 ? '\n✅ TẤT CẢ ĐỀU XANH' : `\n❌ ${hong} phép ĐỎ`);
 process.exit(hong === 0 ? 0 : 1);

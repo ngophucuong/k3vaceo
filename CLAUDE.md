@@ -24,8 +24,18 @@ Khi hai bên mâu thuẫn: SRS thắng về hành vi, HTML thắng về giao di�
 `claude/content-deployment-continuation-m2inni` — mọi thay đổi phải tới ĐÓ thì
 tên miền mới đổi, xem cái bẫy ngay dưới danh sách này.
 
-**MỚI NHẤT (19/9), chưa nằm trong danh sách đánh số bên dưới** — bốn mục
+**MỚI NHẤT (19/9), chưa nằm trong danh sách đánh số bên dưới** — sáu mục
 riêng ở giữa tệp, đọc trước nếu đang sửa đúng chỗ ấy:
+- **"Rủ người CÙNG LÀM đề tài, và người kia phải ĐỒNG Ý"** (migration 0045) —
+  thứ MỚI NHẤT, và là bảng quan hệ NHIỀU-NHIỀU đầu tiên của dự án. Đọc TRƯỚC
+  khi đụng `khkd_cung_lam`, `getTotNghiep` hay `theo_linh_vuc`: màn Ban cán sự
+  lớp nay đếm theo BÀI chứ không theo NGƯỜI, và `nguoi_gui_id` là chỗ sai được
+  mà chỉ MỘT chiều của bộ kiểm bắt được.
+- **Một LỖI CÓ THẬT đã vá cùng ngày:** `computeAction` viết `tn?.du_le !== 'co'`
+  mà quên select cột `du_le`, nên đợt thu phí Gala **không bao giờ** hiện ở ô
+  "Việc của bạn" cho bất kỳ ai — kể cả người đã trả lời "Có dự" và chưa chuyển
+  tiền. Xem "Đính chính 19/9 (tối)" trong mục "Vá kèm: đừng mời người đã từ
+  chối Gala…".
 - **"Số khai ở `/totnghiep` nay MỞ ĐƯỢC cửa `/dangnhap`"** — hai lỗi chồng
   nhau trên đường đăng nhập, một trong hai là chỗ CHẠM VÀO CỘT ĐĂNG NHẬP nên
   có ba điều an toàn phải giữ. Đọc trước khi đụng `putHoSo` hay `boot()`.
@@ -402,6 +412,10 @@ Ba chỗ, đều ghi lý do ngay trong migration tương ứng:
   nghiệp 26/9. SRS viết trước khi Ban tổ chức gửi 15 câu này. Ba cột
   `groups.ban_nop_*` của 0041 **đã GỠ ở 0043** khi lớp bỏ nộp bài theo nhóm;
   đề tài nay là `dang_ky_tot_nghiep.khkd_*`, xem mục riêng bên dưới.
+- `khkd_cung_lam` (migration 0045) — rủ người cùng làm đề tài, và người kia
+  phải ĐỒNG Ý. Bảng quan hệ NHIỀU-NHIỀU đầu tiên của dự án, nên không nhét cột
+  vào `dang_ky_tot_nghiep` được (bảng ấy khoá `member_id UNIQUE`). Xem mục
+  riêng bên dưới.
 
 ## Cạm bẫy của D1 thật — trả giá bằng bốn lần chạy hỏng
 
@@ -1716,6 +1730,218 @@ cũ không thấy vì nó đo lúc khối chứa hàng chip đang GẬP. Nay `.f
   nguyên nội dung cũ. Xem mục "Nới … thành KHAI BỔ SUNG" ở trên. Thứ vẫn
   KHÔNG làm được: xoá trắng một ô đã có chữ — cố ý, và đó là chốt chặn.
 
+## Rủ người CÙNG LÀM đề tài, và người kia phải ĐỒNG Ý (19/9, migration 0045)
+
+Ngô Phú Cường: *"Thâm luồng: Phần chọn chung đề tài có thể chọn người cùng làm
+và người đó đồng ý."*
+
+**Cái hỏng nó chữa, nói bằng con số:** migration 0043 (chiều 18/9) chuyển đề
+tài sang "nộp tự do theo cá nhân hoặc cùng lĩnh vực", nhưng phần B mới chỉ làm
+được vế CÁ NHÂN — cơ chế "làm chung" hoàn toàn là quy ước xã hội, và giao diện
+nói thẳng ra là *"cùng chọn một lĩnh vực và dán cùng một đường dẫn"*. Hệ quả:
+ba người làm chung phải dán cùng một link BA LẦN, và màn Ban cán sự lớp đếm
+thành **BA BÀI**. Đúng cái hỏng mà cả zone này sinh ra để chữa — lượt bình
+chọn Zalo cũng cho con số mà không nối được người với đề tài.
+
+Vế *"người đó đồng ý"* không phải chi tiết lịch sự. `putDeTai` **cố ý không
+nhận `member_id` trong thân** (chính chủ tự khai, không ai khai hộ được). Cho A
+nêu tên B là mở đúng chỗ ấy — và thứ giữ nguyên tắc N5 lại chính là bước B bấm
+Đồng ý.
+
+### Tám quyết định đã chốt, và hai cái cuối làm mô hình ĐƠN GIẢN ĐI
+
+| | Chọn |
+|---|---|
+| "Cùng làm" nghĩa là gì | **Một bài CHUNG, chỉ người giữ bài sửa** |
+| Rủ được ai | **Bất kỳ ai trong lớp**, xuyên nhóm |
+| Báo tin | **Chỉ trong ứng dụng** — không thư, không đẩy |
+| 38 người đi đường công khai | **Chỉ rủ được người ĐÃ ĐĂNG NHẬP** |
+| Tối đa mấy người một bài | **Không giới hạn** |
+| Ai gỡ người đã đồng ý | **Chỉ người cùng làm tự rời** |
+| Bài chung lấy đề tài của ai | **Người gửi chọn lúc gửi** |
+| Người đã có bài chung rồi | **Vẫn chọn được — đứng tên được nhiều bài** |
+
+Hai dòng cuối là thay đổi so với bản kế hoạch đầu (Ngô Phú Cường bác bản ấy
+bằng đúng một câu: *"Tôi có thể chọn người đã có đề tài"*), và chúng làm mô
+hình **nhẹ hơn hẳn**, không phức tạp thêm — xem ngay dưới.
+
+### Mô hình: bài NEO VÀO CHỦ, quan hệ là một dòng phẳng
+
+Mỗi người có **đúng một bài của riêng mình** — chính là ba cột `khkd_*` trên
+dòng `dang_ky_tot_nghiep` của họ. Bảng mới **không đụng tới chúng**. Ngoài ra
+họ **đứng tên được trên bài của bất kỳ ai khác**, bao nhiêu bài cũng được.
+
+Vì bài luôn neo vào **chủ** chứ không neo vào quan hệ, nên **không có chuỗi
+lồng nhau, không có cây, không có vòng**, và **không có "bài hiệu lực", không
+che gì cả** — đề tài riêng của mỗi người vẫn hiện và vẫn sửa được như cũ. Đó
+là vấn đề lớn nhất của bản kế hoạch trước, và nó biến mất cùng với luật "một
+người một bài".
+
+### `nguoi_gui_id` — vì sao có cột này
+
+Dòng luôn đọc là *"`ban` đứng tên trên bài của `chu`"*, và **người DUYỆT luôn
+là người KHÔNG gửi**:
+
+| Người gửi bấm | Dòng ghi ra | Ai duyệt |
+|---|---|---|
+| "Họ cùng làm **bài của tôi**" | `chu = tôi`, `ban = họ` | **họ** |
+| "Tôi cùng làm **bài của họ**" | `chu = họ`, `ban = tôi` | **họ** |
+
+Cả hai chiều đều do người kia đồng ý, đúng nguyên văn yêu cầu — và không cần
+cột `huong` riêng. Thiếu cột này thì không phân biệt được "A rủ B" với "B xin
+vào bài A", và **người gửi tự duyệt được đơn của chính mình**, tức vế ĐỒNG Ý
+biến mất mà không chỗ nào báo lỗi. Đã chạy đối chứng: bỏ nó ra thì phép kiểm
+của chiều `'toi'` VẪN XANH, chỉ chiều `'ho'` mới đỏ (README phép 60).
+
+### `ux_cunglam_dang_song` — chỉ số MỘT PHẦN, và vì sao chỉ phủ hai trạng thái
+
+`UNIQUE(chu, ban) WHERE trang_thai IN ('cho_duyet','da_dong_y')`. Chặn ở tầng
+DB nên **không có khe hở giữa SELECT kiểm tra và INSERT** (bấm nhanh hai lần,
+hai tab) — đúng khuôn `ux_doinhom_dang_cho`. Và vì nó chỉ phủ hai trạng thái
+ĐANG SỐNG: **từ chối rồi vẫn rủ lại được ngay, rời ra rồi vẫn quay lại được**,
+không phải xoá dòng cũ. Đổi ý là chuyện bình thường của người thật; bắt họ chờ
+hết hạn một thứ không có hạn thì mới là lạ.
+
+`da_huy` (người GỬI rút lời rủ khi còn chờ) và `da_roi` (người đã đồng ý tự
+rời) **tách nhau** vì chúng là hai câu chuyện khác nhau, và bảng này là bản ghi
+lịch sử của một thoả thuận giữa hai người.
+
+### Năm route, và chỗ sai được ở từng route
+
+| Route | Ai gọi được |
+|---|---|
+| `POST /api/totnghiep/cung-lam` | ai cũng được — `{doi_tac_member_id, bai_cua:'toi'｜'ho', loi_nhan}` |
+| `…/:id/dong-y` · `…/:id/tu-choi` | **đúng người duyệt** (người KHÔNG gửi) |
+| `…/:id/huy` | **người gửi**, khi còn `cho_duyet` |
+| `…/:id/roi` | **chỉ `ban_member_id`** — chủ bài không gỡ được ai |
+
+- **Sai người → 404, không phải 403** (quy ước 6): ở đây id ấy nói được cả hai
+  người trong một thoả thuận riêng tư.
+- **`INSERT` trước rồi bắt `String(err).includes('UNIQUE')` → 409**, không
+  SELECT-rồi-INSERT.
+- **Bước duyệt kiểm LẠI cả hai người còn `is_active`**, ngay trước khi ghi —
+  phòng đua, vì một người có thể đã được cho ngừng tham gia SAU lúc gửi.
+- **`logActivity` CHỈ khi ĐỒNG Ý.** Một lời rủ chưa phải chuyện đã xảy ra, và
+  một lời TỪ CHỐI là chuyện riêng giữa hai người, không phải tin của cả nhóm.
+- **Chỉ rủ được người `claimed_at IS NOT NULL`** — không phải chỗ quên: người
+  kia phải bấm Đồng ý được, mà 38 người đi đường công khai không có phiên. Rủ
+  họ chỉ để lại một lời rủ nằm chờ mãi mãi trên màn Ban cán sự lớp.
+- **Đường CÔNG KHAI không đụng một dòng nào**, và có phép đối chứng riêng.
+
+### `chon_duoc`: hiện MỜ, KHÔNG lọc ai ra
+
+`getTotNghiep` trả thêm khối `cung_lam` gồm bốn danh sách (`bai_cua_toi` ·
+`toi_tham_gia` · `cho_toi_duyet` · `toi_dang_cho`) cộng `chon_duoc` — **không
+thêm route `GET` riêng**, giữ nếp "màn hình chỉ gọi MỘT lượt" của zone này.
+
+`chon_duoc` liệt kê **đủ mọi người đã đăng nhập** trừ chính mình, và ba điều
+cố ý:
+
+1. **Chỉ id + tên + nhãn nhóm.** Không số điện thoại, không email — nên truy
+   vấn thẳng `members`, KHÔNG dùng lại `/api/danh-ba` (payload nặng hơn, có số
+   đã che, và ở đó `is_active` cố ý nằm trong JOIN nên người đã ngừng vẫn còn
+   tên). `kiem-totnghiep.mjs` grep thô nguyên văn JSON để canh chỗ này.
+2. **`trang_thai_voi_toi` chỉ nói quan hệ với NGƯỜI ĐANG XEM** (`null` ·
+   `dang_cho` · `da_chung`). Không bao giờ hé lộ họ đang làm chung với ai khác
+   — đó là việc riêng của họ.
+3. **Người đã có quan hệ hiện MỜ, KHÔNG bị lọc khỏi danh sách.** Bỏ họ ra là
+   lặp đúng lỗi vừa chữa sáng cùng ngày ở màn tìm tên: *"người không thấy tên
+   mình sẽ kết luận Ban tổ chức bỏ sót họ"*.
+
+### Giao diện: bốn phần trong khối Đề tài, và dòng phụ là mạng lưới an toàn
+
+Xếp dọc, mỗi phần chỉ hiện khi có nội dung: **lời rủ đang chờ TÔI** (trên
+cùng, khối `.tncl.cho` tô cam) → **đề tài của tôi** (ba ô như cũ, KHÔNG đổi gì)
+cộng ai đang đứng tên bài tôi và lời rủ tôi đã gửi → **bài chung tôi đang tham
+gia** (thẻ CHỈ ĐỌC + nút "Rời khỏi bài này") → nút **"Rủ người cùng làm"**.
+
+Bốn điều cố ý:
+
+1. **Lời rủ đặt TRÊN CÙNG.** Đây là việc của người khác đang chờ mình, và có
+   hạn. Đặt dưới ba ô đề tài thì người mở khối ra để sửa một chữ sẽ không bao
+   giờ cuộn tới.
+2. **Dòng phụ `<summary>` thành "N người đang chờ bạn trả lời", tô `.con`
+   (cam `--due`).** Dùng LẠI nguyên lớp CSS của khối Gala, **không dựng chấm
+   đỏ mới**: `veChamDo()` khoá cứng `[data-v="nay"]` và đếm bảng `thong_bao`,
+   mượn nó cho việc khác là làm hỏng nghĩa của nó.
+
+   **Và đây là mạng lưới an toàn thật, không phải trang trí:** `tnKhoiMoDau()`
+   xếp Gala LÊN TRƯỚC lời rủ (hạn 21h00 19/9 gấp hơn), nên người chưa trả lời
+   Gala mở trang ra thấy khối Gala còn khối Đề tài GẬP. Dòng phụ cam ấy là thứ
+   DUY NHẤT còn nhìn thấy được lúc ấy. `pw-totnghiep.mjs` có một phép riêng cho
+   đúng cảnh đó.
+3. **Chủ bài KHÔNG có nút gỡ ai**, và khối nói thẳng ra rằng muốn ai rời thì
+   chính họ tự bấm. Nút "Rời" chỉ hiện ở màn NGƯỜI CÙNG LÀM.
+4. **Sheet rủ dùng LẠI `.fdpick`** của bước chọn tên ở `/vao` (cả dòng là một
+   `<button>` cao ≥56px, đo thật 63px). Ô tìm lọc **thẳng trên DOM** — vẽ lại
+   sheet là ô tìm mất tiêu điểm và bàn phím điện thoại sập xuống sau MỖI chữ.
+   Nút Gửi **không dùng `submitting()`**: lỗi ở đây là thứ cần ĐỌC KỸ ("người
+   này đã cùng làm với bạn rồi") chứ không phải một dòng trôi qua trong ba
+   giây, nên nhánh hỏng chỉ hiện dòng lỗi và KHÔNG đóng sheet — lời nhắn vừa
+   gõ còn nguyên.
+
+**Huy hiệu ✓ và ô tiến độ "Đề tài" phải TRÙNG KHÍT**, và cả hai nay tính CẢ
+việc đứng tên bài người khác (`d.khkd_luc || cl.toi_tham_gia.length`): người
+đã nhận lời làm chung thì ĐÃ CÓ chỗ trong bài cuối khoá, dù ô đề tài riêng còn
+trống. Lệch một chút là dải ô nói "chưa điền" ngay trên một khối mang dấu ✓.
+Cùng phân định ấy áp cho `chua_chon_linh_vuc` ở màn Ban cán sự lớp.
+
+### Màn Ban cán sự lớp đếm theo BÀI, và giữ CẢ HAI con số
+
+`theo_linh_vuc` đổi từ danh sách NGƯỜI sang danh sách BÀI, nhóm theo lĩnh vực
+của **chủ bài**, mỗi bài kèm danh sách người cùng làm (thụt vào dưới chủ bài,
+vạch trái — xếp ngang hàng thì màn hình lại đọc thành một danh sách người,
+đúng cái vừa sửa).
+
+- `so_bai` = số ĐỀ TÀI — thứ Ban tổ chức xếp lịch bảo vệ theo.
+- `so_nguoi` = số LƯỢT ĐỨNG TÊN, chủ bài cộng người cùng làm — thứ thanh so
+  sánh dùng (một lĩnh vực 2 bài 6 người "đông" hơn một lĩnh vực 3 bài 3 người).
+
+Một người đứng nhiều bài thì **đếm nhiều lần**, và đó là sự thật màn hình phải
+nói ra: nó là cái giá của quyết định "đứng tên được nhiều bài", và là lý do
+CSV in **cả hai chiều** ("Ai cùng làm bài của tôi" · "Cùng làm bài của") — nếu
+có ai đứng năm bài thì Ban cán sự lớp **nhìn thấy** chứ không phát hiện lúc
+chấm. Mỗi người vẫn đúng một dòng CSV, và đọc dòng ấy là thấy hết.
+
+**Dòng đầu thẻ Đề tài phải nói rõ ĐANG ĐẾM GÌ.** Bản đầu viết "N/21 người đã
+chọn lĩnh vực" trống không, đọc lên như mâu thuẫn với các dòng dưới (ở đó
+"người" gồm cả người cùng làm). Nay là "N bài · M đã nộp link · K/21 người tự
+đứng tên một bài riêng". Hai chỗ nói hai chuyện về cùng một chữ là đúng loại
+lỗi tệp này nhắc nhiều nhất — chỉ khác là lần ấy nó nằm gọn trong một câu.
+
+### `computeAction`: bước MỚI chen giữa Gala và hồ sơ
+
+*"Có người rủ bạn làm chung đề tài"* → `target: 'totnghiep'`, xếp **sau** hai
+bước Gala/hồ sơ-gấp và **trước** bước hồ sơ. Lý do: đây là việc của NGƯỜI KHÁC
+đang đứng chờ — không trả lời thì họ không biết đi tiếp thế nào — còn hồ sơ là
+việc của riêng mình, hoãn một hôm không ai chờ.
+
+Gác bằng chính `tn.con_ho_so` nên nó **tự tắt sau 26/9**, không để lại một việc
+chết trong "Việc của bạn" suốt phần đời còn lại của ứng dụng. Truy vấn con thêm
+vào CÙNG câu đã có, không `UNION ALL` (bẫy D1). Điều kiện `nguoi_gui_id <> ?`
+là vế ĐỒNG Ý của cả tính năng: thiếu nó thì chính người vừa rủ lại được nhắc đi
+trả lời lời rủ của mình — xem README phép 62 cho bài học về việc phép kiểm ấy
+ban đầu KHÔNG có răng.
+
+### Chưa kiểm chứng được, và điều CỐ Ý không làm
+
+- **Chưa ai dùng với dữ liệu thật.** Mọi phép kiểm chạy trên D1 cục bộ với ba
+  phiên dựng tay. Bằng chứng duy nhất đáng tin là hai người thật rủ nhau.
+- **38 người không đăng nhập được KHÔNG vào bài chung được.** Họ vẫn nộp riêng
+  như cũ. Đó là cái giá của việc đòi người kia bấm Đồng ý, không phải chỗ quên.
+- **Chủ bài không gỡ được ai** (Ngô Phú Cường chọn). Ai bấm Đồng ý nhầm rồi
+  biến mất thì chủ bài phải nhắn Zalo nhờ họ tự rời.
+- **Không giới hạn số người một bài** (Ngô Phú Cường chọn, sau khi tôi nêu
+  rằng hội đồng có thể không biết chấm bài nào). Không chặn ở máy chủ — màn Ban
+  cán sự lớp và CSV in ra đủ để nhìn thấy.
+- **KHÔNG gửi thư, KHÔNG đẩy** (anh chọn). `chonNguoiNhanMail()` cũng không
+  dùng lại được: nó chỉ có hai phạm vi (cả lớp / cả nhóm), không gửi cho MỘT
+  người, và lọc cứng `nhan_mail_thong_bao` — công tắc mà người dùng được nói là
+  *"Thư khi có thông báo mới"*.
+- **N1 vẫn nguyên vẹn.** Đây không phải chat người-với-người: đúng một lời nhắn
+  200 ký tự kèm một lời rủ, không trả lời lại được, không chuỗi hội thoại. Bàn
+  bạc vẫn ở Zalo.
+
 ## Tab Hôm nay thôi giục "đề tài nhóm" — và cách đọc màu của zone Lễ (19/9)
 
 Ngô Phú Cường: *"ở Trang 'Hôm nay' vẫn có session 'Nhóm chưa có đề tài'. dù
@@ -1786,6 +2012,16 @@ mã QR". Lỗi ấy đang sống với **chín nhóm** ngay hôm nay (họ khôn
 mất. Nay bước 5 bỏ qua đợt Gala khi `du_le <> 'co'`, nhận ra đợt ấy bằng
 `(scope, amount, account_no)` chứ **không theo tiêu đề** — tiêu đề sửa được
 bằng nút ✎ trong ứng dụng.
+
+**Đính chính 19/9 (tối):** bản vá ấy viết `tn?.du_le !== 'co'` mà **QUÊN select
+cột `du_le`** trong truy vấn ở đầu `computeAction` — nên `tn.du_le` luôn
+`undefined`, vế ấy luôn đúng, và đợt Gala bị bỏ qua với **MỌI người, kể cả
+người đã trả lời "Có dự" và chưa chuyển tiền**. Tức bản vá chữa quá tay đúng
+thứ nó định chữa. Không lỗi, không cảnh báo; triệu chứng duy nhất là ô "Việc
+của bạn" im lặng đúng lúc cần nhắc nhất, trong ngày chốt danh sách Gala. Đã vá
+(commit riêng, đẩy trước tính năng cùng-làm), và `kiem-totnghiep.mjs` nay canh
+**cả hai chiều**: phép một chiều ("có dự → fund") vẫn xanh với một bản vá thô
+bạo bỏ luôn điều kiện `du_le`.
 
 ### Ba chỗ câu chữ nữa, cùng một luồng, ở ba tầng khác nhau
 
@@ -4445,7 +4681,7 @@ Qua bốn đợt, cách làm đã thành nếp và người dùng không phàn n
   repo**, không còn ở scratchpad nữa: thứ đắt nhất trong chúng là các phép đối
   chứng, mỗi cái ứng với một lỗi đã trả giá để tìm ra, và viết lại từ đầu thì
   phần lớn sẽ thành phép kiểm không có răng. Đọc `scripts/kiem/README.md`
-  trước khi chạy — có mục "năm mươi chín phép đối chứng đáng giữ nhất" và hai
+  trước khi chạy — có mục "sáu mươi tư phép đối chứng đáng giữ nhất" và hai
   chỗ môi trường sandbox không kiểm được.
 - **Nói thẳng cái chưa kiểm chứng được**, đừng để lẫn với cái đã chắc chắn.
 - **Commit vào CẢ HAI nhánh** (Ngô Phú Cường quyết qua AskUserQuestion ngày

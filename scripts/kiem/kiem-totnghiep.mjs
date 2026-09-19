@@ -409,13 +409,16 @@ const dsLv = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
 ok('trả ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai chọn',
    (dsLv.theo_linh_vuc ?? []).length === 15);
 const yte = (dsLv.theo_linh_vuc ?? []).find(x => x.ma === 'lv-y-te-giao-duc');
-ok(`Y tế/Giáo dục đếm được 2 người (nhận ${yte?.so_nguoi})`, yte?.so_nguoi === 2);
+// HAI người, HAI bài — chưa ai rủ ai ở bước này. Phép cùng-làm ở cuối tệp
+// đổi đúng cặp số này thành 1 bài / 2 người, và đó là cả điểm của tính năng.
+ok(`Y tế/Giáo dục đếm được 2 bài (nhận ${yte?.so_bai})`, yte?.so_bai === 2);
+ok(`… và 2 người (nhận ${yte?.so_nguoi})`, yte?.so_nguoi === 2);
 ok('và 2 người ấy đều đã nộp link', yte?.so_da_nop_link === 2);
 // Lượt bình chọn Zalo chỉ cho con số và avatar. Phép này canh đúng chỗ khác
 // biệt: phải dò ngược ra được TÊN, đề tài và link.
-ok('dò ngược ra TÊN từng người', (yte?.nguoi ?? []).some(x => x.full_name === 'Ngô Phú Cường'));
+ok('dò ngược ra TÊN từng người', (yte?.bai ?? []).some(x => x.full_name === 'Ngô Phú Cường'));
 ok('kèm đề tài và link của họ',
-   (yte?.nguoi ?? []).every(x => x.khkd_de_tai && x.khkd_url));
+   (yte?.bai ?? []).every(x => x.khkd_de_tai && x.khkd_url));
 ok(`đếm tổng đã chọn lĩnh vực (nhận ${dsLv.da_chon_linh_vuc})`, dsLv.da_chon_linh_vuc === 2);
 ok(`đếm tổng đã nộp link (nhận ${dsLv.da_nop_link})`, dsLv.da_nop_link === 2);
 ok('liệt kê được người CHƯA chọn lĩnh vực',
@@ -827,6 +830,217 @@ await put('/api/totnghiep/gala', ckN7, { du_le: 'khong' });
 const aKhong = await heroN7();
 ok(`trả lời "Không dự" → KHÔNG mời chuyển 1.000.000 đ (nhận "${aKhong.target}")`,
    aKhong.target !== 'fund');
+
+/* (d3) RỦ NGƯỜI CÙNG LÀM ĐỀ TÀI — migration 0045 ═════════════════════════
+   Ngô Phú Cường 19/9: "Phần chọn chung đề tài có thể chọn người cùng làm và
+   người đó đồng ý."
+
+   ĐẶT Ở CUỐI TỆP, sau cả khối (d2), vì nó đổi `theo_linh_vuc` từ "2 bài · 2
+   người" thành "1 bài · 2 người" — đúng cái tính năng này sinh ra để làm, và
+   đúng thứ sẽ làm mọi phép đếm đứng trước nó đọc ra con số khác. Cùng bài học
+   đã trả giá với khối (d2).
+
+   Ba phép có RĂNG nhất, đã chạy đối chứng (xem README):
+     · phép 5 (`bai_cua: 'ho'` đảo vai) — một bản vá bỏ quên `nguoi_gui_id`
+       vẫn XANH ở phép 4, nhưng ĐỎ ở đây.
+     · phép 6 (người cùng làm không sửa được bài của chủ) — canh đúng vế "bài
+       NEO VÀO CHỦ", thứ giữ cho mô hình không có chuỗi lồng nhau.
+     · phép 8 (đứng được NHIỀU bài) — một bản vá thêm lại UNIQUE(ban_member_id)
+       sẽ đỏ ở đây và chỉ ở đây. */
+console.log('\n── Rủ người cùng làm đề tài (migration 0045) ──');
+
+const post = (p, ck, body) => send(p, ck, 'POST', body);
+const tnCua = ck => get('/api/totnghiep', ck).then(r => r.json()).catch(() => ({}));
+const idCua = async ck => ((await get('/api/home', ck).then(r => r.json()).catch(() => ({}))).me ?? {}).id;
+
+const idCuong = await idCua(ckCuong);
+const idThuong = await idCua(ckThuong);
+const idN7 = meN7.id;
+const idChuaVao = (dsLv.nguoi ?? []).find(x => x.full_name === 'Kiểm TN Chưa Vào')?.member_id;
+ok('đọc được member_id của ba phiên và của người CHƯA đăng nhập',
+   !!idCuong && !!idThuong && !!idN7 && !!idChuaVao);
+
+// ── 1. Danh sách chọn được: không có chính mình, không có người chưa đăng
+//      nhập, và TUYỆT ĐỐI không có số điện thoại hay email của ai.
+const tnC0 = await tnCua(ckCuong);
+const chon = tnC0.cung_lam?.chon_duoc ?? [];
+ok(`chon_duoc có người (${chon.length})`, chon.length > 0);
+ok('chon_duoc KHÔNG có chính mình', !chon.some(x => x.member_id === idCuong));
+ok('chon_duoc KHÔNG có người chưa đăng nhập',
+   !chon.some(x => x.member_id === idChuaVao));
+/* Grep thô nguyên văn JSON, đúng khuôn phép canh của đường công khai. Đây là
+   một đường ĐỌC MỚI liệt kê cả lớp, nên nó là đúng chỗ một cột nhạy cảm dễ
+   lọt vào nhất — và grep bắt được cả nhánh mà một phép đọc theo trường bỏ sót. */
+ok('chon_duoc KHÔNG rò số điện thoại hay email của ai',
+   !/"phone"|"email"|\d{10}/.test(JSON.stringify(chon)));
+
+// ── 2. Không rủ chính mình, không rủ người chưa đăng nhập.
+const rTuRu = await post('/api/totnghiep/cung-lam', ckCuong, { doi_tac_member_id: idCuong });
+ok(`rủ chính mình → 409 tu_ru_chinh_minh (nhận ${rTuRu.status})`,
+   rTuRu.status === 409 && (await rTuRu.json()).error === 'tu_ru_chinh_minh');
+const rChuaVao = await post('/api/totnghiep/cung-lam', ckCuong, { doi_tac_member_id: idChuaVao });
+ok(`rủ người CHƯA đăng nhập → 409 ho_chua_dang_nhap (nhận ${rChuaVao.status})`,
+   rChuaVao.status === 409 && (await rChuaVao.json()).error === 'ho_chua_dang_nhap');
+
+// ── 3. Chỉ số MỘT PHẦN: một cặp chỉ một quan hệ ĐANG SỐNG, nhưng từ chối
+//      rồi / rời ra rồi thì rủ lại được NGAY, không phải xoá dòng cũ.
+const clR1 = await post('/api/totnghiep/cung-lam', ckCuong,
+  { doi_tac_member_id: idThuong, bai_cua: 'toi', loi_nhan: 'làm chung nhé' });
+const clJ1 = await clR1.json();
+ok(`Cường rủ Thường vào bài CỦA MÌNH → 200 (nhận ${clR1.status})`, clR1.status === 200 && !!clJ1.id);
+const clR1b = await post('/api/totnghiep/cung-lam', ckCuong, { doi_tac_member_id: idThuong });
+ok(`rủ lại cùng người khi còn đang chờ → 409 da_co_quan_he (nhận ${clR1b.status})`,
+   clR1b.status === 409 && (await clR1b.json()).error === 'da_co_quan_he');
+
+// ── 4. NGƯỜI GỬI KHÔNG TỰ DUYỆT ĐƯỢC — vế ĐỒNG Ý của cả tính năng.
+//      404 chứ không 403: 403 là xác nhận id đó có thật (quy ước 6).
+const rTuDuyet = await post(`/api/totnghiep/cung-lam/${clJ1.id}/dong-y`, ckCuong);
+ok(`người GỬI tự bấm Đồng ý → 404 (nhận ${rTuDuyet.status})`, rTuDuyet.status === 404);
+const rDy = await post(`/api/totnghiep/cung-lam/${clJ1.id}/dong-y`, ckThuong);
+ok(`đúng người duyệt bấm Đồng ý → 200 (nhận ${rDy.status})`, rDy.status === 200);
+
+// ── 5. PHÉP CÓ RĂNG NHẤT cho vế "người gửi chọn lúc gửi".
+//      Cường XIN vào bài của N7 (`bai_cua: 'ho'`) → chủ phải là N7, và N7 mới
+//      là người duyệt. Một bản vá bỏ quên `nguoi_gui_id` vẫn xanh ở phép 4.
+const clR2 = await post('/api/totnghiep/cung-lam', ckCuong,
+  { doi_tac_member_id: idN7, bai_cua: 'ho' });
+const clJ2 = await clR2.json();
+ok(`Cường XIN vào bài của Nhóm Bảy → 200, bai_cua = "ho" (nhận ${clJ2.bai_cua})`,
+   clR2.status === 200 && clJ2.bai_cua === 'ho');
+const rXinTuDuyet = await post(`/api/totnghiep/cung-lam/${clJ2.id}/dong-y`, ckCuong);
+ok(`chiều "ho": người xin tự duyệt → 404 (nhận ${rXinTuDuyet.status})`, rXinTuDuyet.status === 404);
+const rXinDy = await post(`/api/totnghiep/cung-lam/${clJ2.id}/dong-y`, ckN7);
+ok(`chiều "ho": CHỦ BÀI duyệt → 200 (nhận ${rXinDy.status})`, rXinDy.status === 200);
+const tnC1 = await tnCua(ckCuong);
+ok('chiều "ho" ghi đúng vai: Cường nằm ở toi_tham_gia, không ở bai_cua_toi',
+   (tnC1.cung_lam?.toi_tham_gia ?? []).some(x => x.chu_member_id === idN7)
+   && !(tnC1.cung_lam?.bai_cua_toi ?? []).some(x => x.member_id === idN7));
+
+// ── 6. BÀI NEO VÀO CHỦ: người cùng làm KHÔNG sửa được bài của chủ.
+//      Thường gọi PUT de-tai → ghi vào dòng RIÊNG của Thường, không đụng bài
+//      của Cường. Đây là thứ giữ cho mô hình không có chuỗi lồng nhau.
+const baiCuongTruoc = (await tnCua(ckCuong)).dang_ky?.khkd_de_tai;
+await put('/api/totnghiep/de-tai', ckThuong,
+  { khkd_linh_vuc: 'lv-cong-nghe', khkd_de_tai: 'Bài riêng của Thường' });
+const baiCuongSau = (await tnCua(ckCuong)).dang_ky?.khkd_de_tai;
+ok(`người cùng làm sửa đề tài thì KHÔNG đụng bài của chủ ("${baiCuongSau}")`,
+   baiCuongSau === baiCuongTruoc && baiCuongTruoc === 'Chuỗi nhà thuốc khu công nghiệp');
+ok('… mà ghi vào dòng RIÊNG của chính họ',
+   (await tnCua(ckThuong)).dang_ky?.khkd_de_tai === 'Bài riêng của Thường');
+
+// ── 7. CHỦ BÀI KHÔNG GỠ ĐƯỢC AI (Ngô Phú Cường quyết) — chỉ người cùng làm
+//      tự rời. Đi cả hai chiều: chặn đúng người, và vẫn cho đúng người đi.
+const rChuGo = await post(`/api/totnghiep/cung-lam/${clJ1.id}/roi`, ckCuong);
+ok(`chủ bài bấm Rời → 404 (nhận ${rChuGo.status})`, rChuGo.status === 404);
+const rRoi = await post(`/api/totnghiep/cung-lam/${clJ1.id}/roi`, ckThuong);
+ok(`người cùng làm tự Rời → 200 (nhận ${rRoi.status})`, rRoi.status === 200);
+// Rời ra rồi thì rủ lại được NGAY — chỉ số MỘT PHẦN chỉ phủ hai trạng thái
+// đang sống. Một chỉ số đầy đủ sẽ làm phép này đỏ.
+const rRuLai = await post('/api/totnghiep/cung-lam', ckCuong,
+  { doi_tac_member_id: idThuong, bai_cua: 'toi' });
+const jRuLai = await rRuLai.json();
+ok(`rời ra rồi vẫn rủ lại được ngay → 200 (nhận ${rRuLai.status})`, rRuLai.status === 200);
+// Và từ chối rồi cũng vậy.
+await post(`/api/totnghiep/cung-lam/${jRuLai.id}/tu-choi`, ckThuong);
+const rRuLai2 = await post('/api/totnghiep/cung-lam', ckCuong,
+  { doi_tac_member_id: idThuong, bai_cua: 'toi' });
+ok(`từ chối rồi vẫn rủ lại được ngay → 200 (nhận ${rRuLai2.status})`, rRuLai2.status === 200);
+const jRuLai2 = await rRuLai2.json();
+await post(`/api/totnghiep/cung-lam/${jRuLai2.id}/dong-y`, ckThuong);
+
+// ── 8. ĐỨNG ĐƯỢC NHIỀU BÀI (Ngô Phú Cường chọn). Cường đang đứng tên bài của
+//      N7; nay Thường đứng tên bài của Cường — và Cường vẫn còn nguyên ở bài
+//      N7. Một bản vá thêm lại UNIQUE(ban_member_id) sẽ đỏ đúng ở đây.
+const rN7RuCuong = await post('/api/totnghiep/cung-lam', ckN7,
+  { doi_tac_member_id: idThuong, bai_cua: 'toi' });
+const jN7 = await rN7RuCuong.json();
+await post(`/api/totnghiep/cung-lam/${jN7.id}/dong-y`, ckThuong);
+const tnT = await tnCua(ckThuong);
+ok(`Thường đứng tên ĐƯỢC hai bài cùng lúc (nhận ${(tnT.cung_lam?.toi_tham_gia ?? []).length})`,
+   (tnT.cung_lam?.toi_tham_gia ?? []).length === 2);
+
+/* ── 9. Màn Ban cán sự lớp đếm theo BÀI ─────────────────────────────────
+   Trạng thái tới đây, đếm cho rõ vì con số dưới rất dễ đọc nhầm:
+     · bài của Cường (Y tế) — Thường đứng tên cùng          → 2 người
+     · bài của Nhóm Bảy (Y tế) — Cường và Thường đứng tên cùng → 3 người
+   Tức 2 BÀI · 5 LƯỢT ĐỨNG TÊN. Thường đếm HAI lần, và đó là sự thật màn
+   hình phải nói ra: đó chính là cái giá của quyết định "một người đứng tên
+   được nhiều bài", và là lý do CSV in cả hai chiều để Ban cán sự lớp NHÌN
+   THẤY ai đang đứng năm bài chứ không phát hiện lúc chấm.
+
+   Điều PHẢI đúng ở đây là `so_bai` KHÁC `so_nguoi`: trước migration 0045 hai
+   con số ấy luôn bằng nhau vì mỗi người một bài, nên một bản vá quên đếm
+   người cùng làm vẫn xanh nếu chỉ hỏi `so_bai`. */
+const dsSau = await get('/api/totnghiep/danh-sach', ckCuong).then(r => r.json());
+const yteSau = (dsSau.theo_linh_vuc ?? []).find(x => x.ma === 'lv-y-te-giao-duc');
+ok(`lĩnh vực đếm theo BÀI, không theo người (${yteSau?.so_bai} bài · ${yteSau?.so_nguoi} lượt đứng tên)`,
+   yteSau?.so_bai === 2 && yteSau?.so_nguoi === 5);
+ok('mỗi bài mang kèm danh sách người cùng làm',
+   (yteSau?.bai ?? []).some(b => b.member_id === idCuong
+     && b.cung_lam.some(c => c.full_name === 'Kiểm TN Thường')));
+
+// ── 10. CSV: hai cột mới, và in đúng TÊN cả hai chiều.
+const clCsv = await get('/api/totnghiep/xuat.csv', ckCuong).then(r => r.text());
+const dauCsv = clCsv.replace(/^﻿/, '').split('\r\n')[0];
+ok('CSV có cột "Ai cùng làm bài của tôi"', dauCsv.includes('Ai cùng làm bài của tôi'));
+ok('CSV có cột "Cùng làm bài của"', dauCsv.includes('Cùng làm bài của'));
+const clDongCuong = clCsv.split('\r\n').find(l => l.includes('Ngô Phú Cường'));
+ok('CSV in đúng tên người cùng làm bài của Cường',
+   !!clDongCuong && clDongCuong.includes('Kiểm TN Thường'));
+
+// ── 11. ĐƯỜNG CÔNG KHAI KHÔNG ĐỤNG MỘT DÒNG NÀO. Người đi lối ấy không có
+//       phiên nên không đồng ý được, và cũng không bị ai nêu tên vào.
+const demTruoc = ((await tnCua(ckCuong)).cung_lam?.bai_cua_toi ?? []).length;
+await fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify({ roster_id: rsCuong?.roster_id ?? rsCuong?.id, ho_ten: 'Ngô Phú Cường' }),
+});
+const demSau = ((await tnCua(ckCuong)).cung_lam?.bai_cua_toi ?? []).length;
+ok(`lượt gửi CÔNG KHAI không tạo/đổi/xoá quan hệ nào (${demTruoc} → ${demSau})`,
+   demTruoc === demSau && demTruoc > 0);
+
+// ── 12. Ranh giới index.js:195 — năm route mới phải nằm ở nửa DƯỚI.
+for (const [duong, than] of [
+  ['/api/totnghiep/cung-lam', { doi_tac_member_id: 1 }],
+  [`/api/totnghiep/cung-lam/${clJ1.id}/dong-y`, {}],
+  [`/api/totnghiep/cung-lam/${clJ1.id}/tu-choi`, {}],
+  [`/api/totnghiep/cung-lam/${clJ1.id}/huy`, {}],
+  [`/api/totnghiep/cung-lam/${clJ1.id}/roi`, {}],
+]) {
+  const r = await fetch(B + duong, {
+    method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+    body: JSON.stringify(than),
+  });
+  ok(`POST ${duong} không cookie → 401 (nhận ${r.status})`, r.status === 401);
+}
+
+/* ── 13. Ô "Việc của bạn" nhắc lời rủ đang chờ, và CHỈ nhắc người DUYỆT ──
+   BƯỚC GALA CỦA CẢ HAI PHẢI XONG TRƯỚC, và đó không phải dọn dẹp cho gọn:
+   `computeAction` xét Gala ở bước 1, cùng-làm ở bước 2. Thiếu bước này thì
+   phiên Thường rơi ngay ở bước 1 ("Chưa trả lời dự Lễ tốt nghiệp") và phép
+   "người GỬI không bị nhắc" XANH vì một lý do chẳng liên quan gì — đã chạy
+   đối chứng và thấy đúng vậy: gỡ hẳn điều kiện `nguoi_gui_id <> me.id` ra
+   khỏi home.js mà cả hai phép vẫn xanh. Nay chúng mới thật sự canh đúng chỗ. */
+await put('/api/totnghiep/gala', ckThuong, { du_le: 'khong' });
+const heroThuongTruoc = ((await get('/api/home', ckThuong).then(r => r.json()).catch(() => ({}))).action ?? {});
+ok(`phiên Thường đã qua được bước Gala, tới được bước cùng-làm (nhận "${heroThuongTruoc.h}")`,
+   !/dự Lễ tốt nghiệp/.test(heroThuongTruoc.h ?? ''));
+const rChoN7 = await post('/api/totnghiep/cung-lam', ckThuong,
+  { doi_tac_member_id: idN7, bai_cua: 'toi' });
+const jChoN7 = await rChoN7.json();
+const heroN7Sau = await heroN7();
+ok(`người ĐƯỢC rủ thấy hero nhắc (nhận "${heroN7Sau.h}")`,
+   /rủ bạn làm chung/.test(heroN7Sau.h ?? '') && heroN7Sau.target === 'totnghiep');
+const heroThuong = ((await get('/api/home', ckThuong).then(r => r.json()).catch(() => ({}))).action ?? {});
+ok(`người GỬI KHÔNG bị nhắc trả lời lời rủ của chính mình (nhận "${heroThuong.h}")`,
+   !/rủ bạn làm chung/.test(heroThuong.h ?? ''));
+// Người gửi RÚT được lời rủ khi chưa ai nhận; người kia thì không.
+const rHuySai = await post(`/api/totnghiep/cung-lam/${jChoN7.id}/huy`, ckN7);
+ok(`không phải người gửi mà bấm Huỷ → 404 (nhận ${rHuySai.status})`, rHuySai.status === 404);
+const rHuy = await post(`/api/totnghiep/cung-lam/${jChoN7.id}/huy`, ckThuong);
+ok(`người GỬI rút lời rủ → 200 (nhận ${rHuy.status})`, rHuy.status === 200);
+const heroN7Cuoi = await heroN7();
+ok('rút xong thì hero thôi nhắc', !/rủ bạn làm chung/.test(heroN7Cuoi.h ?? ''));
 
 console.log(hong === 0 ? '\n✅ TẤT CẢ ĐỀU XANH' : `\n❌ ${hong} phép ĐỎ`);
 process.exit(hong === 0 ? 0 : 1);

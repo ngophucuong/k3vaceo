@@ -913,6 +913,60 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
 .tnback{display:block;text-align:center;margin-top:22px;font-size:13px;color:var(--ink2);
   text-decoration:none;padding:10px}
 
+/* ══ CÙNG LÀM ĐỀ TÀI (migration 0045) ═══════════════════════════════════════
+   Ba danh sách cùng một khuôn thẻ, phân biệt bằng viền chứ không bằng màu nền
+   đặc: khối Đề tài có thể có cả ba cùng lúc, mà ba mảng màu xếp chồng đọc
+   thành ba mức quan trọng khác nhau trong khi chúng ngang nhau.
+
+   `.tncl.cho` — lời rủ đang chờ TÔI — là khối DUY NHẤT được tô, và tô CAM
+   (`--due`, màu của việc còn nợ). KHÔNG dùng `--go`/`--go-bg`: cặp ấy trong
+   sản phẩm này có đúng MỘT nghĩa, người thu đã nhận tiền. Và không dùng chàm
+   `--le`: luật của nó là CHỈ cho khung sườn của zone (băng đầu trang, huy
+   hiệu bước, viền khối đang mở), không bao giờ để nói một trạng thái. */
+.tncl{border:1px solid var(--line);border-radius:12px;padding:2px 13px 11px;margin:14px 0 0}
+.tncl.cho{border-color:var(--due);background:var(--due-bg);margin:0 0 18px}
+.tncl>.h{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--ink2);padding:11px 0 3px}
+.tncl.cho>.h{color:var(--due)}
+.tncl>.ft{font-size:11.5px;color:var(--ink2);line-height:1.55;padding:9px 0 2px;
+  border-top:1px solid var(--line);margin-top:10px}
+.tncl .it{padding:8px 0;border-top:1px solid var(--line)}
+.tncl.cho .it{border-top-color:var(--due-line)}
+.tncl .it:first-of-type{border-top:0}
+.tncl .it b{font-size:14.5px;font-weight:600}
+.tncl .it i{font-style:normal;font-size:12px;color:var(--ink2)}
+.tncl .it p{margin:3px 0 0;font-size:13px;color:var(--ink2);line-height:1.5}
+.tncl .it q{display:block;margin:6px 0 0;font-size:13px;color:var(--ink);line-height:1.5;
+  padding-left:10px;border-left:2px solid var(--line2);font-style:italic}
+.tncl .it a{display:inline-block;margin-top:5px;font-size:12.5px;color:var(--due)}
+/* Dòng gọn: tên + nhãn nhóm + một nút chữ đẩy sang phải. Vùng chạm của .lnk
+   phải đủ 44px cao — nó là nút HUỶ một lời rủ, không phải một chú thích. */
+.tncl .it.gon{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-height:44px}
+.tncl .it.gon .mut{font-size:12px}
+.tncl .it.gon .lnk{padding:12px 2px 12px 10px}
+.tncl .btns{display:flex;gap:9px;margin-top:10px;flex-wrap:wrap}
+/* 44px là vùng chạm tối thiểu của cả ứng dụng. Hai nút này quyết định một
+   thoả thuận giữa hai người — không phải chỗ để tiết kiệm chiều cao. */
+.tncl .btns button{min-height:44px;padding:0 16px;border:0;border-radius:11px;
+  font:inherit;font-size:13.5px;font-weight:600;background:var(--ink);color:#fff}
+.tncl .btns button.ghost{background:transparent;color:var(--ink2);
+  box-shadow:inset 0 0 0 1px var(--line2)}
+.tncl .btns button:disabled{opacity:.5}
+
+/* Sheet "Rủ người cùng làm". Danh sách cuộn riêng, trần theo chiều cao màn —
+   146 người là ~9.000px, để nó đẩy nút Gửi ra khỏi sheet thì không ai gửi
+   được. dvh chứ không vh: vh tính theo màn lúc thanh địa chỉ ĐANG ẨN. */
+.ruds{max-height:46dvh;max-height:46vh;overflow-y:auto;overscroll-behavior:contain;
+  margin:10px -2px 0;border-top:1px solid var(--line)}
+/* Người đã có quan hệ: mờ đi, KHÔNG biến mất khỏi danh sách. Bỏ họ ra là
+   người tìm không thấy tên sẽ tưởng ứng dụng bỏ sót — đúng lỗi đã chữa ở màn
+   tìm tên 19/9. */
+.ruds .fdpick.mo{opacity:.45}
+.ruds .fdpick.mo .ch{color:var(--ink2);text-decoration:none}
+.rupick{display:flex;align-items:center;gap:10px;padding:12px 0;margin-bottom:4px;
+  border-bottom:1px solid var(--line);font-size:15px}
+.rupick .lnk{margin-left:auto;padding:10px 2px 10px 10px}
+
 /* Thẻ dẫn sang zone, đặt đầu tab Hôm nay. Không thêm tab thứ bảy: pw-nav.mjs
    đã đo rằng nhãn "Giao thương" cần 75px mà nút rộng nhất chỉ 69px ở khổ
    430px, nên thêm một tab nữa là mọi tab hẹp thêm — cho một việc hết hạn 26/9. */
@@ -950,6 +1004,11 @@ input:focus,textarea:focus,select:focus{outline:none;box-shadow:inset 0 0 0 2px 
    không phân biệt được "chưa ai chọn" với "mình quên mất nó". */
 .dstnlv.trong{opacity:.5;box-shadow:inset 0 0 0 1px var(--line)}
 .dstnai{flex:0 0 auto;background:var(--surf2);border-radius:10px;padding:2px 13px;margin:-2px 0 4px}
+/* Người cùng làm, THỤT VÀO dưới chủ bài — nhìn lướt phải đếm được ra số BÀI,
+   mà xếp ngang hàng thì màn hình đọc thành một danh sách người, đúng cái vừa
+   sửa. Vạch trái chứ không dấu đầu dòng: nó nói "thuộc về khối trên". */
+.dstncl{margin:4px 0 2px;padding-left:10px;border-left:2px solid var(--line2);
+  font-size:12.5px;color:var(--ink2);line-height:1.6}
 
 /* ── Thẻ TỔNG QUAN của màn thống kê (19/9) ─────────────────────────────────
    Ba ô số một hàng, LƯỚI chứ không flex-wrap — cùng lý do `.tnprog`: ba con

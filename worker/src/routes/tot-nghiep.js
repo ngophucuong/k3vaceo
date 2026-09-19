@@ -196,7 +196,7 @@ async function chepSoSangMembers(env, memberId, so) {
    Gộp sẵn mọi thứ: hồ sơ điền sẵn, danh mục ngành, đề tài + link của nhóm,
    danh sách thành viên, đợt thu phí kèm QR, và bản đăng ký đã lưu nếu có. */
 export async function getTotNghiep(env, me) {
-  const [dk, hoSoGoc, nhom, thanhVien, officers, dotPhi] = await Promise.all([
+  const [dk, hoSoGoc, nhom, thanhVien, officers, dotPhi, quanHe] = await Promise.all([
     docDangKy(env, me.id),
     // roster.dob là nguồn DUY NHẤT của ngày sinh — members không có cột này.
     // LEFT JOIN vì người thêm tay (không qua roster) vẫn phải mở form được.
@@ -238,6 +238,10 @@ export async function getTotNghiep(env, me) {
         WHERE cohort_id = ? AND scope = 'class' AND amount = 1000000
           AND account_no = '0975587586' LIMIT 1`
     ).bind(me.cohort_id).first(),
+    // Quan hệ cùng làm đề tài (migration 0045). Đọc cả khoá một lượt rồi mới
+    // xếp theo góc nhìn của người đang xem — cùng hàm với màn Ban cán sự lớp
+    // và CSV, nên ba chỗ không thể lệch nhau.
+    docCungLam(env, me.cohort_id),
   ]);
 
   return json({
@@ -267,6 +271,13 @@ export async function getTotNghiep(env, me) {
       nhu_cau_ket_noi: hoSoGoc?.needs ?? null,
     },
     dang_ky: dk ?? null,
+    /* Cùng làm đề tài. Zone này giữ nếp "màn hình chỉ gọi MỘT lượt" — không
+       thêm route GET riêng, vì mỗi lượt gọi thêm là một chỗ nữa để quên làm
+       mới sau khi bấm Đồng ý. */
+    cung_lam: {
+      ...khoiCungLam(quanHe, me.id),
+      chon_duoc: await docChonDuoc(env, me, quanHe),
+    },
     // Dùng LẠI shapeRound() của funds.js, không chép trường sang hình dạng
     // thứ hai: nhãn trạng thái ("đã tự khai" / "người thu đã nhận", mục 6.4
     // SRS), cú pháp chuyển khoản và đường dựng QR chỉ có một nguồn. Đường GHI
@@ -458,6 +469,255 @@ export async function putDeTai(request, env, me) {
     });
   }
   return json({ ok: true, dang_ky: await docDangKy(env, me.id) });
+}
+
+/* ══ RỦ NGƯỜI CÙNG LÀM ĐỀ TÀI (migration 0045) ══════════════════════════════
+   Ngô Phú Cường 19/9: "Phần chọn chung đề tài có thể chọn người cùng làm và
+   người đó đồng ý." Lý lẽ mô hình nằm trọn trong migration 0045 — đọc ở đó
+   trước khi sửa khối này. Tóm tắt phần phải nhớ:
+
+   · Bài NEO VÀO CHỦ. Một dòng chỉ nói một câu: "`ban` đứng tên trên bài của
+     `chu`". Không có bài nào bị che, không có "bài hiệu lực" — đề tài riêng
+     của mỗi người vẫn hiện và vẫn sửa được như cũ.
+   · Người DUYỆT luôn là người KHÔNG gửi. Nhờ vậy cả hai chiều ("họ cùng làm
+     bài của tôi" và "tôi cùng làm bài của họ") đều do người kia đồng ý.
+   · Một người đứng tên được NHIỀU bài (anh chọn). Không có trần số người.
+   · Chủ bài KHÔNG gỡ được ai (anh chọn) — chỉ người cùng làm tự rời. Nhưng
+     người GỬI rút được lời rủ khi nó còn đang chờ: rút một lời mời chưa ai
+     nhận không phải là đuổi ai cả. */
+
+const CUNG_LAM_SONG = ['cho_duyet', 'da_dong_y'];
+
+// Ai phải bấm Đồng ý cho một dòng: người còn lại, không phải người gửi.
+const nguoiDuyet = r => (r.nguoi_gui_id === r.chu_member_id ? r.ban_member_id : r.chu_member_id);
+
+/* Đọc quan hệ của CẢ KHOÁ một lượt, trả hai chiều tra cứu. Dùng chung cho
+   getTotNghiep, getDanhSachTotNghiep và getXuatCsv — chép phép gom này sang
+   ba chỗ là ba bản sẽ lệch nhau, và chỗ lệch nằm đúng trên con số Ban tổ chức
+   đọc để chấm bài. */
+async function docCungLam(env, cohortId) {
+  const rows = await env.DB.prepare(
+    `SELECT cl.id, cl.chu_member_id, cl.ban_member_id, cl.nguoi_gui_id,
+            cl.trang_thai, cl.loi_nhan, cl.created_at,
+            mc.full_name AS chu_ten, gc.label AS chu_nhom,
+            mb.full_name AS ban_ten, gb.label AS ban_nhom,
+            dc.khkd_linh_vuc AS chu_linh_vuc, dc.khkd_de_tai AS chu_de_tai,
+            dc.khkd_url AS chu_url
+       FROM khkd_cung_lam cl
+       JOIN members mc ON mc.id = cl.chu_member_id
+       JOIN members mb ON mb.id = cl.ban_member_id
+       LEFT JOIN groups gc ON gc.id = mc.group_id
+       LEFT JOIN groups gb ON gb.id = mb.group_id
+       LEFT JOIN dang_ky_tot_nghiep dc ON dc.member_id = cl.chu_member_id
+      WHERE cl.trang_thai IN ('cho_duyet', 'da_dong_y')
+        AND mc.cohort_id = ? AND mb.cohort_id = ?
+        AND mc.is_active = 1 AND mb.is_active = 1
+      ORDER BY cl.id`
+  ).bind(cohortId, cohortId).all();
+  return rows.results ?? [];
+}
+
+/* Xếp những dòng ấy thành bốn danh sách theo góc nhìn của MỘT người. Tách
+   khỏi docCungLam vì docCungLam đọc cả khoá (màn Ban cán sự lớp và CSV dùng
+   chung), còn bốn danh sách này chỉ có nghĩa với người đang xem. */
+function khoiCungLam(rows, meId) {
+  const song = rows.filter(r => r.chu_member_id === meId || r.ban_member_id === meId);
+  return {
+    // Ai đang đứng tên trên bài CỦA TÔI.
+    bai_cua_toi: song
+      .filter(r => r.trang_thai === 'da_dong_y' && r.chu_member_id === meId)
+      .map(r => ({ id: r.id, member_id: r.ban_member_id, full_name: r.ban_ten, group_label: r.ban_nhom })),
+    // Bài của người khác mà TÔI đang đứng tên. Kèm đề tài để giao diện vẽ
+    // được thẻ chỉ-đọc mà không phải gọi thêm một lượt nữa.
+    toi_tham_gia: song
+      .filter(r => r.trang_thai === 'da_dong_y' && r.ban_member_id === meId)
+      .map(r => ({
+        id: r.id, chu_member_id: r.chu_member_id, full_name: r.chu_ten, group_label: r.chu_nhom,
+        khkd_linh_vuc: r.chu_linh_vuc ?? null,
+        khkd_de_tai: r.chu_de_tai ?? null,
+        khkd_url: r.chu_url ?? null,
+      })),
+    // Lời rủ đang chờ CHÍNH TÔI trả lời. `bai_cua` nói theo góc nhìn NGƯỜI
+    // ĐANG XEM: 'toi' = họ xin vào bài của tôi, 'ho' = họ rủ tôi vào bài họ.
+    cho_toi_duyet: song
+      .filter(r => r.trang_thai === 'cho_duyet' && nguoiDuyet(r) === meId)
+      .map(r => ({
+        id: r.id,
+        nguoi_gui_ten: r.nguoi_gui_id === r.chu_member_id ? r.chu_ten : r.ban_ten,
+        group_label: r.nguoi_gui_id === r.chu_member_id ? r.chu_nhom : r.ban_nhom,
+        loi_nhan: r.loi_nhan ?? null,
+        bai_cua: r.chu_member_id === meId ? 'toi' : 'ho',
+        khkd_de_tai: r.chu_member_id === meId ? null : (r.chu_de_tai ?? null),
+      })),
+    // Lời rủ TÔI đã gửi, còn đang chờ người kia. Có nút Huỷ.
+    toi_dang_cho: song
+      .filter(r => r.trang_thai === 'cho_duyet' && r.nguoi_gui_id === meId)
+      .map(r => ({
+        id: r.id,
+        doi_tac_ten: r.chu_member_id === meId ? r.ban_ten : r.chu_ten,
+        group_label: r.chu_member_id === meId ? r.ban_nhom : r.chu_nhom,
+        bai_cua: r.chu_member_id === meId ? 'toi' : 'ho',
+      })),
+  };
+}
+
+/* Danh sách người rủ được: MỌI người đã đăng nhập trong khoá, trừ chính mình.
+   Ba điều cố ý:
+
+   1. CHỈ id + tên + nhãn nhóm. Không số điện thoại, không email — nên không
+      dùng lại /api/danh-ba (payload nặng hơn, có số đã che, và ở đó is_active
+      cố ý nằm trong JOIN nên người đã ngừng vẫn còn tên).
+   2. `trang_thai_voi_toi` chỉ nói quan hệ với NGƯỜI ĐANG XEM. Không bao giờ
+      hé lộ họ đang làm chung với ai khác — đó là việc riêng của họ.
+   3. KHÔNG lọc ai ra khỏi danh sách. Người đã có quan hệ hiện MỜ chứ không
+      biến mất: bỏ họ ra là lặp đúng lỗi vừa chữa ở màn tìm tên sáng nay —
+      "người không thấy tên mình sẽ kết luận Ban tổ chức bỏ sót họ". */
+async function docChonDuoc(env, me, rows) {
+  const r = await env.DB.prepare(
+    `SELECT m.id AS member_id, m.full_name, g.label AS group_label
+       FROM members m
+       LEFT JOIN groups g ON g.id = m.group_id
+      WHERE m.cohort_id = ? AND m.id <> ? AND m.is_active = 1
+        AND m.claimed_at IS NOT NULL
+      ORDER BY m.full_name COLLATE NOCASE`
+  ).bind(me.cohort_id, me.id).all();
+
+  const voiToi = new Map();
+  for (const x of rows) {
+    if (x.chu_member_id !== me.id && x.ban_member_id !== me.id) continue;
+    const kia = x.chu_member_id === me.id ? x.ban_member_id : x.chu_member_id;
+    voiToi.set(kia, x.trang_thai === 'da_dong_y' ? 'da_chung' : 'dang_cho');
+  }
+  return (r.results ?? []).map(x => ({ ...x, trang_thai_voi_toi: voiToi.get(x.member_id) ?? null }));
+}
+
+// Một dòng đang sống, kèm tên hai bên. Lọc theo cohort ngay trong truy vấn.
+async function docQuanHe(env, me, id) {
+  return env.DB.prepare(
+    `SELECT cl.*, mc.full_name AS chu_ten, mb.full_name AS ban_ten
+       FROM khkd_cung_lam cl
+       JOIN members mc ON mc.id = cl.chu_member_id
+       JOIN members mb ON mb.id = cl.ban_member_id
+      WHERE cl.id = ? AND mc.cohort_id = ? AND mb.cohort_id = ?`
+  ).bind(id, me.cohort_id, me.cohort_id).first();
+}
+
+async function dongQuanHe(env, id, trangThai) {
+  await env.DB.prepare(
+    `UPDATE khkd_cung_lam SET trang_thai = ?, quyet_dinh_luc = datetime('now'),
+        updated_at = datetime('now')
+      WHERE id = ? AND trang_thai IN ('cho_duyet', 'da_dong_y')`
+  ).bind(trangThai, id).run();
+}
+
+/* GỬI lời rủ. `bai_cua` quyết định ai là CHỦ:
+     'toi' → tôi giữ bài, họ đứng tên cùng
+     'ho'  → họ giữ bài, tôi xin đứng tên cùng
+   Cả hai chiều đều do NGƯỜI KIA duyệt. */
+export async function postCungLam(request, env, me) {
+  const body = await readJson(request);
+  const doiTac = Number(body.doi_tac_member_id);
+  if (!Number.isInteger(doiTac) || doiTac <= 0) return error('roster_invalid', 422);
+  if (doiTac === me.id) return error('tu_ru_chinh_minh', 409);
+
+  /* Chỉ rủ được người ĐÃ ĐĂNG NHẬP (`claimed_at`), và đó không phải chỗ quên:
+     người kia phải bấm Đồng ý được, mà 38 người đi đường công khai không có
+     phiên. Rủ họ chỉ để lại một lời rủ nằm chờ mãi mãi trên màn Ban cán sự
+     lớp. Họ vẫn nộp bài riêng như cũ. */
+  const ho = await env.DB.prepare(
+    `SELECT id, full_name FROM members
+      WHERE id = ? AND cohort_id = ? AND is_active = 1 AND claimed_at IS NOT NULL`
+  ).bind(doiTac, me.cohort_id).first();
+  if (!ho) return error('ho_chua_dang_nhap', 409);
+
+  const baiCuaToi = body.bai_cua !== 'ho';
+  const chu = baiCuaToi ? me.id : doiTac;
+  const ban = baiCuaToi ? doiTac : me.id;
+  const loiNhan = cleanText(body.loi_nhan, 200);
+
+  /* INSERT trước rồi bắt UNIQUE, không SELECT-rồi-INSERT: giữa hai câu ấy có
+     khe hở cho hai lượt bấm nhanh. Đúng khuôn postDoiNhom (doi-nhom.js). */
+  let row;
+  try {
+    row = await env.DB.prepare(
+      `INSERT INTO khkd_cung_lam (chu_member_id, ban_member_id, nguoi_gui_id, loi_nhan)
+       VALUES (?, ?, ?, ?) RETURNING id`
+    ).bind(chu, ban, me.id, loiNhan).first();
+  } catch (err) {
+    if (String(err).includes('UNIQUE')) return error('da_co_quan_he', 409);
+    throw err;
+  }
+
+  await logAudit(env, {
+    actorId: me.id, action: 'khkd.cung_lam.ru',
+    targetType: 'khkd_cung_lam', targetId: row?.id ?? null,
+    after: { chu_member_id: chu, ban_member_id: ban, bai_cua: baiCuaToi ? 'toi' : 'ho' },
+  });
+  return json({ ok: true, id: row?.id ?? null, bai_cua: baiCuaToi ? 'toi' : 'ho' });
+}
+
+/* ĐỒNG Ý / TỪ CHỐI — chỉ người duyệt gọi được.
+   Sai người trả 404 chứ không 403: 403 là xác nhận id đó có thật (quy ước 6),
+   và ở đây id ấy nói được cả hai người trong một thoả thuận riêng tư. */
+async function traLoiQuanHe(env, me, id, trangThai, tuChoi) {
+  const r = await docQuanHe(env, me, id);
+  if (!r || nguoiDuyet(r) !== me.id) return error('not_found', 404);
+  if (r.trang_thai !== 'cho_duyet') return error('da_xu_ly_roi', 409, { trang_thai: r.trang_thai });
+
+  /* Kiểm LẠI cả hai người còn hoạt động không, ngay trước khi ghi. Phòng đua:
+     một người có thể đã được cho ngừng tham gia SAU lúc lời rủ được gửi —
+     đúng thang bậc postDuyetDoiNhom đã dựng cho cùng loại việc. */
+  const con = await env.DB.prepare(
+    'SELECT COUNT(*) AS n FROM members WHERE id IN (?, ?) AND is_active = 1'
+  ).bind(r.chu_member_id, r.ban_member_id).first();
+  if ((con?.n ?? 0) < 2) return error('nguoi_da_ngung_tham_gia', 409);
+
+  await dongQuanHe(env, id, trangThai);
+  await logAudit(env, {
+    actorId: me.id,
+    action: tuChoi ? 'khkd.cung_lam.tu_choi' : 'khkd.cung_lam.dong_y',
+    targetType: 'khkd_cung_lam', targetId: id,
+    before: { trang_thai: 'cho_duyet' }, after: { trang_thai: trangThai },
+  });
+
+  /* logActivity CHỈ khi ĐỒNG Ý — một lời rủ chưa phải chuyện đã xảy ra, và
+     một lời TỪ CHỐI là chuyện riêng giữa hai người, không phải tin của cả
+     nhóm. Đúng nếp doi-nhom.js đã ghi cho ba nhánh tương ứng. */
+  if (!tuChoi) {
+    await logActivity(env, {
+      cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
+      verb: 'khkd.cung_lam', objectType: 'khkd_cung_lam', objectId: id,
+      summary: r.chu_member_id === me.id
+        ? `nhận ${r.ban_ten} cùng làm đề tài`
+        : `cùng làm đề tài với ${r.chu_ten}`,
+    });
+  }
+  return json({ ok: true, chu_ten: r.chu_ten, ban_ten: r.ban_ten });
+}
+
+export const postCungLamDongY = (env, me, id) => traLoiQuanHe(env, me, id, 'da_dong_y', false);
+export const postCungLamTuChoi = (env, me, id) => traLoiQuanHe(env, me, id, 'tu_choi', true);
+
+/* HUỶ — người GỬI rút lời rủ khi nó còn đang chờ. Không phải "đuổi ai": chưa
+   ai nhận lời thì chưa có thoả thuận nào để phá. */
+export async function postCungLamHuy(env, me, id) {
+  const r = await docQuanHe(env, me, id);
+  if (!r || r.nguoi_gui_id !== me.id) return error('not_found', 404);
+  if (r.trang_thai !== 'cho_duyet') return error('da_xu_ly_roi', 409, { trang_thai: r.trang_thai });
+  await dongQuanHe(env, id, 'da_huy');
+  return json({ ok: true });
+}
+
+/* RỜI — CHỈ `ban_member_id`, tức người đang đứng tên. Chủ bài KHÔNG gọi được
+   (Ngô Phú Cường quyết): người đã bỏ công viết bài không bị gạt tên bởi một
+   cú bấm của người khác. Đây cũng là vế N5 của thoả thuận này — rời khỏi một
+   việc mình đã nhận là quyền của chính mình, không xin ai. */
+export async function postCungLamRoi(env, me, id) {
+  const r = await docQuanHe(env, me, id);
+  if (!r || r.ban_member_id !== me.id) return error('not_found', 404);
+  if (r.trang_thai !== 'da_dong_y') return error('da_xu_ly_roi', 409, { trang_thai: r.trang_thai });
+  await dongQuanHe(env, id, 'da_roi');
+  return json({ ok: true });
 }
 
 /* ══ ĐƯỜNG CÔNG KHAI — cho 38 người chưa đăng nhập được ═════════════════════
@@ -803,23 +1063,52 @@ async function docDanhSach(env, me) {
 
 export async function getDanhSachTotNghiep(env, me) {
   if (!(await isClassCommittee(env, me.id))) return error('forbidden', 403);
-  const ds = await docDanhSach(env, me);
+  const [ds, quanHe] = await Promise.all([docDanhSach(env, me), docCungLam(env, me.cohort_id)]);
 
-  // Đây là thứ THAY CHO lượt bình chọn Zalo. Lượt ấy chỉ cho con số; chỗ này
-  // cho con số KÈM TÊN, kèm ai đã có đề tài và ai đã nộp link — tức là dò
-  // ngược được, và xuất ra được. Trả về ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai
-  // chọn: "chưa ai chọn" là một câu trả lời, còn một dòng biến mất thì Ban cán
-  // sự lớp không biết là chưa ai chọn hay là mình quên mất nó.
+  // Ai đang đứng tên trên bài của ai — chỉ những dòng ĐÃ ĐỒNG Ý. Lời rủ còn
+  // đang chờ KHÔNG được tính vào con số Ban tổ chức đọc để chấm bài: nó chưa
+  // phải một thoả thuận, và đếm nó vào là hứa hẹn một bài chung chưa tồn tại.
+  const daChung = quanHe.filter(r => r.trang_thai === 'da_dong_y');
+  const nguoiCungLam = new Map();   // chu_member_id -> [{member_id, full_name, group_label}]
+  const dungTenBaiCua = new Map();  // ban_member_id -> [tên chủ bài]
+  for (const r of daChung) {
+    if (!nguoiCungLam.has(r.chu_member_id)) nguoiCungLam.set(r.chu_member_id, []);
+    nguoiCungLam.get(r.chu_member_id).push({
+      member_id: r.ban_member_id, full_name: r.ban_ten, group_label: r.ban_nhom,
+    });
+    if (!dungTenBaiCua.has(r.ban_member_id)) dungTenBaiCua.set(r.ban_member_id, []);
+    dungTenBaiCua.get(r.ban_member_id).push(r.chu_ten);
+  }
+
+  /* Đây là thứ THAY CHO lượt bình chọn Zalo. Lượt ấy chỉ cho con số; chỗ này
+     cho con số KÈM TÊN, kèm ai đã có đề tài và ai đã nộp link — tức là dò
+     ngược được, và xuất ra được. Trả về ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai
+     chọn: "chưa ai chọn" là một câu trả lời, còn một dòng biến mất thì Ban cán
+     sự lớp không biết là chưa ai chọn hay là mình quên mất nó.
+
+     TỪ 19/9 ĐẾM THEO BÀI, KHÔNG THEO NGƯỜI — và đó chính là lý do cả tính
+     năng "cùng làm" tồn tại: trước đó ba người làm chung phải dán cùng một
+     link ba lần và màn này đếm thành BA BÀI. Giữ cả hai con số:
+       so_bai   = số ĐỀ TÀI trong lĩnh vực ấy (một bài = một chủ)
+       so_nguoi = số NGƯỜI đứng tên, chủ bài cộng người cùng làm
+     Bỏ `so_nguoi` đi thì thanh so sánh giữa các lĩnh vực mất nghĩa; bỏ
+     `so_bai` đi thì vẫn đúng cái hỏng vừa chữa. */
   const theoLinhVuc = LINH_VUC_KHKD.map(lv => {
-    const nguoi = ds.filter(x => x.khkd_linh_vuc === lv.ma);
-    return {
-      ma: lv.ma, ten: lv.ten,
-      so_nguoi: nguoi.length,
-      so_da_nop_link: nguoi.filter(x => x.khkd_url).length,
-      nguoi: nguoi.map(x => ({
+    const chuBai = ds.filter(x => x.khkd_linh_vuc === lv.ma);
+    const bai = chuBai.map(x => {
+      const cung = nguoiCungLam.get(x.member_id) ?? [];
+      return {
         member_id: x.member_id, full_name: x.full_name, group_label: x.group_label,
         khkd_de_tai: x.khkd_de_tai, khkd_url: x.khkd_url,
-      })),
+        cung_lam: cung,
+      };
+    });
+    return {
+      ma: lv.ma, ten: lv.ten,
+      so_bai: bai.length,
+      so_nguoi: bai.reduce((n, b) => n + 1 + b.cung_lam.length, 0),
+      so_da_nop_link: bai.filter(b => b.khkd_url).length,
+      bai,
     };
   });
 
@@ -897,10 +1186,20 @@ export async function getDanhSachTotNghiep(env, me) {
     du_le: ds.filter(x => x.du_le === 'co').length,
     da_chon_linh_vuc: ds.filter(x => x.khkd_linh_vuc).length,
     da_nop_link: ds.filter(x => x.khkd_url).length,
-    chua_chon_linh_vuc: ds.filter(x => !x.khkd_linh_vuc)
+    // "Chưa có chỗ nào trong bài cuối khoá" — không phải "chưa khai lĩnh vực".
+    // Người đứng tên bài của người khác thì ĐÃ CÓ chỗ rồi, dù ô lĩnh vực riêng
+    // của họ còn trống; để họ trong danh sách này là Ban cán sự lớp đi nhắc
+    // đúng người đã làm xong việc.
+    chua_chon_linh_vuc: ds.filter(x => !x.khkd_linh_vuc && !dungTenBaiCua.has(x.member_id))
       .map(x => ({ full_name: x.full_name, group_label: x.group_label })),
     theo_linh_vuc: theoLinhVuc,
-    nguoi: ds,
+    // Gắn quan hệ vào từng dòng để thẻ "Từng người" khỏi phải tự ghép lại —
+    // ghép ở hàm vẽ là chỗ thứ hai có thể lệch với con số vừa đếm ở trên.
+    nguoi: ds.map(x => ({
+      ...x,
+      cung_lam_voi_toi: nguoiCungLam.get(x.member_id) ?? [],
+      dung_ten_bai_cua: dungTenBaiCua.get(x.member_id) ?? [],
+    })),
   });
 }
 
@@ -914,7 +1213,19 @@ function oCsv(v) {
 
 export async function getXuatCsv(env, me) {
   if (!(await isClassCommittee(env, me.id))) return error('forbidden', 403);
-  const ds = await docDanhSach(env, me);
+  const [ds, quanHe] = await Promise.all([docDanhSach(env, me), docCungLam(env, me.cohort_id)]);
+
+  // CHỈ dòng đã đồng ý — cùng phép lọc với màn Ban cán sự lớp, cùng hàm đọc.
+  // Một lời rủ chưa ai nhận không phải một bài chung, và tệp này đi ra ngoài
+  // cho người làm chứng chỉ đọc.
+  const cungLamVoi = new Map();   // chủ bài -> [tên người cùng làm]
+  const dungTenBaiCua = new Map(); // người cùng làm -> [tên chủ bài]
+  for (const r of quanHe.filter(x => x.trang_thai === 'da_dong_y')) {
+    if (!cungLamVoi.has(r.chu_member_id)) cungLamVoi.set(r.chu_member_id, []);
+    cungLamVoi.get(r.chu_member_id).push(r.ban_ten);
+    if (!dungTenBaiCua.has(r.ban_member_id)) dungTenBaiCua.set(r.ban_member_id, []);
+    dungTenBaiCua.get(r.ban_member_id).push(r.chu_ten);
+  }
 
   const cot = [
     ['Nhóm', x => x.group_label],
@@ -931,6 +1242,16 @@ export async function getXuatCsv(env, me) {
     ['Lĩnh vực KHKD', x => tenLinhVucKhkd(x.khkd_linh_vuc)],
     ['Đề tài KHKD', x => x.khkd_de_tai],
     ['Link bài KHKD', x => x.khkd_url],
+    /* Hai cột của migration 0045. Ba cột đề tài ở trên GIỮ NGUYÊN nghĩa — bài
+       RIÊNG của chính người ấy — nên đọc một dòng là thấy hết: họ làm bài gì,
+       ai làm cùng họ, và họ còn đứng tên bài nào của ai nữa. Mỗi người vẫn
+       đúng một dòng.
+
+       Nói ra được cả hai chiều là cái giá của quyết định "một người đứng tên
+       được nhiều bài": nếu có ai đứng năm bài thì Ban cán sự lớp NHÌN THẤY
+       ngay ở đây chứ không phát hiện lúc chấm. */
+    ['Ai cùng làm bài của tôi', x => (cungLamVoi.get(x.member_id) ?? []).join(' · ')],
+    ['Cùng làm bài của', x => (dungTenBaiCua.get(x.member_id) ?? []).join(' · ')],
     ['Dự Lễ 17h-22h', x => (x.du_le === 'co' ? 'Có' : x.du_le === 'khong' ? 'Không' : '')],
     // Nhãn phải đúng mục 6.4 SRS: "đã tự khai" cho tới khi người thu đối
     // chiếu sao kê, KHÔNG BAO GIỜ "đã đóng". Tệp này đi ra ngoài cho Ban tổ

@@ -109,8 +109,8 @@ bật lên là của môi trường cục bộ, production là Pages tách riên
 | `kiem-tro-ly.mjs` | Trợ lý KHKD: **lệch nền tri thức D1 ↔ giao-trinh.js**, **lệch số hiệu phần bài trợ lý ↔ giao diện**, N6 bốn route, hai tầng trần lượt, công tắc tắt, và `hong_o_buoc` của nhánh gọi hỏng |
 | `pw-tro-ly.mjs` | giao diện hội thoại trợ lý — **XSS trên chữ do MÔ HÌNH sinh ra**, khung cuộn riêng, và ô nhập giữ nguyên chữ khi gửi hỏng |
 | `reset-tro-ly.sh` | gieo ba phiên có sẵn tin nhắn (kể cả bốn ca độc), một phần bài của Nhóm 7, và hai hồ sơ 40/39 lượt; `… tat` để kiểm công tắc tắt |
-| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **chữ "Ngành khác" bị gỡ theo khi bỏ chip**, **CSV không bao giờ có chữ "đã đóng"**, và **đường công khai khai BỔ SUNG được mà không xoá được ô nào đang có chữ** |
-| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **khai xong là mã QR biến mất**, **không mục lĩnh vực nào bị cắt chữ**, và **form công khai để TRỐNG ô ngày sinh/điện thoại** |
+| `kiem-totnghiep.mjs` | zone Lễ tốt nghiệp: **danh sách cả lớp không cookie phải 401**, ba phần lưu độc lập, chốt UNIQUE có răng, **mã lĩnh vực lạ → coi như chưa chọn chứ không 422**, **`khkd_luc` nhả ra khi xoá trắng**, **chữ "Ngành khác" bị gỡ theo khi bỏ chip**, **CSV không bao giờ có chữ "đã đóng"**, **đường công khai khai BỔ SUNG được mà không xoá được ô nào đang có chữ**, và **rủ người cùng làm đề tài: người GỬI không tự duyệt được, chủ bài không gỡ được ai, một người đứng tên được nhiều bài** |
+| `pw-totnghiep.mjs` | giao diện `/totnghiep` — ba khối gập, **lưu một phần không gập mất khối đang cần**, chip phí phải CAM chứ không xanh, nhánh dự phòng khi mã QR không tải được, **khai xong là mã QR biến mất**, **không mục lĩnh vực nào bị cắt chữ**, **form công khai để TRỐNG ô ngày sinh/điện thoại**, và **sheet rủ cùng làm: ô tìm giữ tiêu điểm, người đã có quan hệ hiện MỜ chứ không biến mất, công tắc hai vế gửi đúng `bai_cua`** |
 | `reset-totnghiep.sh` | dựng ba phiên (uỷ viên lớp / người thường / người Nhóm 7), seed hồ sơ `members` cho Vũ Thị Ngân cho giống bản thật, **trả bảng đăng ký về gốc**, và **đếm lại số phiên sau khi seed** — xem phép 30 |
 | `kiem-anh.mjs` | soi ảnh bằng **magic bytes** + nối thân multipart ở mức BYTE — **chạy thẳng, không cần máy chủ**; phần DUY NHẤT của đường Drive mà sandbox chứng minh được |
 | `kiem-anh-route.mjs` | `POST /api/totnghiep/anh` — **không cookie phải 401** (đường này NHẬN TỆP), magic bytes thắng content-type, trần 2MB, và `hong_o_buoc` của nhánh gọi hỏng |
@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Năm mươi chín phép đối chứng đáng giữ nhất
+## Sáu mươi tư phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -723,6 +723,65 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
    `oninput` — mà bản vá ấy làm ô tìm mất tiêu điểm và bàn phím điện thoại
    sập xuống sau MỖI CHỮ gõ vào. Phép có răng là
    `document.activeElement?.id === 'dstnTim'` sau khi lọc.
+
+60. **Chiều `bai_cua: 'ho'` là phép DUY NHẤT bắt được việc bỏ quên
+   `nguoi_gui_id`.** Rủ người cùng làm đề tài (migration 0045) ghi mỗi quan hệ
+   thành một dòng phẳng "`ban` đứng tên trên bài của `chu`", và người DUYỆT
+   luôn là người KHÔNG gửi — nhờ vậy cả hai chiều ("họ cùng làm bài của tôi" và
+   "tôi cùng làm bài của họ") đều do người kia đồng ý, đúng nguyên văn yêu cầu.
+
+   **Đã chạy đối chứng:** đổi `nguoiDuyet()` thành `r => r.ban_member_id` (tức
+   bỏ quên `nguoi_gui_id`) thì phép "người GỬI tự bấm Đồng ý → 404" của chiều
+   `'toi'` **VẪN XANH**, và chỉ hai phép của chiều `'ho'` mới đỏ. Bản vá hỏng
+   ấy cho chính người vừa xin được tự duyệt đơn của mình — tức vế ĐỒNG Ý, cả
+   lý do tính năng này tồn tại, biến mất mà không chỗ nào báo lỗi.
+
+61. **Chỉ số MỘT PHẦN phải kiểm cả chiều "làm lại được".** `ux_cunglam_dang_song`
+   chỉ phủ `('cho_duyet','da_dong_y')`, nên từ chối rồi vẫn rủ lại được ngay và
+   rời ra rồi vẫn quay lại được. Phép "rủ hai lần → 409" một mình vẫn xanh với
+   một chỉ số ĐẦY ĐỦ (phủ mọi trạng thái) — mà bản ấy bắt người đổi ý phải chờ
+   hết hạn một thứ không có hạn.
+
+   **Và một chỉ số `UNIQUE(ban_member_id)` thì chỉ phép "đứng được NHIỀU bài"
+   mới bắt.** Đã chạy đối chứng bằng cách tạo đúng chỉ số ấy trên D1 cục bộ:
+   SQLite **từ chối tạo** vì dữ liệu bộ kiểm vừa sinh ra đã vi phạm — đó tự nó
+   là bằng chứng; xoá bảng rồi tạo lại thì phép ấy đỏ, và chỉ mình nó đỏ.
+
+62. **Phép hero chỉ có răng khi nó TỚI ĐƯỢC bước đang canh.** `computeAction`
+   xét Gala ở bước 1, lời rủ cùng làm ở bước 2. Phiên chưa trả lời Gala thì
+   rơi ngay ở bước 1, nên phép "người GỬI KHÔNG bị nhắc trả lời lời rủ của
+   chính mình" xanh vì một lý do chẳng liên quan.
+
+   **Đã chạy đối chứng và thấy đúng vậy:** gỡ hẳn điều kiện `nguoi_gui_id <> ?`
+   ra khỏi `home.js` mà cả hai phép vẫn xanh. Nay bộ kiểm trả lời Gala cho
+   phiên ấy TRƯỚC, và còn khẳng định thẳng rằng nó đã qua được bước 1 — gỡ bản
+   vá ra thì phép đỏ đúng chỗ.
+
+   Cùng họ, ở tầng giao diện: `innerText` của Chrome trả về **RỖNG** cho nội
+   dung nằm trong `<details>` đang đóng. Nên một phép so chuỗi trên khối đang
+   gập không đỏ vì "chuỗi sai" mà vì "chuỗi rỗng", và câu báo lỗi trỏ sai chỗ
+   hoàn toàn. `pw-totnghiep.mjs` trả lời Gala trước khi soi khối Đề tài, và có
+   một phép RIÊNG cho cảnh khối ấy đang gập: dòng phụ CAM ở `<summary>` phải
+   vẫn báo có người đang chờ — đó là thứ DUY NHẤT còn nhìn thấy được lúc ấy.
+
+63. **Phép "chủ bài không gỡ được ai" phải soi ĐÚNG MÀN, và vai ở đây ngược
+   với trực giác.** Lượt gửi trong `pw-totnghiep.mjs` chọn `bai_cua: 'ho'`
+   (Cường XIN vào bài của Nhóm Bảy), nên NHÓM BẢY là chủ bài còn CƯỜNG là
+   người cùng làm — ngược hẳn thứ tự hai phiên xuất hiện trong tệp. Soi nhầm
+   màn thì cả hai phép đỏ ở một chỗ chẳng liên quan gì tới thứ chúng đang canh.
+
+   Kèm một phép từng KHÔNG THỂ ĐỎ và đã bị thay: `locator('.tncl [data-clgo]')
+   .count() === 0` — không có bộ chọn nào tên `data-clgo` ở bất kỳ đâu trong mã,
+   nên nó xanh vĩnh viễn. Nay hỏi câu đúng: màn CHỦ BÀI phải có **0** nút
+   `[data-clroi]`, màn người cùng làm phải có **đúng 1**.
+
+64. **`\b` của regex coi dấu chấm là ranh giới từ — đổi tên biến hàng loạt làm
+   hỏng cả một URL.** Khi thêm khối mới vào `kiem-totnghiep.mjs`, tôi đổi tên
+   các biến trùng bằng `re.sub(r'\bcsv\b', 'clCsv', ...)` — và nó sửa luôn
+   chuỗi `'/api/totnghiep/xuat.csv'` thành `'/api/totnghiep/xuat.clCsv'`, nên
+   ba phép CSV đỏ với một lý do không có trong mã sản phẩm. Đổi tên biến bằng
+   regex thì phải soi lại các chuỗi hằng, hoặc chọn tên không trùng một mẩu
+   nào của đường dẫn.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

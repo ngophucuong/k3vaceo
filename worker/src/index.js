@@ -31,6 +31,8 @@ import { getLich, getLichCongKhai, getLichIcs, postBuoi, patchBuoi, deleteBuoi, 
 import { putMailThongBao } from './routes/thong-bao-mail.js';
 import { getGiaoThuong, putGianHang, getGiaoThuongCongKhai } from './routes/giao-thuong.js';
 import { getTotNghiep, putHoSo, putGala, putDeTai,
+         postCungLam, postCungLamDongY, postCungLamTuChoi,
+         postCungLamHuy, postCungLamRoi,
          getDanhSachTotNghiep, getXuatCsv,
          getTotNghiepCongKhai, postTotNghiepCongKhai, postAnhTotNghiep,
          postAnhCongKhai
@@ -278,7 +280,7 @@ export default {
       if (pathname === '/api/giao-thuong' && method === 'GET') return getGiaoThuong(env, me);
       if (pathname === '/api/me/giao-thuong' && method === 'PUT') return putGianHang(request, env, me, ip);
 
-      // Lễ tốt nghiệp 26/9 — CẢ SÁU route đều ở nửa DƯỚI, cần phiên. Ranh giới
+      // Lễ tốt nghiệp 26/9 — CẢ MƯỜI BA route đều ở nửa DƯỚI, cần phiên. Ranh giới
       // công khai/cần-phiên của router này là VỊ TRÍ DÒNG chứ không phải một
       // cờ nào: đẩy nhầm một dòng lên trên `getCurrentMember` là nó thành công
       // khai mà không phép kiểm nào kêu. kiem-totnghiep.mjs gọi
@@ -288,6 +290,24 @@ export default {
       if (pathname === '/api/totnghiep/ho-so' && method === 'PUT') return putHoSo(request, env, me);
       if (pathname === '/api/totnghiep/gala' && method === 'PUT') return putGala(request, env, me);
       if (pathname === '/api/totnghiep/de-tai' && method === 'PUT') return putDeTai(request, env, me);
+      // Rủ người cùng làm đề tài (migration 0045). NĂM route, và cả năm nằm ở
+      // nửa DƯỚI này: vế "người đó đồng ý" chỉ có nghĩa khi máy chủ biết CHẮC
+      // ai đang bấm — mà đường công khai chỉ có một roster_id gõ trong URL.
+      if (pathname === '/api/totnghiep/cung-lam' && method === 'POST') {
+        return postCungLam(request, env, me);
+      }
+      if ((m = pathname.match(/^\/api\/totnghiep\/cung-lam\/(\d+)\/dong-y$/)) && method === 'POST') {
+        return postCungLamDongY(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/totnghiep\/cung-lam\/(\d+)\/tu-choi$/)) && method === 'POST') {
+        return postCungLamTuChoi(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/totnghiep\/cung-lam\/(\d+)\/huy$/)) && method === 'POST') {
+        return postCungLamHuy(env, me, Number(m[1]));
+      }
+      if ((m = pathname.match(/^\/api\/totnghiep\/cung-lam\/(\d+)\/roi$/)) && method === 'POST') {
+        return postCungLamRoi(env, me, Number(m[1]));
+      }
       // Ảnh chân dung / logo → Google Drive. KHÔNG đi qua readJson: thân là
       // tệp nhị phân thô, và giao diện cũng không gọi qua api() vì hàm ấy ép
       // content-type: application/json cho mọi request có thân.

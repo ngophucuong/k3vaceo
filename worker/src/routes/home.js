@@ -53,8 +53,11 @@ async function computeAction(env, me) {
             date('now', '+7 hours')     <= ? AS con_ho_so,
             (SELECT ho_so_luc FROM dang_ky_tot_nghiep WHERE member_id = ?) AS ho_so_luc,
             (SELECT gala_luc  FROM dang_ky_tot_nghiep WHERE member_id = ?) AS gala_luc,
-            (SELECT du_le     FROM dang_ky_tot_nghiep WHERE member_id = ?) AS du_le`
-  ).bind(HAN_GALA, NGAY_LE, me.id, me.id, me.id).first();
+            (SELECT du_le     FROM dang_ky_tot_nghiep WHERE member_id = ?) AS du_le,
+            (SELECT COUNT(*) FROM khkd_cung_lam cl
+              WHERE cl.trang_thai = 'cho_duyet' AND cl.nguoi_gui_id <> ?
+                AND (cl.chu_member_id = ? OR cl.ban_member_id = ?)) AS ru_cho_toi`
+  ).bind(HAN_GALA, NGAY_LE, me.id, me.id, me.id, me.id, me.id, me.id).first();
 
   // HAI mốc, HAI điều kiện riêng chứ không một mốc chung: sau 21h00 ngày 19/9
   // nhánh Gala tự tắt (đăng ký đã đóng, nhắc nữa là vô ích), nhánh hồ sơ còn
@@ -65,6 +68,23 @@ async function computeAction(env, me) {
       h: 'Chưa trả lời dự Lễ tốt nghiệp',
       p: 'Chiều 26/9 bảo vệ bài — bắt buộc, không thu phí. Buổi tối là Lễ và Gala, có phí và phải đăng ký trước 21h00 ngày 19/9.',
       c: 'Mở đăng ký', target: 'totnghiep',
+    };
+  }
+  /* Có người rủ làm chung đề tài và đang CHỜ mình trả lời. Xếp trên bước hồ
+     sơ vì đây là việc của NGƯỜI KHÁC đang đứng chờ: không trả lời thì họ
+     không biết đi tiếp thế nào, còn hồ sơ là việc của riêng mình, hoãn một
+     hôm không ai chờ. Gác bằng chính `con_ho_so` nên nó TỰ TẮT sau 26/9 —
+     không để lại một việc chết trong "Việc của bạn" suốt phần đời còn lại
+     của ứng dụng. Điều kiện `nguoi_gui_id <> me.id` là vế ĐỒNG Ý của cả tính
+     năng: người gửi không phải người duyệt, thiếu nó thì chính người vừa rủ
+     lại được nhắc đi trả lời lời rủ của mình. */
+  if (tn?.con_ho_so && tn.ru_cho_toi) {
+    return {
+      h: tn.ru_cho_toi > 1
+        ? `${tn.ru_cho_toi} người rủ bạn làm chung đề tài`
+        : 'Có người rủ bạn làm chung đề tài',
+      p: 'Họ đang chờ bạn bấm Đồng ý hoặc Từ chối. Đồng ý rồi thì cả hai cùng đứng tên một bài, chỉ nộp link một lần.',
+      c: 'Xem lời rủ', target: 'totnghiep',
     };
   }
   if (tn?.con_ho_so && !tn.ho_so_luc) {

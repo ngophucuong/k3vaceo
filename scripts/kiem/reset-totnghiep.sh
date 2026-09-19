@@ -49,8 +49,21 @@ npx wrangler d1 execute k3vaceo --local --command "
 -- members(id), nên xoá members trước là vỡ FOREIGN KEY constraint và cả khối
 -- SQL không chạy dòng nào. Đã trả giá đúng ở đây, và cùng họ với lỗi
 -- reset-thongbao.sh từng vấp (xem README mục 19).
+--
+-- khkd_cung_lam (migration 0045) trỏ vào members(id) qua BA cột, nên nó phải
+-- đi TRƯỚC mọi lệnh xoá members ở dưới. Và bộ kiểm này thật sự tạo quan hệ
+-- rồi đồng ý/từ chối/rời, nên bỏ bước dọn là lượt chạy sau mở đầu với quan hệ
+-- còn sót: phép rủ-hai-lần-thì-409 xanh giả (đã có sẵn dòng từ lượt trước),
+-- còn phép từ-chối-rồi-rủ-lại-được thì đỏ ở một chỗ chẳng liên quan.
+DELETE FROM khkd_cung_lam;
 DELETE FROM dang_ky_tot_nghiep;
 DELETE FROM fund_declarations;
+-- Hai thùng hạn mức của cửa /dangnhap. Bộ kiểm gõ số SAI một lượt (đúng phép
+-- canh của nó), và mỗi lượt sai ăn một phần của trần 8-lần-mỗi-hồ-sơ-mỗi-giờ.
+-- Không dọn thì chạy lại bộ kiểm trong cùng một giờ là phép số-tự-khai-mở-được
+-- -cửa đỏ với 429 rate_limited — một câu trỏ hoàn toàn sai chỗ hỏng, vì mã sản
+-- phẩm vẫn đúng. Đúng bài học đã ghi cho reset-moi.sh, nay áp cho bộ kiểm này.
+DELETE FROM rate_events WHERE bucket IN ('doan_so_ho_so', 'doan_so_ip');
 -- Từ 18/9 putHoSo GHI NGƯỢC linh_vuc sang member_profile.nganh, để ngành khai
 -- ở form tốt nghiệp tới được bộ lọc ngành của tab Giao thương. Nghĩa là bộ
 -- kiểm này nay ĐỔI member_profile — nên reset phải trả chính cột ấy về gốc.
@@ -81,8 +94,10 @@ UPDATE members
 -- Dòng member_profile ấy trỏ vào members(id), nên phải xoá TRƯỚC dòng cha —
 -- cùng thứ tự bắt buộc đã ghi ở đầu khối này.
 DELETE FROM member_profile WHERE member_id IN
-  (SELECT id FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy'));
-DELETE FROM members WHERE full_name IN ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy');
+  (SELECT id FROM members WHERE full_name IN
+    ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy', 'Kiểm TN Chưa Vào'));
+DELETE FROM members WHERE full_name IN
+  ('Kiểm TN Thường', 'Kiểm TN Nhóm Bảy', 'Kiểm TN Chưa Vào');
 -- Đường CÔNG KHAI (migration 0042) TỰ TẠO dòng members cho người chưa có hồ
 -- sơ. Không dọn thì lượt chạy sau mở đầu với người ấy ĐÃ có members — phép
 -- kiểm route-tự-tạo-hồ-sơ mất răng, và nó im lặng chứ không đỏ. Đúng bài học
@@ -122,6 +137,15 @@ SELECT c.id, (SELECT id FROM groups WHERE no = 6 AND cohort_id = c.id),
 INSERT INTO members (cohort_id, group_id, full_name, phone, title, company, is_active, claimed_at)
 SELECT c.id, (SELECT id FROM groups WHERE no = 7 AND cohort_id = c.id),
        'Kiểm TN Nhóm Bảy', '0900000071', 'Chủ tịch', 'Công ty Bảy', 1, datetime('now')
+  FROM cohorts c WHERE c.code = 'K03';
+-- Người thứ TƯ, CỐ Ý chưa đăng nhập (claimed_at để trống) và KHÔNG có phiên.
+-- Chỉ để một việc: canh rằng rủ người chưa đăng nhập bị chặn, và họ KHÔNG có
+-- mặt trong danh sách chọn được. Dựng hẳn một dòng thay vì mượn ai có thật, vì
+-- người thật đăng nhập lúc nào cũng được mà bộ kiểm không hay — đúng bài học
+-- reset-doi-nhom.sh.
+INSERT INTO members (cohort_id, group_id, full_name, phone, title, company, is_active)
+SELECT c.id, (SELECT id FROM groups WHERE no = 7 AND cohort_id = c.id),
+       'Kiểm TN Chưa Vào', '0900000072', 'Giám đốc', 'Công ty Chưa Vào', 1
   FROM cohorts c WHERE c.code = 'K03';
 
 -- Dọn phiên theo TOKEN_HASH, không theo member_id.

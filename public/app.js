@@ -197,6 +197,11 @@ const ERR_TEXT = {
   da_xu_ly_roi: 'Đơn này đã được xử lý rồi — thử tải lại.',
   nguoi_da_ngung_tham_gia: 'Người này đã ngừng tham gia, không duyệt được nữa.',
   nhom_hien_tai_da_doi: 'Nhóm hiện tại của người này đã đổi khác lúc họ nộp đơn — thử tải lại.',
+  // Cùng làm đề tài (migration 0045). `da_xu_ly_roi` và `nguoi_da_ngung_tham_gia`
+  // dùng lại câu của xin-đổi-nhóm ngay trên — cùng nghĩa, cùng cách chữa.
+  tu_ru_chinh_minh: 'Không rủ chính mình được — chọn người khác trong lớp.',
+  ho_chua_dang_nhap: 'Người này chưa đăng nhập ứng dụng nên chưa bấm Đồng ý được. Nhờ Ban cán sự lớp phát link đăng nhập cho họ trước.',
+  da_co_quan_he: 'Bạn và người này đã có một lời rủ đang chờ, hoặc đã cùng làm bài rồi.',
   // Trợ lý KHKD (routes/tro-ly.js)
   tro_ly_da_tat: 'Trợ lý đang tắt. Nhắn Ban cán sự lớp nếu cần bật lại.',
   tro_ly_chua_cau_hinh: 'Máy chủ chưa được cấu hình để gọi trợ lý.',
@@ -4583,15 +4588,26 @@ let TN_MO;
    tự trên màn hình:
      1. còn phải chuyển phí  → Gala, vì mã QR phải nhìn thấy ngay (yêu cầu 18/9)
      2. chưa trả lời Gala    → Gala, hạn 21h00 NGÀY 19/9 là hạn gấp nhất
-     3. chưa xong hồ sơ      → Hồ sơ, hạn 26/9
-     4. chưa khai đề tài     → Đề tài, không bắt buộc
-     5. xong hết             → gập hết, màn hình sạch, ba dấu ✓ nói đủ chuyện */
-function tnKhoiMoDau(d, conPhaiTra) {
+     3. có người đang chờ    → Đề tài — việc của NGƯỜI KHÁC đang chờ mình, và
+                               không trả lời thì họ đứng đó không biết đi tiếp
+                               thế nào. Xếp trên hồ sơ vì hồ sơ là việc của
+                               riêng mình, hoãn một hôm không ai chờ.
+     4. chưa xong hồ sơ      → Hồ sơ, hạn 26/9
+     5. chưa khai đề tài     → Đề tài, không bắt buộc
+     6. xong hết             → gập hết, màn hình sạch, ba dấu ✓ nói đủ chuyện */
+function tnKhoiMoDau(d, conPhaiTra, soChoToiDuyet) {
   if (conPhaiTra || !d.gala_luc) return 'gala';
+  if (soChoToiDuyet) return 'detai';
   if (!d.ho_so_luc) return 'hoso';
   if (!d.khkd_luc) return 'detai';
   return null;
 }
+
+/* Mã lĩnh vực KHKD → nhãn, đọc từ chính danh mục máy chủ vừa gửi xuống. Không
+   chép 15 nhãn sang đây: mã đã vào D1 thì không đổi được nữa, còn nhãn thì
+   sửa thoải mái (luật ghi ở đầu lib/linh-vuc-khkd.js) — và một bản sao ở
+   giao diện là chỗ để hai bên lệch nhau sau đúng một lần sửa nhãn. */
+const tenLinhVuc = ma => (TN?.linh_vuc_khkd_list ?? []).find(x => x.ma === ma)?.ten ?? ma;
 
 async function renderTotNghiep() {
   document.body.classList.add('noapp');
@@ -5042,9 +5058,18 @@ function veTotNghiep() {
      xong việc" là hai chuyện khác nhau, mà bản đầu chỉ hỏi câu thứ nhất. */
   const conPhaiTra = !!(r && d.du_le === 'co' && !r.i_declared && !r.i_am_verified);
 
+  // Cùng làm đề tài (migration 0045). Rơi lui về bốn mảng rỗng chứ không để
+  // `undefined`: một trình duyệt còn đang chạy app.js cũ trong đệm sẽ gọi
+  // /api/totnghiep của bản MỚI và ngược lại, và cả màn này chết vì một dấu
+  // chấm là cái giá quá đắt cho một khối phụ.
+  const cl = {
+    bai_cua_toi: [], toi_tham_gia: [], cho_toi_duyet: [], toi_dang_cho: [], chon_duoc: [],
+    ...(TN.cung_lam ?? {}),
+  };
+
   // Mặc định chỉ áp dụng cho lượt xem ĐẦU TIÊN. Sau đó đi theo đúng thứ người
   // dùng đang mở — họ gập hết thì lượt vẽ sau vẫn gập hết.
-  if (TN_MO === undefined) TN_MO = tnKhoiMoDau(d, conPhaiTra);
+  if (TN_MO === undefined) TN_MO = tnKhoiMoDau(d, conPhaiTra, cl.cho_toi_duyet.length);
   const mo = k => (TN_MO === k ? 'open' : '');
 
   $('#root').innerHTML = `<div class="tnwrap"><div class="tncard">
@@ -5070,7 +5095,13 @@ function veTotNghiep() {
 
     <div class="tnprog">
       ${tnOTienDo('hoso', 'Hồ sơ', d.ho_so_luc)}
-      ${tnOTienDo('detai', 'Đề tài', d.khkd_luc)}
+      ${/* Ô Đề tài tính CẢ việc đứng tên bài của người khác — phải TRÙNG KHÍT
+           với huy hiệu ✓ của khối bên dưới (tnHuyHieu ở <summary>). Lệch một
+           chút là dải ô nói "chưa điền" ngay trên một khối mang dấu ✓, và
+           không chỗ nào báo lỗi. Người đã nhận lời làm chung thì ĐÃ CÓ chỗ
+           trong bài cuối khoá, dù ô đề tài riêng của họ còn trống — cùng một
+           phân định với `chua_chon_linh_vuc` ở màn Ban cán sự lớp. */''}
+      ${tnOTienDo('detai', 'Đề tài', d.khkd_luc || cl.toi_tham_gia.length)}
       ${/* "Gala" chứ không "Dự Lễ" (Ngô Phú Cường 19/9). Cùng một ngày 26/9 có
            HAI việc — buổi bảo vệ chiều và Lễ & Gala tối — nên chữ "Lễ" đứng
            một mình trong một ô rộng 114px đọc ra được cả hai, mà hai việc ấy
@@ -5188,15 +5219,40 @@ function veTotNghiep() {
     </details>
 
     <details class="tnsec" id="tnsec-detai" data-sec="detai" ${mo('detai')}>
-      <summary>${tnHuyHieu(3, d.khkd_luc)}
+      <summary>${tnHuyHieu(3, d.khkd_luc || cl.toi_tham_gia.length)}
         <span class="t"><b>Đề tài Kế hoạch kinh doanh</b>
-        <i>Không bắt buộc · nộp theo cá nhân hoặc cùng lĩnh vực</i></span>
+        ${/* Dòng phụ này là thứ DUY NHẤT còn nhìn thấy được khi khối gập —
+             ba khối nay chỉ mở một. Có người đang chờ trả lời thì nó phải nói
+             ra, và tô CAM (`--due`, màu của việc còn nợ) chứ không dựng một
+             chấm đỏ mới: veChamDo() khoá cứng [data-v="nay"] và đếm bảng
+             thong_bao, mượn nó cho việc khác là làm hỏng nghĩa của nó. */''}
+        <i class="${cl.cho_toi_duyet.length ? 'con' : ''}">${cl.cho_toi_duyet.length
+          ? `${cl.cho_toi_duyet.length} người đang chờ bạn trả lời`
+          : 'Không bắt buộc · nộp theo cá nhân hoặc cùng lĩnh vực'}</i></span>
         <span class="ch">▾</span></summary>
       <div class="tnbody">
+        ${/* ── 1. LỜI RỦ ĐANG CHỜ TÔI — đặt TRÊN CÙNG ──────────────────────
+             Đây là việc của người khác đang chờ mình, và nó có thể hết nghĩa
+             nếu để lâu (hạn 26/9). Đặt dưới ba ô đề tài thì người mở khối ra
+             để sửa một chữ sẽ không bao giờ cuộn tới. */''}
+        ${cl.cho_toi_duyet.length ? `<div class="tncl cho">
+          <div class="h">Có người muốn làm chung với bạn</div>
+          ${cl.cho_toi_duyet.map(x => `<div class="it">
+            <b>${esc(x.nguoi_gui_ten)}</b>${x.group_label ? ` <i>${esc(x.group_label)}</i>` : ''}
+            <p>${x.bai_cua === 'toi'
+              ? 'xin cùng đứng tên trên bài <b>của bạn</b>'
+              : `muốn bạn cùng đứng tên trên bài <b>của họ</b>${x.khkd_de_tai
+                  ? ` — «${esc(x.khkd_de_tai)}»` : ' (họ chưa khai đề tài nào)'}`}</p>
+            ${x.loi_nhan ? `<q>${esc(x.loi_nhan)}</q>` : ''}
+            <div class="btns"><button type="button" class="sm" data-cldy="${x.id}">Đồng ý</button>
+              <button type="button" class="sm ghost" data-cltc="${x.id}">Từ chối</button></div>
+          </div>`).join('')}
+        </div>` : ''}
+
         <p class="mut" style="margin:0 0 16px">Lớp đã chốt: <b>nộp tự do theo cá nhân
-          hoặc cùng lĩnh vực, không bắt buộc ai cũng phải nộp.</b> Làm chung đề tài với
-          ai thì cùng chọn một lĩnh vực và dán cùng một đường dẫn — Ban cán sự lớp nhìn
-          theo lĩnh vực là thấy các bạn đứng cạnh nhau.</p>
+          hoặc cùng lĩnh vực, không bắt buộc ai cũng phải nộp.</b> Muốn làm chung thì
+          rủ nhau ngay trong ứng dụng — mỗi bài chỉ dán link MỘT lần, và Ban cán sự lớp
+          thấy đủ tên những người cùng làm.</p>
 
         <label class="f">Lĩnh vực bạn làm (chọn một)</label>
         <div class="fl cuon" id="tnLv">${(TN.linh_vuc_khkd_list ?? []).map(x =>
@@ -5215,6 +5271,46 @@ function veTotNghiep() {
 
         <div class="errline" id="tnDeTaiErr" style="display:none"></div>
         <button class="wide" id="tnLuuDeTai">Lưu đề tài</button>
+
+        ${/* ── 2b. AI ĐANG ĐỨNG TÊN BÀI CỦA TÔI, và lời rủ tôi đã gửi ───────
+             KHÔNG có nút gỡ ai ra (Ngô Phú Cường quyết): người đã bỏ công
+             viết bài không bị gạt tên bởi một cú bấm của người khác. Lời rủ
+             CHƯA ai nhận thì rút được — rút một lời mời chưa ai nhận không
+             phải là đuổi ai cả. */''}
+        ${cl.bai_cua_toi.length ? `<div class="tncl">
+          <div class="h">Cùng làm bài của bạn</div>
+          ${cl.bai_cua_toi.map(x => `<div class="it gon"><b>${esc(x.full_name)}</b>${
+            x.group_label ? ` <i>${esc(x.group_label)}</i>` : ''}</div>`).join('')}
+          <div class="ft">Muốn ai đó rời ra thì chính họ bấm "Rời khỏi bài này" trong
+            ứng dụng — bạn không gỡ tên người khác được.</div>
+        </div>` : ''}
+        ${cl.toi_dang_cho.length ? `<div class="tncl">
+          <div class="h">Bạn đã rủ, đang chờ họ trả lời</div>
+          ${cl.toi_dang_cho.map(x => `<div class="it gon"><b>${esc(x.doi_tac_ten)}</b>${
+            x.group_label ? ` <i>${esc(x.group_label)}</i>` : ''}
+            <span class="mut">${x.bai_cua === 'toi' ? '· vào bài của bạn' : '· bạn xin vào bài của họ'}</span>
+            <button type="button" class="lnk" data-clhuy="${x.id}">Huỷ</button></div>`).join('')}
+        </div>` : ''}
+
+        ${/* ── 3. BÀI CHUNG TÔI ĐANG THAM GIA — CHỈ ĐỌC ────────────────────
+             Bài neo vào CHỦ, nên chỉ chủ bài sửa được ba ô ấy. Hiện ra ở đây
+             để người cùng làm biết mình đang đứng tên cái gì; không hiện thì
+             họ không có cách nào xem lại link bài mình vừa nhận lời. */''}
+        ${cl.toi_tham_gia.length ? `<div class="tncl">
+          <div class="h">Bài chung bạn đang đứng tên</div>
+          ${cl.toi_tham_gia.map(x => `<div class="it">
+            <b>Bài của ${esc(x.full_name)}</b>${x.group_label ? ` <i>${esc(x.group_label)}</i>` : ''}
+            <p>${x.khkd_de_tai ? `«${esc(x.khkd_de_tai)}»` : '<span class="mut">chưa đặt tên đề tài</span>'}${
+              x.khkd_linh_vuc ? ` · ${esc(tenLinhVuc(x.khkd_linh_vuc))}` : ''}</p>
+            ${x.khkd_url ? `<a href="${esc(x.khkd_url)}" target="_blank" rel="noopener">Mở bài ›</a>`
+              : '<span class="mut">chưa dán đường dẫn</span>'}
+            <div class="btns"><button type="button" class="sm ghost" data-clroi="${x.id}">Rời khỏi bài này</button></div>
+          </div>`).join('')}
+          <div class="ft">Ba ô đề tài ở trên là bài RIÊNG của bạn — sửa ở đó không đụng
+            gì tới bài chung này. Chỉ người giữ bài sửa được nội dung bài của họ.</div>
+        </div>` : ''}
+
+        <button class="wide ghost" id="tnRu" style="margin-top:12px">+ Rủ người cùng làm</button>
         <div class="foot" style="padding:9px 0 0">Chưa có đề tài thì cứ chọn lĩnh vực
           trước rồi quay lại sau — cả ba ô đều để trống được.${n ? `
           Nhóm ${esc(n.label)} của bạn vẫn còn, và tab Bài vẫn dùng được để chia việc
@@ -5594,6 +5690,43 @@ function tnGanSuKien() {
     };
   }
 
+  /* ── Cùng làm đề tài (migration 0045) ────────────────────────────────────
+     Bốn nút, bốn đường, cùng một khuôn: gọi xong thì VẼ LẠI TỪ MÁY CHỦ chứ
+     không vá tại chỗ — huy hiệu ✓, dải ô tiến độ và cả ba danh sách đều do
+     máy chủ tính, đoán lại ở giao diện là có ngày hai bên nói hai chuyện.
+
+     Khoá nút trong lúc chờ, và chỉ mở lại ở nhánh HỎNG: nhánh xuôi thì màn
+     hình sắp bị thay nên mở lại là nhấp nháy vô nghĩa. Không khoá thì người ta
+     bấm Đồng ý ba lần và nhận hai lần 409 `da_xu_ly_roi` cho một việc đã
+     thành công. */
+  const clGoi = (sel, duong, okMsg, hoi) => document.querySelectorAll(sel).forEach(b => {
+    const id = b.dataset.cldy || b.dataset.cltc || b.dataset.clhuy || b.dataset.clroi;
+    b.onclick = async () => {
+      if (hoi && !confirm(hoi)) return;
+      const nhan = b.textContent;
+      b.disabled = true; b.textContent = '…';
+      try {
+        await apiPost(`/api/totnghiep/cung-lam/${id}/${duong}`, {});
+        toast(okMsg);
+        await renderTotNghiep();
+      } catch (e) {
+        toast(errText(e));
+        b.disabled = false; b.textContent = nhan;
+      }
+    };
+  });
+  clGoi('[data-cldy]', 'dong-y', 'Đã đồng ý cùng làm');
+  clGoi('[data-cltc]', 'tu-choi', 'Đã từ chối');
+  clGoi('[data-clhuy]', 'huy', 'Đã rút lời rủ');
+  // CHỈ nút Rời mới hỏi lại: ba nút kia lùi được (từ chối rồi vẫn rủ lại
+  // được, huỷ rồi vẫn gửi lại được), còn rời khỏi một bài là bỏ chỗ của mình
+  // trong bài cuối khoá và phải chờ chủ bài rủ lại.
+  clGoi('[data-clroi]', 'roi', 'Đã rời khỏi bài chung',
+    'Rời khỏi bài chung này? Muốn quay lại thì phải nhờ chủ bài rủ lần nữa.');
+
+  const nutRu = $('#tnRu');
+  if (nutRu) nutRu.onclick = openRuCungLam;
+
   // Ảnh QR nạp từ img.vietqr.io — hỏng thì thay bằng ô giải thích, đừng để
   // một ô vỡ ảnh nằm giữa màn hình tiền nong. Nhánh này CÓ SẴN ở tab Quỹ từ
   // Đợt 3 và ban đầu tôi quên chép sang đây; ảnh chụp 390px bắt được ngay (ở
@@ -5644,6 +5777,128 @@ async function tnLuu(nutSel, errSel, duong, than, okMsg) {
     $(errSel).style.display = 'block';
     nut.disabled = false; nut.textContent = nhan;
   }
+}
+
+/* ══ SHEET "RỦ NGƯỜI CÙNG LÀM" ════════════════════════════════════════════
+   Hai bước trong MỘT sheet: chọn người, rồi chọn chiều. Tách làm hai sheet
+   thì bước hai mất hẳn ngữ cảnh "tôi vừa chọn ai".
+
+   Danh sách dùng LẠI `.fdpick` của bước chọn tên ở /vao — cả dòng là một
+   <button> cao ≥56px, đã đo thật 19/9. Không phát minh lớp mới cho cùng một
+   việc: hai bản sao thì sớm muộn một bản tụt lại ở vùng chạm.
+
+   NGƯỜI ĐÃ CÓ QUAN HỆ HIỆN MỜ, KHÔNG BỊ LỌC RA. Bỏ họ khỏi danh sách là lặp
+   đúng lỗi vừa chữa sáng nay ở màn tìm tên: người không thấy tên ai đó sẽ
+   kết luận ứng dụng bỏ sót, rồi đi hỏi vòng quanh. Hiện mờ kèm một chữ nói
+   rõ đang ở trạng thái nào thì họ tự hiểu ngay. */
+function openRuCungLam() {
+  const ds = TN?.cung_lam?.chon_duoc ?? [];
+  const nhan = { dang_cho: 'đang chờ trả lời', da_chung: 'đã cùng làm' };
+  openSheet(`<h3>Rủ người cùng làm đề tài</h3>
+    <p class="mut" style="margin:0 0 4px">Chọn người, rồi chọn <b>bài của ai</b> —
+      người kia phải bấm Đồng ý thì mới thành.</p>
+    <p class="foot" style="padding:0 0 10px">Chỉ rủ được người <b>đã đăng nhập</b>
+      ứng dụng: họ phải bấm được nút Đồng ý. Ai chưa vào được thì nộp bài riêng
+      như cũ.</p>
+    <input id="ruTim" placeholder="Tìm tên hoặc nhóm…" maxlength="60" autocomplete="off">
+    <div class="ruds" id="ruDs">
+      ${ds.map(x => `<button type="button" class="fdpick ${x.trang_thai_voi_toi ? 'mo' : ''}"
+        data-ru="${x.member_id}" data-ten="${esc(x.full_name)}"
+        data-tim="${esc(boDau(`${x.full_name} ${x.group_label ?? ''}`).toLowerCase())}"
+        ${x.trang_thai_voi_toi ? 'disabled' : ''}>
+        <span class="x"><b>${esc(x.full_name)}</b>${x.group_label
+          ? `<span class="d">${esc(x.group_label)}</span>` : ''}</span>
+        <span class="ch">${x.trang_thai_voi_toi ? nhan[x.trang_thai_voi_toi] : 'chọn'}</span>
+      </button>`).join('')}
+    </div>
+    <div class="mut" id="ruKhong" style="display:none;padding:14px 0">Không ai khớp —
+      thử gõ ít chữ hơn.</div>
+    ${ds.length ? '' : `<div class="mut" style="padding:14px 0">Chưa có ai khác trong lớp
+      đăng nhập ứng dụng, nên chưa rủ được ai.</div>`}
+    <div id="ruB2" style="display:none"></div>`);
+
+  const oTim = $('#ruTim');
+  // Lọc THẲNG TRÊN DOM, không vẽ lại sheet: vẽ lại là ô tìm mất tiêu điểm và
+  // bàn phím điện thoại sập xuống sau MỖI chữ gõ vào — đúng bài học của ô tìm
+  // ở màn Ban cán sự lớp.
+  oTim.oninput = () => {
+    const q = boDau(oTim.value.trim()).toLowerCase();
+    let con = 0;
+    document.querySelectorAll('#ruDs .fdpick').forEach(b => {
+      const hien = !q || (b.dataset.tim ?? '').includes(q);
+      b.style.display = hien ? '' : 'none';
+      if (hien) con++;
+    });
+    $('#ruKhong').style.display = (!con && ds.length) ? 'block' : 'none';
+  };
+
+  document.querySelectorAll('#ruDs [data-ru]').forEach(b => {
+    b.onclick = () => ruBuocHai(Number(b.dataset.ru), b.dataset.ten);
+  });
+}
+
+/* Bước hai: công tắc hai vế. Vế "tôi cùng làm bài của họ" in kèm TÊN ĐỀ TÀI
+   của họ — không in thì người bấm không biết mình đang xin vào cái gì, và
+   "họ chưa khai đề tài nào" cũng là một câu trả lời đáng nói ra. */
+function ruBuocHai(id, ten) {
+  // Đề tài của họ đọc từ danh sách người CÙNG LĨNH VỰC thì không có — payload
+  // `chon_duoc` cố ý chỉ mang id + tên + nhãn nhóm, không mang đề tài của ai.
+  // Nên câu chữ ở đây nói theo NGƯỜI, không nói theo bài: hỏi đúng chuyện
+  // đang hỏi mà không phát tán thêm một trường nào của ai.
+  $('#ruDs').style.display = 'none';
+  $('#ruTim').style.display = 'none';
+  $('#ruKhong').style.display = 'none';
+  const b2 = $('#ruB2');
+  b2.style.display = 'block';
+  b2.innerHTML = `
+    <div class="rupick"><b>${esc(ten)}</b>
+      <button type="button" class="lnk" id="ruDoi">đổi người</button></div>
+    <label class="f">Bài chung này là bài của ai?</label>
+    <div class="fl cuon" id="ruBen">
+      <button type="button" class="fc on" data-ben="toi">Họ cùng làm <b>bài của tôi</b></button>
+      <button type="button" class="fc" data-ben="ho">Tôi cùng làm <b>bài của họ</b></button>
+    </div>
+    <div class="hintline">Chọn "bài của tôi" thì ba ô đề tài bạn vừa khai là bài chung,
+      và ${esc(ten)} đứng tên cùng. Chọn "bài của họ" thì ngược lại — bài của họ giữ
+      nguyên, bạn đứng tên cùng.</div>
+    <label class="f">Lời nhắn (không bắt buộc)</label>
+    <textarea id="ruNhan" maxlength="200" rows="2"
+      placeholder="Ví dụ: mình cùng làm mảng chuỗi nhà thuốc nhé"></textarea>
+    <div class="errline" id="ruErr" style="display:none"></div>
+    <button class="wide" id="ruGui">Gửi lời rủ</button>
+    <div class="foot" style="padding:9px 0 0">Gửi xong thì chờ ${esc(ten)} bấm Đồng ý.
+      Chưa ai trả lời thì bạn vẫn rút lại được.</div>`;
+
+  $('#ruDoi').onclick = openRuCungLam;
+  document.querySelectorAll('#ruBen [data-ben]').forEach(b => {
+    b.onclick = () => document.querySelectorAll('#ruBen [data-ben]')
+      .forEach(x => x.classList.toggle('on', x === b));
+  });
+
+  /* CỐ Ý không dùng submitting(): hàm ấy báo lỗi bằng toast rồi đóng sheet ở
+     nhánh xuôi, mà lỗi ở đây là thứ người ta cần ĐỌC KỸ ("người này đã cùng
+     làm với bạn rồi", "họ chưa đăng nhập ứng dụng") chứ không phải một dòng
+     trôi qua trong ba giây. Nhánh hỏng chỉ hiện dòng lỗi và KHÔNG đóng sheet
+     — lời nhắn vừa gõ còn nguyên, đúng nếp đã ghi cho ô nhập của Trợ lý. */
+  $('#ruGui').onclick = async () => {
+    const nut = $('#ruGui');
+    nut.disabled = true; nut.textContent = 'Đang gửi…';
+    $('#ruErr').style.display = 'none';
+    try {
+      await apiPost('/api/totnghiep/cung-lam', {
+        doi_tac_member_id: id,
+        bai_cua: document.querySelector('#ruBen .fc.on')?.dataset.ben ?? 'toi',
+        loi_nhan: $('#ruNhan').value,
+      });
+      closeSheet();
+      toast('Đã gửi lời rủ — chờ họ bấm Đồng ý');
+      await renderTotNghiep();
+    } catch (e) {
+      $('#ruErr').textContent = errText(e);
+      $('#ruErr').style.display = 'block';
+      nut.disabled = false; nut.textContent = 'Gửi lời rủ';
+    }
+  };
 }
 
 /* Ban cán sự lớp xem cả lớp. isClassCommittee gồm cả uy_vien, nên Ngô Phú
@@ -5704,20 +5959,32 @@ function veDanhSachTotNghiep() {
      đã có đề tài, ai đã nộp link — tức dò ngược được và xuất ra được.
      Giữ ĐỦ 15 lĩnh vực kể cả lĩnh vực chưa ai chọn: "chưa ai chọn" là một câu
      trả lời, còn một dòng biến mất thì Ban cán sự lớp không biết là chưa ai
-     chọn hay là mình quên mất nó. Sắp theo số người giảm dần, y như Zalo. */
+     chọn hay là mình quên mất nó. Sắp theo số người giảm dần, y như Zalo.
+
+     TỪ 19/9 ĐƠN VỊ LÀ BÀI, KHÔNG PHẢI NGƯỜI — và đó là cả lý do tính năng
+     "cùng làm" tồn tại: trước đó ba người làm chung phải dán cùng một link ba
+     lần và màn này đếm thành BA BÀI. Vẫn in cả hai con số: `so_bai` là thứ
+     Ban tổ chức xếp lịch bảo vệ theo, `so_nguoi` là thứ thanh so sánh dùng
+     (một lĩnh vực 2 bài 6 người "đông" hơn một lĩnh vực 3 bài 3 người). */
   const lv = [...(ds.theo_linh_vuc ?? [])].sort((a, b) => b.so_nguoi - a.so_nguoi);
   const donVi = Math.max(1, ...lv.map(x => x.so_nguoi));
   const khoiLinhVuc = lv.map(x => `
-    <button type="button" class="dstnlv ${x.so_nguoi ? '' : 'trong'}" data-lv="${esc(x.ma)}">
+    <button type="button" class="dstnlv ${x.so_bai ? '' : 'trong'}" data-lv="${esc(x.ma)}">
       <span class="thanh" style="width:${Math.round((x.so_nguoi / donVi) * 100)}%"></span>
       <span class="tx"><b>${esc(x.ten)}</b>
-        <i>${x.so_nguoi ? `<span class="num">${x.so_nguoi}</span> người` : 'chưa ai chọn'}${
+        <i>${x.so_bai ? `<span class="num">${x.so_bai}</span> bài · <span class="num">${x.so_nguoi}</span> người` : 'chưa ai chọn'}${
           x.so_da_nop_link ? ` · <span class="num">${x.so_da_nop_link}</span> đã nộp link` : ''}</i></span>
     </button>
-    ${DSTN_MO.has(x.ma) && x.so_nguoi ? `<div class="dstnai">${x.nguoi.map(n => `
+    ${DSTN_MO.has(x.ma) && x.so_bai ? `<div class="dstnai">${(x.bai ?? []).map(n => `
       <div class="fd"><div class="x"><b>${esc(n.full_name)}</b>
-        <span class="mut"> · ${esc(n.group_label || '—')}</span>
+        <span class="mut"> · ${esc(n.group_label || '—')}${n.cung_lam.length ? ' · giữ bài' : ''}</span>
         <div class="mut" style="margin-top:2px">${n.khkd_de_tai ? esc(n.khkd_de_tai) : '<i>chưa đặt tên đề tài</i>'}</div>
+        ${/* Người cùng làm nằm THỤT VÀO dưới chủ bài, không thành dòng ngang
+             hàng: một bài là một khối, và nhìn lướt phải đếm được ra số bài.
+             Xếp ngang hàng thì màn hình lại đọc thành một danh sách người —
+             đúng cái vừa sửa. */''}
+        ${n.cung_lam.length ? `<div class="dstncl">${n.cung_lam.map(c =>
+          `<div>${esc(c.full_name)}<span class="mut"> · ${esc(c.group_label || '—')}</span></div>`).join('')}</div>` : ''}
         ${n.khkd_url ? `<a href="${esc(n.khkd_url)}" target="_blank" rel="noopener"
            style="font-size:12px;overflow-wrap:anywhere">mở bài ›</a>`
           : '<span class="tg">chưa nộp link</span>'}
@@ -5816,8 +6083,15 @@ function veDanhSachTotNghiep() {
     </div>
 
     ${DSTN_THE === 'tong' ? oTong : DSTN_THE === 'linhvuc' ? `
-      <p class="sub"><b class="num">${ds.da_chon_linh_vuc}</b>/${ds.tong} người đã chọn lĩnh vực ·
-         <b class="num">${ds.da_nop_link}</b> đã nộp link bài.</p>
+      ${/* NÓI RÕ ĐANG ĐẾM GÌ. Từ 19/9 mỗi lĩnh vực đếm "N bài · M người", mà
+           M gồm cả người cùng làm — nên một dòng đầu viết trống không "N/21
+           người đã chọn lĩnh vực" đọc lên như mâu thuẫn với các dòng dưới.
+           Hai chỗ nói hai chuyện về cùng một chữ "người" là đúng loại lỗi
+           tệp CLAUDE.md nhắc nhiều nhất, chỉ khác là lần này nó nằm gọn
+           trong một câu. */''}
+      <p class="sub"><b class="num">${ds.theo_linh_vuc.reduce((n, x) => n + x.so_bai, 0)}</b> bài ·
+         <b class="num">${ds.da_nop_link}</b> đã nộp link ·
+         <b class="num">${ds.da_chon_linh_vuc}</b>/${ds.tong} người tự đứng tên một bài riêng.</p>
       <div class="dstnbox">${khoiLinhVuc}</div>
       ${chuaChon.length ? `<div class="eb" style="margin-top:18px">Chưa chọn lĩnh vực (${chuaChon.length})</div>
         <div class="card"><div class="cb"><div class="mut" style="line-height:1.7">${
@@ -5853,7 +6127,18 @@ function veDanhSachTotNghiep() {
                 ${p.gala_luc ? `<span class="tg ${p.du_le === 'co' ? 'go' : ''}">${p.du_le === 'co' ? 'dự Gala' : 'không dự'}</span>` : '<span class="tg">chưa trả lời</span>'}
                 ${p.khkd_url ? '<span class="tg go">đã nộp bài</span>' : p.khkd_linh_vuc ? '<span class="tg">đã chọn lĩnh vực</span>' : ''}
                 ${phi}
-              </div></div></div>`;
+              </div>
+              ${/* Cùng làm bài (migration 0045). In ra ở ĐÂY chứ không chỉ
+                   trong tệp CSV, vì cả lý do thẻ này tồn tại là tra MỘT người:
+                   "anh A đã nộp gì chưa" mà anh A đứng tên bài của chị B thì
+                   một dòng "hồ sơ ✓ · chưa chọn lĩnh vực" đọc lên như anh ấy
+                   chưa làm gì. Chữ, không phải huy hiệu màu: đây là một sự
+                   thật cần ĐỌC, không phải một trạng thái xong/chưa. */''}
+              ${p.dung_ten_bai_cua?.length ? `<div class="mut" style="margin-top:3px;font-size:12px">
+                cùng làm bài của ${esc(p.dung_ten_bai_cua.join(' · '))}</div>` : ''}
+              ${p.cung_lam_voi_toi?.length ? `<div class="mut" style="margin-top:3px;font-size:12px">
+                bài của họ có ${esc(p.cung_lam_voi_toi.map(c => c.full_name).join(' · '))} cùng làm</div>` : ''}
+            </div></div>`;
         }).join('')
       }<div class="mut" id="dstnKhong" style="display:none;padding:12px 2px">Không có ai khớp.</div></div></div>
     `}
