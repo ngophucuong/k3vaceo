@@ -641,22 +641,32 @@ function vaoBuoc1() {
     // Chờ người ta gõ xong hẵng hỏi máy chủ.
     hen = setTimeout(async () => {
       let ds = [];
+      let tong = 0;
       if (truoc && nhu(q).startsWith(truoc.q)) {
         ds = truoc.ds.filter(p => nhu(p.full_name).includes(nhu(q)));
+        tong = ds.length;
       } else {
-        try { ds = (await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q))).people; }
+        try {
+          const kq = await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q));
+          ds = kq.people; tong = kq.tong_khop ?? ds.length;
+        }
         catch (e) { truoc = null; $('#vDs').innerHTML = `<div class="err">${esc(errText(e))}</div>`; return; }
         truoc = ds.length < 12 ? { q: nhu(q), ds } : null;
       }
       if (!ds.length) {
-        $('#vDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp. Thử gõ ngắn hơn, hoặc nhắn trưởng nhóm.</div>`;
+        $('#vDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp.
+          Thử gõ họ và tên đệm (gõ không dấu cũng được), hoặc nhắn trưởng nhóm.</div>`;
         return;
       }
+      // Cùng bản vá của /totnghiep: danh sách cắt ở 12 thì phải nói ra. Đây là
+      // cửa đăng nhập, nên người không thấy tên mình sẽ bỏ luôn ứng dụng.
+      const conNua = Math.max(0, tong - ds.length);
       $('#vDs').innerHTML = `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
         <div class="fd"><div class="x"><b>${esc(p.full_name)}</b>
           <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
         </div><button class="lnk" data-rid="${p.roster_id}">là tôi</button></div>`).join('')}
-      </div></div>`;
+      </div></div>${conNua ? `<div class="hintline">Còn ${conNua} người nữa cũng khớp —
+        gõ thêm chữ (họ, tên đệm) cho danh sách ngắn lại.</div>` : ''}`;
       document.querySelectorAll('#vDs [data-rid]').forEach(b => {
         b.onclick = () => {
           const p = ds.find(x => String(x.roster_id) === b.dataset.rid);
@@ -3137,7 +3147,7 @@ async function drawQuy() {
   });
   document.querySelectorAll('#v-quy [data-copy]').forEach(b => {
     b.onclick = async () => {
-      try { await navigator.clipboard.writeText(b.dataset.copy); toast('Đã chép nội dung chuyển khoản'); }
+      try { await navigator.clipboard.writeText(b.dataset.copy); toast('Đã chép ' + (b.dataset.nhan || 'nội dung chuyển khoản')); }
       catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
     };
   });
@@ -3385,8 +3395,11 @@ function renderRound(r) {
       </div>` : `
       ${xongCuaToi ? '' : `<div class="qrw">
         <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
-        <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
-        <button class="copy" data-copy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
+        <div class="cap">${esc(r.bank_name || r.bank_bin)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
+        <div class="chep">
+          <button class="copy" data-copy="${esc(r.account_no)}" data-nhan="số tài khoản">${esc(r.account_no)} <span class="nh">chép số TK</span></button>
+          <button class="copy" data-copy="${esc(r.transfer_note)}" data-nhan="nội dung chuyển khoản">${esc(r.transfer_note)} <span class="nh">chép nội dung</span></button>
+        </div>
       </div>`}
       <div class="cb">
         ${r.i_am_verified
@@ -4561,24 +4574,37 @@ function tnckTimTen() {
     if (q.length < 2) { $('#tnckDs').innerHTML = ''; return; }
     hen = setTimeout(async () => {
       let ds = [];
+      let tong = 0;
       // Cùng mẹo thu hẹp tại chỗ của /vao: chỉ giữ lại danh sách CHƯA bị cắt
       // (dưới 12 người) — thu hẹp trên một danh sách đã cụt sẽ giấu mất người.
       if (truoc && nhu(q).startsWith(truoc.q)) {
         ds = truoc.ds.filter(p => nhu(p.full_name).includes(nhu(q)));
+        tong = ds.length;
       } else {
-        try { ds = (await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q))).people; }
+        try {
+          const kq = await apiGet('/api/wizard/roster/search?q=' + encodeURIComponent(q));
+          ds = kq.people; tong = kq.tong_khop ?? ds.length;
+        }
         catch (e) { truoc = null; $('#tnckDs').innerHTML = `<div class="errline" style="display:block">${esc(errText(e))}</div>`; return; }
         truoc = ds.length < 12 ? { q: nhu(q), ds } : null;
       }
       if (!ds.length) {
-        $('#tnckDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp. Thử gõ ngắn hơn, hoặc nhắn trưởng nhóm.</div>`;
+        // Câu cũ khuyên "thử gõ NGẮN hơn" — ngược đúng chiều: gõ ngắn thì càng
+        // nhiều người khớp và càng bị cắt. Nói đúng việc cần làm.
+        $('#tnckDs').innerHTML = `<div class="mut">Không thấy ai tên như vậy trong lớp.
+          Thử gõ họ và tên đệm (gõ không dấu cũng được), hoặc nhắn trưởng nhóm.</div>`;
         return;
       }
+      // DANH SÁCH BỊ CẮT thì phải NÓI RA. Giấu mức cắt là để người không thấy
+      // tên mình kết luận Ban tổ chức bỏ sót họ — mà đây là bước đầu tiên của
+      // lối đi DUY NHẤT dành cho 38 người không đăng nhập được.
+      const conNua = Math.max(0, tong - ds.length);
       $('#tnckDs').innerHTML = `<div class="card"><div class="cb" style="padding:2px 14px">${ds.map(p => `
         <div class="fd"><div class="x"><b>${esc(p.full_name)}</b>
           <div style="font-size:11.5px;color:var(--ink3);margin-top:2px">${esc(p.group_label)}${p.title ? ' · ' + esc(p.title) : ''}</div>
         </div><button class="lnk" data-rid="${p.roster_id}">là tôi</button></div>`).join('')}
-      </div></div>`;
+      </div></div>${conNua ? `<div class="hintline">Còn ${conNua} người nữa cũng khớp —
+        gõ thêm chữ (họ, tên đệm) cho danh sách ngắn lại.</div>` : ''}`;
       document.querySelectorAll('#tnckDs [data-rid]').forEach(b => {
         b.onclick = () => {
           TNCK.nguoi = ds.find(x => String(x.roster_id) === b.dataset.rid);
@@ -4603,16 +4629,37 @@ async function tnckForm() {
      trang này, tìm tên mình và gửi thêm lần nữa — ô để trống vẫn giữ nguyên
      nội dung cũ.`, `
     ${tnNhanBatBuoc()}
+    ${/* BA Ô NÀY LÀ `placeholder`, KHÔNG PHẢI `value` — và đó là một bản vá
+         cho lỗi MẤT DỮ LIỆU, không phải chuyện trình bày (19/9).
+
+         Máy chủ giữ bản cũ theo luật `giuCu()`: ô nào NGƯỜI GỬI ĐỂ TRỐNG thì
+         giữ nguyên giá trị đang có trong D1. Bản đầu điền sẵn ba ô này bằng
+         dữ liệu DANH SÁCH GỐC 15/8 (thứ /api/wizard/roster/search trả về),
+         nên chúng KHÔNG BAO GIỜ trống — tức luật kia không bao giờ chạy cho
+         chúng. Ai đã sửa "Công ty X" thành "Công ty TNHH X Việt Nam", hôm sau
+         quay lại chỉ để thêm ngày sinh, thì tên doanh nghiệp bị TRẢ VỀ bản
+         15/8, im lặng — đúng lúc màn cuối đang hứa "những ô bạn để trống vẫn
+         giữ nguyên nội dung cũ".
+
+         Bài học chung, đáng nhớ hơn chính bản vá: ĐIỀN SẴN một ô là VÔ HIỆU
+         HOÁ mọi luật "ô trống thì giữ bản cũ" đứng sau nó.
+
+         Để trống an toàn tuyệt đối vì máy chủ có sẵn chuỗi rơi lui
+         gõ → bản đã lưu → danh sách gốc (tot-nghiep.js `dat.ho_ten`), và
+         `cleanText('')` trả null nên `??` bắt đúng. `BAT_BUOC` cũng cố ý
+         không xét ho_ten nên không sinh 422. */ ''}
     <label class="f">Họ và tên <i>in trên chứng chỉ</i></label>
-    <input id="ckTen" maxlength="120" value="${esc(p.full_name)}">
+    <input id="ckTen" maxlength="120" placeholder="${esc(p.full_name)}" autocomplete="name">
     <label class="f">Ngày sinh</label>
-    <input id="ckDob" maxlength="20" placeholder="dd/mm/yyyy">
+    <input id="ckDob" maxlength="20" placeholder="dd/mm/yyyy" inputmode="numeric">
     <label class="f">Số điện thoại</label>
-    <input id="ckSdt" maxlength="20" inputmode="tel">
+    <input id="ckSdt" maxlength="20" inputmode="tel" type="tel" autocomplete="tel">
     <label class="f">Doanh nghiệp</label>
-    <input id="ckDN" maxlength="200" value="${esc(p.company)}">
+    <input id="ckDN" maxlength="200" placeholder="${esc(p.company)}" autocomplete="organization">
     <label class="f">Chức vụ</label>
-    <input id="ckCV" maxlength="120" value="${esc(p.title)}">
+    <input id="ckCV" maxlength="120" placeholder="${esc(p.title)}" autocomplete="organization-title">
+    <div class="hintline">Chữ mờ là thông tin trong danh sách gốc của Ban tổ chức.
+      Để trống thì giữ nguyên thứ bạn đã khai trước đó; gõ vào thì đổi.</div>
 
     <label class="f">Lĩnh vực hoạt động (tối đa 3)</label>
     <div class="fl cuon" id="ckNg">${(cf.nganh_list ?? []).map(x =>
@@ -4769,8 +4816,11 @@ function tnckXong(kq) {
       <div class="eb">Phí dự Lễ ${vnMoney(r.amount)} đ</div>
       <div class="qrw">
         <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
-        <div class="cap">${esc(r.bank_name)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
-        <button class="copy" data-tncopy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
+        <div class="cap">${esc(r.bank_name)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
+        <div class="chep">
+          <button class="copy" data-tncopy="${esc(r.account_no)}" data-nhan="số tài khoản">${esc(r.account_no)} <span class="nh">chép số TK</span></button>
+          <button class="copy" data-tncopy="${esc(r.transfer_note)}" data-nhan="nội dung chuyển khoản">${esc(r.transfer_note)} <span class="nh">chép nội dung</span></button>
+        </div>
       </div>
       <div class="foot" style="padding:9px 0 0">Chuyển khoản xong thì thôi — người thu
         đối chiếu sao kê rồi xác nhận. Nhớ giữ ĐÚNG nội dung chuyển khoản ở trên,
@@ -4792,7 +4842,7 @@ function tnckXong(kq) {
   });
   document.querySelectorAll('[data-tncopy]').forEach(b => {
     b.onclick = async () => {
-      try { await navigator.clipboard.writeText(b.dataset.tncopy); toast('Đã chép nội dung chuyển khoản'); }
+      try { await navigator.clipboard.writeText(b.dataset.tncopy); toast('Đã chép ' + (b.dataset.nhan || 'nội dung chuyển khoản')); }
       catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
     };
   });
@@ -5242,8 +5292,11 @@ function tnVePhi(r) {
     <label class="f">Bạn đã chuyển khoản ${vnMoney(r.amount)} đ chưa?</label>
     <div class="qrw">
       <img class="qr" src="${esc(r.qr_url)}" alt="Mã chuyển khoản riêng của bạn" width="196" height="196">
-      <div class="cap">${esc(r.bank_name || r.bank_bin)} · ${esc(r.account_no)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
-      <button class="copy" data-tncopy="${esc(r.transfer_note)}">${esc(r.transfer_note)} <span style="font-size:11px;color:var(--ink3)">chép</span></button>
+      <div class="cap">${esc(r.bank_name || r.bank_bin)}${r.account_name ? ' · ' + esc(r.account_name) : ''}</div>
+      <div class="chep">
+        <button class="copy" data-tncopy="${esc(r.account_no)}" data-nhan="số tài khoản">${esc(r.account_no)} <span class="nh">chép số TK</span></button>
+        <button class="copy" data-tncopy="${esc(r.transfer_note)}" data-nhan="nội dung chuyển khoản">${esc(r.transfer_note)} <span class="nh">chép nội dung</span></button>
+      </div>
     </div>
     <button class="wide" data-tndeclare="${r.id}" data-on="0" ${r.status !== 'open' ? 'disabled' : ''}>Rồi, tôi đã chuyển ${vnMoney(r.amount)} đ</button>
     <div class="foot" style="padding:9px 0 0">Đây là lời tự khai của bạn, không phải xác nhận của người thu.</div>
@@ -5374,7 +5427,7 @@ function tnGanSuKien() {
 
   document.querySelectorAll('[data-tncopy]').forEach(b => {
     b.onclick = async () => {
-      try { await navigator.clipboard.writeText(b.dataset.tncopy); toast('Đã chép nội dung chuyển khoản'); }
+      try { await navigator.clipboard.writeText(b.dataset.tncopy); toast('Đã chép ' + (b.dataset.nhan || 'nội dung chuyển khoản')); }
       catch { toast('Trình duyệt không cho chép — chép tay giúp nhé'); }
     };
   });

@@ -436,6 +436,20 @@ ok('có lối "điền thẳng ở đây"', await p3.locator('#tnckBatDau').coun
 
 await p3.click('#tnckBatDau'); await p3.waitForTimeout(500);
 ok('mở ra màn tìm tên', await p3.locator('#tnckTen').count() === 1);
+
+/* A4 — DANH SÁCH BỊ CẮT PHẢI NÓI RA.
+   searchRoster cắt cứng ở 12 người và trước 19/9 không báo là đã cắt: gõ
+   "nguyen" khớp 26 người, chỉ thấy 12, và người không thấy tên mình kết luận
+   Ban tổ chức bỏ sót họ — ngay ở bước ĐẦU TIÊN của lối đi duy nhất dành cho
+   38 người không đăng nhập được. */
+await p3.fill('#tnckTen', 'nguyen'); await p3.waitForTimeout(1400);
+const dsCat = await p3.locator('#tnckDs').innerText();
+ok('gõ một chuỗi khớp nhiều người thì đúng 12 dòng hiện ra',
+   (await p3.locator('#tnckDs [data-rid]').count()) === 12);
+ok('và NÓI RA còn bao nhiêu người nữa bị cắt', /Còn \d+ người nữa/.test(dsCat));
+ok('kèm lời khuyên ĐÚNG CHIỀU — gõ THÊM chữ, không phải gõ ngắn hơn',
+   /gõ thêm chữ/i.test(dsCat) && !/ngắn hơn/i.test(dsCat));
+
 await p3.fill('#tnckTen', 'khanh toan'); await p3.waitForTimeout(1400);
 ok('tìm không dấu ra đúng người', (await p3.locator('#tnckDs').innerText()).includes('Đinh Khánh Toàn'));
 await p3.locator('#tnckDs [data-rid]').first().click(); await p3.waitForTimeout(1200);
@@ -446,8 +460,22 @@ ok('form công khai cũng có 15 chip lĩnh vực KHKD', await p3.locator('#ckLv
 ok('ô Ngày sinh để TRỐNG — không điền sẵn dữ liệu của ai',
    (await p3.inputValue('#ckDob')) === '');
 ok('ô Số điện thoại để TRỐNG', (await p3.inputValue('#ckSdt')) === '');
-ok('ô Họ tên có sẵn tên vừa chọn (thứ chính họ vừa bấm, không phải thứ bị lộ)',
-   (await p3.inputValue('#ckTen')) === 'Đinh Khánh Toàn');
+/* A1 — BA Ô NÀY LÀ CHỮ MỜ, KHÔNG PHẢI GIÁ TRỊ.
+   Máy chủ hứa "ô để trống thì giữ nguyên bản đã lưu" (giuCu). Một ô điền sẵn
+   thì KHÔNG BAO GIỜ trống, nên lời hứa ấy chết lặng với đúng ba ô này: người
+   đã sửa doanh nghiệp/chức vụ, hôm sau quay lại chỉ để thêm ngày sinh, bị trả
+   về bản danh sách gốc 15/8. Chữ mờ giữ đủ hai vế — vẫn nhìn thấy bản gốc, mà
+   để trống vẫn là "giữ bản đã lưu".
+   Vế `value` rỗng mới là vế có răng: bỏ nó đi thì đổi ngược về `value=` vẫn
+   xanh, vì placeholder và value hiện lên trông y hệt nhau trên ảnh chụp. */
+ok('ô Họ tên: tên vừa chọn là CHỮ MỜ, ô vẫn trống',
+   (await p3.getAttribute('#ckTen', 'placeholder')) === 'Đinh Khánh Toàn'
+   && (await p3.inputValue('#ckTen')) === '');
+ok('ô Doanh nghiệp và Chức vụ cũng vậy — trống, chỉ gợi ý bằng chữ mờ',
+   (await p3.inputValue('#ckDN')) === '' && (await p3.inputValue('#ckCV')) === ''
+   && ((await p3.getAttribute('#ckDN', 'placeholder')) || '').length > 0);
+ok('nói cho người điền biết chữ mờ nghĩa là gì',
+   /chữ mờ/i.test(await p3.locator('#ckGui').locator('xpath=ancestor::*[contains(@class,"tncard")]').innerText()));
 const chuCk = await p3.locator('body').innerText();
 ok('KHÔNG có chữ "đã đóng" trên màn công khai', !/đã đóng/i.test(chuCk));
 
@@ -501,8 +529,22 @@ ok('điền đủ thì gửi được, ra màn "Đã gửi xong"',
 // Mã QR chỉ hiện SAU khi chọn "có dự" — chưa nói là đi thì chưa có gì để
 // chuyển tiền, mà bày sẵn mã là mời chuyển nhầm.
 ok('hiện khối phí kèm cú pháp chuyển khoản', await p3.locator('.tnphi').count() === 1);
-ok('cú pháp bắt đầu bằng GALA',
-   /GALA/.test(await p3.locator('.tnphi .copy').innerText()));
+/* A3 — HAI nút chép, không phải một.
+   Nhánh dự phòng lúc mã QR không tải được nói thẳng "chuyển khoản tay theo số
+   tài khoản bên dưới cũng được" — mà trước 19/9 số ấy là chữ thường 12.5px,
+   không chép được. Tức đường lui chính thức bắt người 50 tuổi đọc tay một dãy
+   10 chữ số rồi gõ lại vào app ngân hàng; gõ sai một số là tiền đi nhầm người.
+   Phép này đếm ĐÚNG HAI và soi từng nút mang đúng chuỗi nào — đếm ">= 1" thì
+   một bản vá làm rụng mất nút số tài khoản vẫn xanh. */
+const chepCk = p3.locator('.tnphi .copy');
+ok('khối phí có ĐÚNG hai nút chép', (await chepCk.count()) === 2);
+ok('nút thứ nhất chép SỐ TÀI KHOẢN',
+   (await chepCk.nth(0).getAttribute('data-tncopy')) === '0975587586');
+ok('nút thứ hai chép cú pháp, bắt đầu bằng GALA',
+   /^GALA/.test(await chepCk.nth(1).getAttribute('data-tncopy')));
+ok('mỗi nút nói rõ nó chép cái gì',
+   /chép số TK/i.test(await chepCk.nth(0).innerText())
+   && /chép nội dung/i.test(await chepCk.nth(1).innerText()));
 ok('mã QR hỏng thì có ô dự phòng, không để ô vỡ ảnh',
    await p3.locator('.tnphi .ph').count() === 1);
 ok('không lỗi JS ở đường công khai: ' + (loi3.join(' | ') || 'sạch'), loi3.length === 0);

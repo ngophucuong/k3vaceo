@@ -348,6 +348,18 @@ main{padding-top:18px}
   background:var(--surf);box-shadow:var(--sh);padding:8px 13px;border-radius:99px;margin-top:9px;transition:.16s;
   max-width:100%;overflow-wrap:anywhere}
 .copy:active{transform:scale(.96)}
+/* Hai nút chép xếp dọc, canh giữa trong .qrw. Số tài khoản có nút RIÊNG từ
+   19/9: nhánh dự phòng lúc mã QR hỏng bảo người ta "chuyển khoản tay theo số
+   tài khoản bên dưới", mà số ấy trước nay là chữ thường 12.5px không chép
+   được — tức đường lui chính thức bắt người 50 tuổi đọc tay một dãy 10-14
+   chữ số rồi gõ lại vào app ngân hàng. Gõ sai một số là tiền đi nhầm người. */
+.qrw .chep{display:flex;flex-direction:column;align-items:center;gap:7px;margin-top:11px}
+.qrw .chep .copy{margin-top:0}
+/* Nhãn phụ phải rơi về phông CHỮ, không dùng var(--num): Space Grotesk thiếu
+   glyph tiếng Việt nên "chép" rụng dấu và đứng lệch hẳn — đúng lỗi đã trả giá
+   với tiêu đề trang /giao-thuong. */
+.copy .nh{font-family:'Be Vietnam Pro',system-ui,sans-serif;font-size:11px;
+  font-weight:500;color:var(--ink3);letter-spacing:0}
 .dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:12px}
 .dots i{width:12px;height:12px;border-radius:4px;background:var(--line2);transition:background .4s}
 .dots i.d{background:var(--due)}

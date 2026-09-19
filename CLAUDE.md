@@ -1850,6 +1850,106 @@ Ba thay đổi, mỗi cái chữa đúng một điều anh chỉ ra:
   đúng ngay sau lượt deploy; câu chữ ở tab Bài nằm trong `app.js` nên có thể
   trễ tới 4 tiếng vì Browser Cache TTL cấp zone (xem mục "Làm mới").
 
+## Hai LỖI vá trước khi phát link, và hai chỗ nới kèm (19/9)
+
+Ngô Phú Cường xin tư vấn chủ động: *"UI mới khá ổn, bạn xem lại các chức năng
+bên trong cần điều chỉnh UI như thế nào thì chủ động tư vấn cho tôi."* Soi bên
+trong thì hai thứ hoá ra **không phải chuyện giao diện mà là lỗi**, và cả hai
+nằm đúng trên đường 146 người sắp đi. Link chưa phát — nên còn đúng một cửa sổ
+yên tĩnh để vá. Anh chọn vá cả hai ngay, cộng hai chỗ nới.
+
+### Ô ĐIỀN SẴN vô hiệu hoá mọi luật "ô trống thì giữ bản cũ" đứng sau nó
+
+**Đây là bài học đáng nhớ nhất của cả đợt.** Máy chủ hứa `giuCu()` — ô nào để
+trống thì giữ nguyên giá trị cũ — và mục "Nới … thành KHAI BỔ SUNG" ở trên ghi
+hẳn lý lẽ: *"lượt gửi công khai KHÔNG BAO GIỜ xoá trắng một ô đã có chữ"*.
+
+Nhưng `tnckForm()` điền sẵn BA ô bằng dữ liệu **danh sách gốc 15/8** lấy từ
+`/api/wizard/roster/search`: họ tên, doanh nghiệp, chức vụ. Ba ô ấy **không
+bao giờ rỗng**, nên `giuCu()` không bao giờ nhìn thấy chúng trống — người đã
+sửa doanh nghiệp trong tài khoản, hôm sau quay lại chỉ để thêm ngày sinh, bị
+**trả ngược về bản 15/8**, im lặng, đúng lúc màn cuối đang hứa ngược lại.
+
+Chữa bằng `placeholder=` thay `value=`: chữ mờ giữ đủ hai vế — vẫn nhìn thấy
+bản gốc, mà để trống vẫn là "giữ bản đã lưu". Ba điều đã xác minh chứ không
+suy đoán, vì nếu sai thì hỏng ở chỗ nguy nhất (ô bắt buộc):
+
+- `doanh_nghiep` / `chuc_vu` đi qua `giuCu()`, vốn kiểm `moi === ''` tường minh.
+- `ho_ten` đi qua chuỗi rơi lui **gõ → bản đã lưu → danh sách gốc**, và
+  `cleanText('')` trả `null` nên `??` bắt đúng. Để trống không bao giờ ra tên rỗng.
+- `BAT_BUOC` cố ý không xét `ho_ten`, nên để trống không sinh 422.
+
+Kèm một dòng nói thẳng chữ mờ nghĩa là gì — không nói thì người ta tưởng ứng
+dụng đã điền hộ rồi và bỏ qua ô cần sửa.
+
+**Phép canh phải đi HAI TẦNG, mỗi tầng một mình đều mù:** giao diện kiểm
+`value === ''` **và** `placeholder` có chữ (chỉ kiểm placeholder thì đổi ngược
+về `value=` vẫn xanh — trên ảnh chụp hai thứ trông y hệt nhau); máy chủ phải
+lưu `doanh_nghiep` một giá trị KHÁC bản gốc rồi bổ sung một ô khác, vì fixture
+cũ chưa bao giờ sửa hai ô ấy trước khi bổ sung.
+
+**Ghi kèm, CỐ Ý KHÔNG sửa:** hai ô `gian_hang` / `van_nghe` vẫn không qua
+`giuCu` (lý lẽ ở mục trên: phải có đường rút đăng ký). Lý lẽ ấy đúng nhưng giả
+định người ta NHÌN THẤY trạng thái hiện tại — form công khai thì luôn vẽ hai ô
+chưa tích. Đây là một quyết định cần hỏi lại, không phải một bản vá lén.
+
+### `gala_luc` đóng dấu vô điều kiện — làm sai chính con số chốt danh sách
+
+`putGala` ghi `gala_luc = datetime('now')` kể cả khi `du_le` còn `null`. Khác
+hẳn `putDeTai` ngay bên dưới, vốn có `coGi` kèm chú thích giải thích đúng cái
+bẫy này; đường CÔNG KHAI cũng có (`coGala`). **`putGala` là chỗ DUY NHẤT quên.**
+
+Hệ quả: bấm Lưu mà chưa chạm Có/Không thì ô "Dự Lễ" thành **✓ xong**, huy hiệu
+khối 1 thành ✓, và `xong_gala` trên màn Ban cán sự lớp **đếm người ấy vào cột
+đã trả lời** — trong khi Ban tổ chức không có câu trả lời nào. Con số ấy là cả
+lý do màn kia tồn tại, và hạn dùng nó là 21h00 ngày 19/9.
+
+Bản vá chép đúng câu chữ của `coGala` để hai đường không lệch nhau, và
+`logActivity` cũng phải mang thêm vế `coGi` — thiếu nó thì một lượt Lưu rỗng
+vẫn đẩy một dòng vào feed "Đang diễn ra" của cả nhóm.
+
+**Phép canh đi CẢ HAI CHIỀU:** một bản vá chặn quá tay làm người trả lời
+"Không dự" cũng không đóng được mốc, và họ biến mất khỏi danh sách y hệt.
+
+### Nút chép SỐ TÀI KHOẢN — ở cả ba khối QR
+
+Nút `.copy` cũ chỉ chép **cú pháp chuyển khoản**. Số tài khoản nằm trong
+`.qrw .cap`: chữ thường 12.5px, không nút, không chép được. Mà nhánh dự phòng
+lúc mã QR hỏng lại nói thẳng *"chuyển khoản tay theo số tài khoản bên dưới
+cũng được"* — tức đường lui chính thức bắt người 50 tuổi đọc tay một dãy 10
+chữ số ở cỡ chữ nhỏ thứ hai trên màn hình rồi gõ lại vào app ngân hàng. Gõ sai
+một số là tiền đi nhầm người.
+
+Áp cho **cả ba chỗ dựng `.qrw`**: `tnVePhi()`, màn cuối đường công khai
+`tnckXong()`, và thẻ đợt thu ở **tab Quỹ**. Đây là chỗ DUY NHẤT của đợt này
+chạm vào tab Quỹ — cộng thêm một nút, không đụng quy ước hai mức của Đợt 3.
+Để hai màn tiền khác nhau là đúng chỗ người ta học sai thói quen.
+
+Mỗi nút mang `data-nhan` để toast nói đúng thứ vừa chép, và một nhãn phụ
+`.copy .nh` ("chép số TK" / "chép nội dung"). **Nhãn ấy phải khai font riêng:**
+`.copy` dùng `var(--num)` (Space Grotesk) cho dãy số, mà font ấy thiếu glyph
+tiếng Việt nên chữ có dấu rơi về monospace, đứng lệch hẳn.
+
+### Bước tìm tên: bỏ cắt ẩn ở 12 người, và sửa lời khuyên ngược
+
+`searchRoster` cắt cứng `.slice(0, 12)` và giao diện **không báo là đã cắt**.
+Gõ `"nguyen"` khớp 26 người, `"ng"` khớp 74 — đều chỉ thấy 12. Người không
+thấy tên mình sẽ kết luận Ban tổ chức bỏ sót họ, ngay ở bước ĐẦU TIÊN của lối
+đi duy nhất dành cho 38 người không đăng nhập được. Tệ hơn, khi ra 0 kết quả
+thì câu cũ khuyên **"Thử gõ ngắn hơn"** — ngược đúng chiều, vì gõ ngắn thì
+càng nhiều người khớp và càng bị cắt.
+
+Máy chủ trả thêm `tong_khop` cạnh danh sách đã cắt; giao diện in *"Còn N người
+nữa cũng khớp — gõ thêm chữ (họ, tên đệm) cho danh sách ngắn lại"*, và câu khi
+0 kết quả nay nói đúng chiều. Sửa ở **cả hai** màn dùng chung đường này:
+`/totnghiep` và `/vao`.
+
+**Chốt phải giữ:** `/api/wizard/roster/search` là đường CÔNG KHAI và cố ý không
+bao giờ trả số điện thoại hay email. Chỉ được cộng thêm **một con số đếm**,
+không thêm trường nào của ai, và phải là **khoá MỚI** chứ không đổi khoá cũ —
+`/vao` và wizard dùng chung đường này. Phép canh có răng nhất là grep thô
+nguyên văn phúc đáp: không `"phone"`, không `"email"`, không chuỗi 10 chữ số.
+
 ## Ảnh chứng chỉ qua Google Drive — ĐÃ LÀM (18/9)
 
 Ngô Phú Cường hỏi *"nếu không dùng Google thì cloudflare có dịch vụ nào lưu

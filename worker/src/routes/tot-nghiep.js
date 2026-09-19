@@ -319,23 +319,44 @@ export async function putGala(request, env, me) {
   const duLe = motTrong(body.du_le, DU_LE);
   const taiTro = motTrong(body.tai_tro, TAI_TRO);
   const vanNghe = coKhong(body.van_nghe);
+  const taiTroMo = cleanText(body.tai_tro_mo_ta, 500);
+  const vanNgheMo = cleanText(body.van_nghe_mo_ta, 500);
+  const gianHang = coKhong(body.gian_hang);
+
+  /* MỐC gala_luc CHỈ ĐÓNG KHI THẬT SỰ CÓ TRẢ LỜI — vá 19/9.
+     Bản đầu ghi `gala_luc = datetime('now')` VÔ ĐIỀU KIỆN, nên bấm Lưu mà
+     chưa chạm Có/Không vẫn làm ô "Dự Lễ" ở dải tiến độ thành ✓ xong, huy
+     hiệu khối thành ✓, và `xong_gala` trên màn Ban cán sự lớp ĐẾM người ấy
+     vào cột đã trả lời — trong khi Ban tổ chức không có câu trả lời nào.
+     Con số ấy là cả lý do màn kia tồn tại, và hạn dùng nó là 21h00 ngày 19/9.
+
+     `putDeTai` ngay dưới đã có đúng chốt này từ đầu, và đường CÔNG KHAI cũng
+     có (`coGala` trong postTotNghiepCongKhai) — putGala là chỗ DUY NHẤT quên.
+
+     Hai ô đánh dấu tính là CÓ trả lời chỉ khi được TÍCH: hộp bỏ trống gửi lên
+     0 ở mọi lượt, nên coi 0 là một câu trả lời thì lượt nào cũng đóng dấu.
+     Chép đúng câu chữ của `coGala` để hai đường không lệch nhau. */
+  const coGi = !!(duLe || taiTro || taiTroMo || vanNgheMo || gianHang || vanNghe);
 
   await env.DB.prepare(
     `INSERT INTO dang_ky_tot_nghiep
        (member_id, du_le, tai_tro, tai_tro_mo_ta, gian_hang, van_nghe,
         van_nghe_mo_ta, gala_luc, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+     VALUES (?, ?, ?, ?, ?, ?, ?,
+             CASE WHEN ? = 1 THEN datetime('now') ELSE NULL END, datetime('now'))
      ON CONFLICT(member_id) DO UPDATE SET
        du_le = excluded.du_le, tai_tro = excluded.tai_tro,
        tai_tro_mo_ta = excluded.tai_tro_mo_ta, gian_hang = excluded.gian_hang,
        van_nghe = excluded.van_nghe, van_nghe_mo_ta = excluded.van_nghe_mo_ta,
        gala_luc = excluded.gala_luc, updated_at = excluded.updated_at`
   ).bind(
-    me.id, duLe, taiTro, cleanText(body.tai_tro_mo_ta, 500),
-    coKhong(body.gian_hang), vanNghe, cleanText(body.van_nghe_mo_ta, 500)
+    me.id, duLe, taiTro, taiTroMo, gianHang, vanNghe, vanNgheMo, coGi ? 1 : 0
   ).run();
 
-  if (!cu?.gala_luc) {
+  // Ghi hoạt động LẦN ĐẦU thôi, và chỉ khi lượt này thật sự có trả lời —
+  // đúng khuôn putDeTai. Thiếu vế `coGi` thì một lượt Lưu rỗng cũng đẩy một
+  // dòng vào feed "Đang diễn ra" của cả nhóm.
+  if (coGi && !cu?.gala_luc) {
     await logActivity(env, {
       cohortId: me.cohort_id, groupId: me.group_id, actorId: me.id,
       verb: 'totnghiep.gala', objectType: 'dang_ky_tot_nghiep', objectId: me.id,

@@ -122,7 +122,7 @@ Hai tệp `coso.json` và `moi-tanso.json` **tự sinh, không commit** — chú
 scratchpad, nên `pw-vao-nhanh.mjs` commit vào repo **không chạy nổi**: thiếu
 đúng một tệp mà không ai biết lấy ở đâu. Nay `reset-vao.sh` sinh lại nó.
 
-## Bốn mươi lăm phép đối chứng đáng giữ nhất
+## Bốn mươi chín phép đối chứng đáng giữ nhất
 
 Mỗi cái dưới đây từng bắt được một phép kiểm **đậu giả**. Đừng gỡ.
 
@@ -581,6 +581,43 @@ WiFi" lẫn vai kẻ dò ngồi chỗ khác. Địa chỉ lấy trong dải tài
 
    Kèm một bẫy nhỏ: đổi cấu trúc DOM là các bộ chọn `>` gãy trong im lặng.
    `h1` chuyển vào trong băng `.tnhead` làm `.tncard > h1` thôi khớp ở ba chỗ.
+
+46. **Ô ĐIỀN SẴN vô hiệu hoá mọi luật "ô trống thì giữ bản cũ" đứng sau nó.**
+   Máy chủ hứa `giuCu()`, nhưng `tnckForm()` điền sẵn họ tên / doanh nghiệp /
+   chức vụ bằng bản danh sách gốc 15/8 — ba ô ấy KHÔNG BAO GIỜ trống, nên
+   người đã sửa doanh nghiệp, hôm sau quay lại chỉ để thêm ngày sinh, bị trả
+   ngược về bản 15/8. Im lặng, và đúng lúc màn cuối đang hứa ngược lại.
+
+   Phép canh đi hai tầng, vì mỗi tầng một mình đều mù: ở giao diện phải kiểm
+   `value === ''` **và** `placeholder` có chữ (chỉ kiểm placeholder thì đổi
+   ngược về `value=` vẫn xanh — trên ảnh chụp hai thứ trông y hệt nhau); ở máy
+   chủ phải lưu `doanh_nghiep` một giá trị KHÁC bản gốc rồi bổ sung một ô
+   khác, vì fixture cũ chưa bao giờ sửa hai ô ấy trước khi bổ sung.
+
+47. **Mốc thời gian phải có chốt `coGi`, và phải đi CẢ HAI CHIỀU.** `putGala`
+   đóng `gala_luc` vô điều kiện, nên một lượt bấm Lưu hụt (chưa chạm Có/Không)
+   vẫn làm ô "Dự Lễ" thành ✓ xong và `xong_gala` đếm người ấy vào cột ĐÃ TRẢ
+   LỜI — trong khi Ban tổ chức không có câu trả lời nào, mà con số ấy là cả lý
+   do màn Ban cán sự lớp tồn tại. `putDeTai` có chốt này từ đầu, đường công
+   khai cũng có; `putGala` là chỗ DUY NHẤT quên.
+
+   Chiều ngược cũng phải kiểm: một bản vá chặn quá tay làm người trả lời
+   "Không dự" cũng không đóng được mốc, và họ biến mất khỏi danh sách y hệt.
+
+48. **Đếm ĐÚNG HAI nút chép, và soi từng nút mang chuỗi nào.** Nhánh dự phòng
+   lúc mã QR không tải được tự nói "chuyển khoản tay theo số tài khoản bên
+   dưới cũng được" — mà số ấy từng là chữ thường 12.5px, không chép được. Phép
+   `count() >= 1` vẫn xanh khi bản vá làm rụng mất nút số tài khoản, nên phải
+   đếm chính xác hai và đọc `data-tncopy` của từng nút.
+
+49. **Danh sách BỊ CẮT phải NÓI RA, và phúc đáp chỉ được cộng thêm một CON SỐ.**
+   `searchRoster` cắt cứng ở 12 người: gõ `"nguyen"` khớp 26, chỉ thấy 12, và
+   người không thấy tên mình kết luận Ban tổ chức bỏ sót họ — ngay ở bước đầu
+   tiên của lối đi duy nhất dành cho 38 người không đăng nhập được. Câu cũ còn
+   khuyên "thử gõ ngắn hơn", ngược đúng chiều.
+
+   Đường này CÔNG KHAI, nên phép canh có răng nhất là grep thô nguyên văn
+   phúc đáp: không `"phone"`, không `"email"`, không chuỗi 10 chữ số nào.
 
 ## Chạy bộ kiểm đường nộp ảnh (Google Drive)
 

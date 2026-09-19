@@ -55,8 +55,16 @@ export async function searchRoster(request, env) {
   ).all();
 
   const needle = bare(q);
-  const people = (rows.results ?? [])
-    .filter(r => bare(r.full_name).includes(needle))
+  const khop = (rows.results ?? []).filter(r => bare(r.full_name).includes(needle));
+  /* TỔNG SỐ KHỚP, cạnh danh sách đã cắt còn 12 (vá 19/9).
+     Bản đầu cắt ở 12 mà KHÔNG nói là đã cắt: gõ "nguyen" khớp 26 người, gõ
+     "ng" khớp 74, đều chỉ thấy 12. Người không thấy tên mình trong 12 dòng
+     kết luận Ban tổ chức bỏ sót họ — và câu gợi ý khi ra 0 kết quả lại khuyên
+     "thử gõ NGẮN hơn", ngược đúng chiều cần đi.
+     CHỈ thêm một CON SỐ. Đường này công khai, ai gọi cũng được, nên tuyệt đối
+     không kèm thêm trường nào của ai; và chỉ CỘNG khoá mới, không đổi khoá cũ,
+     vì /vao và wizard dùng chung phúc đáp này. */
+  const people = khop
     .slice(0, 12)
     .map(r => ({
       roster_id: r.id, full_name: r.full_name,
@@ -72,7 +80,7 @@ export async function searchRoster(request, env) {
       // số nào, thất bại hai lần liền là họ bỏ cuộc.
       co_so_doi_chieu: r.co_so === 1,
     }));
-  return json({ people });
+  return json({ people, tong_khop: khop.length });
 }
 
 /* ══ Bước 2+3: nhận nhóm ══ */

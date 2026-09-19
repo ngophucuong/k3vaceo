@@ -132,6 +132,27 @@ ok(`câu hero nhắc Lễ tốt nghiệp (nhận "${a0.h}")`, /Lễ tốt nghi�
 ok('chuỗi "Nhóm chưa chốt đề tài" KHÔNG còn trong /api/home',
    !tho0.includes('Nhóm chưa chốt đề tài'));
 
+/* A2 — MỐC gala_luc CHỈ ĐÓNG KHI THẬT SỰ CÓ TRẢ LỜI (vá 19/9).
+   `putGala` bản đầu ghi mốc VÔ ĐIỀU KIỆN, nên bấm Lưu mà chưa chạm Có/Không
+   vẫn làm ô "Dự Lễ" thành ✓ xong và `xong_gala` trên màn Ban cán sự lớp đếm
+   người ấy vào cột ĐÃ TRẢ LỜI — trong khi Ban tổ chức không có câu trả lời
+   nào. Chỗ này gọi được vì bản đăng ký của anh Cường còn trắng nguyên.
+
+   ĐI CẢ HAI CHIỀU: một bản vá chặn quá tay (không bao giờ đóng mốc) cũng làm
+   người trả lời "Không" biến mất khỏi danh sách, mà chiều ấy im lặng y hệt. */
+const rGalaGalaRong = await put('/api/totnghiep/gala', ckCuong, {});
+const bGalaGalaRong = await rGalaGalaRong.json().catch(() => ({}));
+ok(`lưu Gala với thân RỖNG → 200 (nhận ${rGalaGalaRong.status})`, rGalaGalaRong.status === 200);
+ok('… nhưng KHÔNG đóng mốc gala_luc', bGalaGalaRong.dang_ky?.gala_luc == null);
+const aGalaRong = await hero();
+ok('… và hero vẫn còn giục việc Lễ & Gala, chưa coi là xong',
+   aGalaRong.target === 'totnghiep' && /Lễ tốt nghiệp/i.test(aGalaRong.h ?? ''));
+
+const rKhong = await put('/api/totnghiep/gala', ckCuong, { du_le: 'khong' });
+const bKhong = await rKhong.json().catch(() => ({}));
+ok('trả lời "Không dự" thì mốc PHẢI đóng — không chặn quá tay',
+   !!bKhong.dang_ky?.gala_luc && bKhong.dang_ky?.du_le === 'khong');
+
 // (b) Trả lời Gala xong → phải CHUYỂN sang việc hồ sơ chứng chỉ, chưa tắt hẳn.
 await put('/api/totnghiep/gala', ckCuong, { du_le: 'co' });
 const a1 = await hero();
@@ -487,6 +508,25 @@ ok('KHÔNG có trường nào tên dien_thoai/ngay_sinh/email trong phúc đáp'
 ok('KHÔNG lộ số điện thoại của ai (không có chuỗi 10 chữ số bắt đầu bằng 0 ngoài số tài khoản)',
    (thoCk.match(/"0\d{9}"/g) ?? []).every(x => x === '"0975587586"'));
 
+/* A4 — BƯỚC TÌM TÊN PHẢI NÓI RA LÀ DANH SÁCH BỊ CẮT.
+   `searchRoster` cắt cứng ở 12 người. Đây là bước ĐẦU TIÊN của lối đi duy
+   nhất dành cho 38 người không đăng nhập được: không thấy tên mình mà không
+   ai nói là danh sách đã cắt thì họ kết luận Ban tổ chức bỏ sót họ.
+
+   Chỉ được cộng thêm MỘT CON SỐ ĐẾM. Đường này công khai và cố ý không bao
+   giờ trả số điện thoại hay email — grep thô ở đây là phép canh có răng nhất,
+   vì một trường lỡ thêm vào sẽ im lặng đi ra cho bất kỳ ai gọi. */
+const rTim = await fetch(B + '/api/wizard/roster/search?q=nguyen', { headers: IP });
+const bTim = await rTim.json();
+ok('tìm "nguyen" → trả về đúng 12 dòng (mức cắt cũ)', (bTim.people ?? []).length === 12);
+ok(`… kèm TỔNG số người khớp, lớn hơn 12 (nhận ${bTim.tong_khop})`,
+   typeof bTim.tong_khop === 'number' && bTim.tong_khop > 12);
+const thoTim = JSON.stringify(bTim);
+ok('phúc đáp KHÔNG lọt thêm trường phone/email nào',
+   !/"phone"|"email"|dien_thoai/.test(thoTim));
+ok('và không có chuỗi 10 chữ số nào trông như số điện thoại',
+   (thoTim.match(/"0\d{9}"/g) ?? []).length === 0);
+
 // Người CHƯA có hồ sơ members: route phải tự tạo, đúng nhóm trong danh sách gốc.
 const timNguoi = await fetch(B + '/api/wizard/roster/search?q=' + encodeURIComponent('Đinh Khánh Toàn'),
   { headers: IP }).then(r => r.json()).catch(() => ({ people: [] }));
@@ -619,6 +659,32 @@ await fetch(B + '/api/totnghiep/cong-khai', {
 const sauPha = await get('/api/totnghiep', ckCuong).then(r => r.json());
 ok('gửi ô RỖNG không xoá được ô đang có chữ',
    sauPha.dang_ky?.ho_ten === 'Ngô Phú Cường' && sauPha.dang_ky?.du_le === 'co');
+
+/* A1 — ĐÚNG CA ĐÃ HỎNG NGOÀI ĐỜI, ở tầng máy chủ.
+   Người sửa doanh nghiệp/chức vụ trong tài khoản, hôm sau quay lại đường công
+   khai chỉ để thêm ngày sinh. Giao diện điền sẵn hai ô ấy bằng bản danh sách
+   gốc 15/8, nên `giuCu()` không bao giờ nhìn thấy ô trống và bản đã sửa bị
+   trả ngược về — im lặng, đúng lúc màn cuối đang hứa "ô để trống vẫn giữ
+   nguyên nội dung cũ".
+
+   Bản vá nằm ở GIAO DIỆN (value → placeholder, `pw-totnghiep.mjs` canh), còn
+   phép này canh vế máy chủ của cùng lời hứa cho ĐÚNG hai ô ấy: các phép trên
+   chỉ thử ho_ten/du_le/khkd_*, chưa bao giờ thử doanh_nghiep và chuc_vu. */
+await put('/api/totnghiep/ho-so', ckCuong, {
+  ho_ten: 'Ngô Phú Cường', ngay_sinh: '01/02/1980', dien_thoai: '0979755857',
+  doanh_nghiep: 'Công ty ĐÃ SỬA', chuc_vu: 'Chức vụ ĐÃ SỬA',
+  linh_vuc: ['cong-nghe'], nhu_cau_ket_noi: 'giữ nguyên khi bổ sung',
+});
+await fetch(B + '/api/totnghiep/cong-khai', {
+  method: 'POST', headers: { 'content-type': 'application/json', ...IP },
+  body: JSON.stringify({ roster_id: rsCuong?.roster_id, ngay_sinh: '02/03/1981' }),
+});
+const sauA1 = await get('/api/totnghiep', ckCuong).then(r => r.json());
+ok('bổ sung ngày sinh qua link công khai KHÔNG trả doanh nghiệp về bản gốc',
+   sauA1.dang_ky?.doanh_nghiep === 'Công ty ĐÃ SỬA');
+ok('… và chức vụ cũng giữ nguyên bản đã sửa',
+   sauA1.dang_ky?.chuc_vu === 'Chức vụ ĐÃ SỬA');
+ok('… còn ô thật sự gửi lên thì ĐÃ vào', sauA1.dang_ky?.ngay_sinh === '02/03/1981');
 
 // roster_id bịa → 404, không phải 500
 const rBia = await fetch(B + '/api/totnghiep/cong-khai', {
